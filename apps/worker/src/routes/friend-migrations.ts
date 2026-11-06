@@ -1,6 +1,15 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { logger } from '@line-crm/shared/server';
+import { runJson } from './friend-migration-display.js';
+import { consentRollbackConflicts, suppressionReconciliation } from '@line-crm/db/src/friend-delivery-consents.js';
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   UID_EVIDENCE_TYPES,
+  getFriendFieldsForScope,
+  validateFriendFieldValue,
+  type ScopedFriendField,
   countUidMigrationItemDecisions,
   countUidMigrationItems,
   createUidMigrationRun,
@@ -13,53 +22,36 @@ import {
   type UidMigrationItemRow,
   type UidMigrationRunRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 export const friendMigrations = new Hono<Env>();
 const MAX_MAPPING_ROWS = 5_000;
-const EXPORT_COLUMNS = ['basic', 'tags_fields', 'support'] as const;
+const EXPORT_COLUMNS = ['basic', 'friend_fields', 'tags_fields', 'support'] as const;
 type ExportColumn = (typeof EXPORT_COLUMNS)[number];
 type ImportCandidate = {
   id: string; display_name: string | null;
   real_name: string | null; system_display_name: string | null;
 };
 
-function runJson(row: UidMigrationRunRow) {
-  return {
-    id: row.id,
-    fromAccountId: row.from_account_id,
-    toAccountId: row.to_account_id,
-    purpose: row.purpose,
-    sourceKind: row.source_kind,
-    sourceFilename: row.source_filename,
-    status: row.status,
-    dryRunRevision: row.dry_run_revision,
-    counts: {
-      total: row.total_count,
-      auto: row.auto_count,
-      review: row.review_count,
-      unmatched: row.unmatched_count,
-      conflict: row.conflict_count,
-      applied: row.applied_count,
-      failed: row.failed_count,
-    },
-    createdBy: row.created_by,
-    approvedBy: row.approved_by,
-    createdAt: row.created_at,
-    reviewedAt: row.reviewed_at,
-    executedAt: row.executed_at,
-    completedAt: row.completed_at,
-    rolledBackAt: row.rolled_back_at,
-    failureReason: row.failure_reason,
-    /*
-      FRIEND-34: 一部成功・一部失敗（status='failed' かつ applied>0）でも
-      反映済みの行だけは切り戻せる。画面が status 文字列を推測しなくて
-      済むよう、復旧可否をここで1つに決める。
-    */
-    rollbackable: row.status === 'completed' || (row.status === 'failed' && row.applied_count > 0),
-  };
+// CSV の見出し・入力キーには項目コードを使う。時刻も中央の検証を通す。
+function importFields(raw: unknown, fields: ScopedFriendField[]):
+  { values: Record<string, string | null>; error: string | null } {
+  if (raw === undefined) return { values: {}, error: null };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { values: {}, error: '友だち情報は項目コードと値で指定してください' };
+  const values: Record<string, string | null> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    const field = fields.find((item) => item.field_key === key);
+    if (!field || field.status !== 'active' || field.ec_is_master) return { values: {}, error: `${key}: 書き込める項目がありません` };
+    const checked = validateFriendFieldValue(field, value);
+    if (!checked.ok) return { values: {}, error: `${key}: ${checked.error}` };
+    values[key] = checked.value;
+  }
+  return { values, error: null };
 }
 
 interface UidItemSnapshot {
@@ -135,12 +127,11 @@ friendMigrations.get('/api/friends/migrations', requireRole('owner', 'admin', 's
     const runs = await listUidMigrationRuns(c.env.DB, scope.allowedAccountIds);
     return c.json({ success: true, data: runs.map(runJson) });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migrations_list_failed', error: String(error) }));
-    return c.json({ success: false, error: '移行履歴を読み込めませんでした' }, 500);
+    throw error;
   }
 });
 
-friendMigrations.post('/api/friends/migrations', requireRole('owner', 'admin'), async (c) => {
+friendMigrations.post('/api/friends/migrations', requireRole('owner', 'admin'), inputJsonBoundary({"fromAccountId":["string"],"toAccountId":["string"],"purpose":["string"],"sourceKind":["string"],"sourceFilename":["string"],"sourceChecksum":["string"],"mappings":["array"]}), async (c) => {
   try {
     const body = await c.req.json<{
       fromAccountId?: string;
@@ -161,10 +152,10 @@ friendMigrations.post('/api/friends/migrations', requireRole('owner', 'admin'), 
     const purpose = body.purpose?.trim();
     const mappings = body.mappings ?? [];
     if (!from || !to || !purpose || from === to) {
-      return c.json({ success: false, error: '異なる移行元・移行先と利用目的を指定してください' }, 400);
+      return inputError(c, { success: false, error: '異なる移行元・移行先と利用目的を指定してください' }, 400, ["fromAccountId","toAccountId","purpose"]);
     }
     if (mappings.length === 0 || mappings.length > MAX_MAPPING_ROWS) {
-      return c.json({ success: false, error: `対応表は1〜${MAX_MAPPING_ROWS}行で指定してください` }, 400);
+      return inputError(c, { success: false, error: `対応表は1〜${MAX_MAPPING_ROWS}行で指定してください` }, 400, ["mappings"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [from, to])) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -176,7 +167,7 @@ friendMigrations.post('/api/friends/migrations', requireRole('owner', 'admin'), 
       evidence: mapping.evidence,
     }));
     if (normalized.some((mapping) => !mapping.oldUid || !UID_EVIDENCE_TYPES.includes(mapping.evidenceType))) {
-      return c.json({ success: false, error: '旧UIDと確認済みの一致根拠が必要です' }, 400);
+      return inputError(c, { success: false, error: '旧UIDと確認済みの一致根拠が必要です' }, 400, ["mappings"]);
     }
     const staff = c.get('staff');
     const run = await createUidMigrationRun(c.env.DB, {
@@ -191,8 +182,7 @@ friendMigrations.post('/api/friends/migrations', requireRole('owner', 'admin'), 
     });
     return c.json({ success: true, data: runJson(run) }, 201);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migration_dry_run_failed', error: String(error) }));
-    return c.json({ success: false, error: 'テスト移行を実行できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -206,12 +196,7 @@ friendMigrations.get('/api/friends/migrations/:id', requireRole('owner', 'admin'
       **対応表はページで区切って返す。** 全件返すと数千行で応答が重く、
       画面も先頭しか触れない。分類と「未判断のみ」の絞り込みもここで受ける。
     */
-    const limitParam = c.req.query('limit');
-    const offsetParam = c.req.query('offset');
-    const rawLimit = limitParam === undefined || limitParam === '' ? NaN : Number(limitParam);
-    const rawOffset = offsetParam === undefined || offsetParam === '' ? NaN : Number(offsetParam);
-    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.floor(rawLimit), 1), 500) : 20;
-    const offset = Number.isFinite(rawOffset) ? Math.max(Math.floor(rawOffset), 0) : 0;
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 20, limitPolicy: { fallback: 'finite', truncate: true, minimum: 1, maximum: 500 }, offsetPolicy: { fallback: 'finite', truncate: true, minimum: 0 } });
     const classification = c.req.query('classification');
     if (classification !== undefined && !(ITEM_CLASSIFICATIONS as readonly string[]).includes(classification)) {
       return c.json({ success: false, error: '分類を確認してください' }, 400);
@@ -228,35 +213,33 @@ friendMigrations.get('/api/friends/migrations/:id', requireRole('owner', 'admin'
       countUidMigrationItems(c.env.DB, run.id, filter),
       countUidMigrationItems(c.env.DB, run.id, { pendingOnly: true }),
       /*
-        FRIEND-33: 実行前の確認画面に「結び付け n 件・除外 m 件」を出すための
+        実行前の確認画面に「結び付け n 件・除外 m 件」を出すための
         判断別の件数。表示中のページだけでは数えられないので口で数える。
       */
       countUidMigrationItemDecisions(c.env.DB, run.id),
     ]);
     return c.json({
       success: true,
-      data: {
-        ...runJson(run),
+      data: buildOffsetListResponse({ ...runJson(run),
         items: items.map(itemJson),
         itemTotal,
         itemLimit: limit,
         itemOffset: offset,
         unresolved,
         decisionCounts,
-      },
+        suppressionReconciliation: await suppressionReconciliation(c.env.DB, run.id), total: itemTotal, paging: { limit, offset }, sort: [] }),
     });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migration_detail_failed', error: String(error) }));
-    return c.json({ success: false, error: '移行結果を読み込めませんでした' }, 500);
+    throw error;
   }
 });
 
-friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole('owner', 'admin'), async (c) => {
+friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole('owner', 'admin'), inputJsonBoundary({"decision":["string"]}), async (c) => {
   try {
     const run = await accessibleRun(c, c.req.param('id'));
     if (!run) return c.json({ success: false, error: 'Not found' }, 404);
     /*
-      FRIEND-34: 失敗した移行も判断を直せるようにする。
+      失敗した移行も判断を直せるようにする。
       'failed' のままだと失敗行の再確認・再試行のどちらにも進めない。
       'completed' / 'rolled_back' / 'executing' は締めたままにする。
     */
@@ -265,21 +248,22 @@ friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole(
     }
     const body = await c.req.json<{ decision?: 'link' | 'create' | 'exclude' }>();
     if (!body.decision || !['link', 'create', 'exclude'].includes(body.decision)) {
-      return c.json({ success: false, error: '判断を選んでください' }, 400);
+      return inputError(c, { success: false, error: '判断を選んでください' }, 400, ["decision"]);
     }
     const item = await c.env.DB.prepare(
       'SELECT * FROM uid_migration_items WHERE id = ? AND run_id = ?',
     ).bind(c.req.param('itemId'), run.id).first<UidMigrationItemRow>();
     if (!item) return c.json({ success: false, error: 'Not found' }, 404);
     if (body.decision === 'link' && (!item.old_friend_id || !item.new_friend_id)) {
-      return c.json({ success: false, error: '新旧の友だちが両方見つからないため結び付けられません' }, 422);
+      return inputError(c, { success: false, error: '新旧の友だちが両方見つからないため結び付けられません' }, 422, ["decision"]);
     }
     /*
-      **一致先のない行に「新規作成」を選ばせない。** 選べても本移行で
-      失敗に数えるだけなので、ここで止めて除外か取り込みへ案内する。
+      一致先のない行の「新規作成」は、本移行で移行先UIDの友だちを
+      作る。移行先UIDがなければ作るものがなく、移行元の友だちがなければ
+      引き継ぐ名前がないので、ここで止めて対応表の修正か除外へ案内する。
     */
-    if (body.decision === 'create' && !item.new_friend_id) {
-      return c.json({ success: false, error: '一致先がない行は新規作成できません。除外するか、取り込み画面で作ってください' }, 422);
+    if (body.decision === 'create' && (!item.old_friend_id || !item.new_uid)) {
+      return inputError(c, { success: false, error: '移行元の友だちと移行先のUIDがそろわない行は新規作成できません。対応表を直すか、除外してください' }, 422, ["decision"]);
     }
     const now = new Date().toISOString();
     await c.env.DB.prepare(`UPDATE uid_migration_items
@@ -294,12 +278,11 @@ friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole(
       .run();
     return c.json({ success: true, data: { ...(runJson((await getUidMigrationRun(c.env.DB, run.id))!)), unresolved: pending?.count ?? null } });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migration_decision_failed', error: String(error) }));
-    return c.json({ success: false, error: '判断を保存できませんでした' }, 500);
+    throw error;
   }
 });
 
-friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'), async (c) => {
+friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const run = await accessibleRun(c, c.req.param('id'));
     if (!run) return c.json({ success: false, error: 'Not found' }, 404);
@@ -314,15 +297,17 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
       return c.json({ success: false, error: 'この移行は実行中です。履歴を読み直してください' }, 409);
     }
     /*
-      FRIEND-34: 一部失敗した移行の再試行を許す。
+      一部失敗した移行の再試行を許す。
       'ready' か、未判断が残っていない 'failed' だけ実行できる。
       未判断が残るままの再実行は従来どおり止める。
     */
     const pending = await countUidMigrationItems(c.env.DB, run.id, { pendingOnly: true });
     if ((run.status !== 'ready' && run.status !== 'failed') || (run.status === 'failed' && pending > 0)) {
-      return c.json({ success: false, error: '要確認をすべて判断してから本移行してください' }, 422);
+      return inputError(c, { success: false, error: '要確認をすべて判断してから本移行してください' }, 422, []);
     }
     const items = await listUidMigrationItems(c.env.DB, run.id);
+    const targets=items.filter(i=>i.decision==='link'||i.decision==='create').map(i=>i.new_friend_id??i.new_uid).filter(Boolean);
+    if(new Set(targets).size!==targets.length) return c.json({success:false,error:'同じ移行先が複数行あります。対応表を直してください'},409);
     const now = new Date().toISOString();
     /*
       二重実行はここで止める。status を 'executing' へ進められたのは
@@ -335,7 +320,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
       return c.json({ success: false, error: 'この移行はすでに実行中か、実行できる状態ではありません' }, 409);
     }
     /*
-     * R395: 競合した行の失敗記録。before/after は書かない（何も変えていない
+     * 競合した行の失敗記録。before/after は書かない（何も変えていない
      * ため）。成功時の before_json は確認時＝書込時の現在値になる。
      */
     const failItem = async (itemId: string, message: string) => {
@@ -343,10 +328,19 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
         SET result = 'failed', error_message = ?, updated_at = ? WHERE id = ?`)
         .bind(message, now, itemId).run();
     };
+    /*
+      create 経路で確定した結び付け先。成功記録と対にし、外側の例外
+      でも副作用を残さないための台帳。link 判断の行は従来どおり触らない。
+    */
+    const createdThisRun: Array<{
+      itemId: string; oldFriendId: string; newFriendId: string;
+      oldBefore: string | null; newBefore: string | null; created: boolean;
+      pointerPreexisting: boolean; assigned: string | null;
+    }> = [];
     try {
       for (const item of items) {
         /*
-          FRIEND-34: 反映済み・切り戻し済み・除外済みの行は再実行でも触らない。
+          反映済み・切り戻し済み・除外済みの行は再実行でも触らない。
           触ると before_json が統合後の状態で上書きされ、切り戻しで
           元の紐付けへ戻せなくなる。
         */
@@ -358,7 +352,110 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
             .bind(now, item.id).run();
           continue;
         }
-        if (item.decision !== 'link' || !item.old_friend_id || !item.new_friend_id) {
+        /*
+          判断 create は対応表の移行先UIDで友だちを新しく作り、名前は
+          移行元の友だちから引き継ぐ。同じUIDが対象アカウントにあれば新規
+          の重複は作らず採用し、並行作成・再送は一人に収束させる。対象外の
+          アカウントにあるUIDは越境させず、書込みなしで失敗に記録する。
+        */
+        let createdFriendId: string | null = null;
+        /*
+          今作った行の後始末。項目の参照を外し、未連携のままの行だけ
+          消す。採用した既存行・別操作で結び付いた行は残す。
+        */
+        const compensateCreated = async () => {
+          if (!createdFriendId) return;
+          const freshId = createdFriendId;
+          createdFriendId = null;
+          item.new_friend_id = null;
+          await c.env.DB.prepare(`UPDATE uid_migration_items SET new_friend_id = NULL, updated_at = ?
+            WHERE id = ? AND new_friend_id = ?`).bind(now, item.id, freshId).run();
+          await c.env.DB.prepare(`DELETE FROM friends WHERE id = ? AND user_id IS NULL`)
+            .bind(freshId).run();
+        };
+        if (item.decision === 'create') {
+          if (!item.old_friend_id || !item.new_uid) {
+            await failItem(item.id, 'この判断は自動反映できません。新しい友だちを確認してください');
+            continue;
+          }
+          const oldFriendId: string = item.old_friend_id;
+          const source = await c.env.DB.prepare(`SELECT id, line_account_id, user_id,
+              display_name, real_name, system_display_name FROM friends WHERE id = ?`)
+            .bind(item.old_friend_id)
+            .first<{
+              id: string; line_account_id: string | null; user_id: string | null;
+              display_name: string | null; real_name: string | null; system_display_name: string | null;
+            }>();
+          if (!source || source.line_account_id !== run.from_account_id) {
+            await failItem(item.id, '本移行前に結び付きが変わりました。確認してからもう一度実行してください');
+            continue;
+          }
+          const selectTarget = () => c.env.DB.prepare(`SELECT id, user_id FROM friends
+            WHERE line_account_id = ? AND line_user_id = ? LIMIT 1`)
+            .bind(run.to_account_id, item.new_uid)
+            .first<{ id: string; user_id: string | null }>();
+          /*
+            対象アカウントの行を読む。見つかった行は作らず採用する。
+            参照の確定より先に追跡へ載せ、後続の失敗でも把握漏れを出さない。
+          */
+          const trackTarget = (
+            targetId: string, oldBefore: string | null, newBefore: string | null, created: boolean,
+          ) => {
+            createdThisRun.push({
+              itemId: item.id, oldFriendId, newFriendId: targetId,
+              oldBefore, newBefore, created,
+              pointerPreexisting: item.new_friend_id !== null,
+              assigned: null,
+            });
+          };
+          let target = await selectTarget();
+          if (!target) {
+            const elsewhere = await c.env.DB.prepare(`SELECT id FROM friends
+              WHERE line_user_id = ? LIMIT 1`).bind(item.new_uid).first<{ id: string }>();
+            if (elsewhere) {
+              await failItem(item.id, '別のLINEアカウントに同じUIDがあります');
+              continue;
+            }
+            const freshId = crypto.randomUUID();
+            let inserted = false;
+            try {
+              await c.env.DB.prepare(`INSERT INTO friends (
+                id, line_user_id, line_account_id, display_name, real_name, system_display_name,
+                is_following, metadata, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, 0, '{}', ?, ?)`).bind(
+                freshId, item.new_uid, run.to_account_id,
+                source.display_name, source.real_name, source.system_display_name, now, now,
+              ).run();
+              inserted = true;
+            } catch {
+              inserted = false;
+            }
+            if (inserted) {
+              target = { id: freshId, user_id: null };
+              createdFriendId = freshId;
+              trackTarget(freshId, source.user_id, null, true);
+            } else {
+              /*
+                並行作成の競合は作り直さず、対象アカウントの行を採用して
+                一人に収束させる。見つからない場合は原因が確定しないため、
+                越境と断定せず再確認へ案内する（再送時は対象確認から入る）。
+              */
+              target = await selectTarget();
+              if (!target) {
+                await failItem(item.id, '本移行前に結び付きが変わりました。確認してからもう一度実行してください');
+                continue;
+              }
+              trackTarget(target.id, source.user_id, target.user_id, false);
+            }
+          } else {
+            trackTarget(target.id, source.user_id, target.user_id, false);
+          }
+          item.new_friend_id = target.id;
+          await c.env.DB.prepare(`UPDATE uid_migration_items SET new_friend_id = ?, updated_at = ?
+            WHERE id = ? AND (new_friend_id IS NULL OR new_friend_id = ?)`)
+            .bind(target.id, now, item.id, target.id).run();
+        }
+        if ((item.decision !== 'link' && item.decision !== 'create') || !item.old_friend_id || !item.new_friend_id) {
           await failItem(item.id, 'この判断は自動反映できません。新しい友だちを確認してください');
           continue;
         }
@@ -368,12 +465,19 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
         const oldFriend = pair.results.find((friend) => friend.id === item.old_friend_id);
         const newFriend = pair.results.find((friend) => friend.id === item.new_friend_id);
         if (!oldFriend || !newFriend || (oldFriend.user_id && newFriend.user_id && oldFriend.user_id !== newFriend.user_id)) {
+          await compensateCreated();
           await failItem(item.id, '本移行前に結び付きが変わりました。確認してからもう一度実行してください');
           continue;
         }
         const userId = oldFriend.user_id ?? newFriend.user_id ?? crypto.randomUUID();
         /*
-         * R395: 2件の付け替えは1文で同時に行う。確認時と現在値が両方一致
+          この実行が割り当てた結び付きを控える。外側補償は現在値が
+          この割当てと一致するときだけ戻し、他処理の結び付きを巻戻さない。
+        */
+        const tracked = createdThisRun.find((entry) => entry.itemId === item.id);
+        if (tracked) tracked.assigned = userId;
+        /*
+         * 2件の付け替えは1文で同時に行う。確認時と現在値が両方一致
          * したときだけ2件更新になり、確認後の再連携は上書きしない。
          * 片方でも違うと0〜1件で止まり、この行は競合として残す（変更0）。
          * `IS` 比較なので未連携（NULL）の一致も見られる。
@@ -382,7 +486,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
          * 条件付きの付け替えだけを先に行い、2件とも一致したときだけ次へ進む。
          * 新規作成の本人行は付け替えの後に足す（競合時はゴミ行を作らない）。
          */
-        const pairResult = await c.env.DB.prepare(
+        const pairWrite = c.env.DB.prepare(
           `UPDATE friends
               SET user_id = CASE id WHEN ? THEN ? WHEN ? THEN ? END, updated_at = ?
             WHERE id IN (?, ?)
@@ -391,25 +495,8 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
           oldFriend.id, userId, newFriend.id, userId, now,
           oldFriend.id, newFriend.id,
           oldFriend.id, oldFriend.user_id, newFriend.id, newFriend.user_id,
-        ).run();
-        if ((pairResult.meta?.changes ?? 0) !== 2) {
-          /*
-           * R395/R396: 片方だけ動いた場合は、今書いた値のままの行だけを
-           * 確認時の値へ戻す（ペア全体で変更0へ寄せる）。競合側の行は
-           * 今書いた値を持たないので触らない。
-           */
-          await c.env.DB.batch([
-            c.env.DB.prepare(
-              `UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`,
-            ).bind(oldFriend.user_id, now, oldFriend.id, userId),
-            c.env.DB.prepare(
-              `UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`,
-            ).bind(newFriend.user_id, now, newFriend.id, userId),
-          ]);
-          await failItem(item.id, '本移行前に結び付きが変わりました。確認してからもう一度実行してください');
-          continue;
-        }
-        const recordWrites: D1PreparedStatement[] = [];
+        );
+        const recordWrites: D1PreparedStatement[] = [pairWrite];
         if (!oldFriend.user_id && !newFriend.user_id) {
           recordWrites.push(c.env.DB.prepare(`INSERT INTO users
             (id, display_name, primary_display_name, created_by, created_at, updated_at)
@@ -428,15 +515,74 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
             SET result = 'applied', before_json = ?, after_json = ?, updated_at = ? WHERE id = ? AND result <> 'applied'`)
             .bind(JSON.stringify({ oldUserId: oldFriend.user_id, newUserId: newFriend.user_id }), JSON.stringify({ userId }), now, item.id),
           /*
-           * R392: 結び付きが変わるので本人の版を進める。後に開いた保存は
+           * 結び付きが変わるので本人の版を進める。後に開いた保存は
            * 409になり、移行前の中身が再保存されない。
            */
           c.env.DB.prepare(`UPDATE users SET revision = revision + 1, updated_at = ? WHERE id = ?`)
             .bind(now, userId),
         );
-        await c.env.DB.batch(recordWrites);
+        try {
+          await c.env.DB.batch(recordWrites);
+        } catch(error) {
+          if(String(error).includes('delivery_consent_identity_conflict')) {
+            await compensateCreated();
+            await failItem(item.id,'本移行前に結び付きが変わりました。確認してからもう一度実行してください');
+            continue;
+          }
+          throw error;
+        }
       }
     } catch (error) {
+      /*
+        create 経路は成功記録と対で戻す。pair まで進んで記録 batch が
+        落ちると、結び付きだけ残って再試行・切り戻しのどちらからも見えなく
+        なる。反映済みの行は触らず、未反映の行だけ実行前の状態へ寄せる。
+        link 判断の行は従来どおり残す。
+      */
+      const compensatedAt = new Date().toISOString();
+      try {
+        for (const created of createdThisRun) {
+          const state = await c.env.DB.prepare(`SELECT result FROM uid_migration_items WHERE id = ?`)
+            .bind(created.itemId).first<{ result: string }>();
+          if (!state || state.result === 'applied') continue;
+          const pair = await c.env.DB.prepare(`SELECT id, user_id FROM friends WHERE id IN (?, ?)`)
+            .bind(created.oldFriendId, created.newFriendId)
+            .all<{ id: string; user_id: string | null }>();
+          const currentOld = pair.results.find((friend) => friend.id === created.oldFriendId);
+          const currentNew = pair.results.find((friend) => friend.id === created.newFriendId);
+          /*
+            片側ずつ、この実行の割当てと一致する側だけ戻す。一致しない側は
+            他処理が結び付け直したものとして保持する。両側一致だけ戻す形だと、
+            片側 relink 後に本操作が設定したままの側が成功記録なしで残る。
+          */
+          if (created.assigned !== null) {
+            const restores: D1PreparedStatement[] = [];
+            if (currentOld && currentOld.user_id === created.assigned) {
+              restores.push(c.env.DB.prepare(`UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`)
+                .bind(created.oldBefore, compensatedAt, created.oldFriendId, created.assigned));
+            }
+            if (currentNew && currentNew.user_id === created.assigned) {
+              restores.push(c.env.DB.prepare(`UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`)
+                .bind(created.newBefore, compensatedAt, created.newFriendId, created.assigned));
+            }
+            if (restores.length > 0) await c.env.DB.batch(restores);
+          }
+          /*
+            参照は自分が付けた分だけ外す。元からあった参照は残し、再送が
+            辿れるようにする。作った行は未連携のままなら消す。
+          */
+          if (created.created || !created.pointerPreexisting) {
+            await c.env.DB.prepare(`UPDATE uid_migration_items SET new_friend_id = NULL, updated_at = ?
+              WHERE id = ? AND new_friend_id = ?`).bind(compensatedAt, created.itemId, created.newFriendId).run();
+          }
+          if (created.created) {
+            await c.env.DB.prepare(`DELETE FROM friends WHERE id = ? AND user_id IS NULL`)
+              .bind(created.newFriendId).run();
+          }
+        }
+      } catch (compensationError) {
+        logger.error("friend_migrations.compensate_create_failed");
+      }
       /*
         途中例外でも executing のまま放置しない。ここまでに反映・失敗した
         件数を履歴へ残し、反映済みの分だけ切り戻せる状態にする。
@@ -458,17 +604,16 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
     ).run();
     return c.json({ success: true, data: runJson((await getUidMigrationRun(c.env.DB, run.id))!) });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migration_execute_failed', error: String(error) }));
-    return c.json({ success: false, error: '本移行を実行できませんでした' }, 500);
+    throw error;
   }
 });
 
-friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner'), async (c) => {
+friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const run = await accessibleRun(c, c.req.param('id'));
     if (!run) return c.json({ success: false, error: 'Not found' }, 404);
     /*
-      FRIEND-34/35/36: 切り戻しの可否・照合・冪等性をここで固める。
+      切り戻しの可否・照合・冪等性をここで固める。
       - 'completed' または一部失敗（failed かつ applied>0）だけ対象。
       - 2回目以降は何も書かず 409 で止める（冪等）。
       - 移行後に統合ユーザーが変わった行は上書きせず、競合として返す。
@@ -494,7 +639,7 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
     }
     const now = new Date().toISOString();
     /*
-      FRIEND-35: 先に全行を照合し、競合があれば1行も書かず 409 で止める。
+      先に全行を照合し、競合があれば1行も書かず 409 で止める。
       「移行直後の状態」と違う行へ before_json を書き戻すと、別担当の
       正当な変更まで消えるため。
     */
@@ -502,7 +647,12 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
     const conflicts: Array<{ itemId: string; oldUid: string; reason: string }> = [];
     const prepared: Prepared[] = [];
     let alreadyRestored = 0;
+    const consentConflicts = new Set(await consentRollbackConflicts(c.env.DB, run.id));
     for (const item of appliedItems) {
+      if (consentConflicts.has(item.id)) {
+        conflicts.push({itemId:item.id,oldUid:item.old_uid,reason:'移行後に配信停止・同意の状態が変更されています'});
+        continue;
+      }
       const before = parseSnapshot(item.before_json);
       const after = parseAfter(item.after_json);
       if (!before || !after?.userId || !item.old_friend_id || !item.new_friend_id) {
@@ -551,12 +701,12 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
     let rolledBack = 0;
     for (const { item, before, afterUserId } of prepared) {
       /*
-       * R396: ペア2件の書き戻しは1文で行う。両方一致のときだけ2件更新に
+       * ペア2件の書き戻しは1文で行う。両方一致のときだけ2件更新に
        * なり、遅い競合では1件も変わらない（部分復旧を出さない）。
        * 変わらなかった行は applied のまま残り、移行後の状態も保たれるので
        * 再試行できる。`IS` 比較で未連携（NULL）の一致も見られる。
        */
-      const restored = await c.env.DB.prepare(
+      const restorePair = c.env.DB.prepare(
         `UPDATE friends
             SET user_id = CASE id WHEN ? THEN ? WHEN ? THEN ? END, updated_at = ?
           WHERE id IN (?, ?)
@@ -565,10 +715,25 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
         item.old_friend_id, before.oldUserId, item.new_friend_id, before.newUserId, now,
         item.old_friend_id, item.new_friend_id,
         item.old_friend_id, afterUserId, item.new_friend_id, afterUserId,
-      ).run();
+      );
+      let restored: D1Result;
+      try {
+        [restored] = await c.env.DB.batch([
+          restorePair,
+          c.env.DB.prepare(`UPDATE uid_migration_items SET result='rolled_back',updated_at=? WHERE id=? AND result='applied'
+            AND (SELECT user_id FROM friends WHERE id=?) IS ? AND (SELECT user_id FROM friends WHERE id=?) IS ?`)
+            .bind(now,item.id,item.old_friend_id,before.oldUserId,item.new_friend_id,before.newUserId),
+        ]);
+      } catch(error) {
+        if(String(error).includes('delivery_consent_conflict')) {
+          lateConflicts.push({itemId:item.id,oldUid:item.old_uid,reason:'切り戻しの直前に配信停止・同意が変更されました'});
+          continue;
+        }
+        throw error;
+      }
       if ((restored.meta?.changes ?? 0) !== 2) {
         /*
-         * R396: 片方だけ戻った場合は、今書いた値のままの行だけを移行後の
+         * 片方だけ戻った場合は、今書いた値のままの行だけを移行後の
          * 値へ戻す（ペア全体で変更0へ寄せ、再試行できる状態に保つ）。
          */
         await c.env.DB.batch([
@@ -583,7 +748,7 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
         continue;
       }
       /*
-       * R392: 結び付きが変わるので関係する本人の版を進める。後に開いた
+       * 結び付きが変わるので関係する本人の版を進める。後に開いた
        * 保存は409になり、切り戻し前の中身が再保存されない。
        */
       const bumped = [...new Set(
@@ -612,26 +777,25 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
       data: { ...runJson((await getUidMigrationRun(c.env.DB, run.id))!), rolledBack: rolledBack + alreadyRestored },
     });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migration_rollback_failed', error: String(error) }));
-    return c.json({ success: false, error: '切り戻しを実行できませんでした' }, 500);
+    throw error;
   }
 });
 
-friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), async (c) => {
+friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"columns":["array"],"encoding":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: string; columns?: ExportColumn[]; encoding?: 'utf-8' | 'shift_jis' }>();
     const accountId = body.accountId?.trim();
     const columns = body.columns ?? ['basic'];
     if (!accountId || columns.some((column) => !EXPORT_COLUMNS.includes(column))) {
-      return c.json({ success: false, error: '対象アカウントと書き出す項目を選んでください' }, 400);
+      return inputError(c, { success: false, error: '対象アカウントと書き出す項目を選んでください' }, 400, ["accountId","columns"]);
     }
-    // R114: タグ・友だち情報と対応情報の書き出しは未接続。選べたのに出ない
+    // タグと対応情報の書き出しは未接続。友だち情報は friend_fields で指定。
     // 5列だけのCSVを渡すより、作る前に理由を返して止める（Shift_JISと同じ扱い）。
-    if (columns.some((column) => column !== 'basic')) {
-      return c.json({ success: false, error: 'タグ・友だち情報、対応情報の書き出しはまだ使えません。基本だけ選んでください' }, 422);
+    if (columns.some((column) => column !== 'basic' && column !== 'friend_fields')) {
+      return inputError(c, { success: false, error: 'タグ・友だち情報、対応情報の書き出しはまだ使えません。基本だけ選んでください' }, 422, ["columns"]);
     }
     if (body.encoding === 'shift_jis') {
-      return c.json({ success: false, error: 'Shift_JIS書き出しはまだ接続されていません。UTF-8を選んでください' }, 422);
+      return inputError(c, { success: false, error: 'Shift_JIS書き出しはまだ接続されていません。UTF-8を選んでください' }, 422, ["encoding"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -648,38 +812,53 @@ friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), asy
       id, accountId, JSON.stringify({ accountId }), JSON.stringify(columns), body.encoding ?? 'utf-8',
       count?.count ?? 0, staff.id, staff.name, now.toISOString(), new Date(now.getTime() + 7 * 86_400_000).toISOString(),
     ).run();
+    c.set('outputAudit', { count: count?.count ?? null, accountId, targetId: id, phase: 'requested' });
     return c.json({ success: true, data: { id, rowCount: count?.count ?? null, status: 'completed', downloadUrl: `/api/friends/exports/${id}/download` } }, 201);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_export_create_failed', error: String(error) }));
-    return c.json({ success: false, error: '書き出しを作れませんでした' }, 500);
+    throw error;
   }
 });
 
 friendMigrations.get('/api/friends/exports/:id/download', requireRole('owner', 'admin'), async (c) => {
   const job = await c.env.DB.prepare('SELECT * FROM friend_export_jobs WHERE id = ?').bind(c.req.param('id'))
-    .first<{ line_account_id: string; expires_at: string }>();
+    .first<{ line_account_id: string; expires_at: string; columns_json: string }>();
   if (!job || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [job.line_account_id])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   if (job.expires_at <= new Date().toISOString()) return c.json({ success: false, error: 'ダウンロード期限が切れています' }, 410);
-  type ExportRow = { line_user_id: string; display_name: string | null; real_name: string | null; system_display_name: string | null; created_at: string };
+  type ExportRow = { id: string; line_user_id: string; display_name: string | null; real_name: string | null; system_display_name: string | null; created_at: string };
+  const fields = (JSON.parse(job.columns_json) as ExportColumn[]).includes('friend_fields')
+    ? await getFriendFieldsForScope(c.env.DB, { tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID, lineAccountId: job.line_account_id }, { status: 'active' })
+    : [];
+  const count = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM friends WHERE line_account_id=?').bind(job.line_account_id).first<{ n: number }>();
+  c.set('outputAudit', { count: count?.n ?? 0, accountId: job.line_account_id, targetId: c.req.param('id') });
   const encoder = new TextEncoder();
   let offset = 0;
   let started = false;
   const body = new ReadableStream<Uint8Array>({
     async pull(controller) {
       if (!started) {
-        controller.enqueue(encoder.encode('\uFEFFLINEユーザーID,LINE表示名,本名,システム表示名,登録日\r\n'));
+        controller.enqueue(encoder.encode('\uFEFF' + ['LINEユーザーID', 'LINE表示名', '本名', 'システム表示名', '登録日', ...fields.map((field) => field.field_key)].map(protectCsvCell).join(',') + '\r\n'));
         started = true;
       }
-      const page = await c.env.DB.prepare(`SELECT line_user_id, display_name, real_name, system_display_name, created_at
+      const page = await c.env.DB.prepare(`SELECT id, line_user_id, display_name, real_name, system_display_name, created_at
         FROM friends WHERE line_account_id = ? ORDER BY created_at DESC, id ASC LIMIT 500 OFFSET ?`)
         .bind(job.line_account_id, offset).all<ExportRow>();
       if (page.results.length === 0) {
         controller.close();
         return;
       }
-      const csv = page.results.map((row) => [row.line_user_id, row.display_name, row.real_name, row.system_display_name, row.created_at]
+      const valueMap = new Map<string, string | null>();
+      // D1 の1文あたりのbind上限を守って、500件のページを分けて読む。
+      if (fields.length) for (let index = 0; index < page.results.length; index += 90) {
+        const ids = page.results.slice(index, index + 90).map((row) => row.id);
+        const values = await c.env.DB.prepare(
+          `SELECT friend_id, field_id, value FROM friend_field_values WHERE friend_id IN (${ids.map(() => '?').join(',')})`,
+        ).bind(...ids).all<{ friend_id: string; field_id: string; value: string | null }>();
+        for (const value of values.results) valueMap.set(`${value.friend_id}:${value.field_id}`, value.value);
+      }
+      const csv = page.results.map((row) => [row.line_user_id, row.display_name, row.real_name, row.system_display_name, row.created_at,
+        ...fields.map((field) => valueMap.get(`${row.id}:${field.id}`) ?? field.default_value)]
         .map((cell) => protectCsvCell(cell)).join(',')).join('\r\n') + '\r\n';
       controller.enqueue(encoder.encode(csv));
       offset += page.results.length;
@@ -691,7 +870,7 @@ friendMigrations.get('/api/friends/exports/:id/download', requireRole('owner', '
   });
 });
 
-friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), async (c) => {
+friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"sourceFilename":["string"],"sourceChecksum":["string"],"rows":["array"]}), async (c) => {
   try {
     const body = await c.req.json<{
       accountId?: string;
@@ -699,6 +878,7 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
       sourceChecksum?: string;
       rows?: Array<{
         lineUid?: string;
+        friendFields?: Record<string, unknown>;
         displayName?: string | null;
         realName?: string | null;
         systemDisplayName?: string | null;
@@ -709,7 +889,7 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
     const checksum = body.sourceChecksum?.trim();
     const rows = body.rows ?? [];
     if (!accountId || !filename || !checksum || rows.length === 0 || rows.length > MAX_MAPPING_ROWS) {
-      return c.json({ success: false, error: `対象・ファイル情報と1〜${MAX_MAPPING_ROWS}行のデータが必要です` }, 400);
+      return inputError(c, { success: false, error: `対象・ファイル情報と1〜${MAX_MAPPING_ROWS}行のデータが必要です` }, 400, ["accountId","sourceFilename","sourceChecksum","rows"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -720,16 +900,20 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
     if (previous) {
       return c.json({ success: true, data: { id: previous.id, status: previous.status, result: JSON.parse(previous.result_json), duplicate: true } });
     }
+    const fields = rows.some((row) => row.friendFields !== undefined)
+      ? await getFriendFieldsForScope(c.env.DB, { tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID, lineAccountId: accountId }) : [];
     const seen = new Set<string>();
     const results: Array<{
       lineUid: string;
       kind: 'add' | 'update' | 'unchanged' | 'conflict' | 'error';
       reason: string | null;
-      values: { displayName: string | null; realName: string | null; systemDisplayName: string | null };
+      values: { displayName: string | null; realName: string | null; systemDisplayName: string | null; friendFields?: Record<string, string | null> };
     }> = [];
     for (const raw of rows) {
       const lineUid = raw.lineUid?.trim() ?? '';
+      const checkedFields = importFields(raw.friendFields, fields);
       const values = {
+        ...(raw.friendFields === undefined ? {} : { friendFields: checkedFields.values }),
         displayName: raw.displayName?.trim() || null,
         realName: raw.realName?.trim() || null,
         systemDisplayName: raw.systemDisplayName?.trim() || null,
@@ -739,6 +923,10 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
         continue;
       }
       seen.add(lineUid);
+      if (checkedFields.error) {
+        results.push({ lineUid, kind: 'error', reason: checkedFields.error, values });
+        continue;
+      }
       /*
         **同じUIDの有無は2本で見る。** 1本(`LIMIT 1`)だと拾った行が
         たまたま同アカウントの場合に他アカウントの重複を見逃す。
@@ -760,6 +948,7 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
         sameAccount.display_name === values.displayName
         && sameAccount.real_name === values.realName
         && sameAccount.system_display_name === values.systemDisplayName
+        && Object.keys(checkedFields.values).length === 0
       ) {
         results.push({ lineUid, kind: 'unchanged', reason: null, values });
       } else {
@@ -782,12 +971,11 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), asy
     ).run();
     return c.json({ success: true, data: { id, status: 'previewed', result: { summary, rows: results }, duplicate: false } }, 201);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_import_preview_failed', error: String(error) }));
-    return c.json({ success: false, error: '取り込みの確認を実行できませんでした' }, 500);
+    throw error;
   }
 });
 
-friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', 'admin'), async (c) => {
+friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const job = await c.env.DB.prepare('SELECT * FROM friend_import_jobs WHERE id = ?').bind(c.req.param('id')).first<{
       id: string; line_account_id: string; status: string; result_json: string;
@@ -799,7 +987,7 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
     if (job.status !== 'previewed') return c.json({ success: false, error: '確認が終わったファイルだけ反映できます' }, 409);
     const result = JSON.parse(job.result_json) as { rows: Array<{
       lineUid: string; kind: 'add' | 'update' | 'unchanged' | 'conflict' | 'error';
-      values: { displayName: string | null; realName: string | null; systemDisplayName: string | null };
+      values: { displayName: string | null; realName: string | null; systemDisplayName: string | null; friendFields?: Record<string, string | null> };
     }> };
     /*
       **競合・エラーが残るまま反映しない。** 画面は無効化しているが、
@@ -811,12 +999,18 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
       return c.json({ success: false, error: `競合が${remainingConflict}件のこっています。確認画面で解消してから反映してください` }, 409);
     }
     if (remainingError > 0) {
-      return c.json({ success: false, error: `入力不備が${remainingError}件のこっています。ファイルを確認画面で直してから反映してください` }, 422);
+      return inputError(c, { success: false, error: `入力不備が${remainingError}件のこっています。ファイルを確認画面で直してから反映してください` }, 422, []);
     }
     const now = new Date().toISOString();
+    const fields = result.rows.some((row) => row.values.friendFields !== undefined)
+      ? await getFriendFieldsForScope(c.env.DB, { tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID, lineAccountId: job.line_account_id }) : [];
     const statements: D1PreparedStatement[] = [];
+    let applied = 0;
     for (const row of result.rows) {
+      const checked = importFields(row.values.friendFields, fields);
+      if (checked.error) return inputError(c, { success: false, error: `${row.lineUid}: ${checked.error}` }, 422, []);
       if (row.kind === 'add') {
+        applied += 1;
         statements.push(c.env.DB.prepare(`INSERT INTO friends (
           id, line_user_id, line_account_id, display_name, real_name, system_display_name,
           is_following, metadata, created_at, updated_at
@@ -825,6 +1019,7 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
           row.values.realName, row.values.systemDisplayName, now, now,
         ));
       } else if (row.kind === 'update') {
+        applied += 1;
         statements.push(c.env.DB.prepare(`UPDATE friends
           SET display_name = ?, real_name = ?, system_display_name = ?, updated_at = ?
           WHERE line_account_id = ? AND line_user_id = ?`).bind(
@@ -832,14 +1027,25 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
           now, job.line_account_id, row.lineUid,
         ));
       }
+      if (row.kind === 'add' || row.kind === 'update') {
+        for (const [key, value] of Object.entries(checked.values)) {
+          const field = fields.find((item) => item.field_key === key)!;
+          const friendSelect = 'SELECT id FROM friends WHERE line_account_id = ? AND line_user_id = ?';
+          statements.push(value === null
+            ? c.env.DB.prepare(`DELETE FROM friend_field_values WHERE field_id = ? AND friend_id IN (${friendSelect})`).bind(field.id, job.line_account_id, row.lineUid)
+            : c.env.DB.prepare(`INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
+                SELECT id, ?, ?, ?, ? FROM friends WHERE line_account_id = ? AND line_user_id = ?
+                ON CONFLICT(friend_id, field_id) DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at`)
+              .bind(field.id, value, c.get('staff').id, now, job.line_account_id, row.lineUid));
+        }
+      }
     }
     if (statements.length > 0) await c.env.DB.batch(statements);
     await c.env.DB.prepare(`UPDATE friend_import_jobs SET status = 'completed', executed_at = ? WHERE id = ? AND status = 'previewed'`)
       .bind(now, job.id).run();
-    return c.json({ success: true, data: { id: job.id, status: 'completed', applied: statements.length, duplicate: false } });
+    return c.json({ success: true, data: { id: job.id, status: 'completed', applied, duplicate: false } });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_import_execute_failed', error: String(error) }));
-    return c.json({ success: false, error: '取り込みを反映できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -847,14 +1053,14 @@ friendMigrations.get('/api/friends/migration-jobs', requireRole('owner', 'admin'
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (scope.allowedAccountIds.length === 0) return c.json({ success: true, data: [] });
-    const placeholders = scope.allowedAccountIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(scope.allowedAccountIds).sql;
     const [exports, imports] = await Promise.all([
       c.env.DB.prepare(`SELECT id, line_account_id, row_count, status, created_by_name, created_at, expires_at
         FROM friend_export_jobs WHERE line_account_id IN (${placeholders}) ORDER BY created_at DESC LIMIT 20`)
-        .bind(...scope.allowedAccountIds).all<Record<string, unknown>>(),
+        .bind(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [])).all<Record<string, unknown>>(),
       c.env.DB.prepare(`SELECT id, line_account_id, total_count, update_count, conflict_count, status,
         created_by_name, created_at FROM friend_import_jobs WHERE line_account_id IN (${placeholders})
-        ORDER BY created_at DESC LIMIT 20`).bind(...scope.allowedAccountIds).all<Record<string, unknown>>(),
+        ORDER BY created_at DESC LIMIT 20`).bind(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [])).all<Record<string, unknown>>(),
     ]);
     const jobs = [
       ...exports.results.map((row) => ({ ...row, kind: 'export', sortCreatedAt: String(row['created_at']) })),
@@ -865,7 +1071,6 @@ friendMigrations.get('/api/friends/migration-jobs', requireRole('owner', 'admin'
       .slice(0, 20)
       .map(({ sortCreatedAt: _sortCreatedAt, ...job }) => job) });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'friend_migration_jobs_list_failed', error: String(error) }));
-    return c.json({ success: false, error: '書き出し・取り込み履歴を読み込めませんでした' }, 500);
+    throw error;
   }
 });

@@ -7,7 +7,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type Database from 'better-sqlite3'
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js'
-import { buildPublicSegmentQuery, buildSegmentQuery, matchesCondition, type SegmentCondition } from './segment-query.js'
+import { buildPublicSegmentQuery, buildSegmentQuery, matchesCondition } from './segment-query.js';
+import { type SegmentCondition } from '@line-crm/shared';
 
 let db: D1Database
 let raw: Database.Database
@@ -106,7 +107,7 @@ describe('名前', () => {
   })
 
   /*
-   * R258: 検索対象の指定と未指定を区別する。空配列は「選んでいない」
+   * 検索対象の指定と未指定を区別する。空配列は「選んでいない」
    * 状態のまま保存されたもので、全欄へ広げず作り直しを促す。
    * 未指定（古い保存形）はこれまでどおり全欄で探す。
    */
@@ -345,7 +346,7 @@ describe('分析の一時対象者(N-274)', () => {
 
 describe('友だち一覧からの引継ぎ条件（chat_status / operator_id）', () => {
   /*
-   * IDEA-03。一覧の「対応」「担当者」絞り込みを配信条件へ写すための
+   *。一覧の「対応」「担当者」絞り込みを配信条件へ写すための
    * ルール。一覧と同じ chats 台帳を見るので、一覧に出た人と
    * 配信対象がずれない。行が無い人は一覧どおり resolved 扱い。
    */

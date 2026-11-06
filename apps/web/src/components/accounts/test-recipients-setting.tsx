@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import CloseButton from '@/components/shared/close-button'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 interface Friend {
   id: string
@@ -19,6 +22,7 @@ interface TestRecipientsSettingProps {
 }
 
 export default function TestRecipientsSetting({ accountId }: TestRecipientsSettingProps) {
+  const saveErrors = useSaveFormErrors()
   const [recipients, setRecipients] = useState<Friend[]>([])
   const [loginUsers, setLoginUsers] = useState<LoginUserCandidate[]>([])
   const [loading, setLoading] = useState(true)
@@ -93,11 +97,12 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
               .map((f: Friend) => ({ id: f.id, displayName: f.displayName, pictureUrl: f.pictureUrl }))
           )
         }
-      } catch { /* ignore */ }
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure) /* ignore */ }
       finally { if (!cancelled) setSearching(false) }
     }, 300)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [search, accountId, recipients])
+  }, [search, accountId, recipients, saveErrors])
 
   const addRecipient = async (friend: Friend) => {
     const updated = [...recipients, friend]
@@ -109,10 +114,12 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
     try {
       const res = await api.accountSettings.updateTestRecipients(accountId, updated.map(r => r.id))
       if (!res.success) throw new Error('save failed')
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       // 保存だけ失敗したのに一覧へ出続けると「入っている」と誤認させる。
       // 失敗を表示し、サーバの真値へ戻す。
-      setSaveError('テスト送信先を保存できませんでした。')
+      { if (!fieldFailure)
+      setSaveError('テスト送信先を保存できませんでした。時間をおいて、もう一度お試しください。') }
       void load()
     } finally { setSaving(false) }
   }
@@ -125,21 +132,25 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
     try {
       const res = await api.accountSettings.updateTestRecipients(accountId, updated.map(r => r.id))
       if (!res.success) throw new Error('save failed')
-    } catch {
-      setSaveError('テスト送信先を保存できませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setSaveError('テスト送信先を保存できませんでした。時間をおいて、もう一度お試しください。') }
       void load()
     } finally { setSaving(false) }
   }
 
-  if (loading) return <p className="text-xs text-gray-400">読み込み中...</p>
+  if (loading) return <SaveErrorScope errors={saveErrors}><p className="text-xs text-ink-faint">読み込み中…</p></SaveErrorScope>
   if (loadError) {
     return (
+      <SaveErrorScope errors={saveErrors}>
       <div className="mt-3">
         <p className="text-danger text-xs">テスト送信先を読み込めませんでした。通信状態を確認してください。</p>
         <button type="button" onClick={() => void load()} className="text-action mt-1 text-xs hover:underline">
           再読み込み
         </button>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -149,6 +160,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
   )
 
   return (
+    <SaveErrorScope errors={saveErrors}>
     <div className="mt-3">
       {saveError ? <p className="text-danger mb-2 text-xs">{saveError}</p> : null}
 
@@ -156,10 +168,10 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
       {recipients.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {recipients.map(r => (
-            <span key={r.id} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs">
-              {r.pictureUrl && <img src={r.pictureUrl} alt="" className="w-4 h-4 rounded-full" />}
+            <span key={r.id} className="inline-flex items-center gap-1 px-2 py-1 bg-status-info-soft text-action rounded-pill text-xs">
+              {r.pictureUrl && <img width={16} height={16} src={r.pictureUrl} alt="" className="w-4 h-4 rounded-pill" />}
               {r.displayName}
-              <button onClick={() => removeRecipient(r.id)} className="text-blue-400 hover:text-blue-600 ml-0.5">×</button>
+              <CloseButton aria-label={`${r.displayName}を外す`} onClick={() => removeRecipient(r.id)} />
             </span>
           ))}
         </div>
@@ -167,21 +179,21 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
 
       {/* LINE連携済みのログインユーザーは、友だち検索に埋もれないよう常に候補へ出す。 */}
       {availableLoginUsers.length > 0 && (
-        <div className="mb-2 rounded-lg border border-emerald-100 bg-emerald-50/60 p-2">
-          <p className="mb-1.5 text-[11px] font-medium text-success">ログインユーザーから追加</p>
+        <div className="mb-2 rounded-control border border-accent-border bg-accent-soft/60 p-2">
+          <p className="mb-1.5 text-micro font-medium text-success">ログインユーザーから追加</p>
           <div className="flex flex-wrap gap-1.5">
             {availableLoginUsers.map((candidate) => (
               <button
                 key={candidate.id}
                 type="button"
                 onClick={() => addRecipient(candidate)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-2 py-1 text-xs font-medium text-success hover:border-emerald-400 hover:bg-emerald-50"
+                className="inline-flex items-center gap-1.5 rounded-pill border border-accent-border bg-canvas px-2 py-1 text-xs font-medium text-success hover:border-accent hover:bg-accent-soft"
                 title={`${candidate.staffName}をテスト送信先に追加`}
               >
                 {candidate.pictureUrl ? (
-                  <img src={candidate.pictureUrl} alt="" className="h-4 w-4 rounded-full" />
+                  <img width={16} height={16} src={candidate.pictureUrl} alt="" className="h-4 w-4 rounded-pill" />
                 ) : (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-micro font-bold">{candidate.staffName.charAt(0)}</span>
+                  <span className="flex h-4 w-4 items-center justify-center rounded-pill bg-accent-soft text-micro font-medium">{candidate.staffName.charAt(0)}</span>
                 )}
                 <span>{candidate.staffName}</span>
                 <span aria-hidden="true" className="text-success">＋</span>
@@ -193,28 +205,28 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
 
       {/* Search to add */}
       <div className="relative">
-        <input
+        <SaveErrorField names={["search"]}><SharedTextField
           type="text"
-          placeholder="友だちを検索して追加..."
+          placeholder="友だちを検索して追加…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
-        />
-        {searching && <span className="absolute right-2 top-1.5 text-xs text-gray-400">検索中...</span>}
-        {saving && <span className="absolute right-2 top-1.5 text-xs text-success">保存中...</span>}
+          className="w-full border border-hairline rounded-control px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-focus-ring"
+        /></SaveErrorField>
+        {searching && <span className="absolute right-2 top-1.5 text-xs text-ink-faint">検索中…</span>}
+        {saving && <span className="absolute right-2 top-1.5 text-xs text-success">保存中…</span>}
 
         {searchResults.length > 0 && (
-          <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+          <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-canvas border border-hairline rounded-control shadow-float max-h-40 overflow-y-auto">
             {searchResults.map(f => (
               <li key={f.id}>
                 <button
                   onClick={() => addRecipient(f)}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-left text-xs"
+                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-surface-pearl text-left text-xs"
                 >
                   {f.pictureUrl ? (
-                    <img src={f.pictureUrl} alt="" className="w-5 h-5 rounded-full" />
+                    <img width={20} height={20} src={f.pictureUrl} alt="" className="w-5 h-5 rounded-pill" />
                   ) : (
-                    <div className="w-5 h-5 rounded-full bg-gray-200" />
+                    <div className="w-5 h-5 rounded-pill bg-shell-gray" />
                   )}
                   {f.displayName}
                 </button>
@@ -223,6 +235,6 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
           </ul>
         )}
       </div>
-    </div>
+    </div></SaveErrorScope>
   )
 }

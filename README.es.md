@@ -1,3 +1,5 @@
+> 文書：LINE Harness｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 > **Congelado en v0.13.2 (2026-09-03).** El `README.md` en japonés es la fuente de verdad y la única versión que se mantiene actualizada.
 
 🌐 [日本語](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [한국어](README.ko.md) | **Español**
@@ -13,7 +15,7 @@ Funciona sobre el plan gratuito de Cloudflare. **Costo de servidor: $0/mes**. Op
 
 [![Haz clic para reproducir en YouTube — Guía de configuración de LINE Harness](https://img.youtube.com/vi/DiRuGaeq1sM/maxresdefault.jpg)](https://youtu.be/DiRuGaeq1sM)
 
-**Versión actual**: v0.13.2 ・ Licencia MIT ・ TypeScript / Cloudflare Workers + D1
+**Versión de este documento**: v0.13.2 (versión actual: [package.json](package.json)) ・ Licencia MIT ・ TypeScript / Cloudflare Workers + D1
 
 ---
 
@@ -92,7 +94,7 @@ Tarda unos 5 minutos. Al finalizar, el panel en `https://<your-name>-admin.pages
 - **Tracking cronológico** — registra clic → alta como contacto → conversión en orden, atribución last-touch
 - **Flujo de aprobación** — aprueba o rechaza las conversiones atribuidas para confirmar la comisión, con marcas de cuentas duplicadas para detectar posible fraude
 - **Notificaciones push por LINE** — push automático al afiliado cuando se confirma la conversión
-- Detalles: [docs/wiki/27-Affiliate-ASP.md](docs/wiki/27-Affiliate-ASP.md)
+- Detalles: [docs/v6-requirements/v6-16-affiliate-requirements-draft.md](docs/v6-requirements/v6-16-affiliate-requirements-draft.md)
 
 ### Automatización
 - **Reglas IF-THEN** — 7 tipos de triggers × 6 tipos de acciones
@@ -110,7 +112,7 @@ Tarda unos 5 minutos. Al finalizar, el panel en `https://<your-name>-admin.pages
 ### Integración con IA
 - **MCP server incluido** (`@line-harness/mcp-server`) — operación en lenguaje natural desde Claude Code
   - `list_conversations` / `get_conversation` — la IA monitorea conversaciones sin responder
-  - `create_scenario` / `update_step` — deja que la IA diseñe escenarios
+  - `create_scenario` / `update_step` — deja que la IA diseñe escenarios — se crean inactivos; revisa y activa con update de `manage_scenarios` (requiere permiso de publicación)
   - `broadcast` / `send_message` — los envíos requieren confirmación del usuario
 - **SDK oficial** (`@line-harness/sdk`) — SDK TypeScript tipado, ESM + CJS, sin dependencias
 

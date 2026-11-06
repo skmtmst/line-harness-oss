@@ -4,8 +4,11 @@ import {
   getStaffById,
   type LineAccountScopeEntry,
 } from '@line-crm/db';
+
+import { timingDbSpan } from '../lib/server-timing.js';
+import { readAuthenticatedStaffRecord, rememberAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 /**
  * 認証済みユーザーが閲覧できるLINE公式アカウントを返す。
@@ -35,18 +38,18 @@ export function canAccessLineAccount<T extends { id: string; tenant_id: string |
 
 export type VisibleLineAccountScope = {
   accounts: LineAccountScopeEntry[];
-  /** Account IDs that every scoped query must filter against. */
+  /** 範囲付きの全問い合わせで絞るべきアカウント ID。 */
   allowedAccountIds: string[];
-  /** Only the default tenant may see legacy rows without an account assignment. */
+  /** 所属のない保存済み行は既定統括だけへ許可する。 */
   canSeeUnassigned: boolean;
-  /** Kept for account-specific authorization call sites. */
+  /** アカウントごとの認可でも使う。 */
   ids: string[];
-  /** True when the staff member is limited to explicitly assigned accounts. */
+  /** 明示割当されたアカウントだけへ制限されるかを示す。 */
   isAccountScoped: boolean;
 };
 
 /**
- * 同一リクエスト内の scope 再計算を防ぐメモ化(#633)。
+ * 同一リクエスト内の scope 再計算を防ぐメモ化。
  *
  * tenant境界 middleware・機能off middleware・各 route の
  * canAccessAllLineAccounts が、1要求の中で同じ (staff, db) の
@@ -88,7 +91,7 @@ function scopeSignature(staff: AuthenticatedStaff): string {
   ].join('\u0000');
 }
 
-/** Resolve account visibility once at a route boundary and reuse it in every query. */
+/** 境界で一度だけ可視範囲を解決し、すべての問い合わせで再利用する。 */
 export function getVisibleLineAccountScope(
   db: D1Database,
   staff: AuthenticatedStaff | undefined,
@@ -111,12 +114,36 @@ export function getVisibleLineAccountScope(
   const cached = byDb.get(db);
   if (cached && cached.signature === signature) return cached.pending;
   // 失敗した読取は残さず、同じ要求内の再試行を許す。
-  const pending = resolveVisibleLineAccountScope(db, staff).catch((error: unknown) => {
+  const pending = timingDbSpan(db, 'scope', () => resolveVisibleLineAccountScope(db, staff)).catch((error: unknown) => {
     if (byDb.get(db)?.pending === pending) byDb.delete(db);
     throw error;
   });
   byDb.set(db, { signature, pending });
   return pending;
+}
+
+/** 同じ要求で機能の範囲だけを狭める。元の統括・担当範囲を広げない。 */
+export function restrictVisibleLineAccountScope(
+  db: D1Database,
+  staff: AuthenticatedStaff,
+  enabledIds: string[],
+): AuthenticatedStaff {
+  const narrowed = { ...staff, featureEnabledLineAccountIds: [...enabledIds] };
+  const cached = scopeCacheByStaff.get(staff)?.get(db);
+  if (cached?.signature === scopeSignature(staff)) {
+    const byDb = new WeakMap<D1Database, CachedScope>();
+    const enabled = new Set(enabledIds);
+    const pending = cached.pending.then(scope => {
+      const accounts = scope.accounts.filter(account => enabled.has(account.id));
+      const ids = accounts.map(account => account.id);
+      return { ...scope, accounts, ids, allowedAccountIds: ids, canSeeUnassigned: false };
+    }).catch((error: unknown) => { byDb.delete(db); throw error; });
+    byDb.set(db, { signature: scopeSignature(narrowed), pending });
+    scopeCacheByStaff.set(narrowed, byDb);
+  }
+  const record = readAuthenticatedStaffRecord(db, staff);
+  if (record) rememberAuthenticatedStaffRecord(db, narrowed, record);
+  return narrowed;
 }
 
 async function resolveVisibleLineAccountScope(
@@ -127,7 +154,9 @@ async function resolveVisibleLineAccountScope(
   // アカウント一覧とスタッフ行は互いに独立。直列だと2往復分待つので同時に投げる。
   const [entries, member] = await Promise.all([
     getLineAccountScopeEntries(db, staffTenant),
-    staff.id && staff.id !== 'env-owner' ? getStaffById(db, staff.id) : Promise.resolve(null),
+    staff.id && staff.id !== 'env-owner'
+      ? readAuthenticatedStaffRecord(db, staff) ?? getStaffById(db, staff.id)
+      : Promise.resolve(null),
   ]);
   const tenantAccounts = filterVisibleLineAccounts(entries, staff);
   const featureScope = staff.featureEnabledLineAccountIds
@@ -151,7 +180,7 @@ async function resolveVisibleLineAccountScope(
   const scopedIds = isAccountScoped
     ? new Set(await getStaffAccountScopeIds(db, staff.id))
     : null;
-  // The tenant wall is applied first. An empty assigned scope deliberately stays empty.
+  // 統括境界を先に適用し、割当範囲が空なら無制限へ戻さず空のまま保つ。
   const accounts = scopedIds
     ? featureScopedAccounts.filter((account) => scopedIds.has(account.id))
     : featureScopedAccounts;
@@ -165,7 +194,7 @@ async function resolveVisibleLineAccountScope(
   };
 }
 
-/** Return true only when every account reference belongs to the staff tenant. */
+/** 参照するすべてのアカウントがスタッフの統括内にあるときだけ許可する。 */
 export async function canAccessAllLineAccounts(
   db: D1Database,
   staff: AuthenticatedStaff | undefined,

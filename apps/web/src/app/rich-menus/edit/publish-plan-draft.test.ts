@@ -5,7 +5,7 @@ import {
   loadPublishPlanDraft,
   savePublishPlanDraft,
   type PublishPlanInput,
-} from './publish-plan-draft'
+} from '../../../v8/rich-menus/edit/publish-plan-draft'
 
 /** localStorage の代わり。試験ごとに空で始める。 */
 class MemoryStorage {

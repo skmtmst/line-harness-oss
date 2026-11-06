@@ -1,0 +1,4 @@
+/* 詳細の左右・読む行・状態・通知は型と共通部品が持つ。ここは操作の並びだけ。 */
+.aside { display: flex; flex-direction: column; gap: var(--polish-space-card); min-width: 0; }
+.nextActions { display: flex; flex-direction: column; gap: var(--polish-space-row); min-width: 0; }
+.doneButtons { display: flex; justify-content: center; }

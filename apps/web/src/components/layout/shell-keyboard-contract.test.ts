@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /*
- * シェルのキーボード操作（★V7 修正方針 §2、2026-09-24 の点検）。
+ * シェルのキーボード操作（★管理画面 修正方針 §2、2026-09-24 の点検）。
  *
  * - 閉じたスマホのメニューは画面外にずらすだけで、中の11項目が Tab で選べた。
  *   焦点が見えない所へ行く。閉じている間は inert にする。
@@ -26,7 +26,7 @@ describe('スマホのメニュー', () => {
   })
 
   it('Esc で閉じ、閉じたら焦点をハンバーガーへ戻す', () => {
-    expect(sidebar).toMatch(/event\.key === 'Escape'\) setIsOpen\(false\)/)
+    // Esc の実操作は sidebar-version.test.tsx と sidebar-drawer-escape.test.tsx で確認する。
     expect(sidebar).toContain('menuButtonRef.current?.focus()')
   })
 })

@@ -1,0 +1,19 @@
+@layer components {
+.list { display: flex; flex-direction: column; margin: var(--tpl-layout-zero); padding: var(--tpl-layout-zero); list-style: none; }
+.row { display: grid; grid-template-columns: var(--tpl-sender-icon) minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-12); min-height: var(--tpl-sender-row); padding: var(--space-8) 0; border-top: 1px solid var(--color-hairline); }
+.row:first-child { border-top: 0; }
+.icon { display: inline-flex; align-items: center; justify-content: center; width: var(--tpl-sender-icon); height: var(--tpl-sender-icon); border-radius: var(--radius-pill); background: var(--color-accent-soft); color: var(--color-accent-deep); font-size: var(--tpl-sender-icon-text); font-weight: 700; object-fit: cover; }
+.name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; }
+.who { color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.nameWrap { width: 100%; align-self: stretch; }
+.nameWrap > *, .nameWrap input { width: 100%; }
+.iconRow { display: flex; align-items: center; gap: var(--space-16); margin-bottom: var(--space-16); }
+.iconTile { display: inline-flex; flex: none; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-4); width: var(--tpl-sender-tile); height: var(--tpl-sender-tile); border: 1px solid var(--color-hairline); border-radius: var(--radius-segment); background: var(--color-canvas-sunken); color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; cursor: pointer; overflow: hidden; }
+.iconTile:focus-visible { outline: var(--tpl-sender-outline) solid var(--color-focus-ring); outline-offset: var(--tpl-sender-outline); }
+.iconTileImage { width: 100%; height: var(--tpl-layout-full); object-fit: cover; }
+.iconText { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-sender-note-lh); }
+.iconText strong { color: var(--color-ink); font-size: var(--text-body); }
+.nameNote { width: 100%; align-self: stretch; display: flex; justify-content: space-between; gap: var(--space-12); margin: var(--space-8) 0 var(--space-16); color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.over { color: var(--color-danger); font-weight: 600; }
+.iconPick { display: inline-flex; align-items: center; gap: var(--space-12); }
+}

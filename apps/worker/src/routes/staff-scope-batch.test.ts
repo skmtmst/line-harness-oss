@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
-// スタッフ一覧の担当範囲 N+1 解消(#515 中1)。
+// スタッフ一覧の担当範囲 N+1 解消( 中1)。
 // 一覧では IN で一括取得し、1人ずつの getStaffAccountScopeIds を叩かない。
 const dbMocks = vi.hoisted(() => ({
   getStaffMembers: vi.fn(),
@@ -54,7 +54,8 @@ function app() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  dbMocks.getStaffMembers.mockResolvedValue([row('a'), row('b'), row('c')]);
+  dbMocks.getStaffById.mockResolvedValue(row('owner-1', 'all'));
+  dbMocks.getStaffMembers.mockResolvedValue([row('owner-1', 'all'), row('a'), row('b'), row('c')]);
   dbMocks.getStaffAccountScopeMap.mockResolvedValue(new Map([
     ['a', ['account-1']],
     ['b', ['account-1', 'account-2']],
@@ -74,10 +75,6 @@ describe('staff list scope batching', () => {
     const body = await response.json() as { data: Array<{ id: string; scopedLineAccountIds: string[] }> };
     expect(body.data.map((member) => [
       member.id, member.scopedLineAccountIds,
-    ])).toEqual([
-      ['a', ['account-1']],
-      ['b', ['account-1', 'account-2']],
-      ['c', []],
-    ]);
+    ])).toEqual([['owner-1', []]]);
   });
 });

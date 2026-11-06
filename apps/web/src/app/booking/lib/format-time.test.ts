@@ -27,7 +27,7 @@ describe('予約設定の日時整形', () => {
     ])).toEqual({ value: '9:00〜18:00', detail: '月・火' })
     expect(shortDate('2026-09-08')).toBe('9/8')
     // (a): 終わりの日は判定と同じく今日＋日数（3日先までなら9/11まで）。
-    expect(bookingWindowEnd(3, new Date('2026-09-08T03:00:00.000Z'))).toBe('9/11')
+    expect(bookingWindowEnd(3, new Date('2026-09-08T03:00:00.000Z'))).toBe('9月11日（金）')
   })
 })
 

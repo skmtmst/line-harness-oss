@@ -22,7 +22,7 @@ function legacyRow(
   };
 }
 
-describe('V6オートメーション移行dry-run', () => {
+describe('オートメーション移行dry-run', () => {
   it('認識できる所属・きっかけ・条件・処理だけを自動変換にする', () => {
     expect(assessLegacyAutomation(legacyRow())).toMatchObject({
       decision: 'auto_convert',

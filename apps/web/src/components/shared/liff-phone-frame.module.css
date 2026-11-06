@@ -1,0 +1,167 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/*
+ * お客さまの予約画面の写し（LIFF ②担当・③日時）。器は LINE の見え方と同じ 330×690（2026-10-15 司令塔）。
+ * 色は --v8-liff-*、寸法は --tpl-bks-ph-*（globals.css）。
+ */
+/* 器：LINE の見え方（line-preview の .phone）と同じ形。330×690・黒・縁・内側10・角丸52・影。 */
+.phone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: var(--v8-line-phone-width);
+  height: var(--v8-line-phone-height);
+  padding: 10px;
+  border-radius: var(--v8-line-shell-radius);
+  background: var(--v8-line-shell);
+  outline: 2px solid var(--v8-line-shell-edge);
+  outline-offset: -1px;
+  box-shadow: var(--v8-line-shell-shadow);
+}
+.phone[data-compact] { height: var(--v8-line-phone-compact-height); }
+
+/* 画面：白い地・角丸42。中身は画面の中に収める。 */
+.screen {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--v8-line-screen-radius);
+  background: var(--color-canvas);
+}
+
+/* 上の帯 44：時刻・黒い島・電波/Wi-Fi/電池（line-preview の .statusBar と同じ）。 */
+.status {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  height: 44px;
+  padding: 14px 24px 0 32px;
+}
+
+.time {
+  color: var(--color-ink);
+  font-family: var(--font-inter);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 18px;
+  font-variant-numeric: var(--font-numeric);
+}
+
+.island {
+  position: absolute;
+  top: 8px;
+  left: 97px;
+  width: 96px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink);
+}
+
+.statusIcons {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--color-ink);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: var(--tpl-bks-ph-bar-h);
+  padding: var(--tpl-bks-ph-bar-pad);
+  border-bottom: 1px solid var(--v8-liff-line);
+}
+
+.barSide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tpl-bks-ph-side-w);
+  color: var(--color-ink);
+}
+
+.barTitle {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+}
+
+.barMain {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-bks-ph-bar-title-lh);
+}
+
+.barShop {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bks-ph-shop-size);
+  line-height: var(--tpl-bks-ph-shop-lh);
+}
+
+.steps {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--tpl-bks-ph-steps-gap);
+  padding: var(--tpl-bks-ph-steps-pad);
+}
+
+.step {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-bks-ph-steps-gap);
+  min-width: 0;
+}
+
+.stepLine {
+  height: var(--tpl-bks-ph-step-h);
+  border-radius: var(--v8-liff-step-radius);
+  background: var(--v8-liff-line);
+}
+
+.step[data-state='done'] .stepLine,
+.step[data-state='now'] .stepLine { background: var(--v8-liff-primary); }
+
+.stepLabel {
+  color: var(--v8-liff-idle);
+  font-size: var(--text-nano);
+  font-weight: 500;
+  line-height: var(--tpl-bks-ph-step-lh);
+  white-space: nowrap;
+}
+
+.step[data-state='done'] .stepLabel { color: var(--v8-liff-sub); }
+.step[data-state='now'] .stepLabel { color: var(--color-ink); font-weight: 700; }
+
+.body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-bks-ph-body-gap);
+  min-height: 0;
+  padding: var(--tpl-bks-ph-body-pad);
+  overflow: hidden;
+}
+
+
+.content { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
+.root { display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 0; }
+/* 見出しは LINE の見え方（共通の見本の題）と同じ大きさ（絵 ：15・行23）。 */
+.caption { align-self: stretch; margin: 0; font-size: var(--tpl-preview-title-size); font-weight: 600; line-height: var(--tpl-preview-title-lh); }
+/* 下端の印は下の余白に重ねる。中身や保存の段を20px持ち上げない。 */
+.home { position: absolute; inset-inline: 0; bottom: 0; height: 20px; display: grid; place-items: center; pointer-events: none; }
+.home span { width: 100px; height: 4px; border-radius: var(--radius-chart-bar); background: var(--color-ink); }
+
+}

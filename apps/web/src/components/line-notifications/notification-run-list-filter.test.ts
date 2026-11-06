@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EcNotificationRun } from '@/lib/api'
-import { filterNotificationRuns } from './notification-run-list'
+import { filterNotificationRuns } from './notification-run-state'
 
 const NOW = Date.parse('2026-09-09T12:00:00+09:00')
 

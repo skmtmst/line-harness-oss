@@ -7,23 +7,25 @@
  *   - 項目を触ると「変更後の予定」と差分が出る
  *   - 「つながる先」はリンク（hrefを持つ）で、見た目だけの矢印ではない
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams('tab=members'),
 }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => <nav aria-label="ログインユーザーのタブ" />,
   useMergedTab: () => 'members',
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -57,11 +59,13 @@ const state = {
   ],
 }
 
-vi.mock('@/lib/api', () => {
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
   class ApiError extends Error {}
   return {
+    ...actual,
     ApiError,
-    fetchApi: vi.fn(),
+    fetchApi: vi.fn().mockResolvedValue({ success: true, data: [] }),
     api: {
       staff: {
         list: async () => ({ success: true, data: state.members }),
@@ -95,8 +99,8 @@ const { default: StaffPage } = await import('./page')
 
 async function openPermissionView() {
   await act(async () => { render(<StaffPage />) })
-  await waitFor(() => expect(screen.getByText('対象者')).toBeTruthy())
-  fireEvent.click(within(screen.getByText('対象者').closest('tr') as HTMLTableRowElement).getByRole('button', { name: '中身を見る' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '対象者の中身を見る' })).toBeTruthy())
+  fireEvent.click(within(screen.getByRole('button', { name: '対象者の中身を見る' }).closest('[role="row"]') as HTMLElement).getByRole('button', { name: /の中身を見る$/ }))
   await waitFor(() => expect(screen.getByText('この決め方で、この人にはこう見えます')).toBeTruthy())
 }
 
@@ -107,17 +111,17 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('権限詳細の説明欄は選択中の権限から生成する (#983)', () => {
-  it('「運用」の説明はプリセットから項目数と名前を組み立て、人数は実集計を使う', async () => {
+  it('「スタッフ」の説明はプリセットから項目数と名前を組み立て、人数は実集計を使う', async () => {
     await openPermissionView()
 
-    // 運用プリセット: settings だけ none。feature行10件のうち出るのは9項目。
-    expect(screen.getByText(/メニューに出るのは9項目/)).toBeTruthy()
+    // 運用プリセット: settings だけ none。feature行11件（来店スタンプを含む）のうち出るのは10項目。
+    expect(screen.getByText(/メニューに出るのは10項目/)).toBeTruthy()
     expect(screen.getByText(/出さないのは1項目/)).toBeTruthy()
     expect(screen.queryByText(/サイドメニューに出るのは4項目/)).toBeNull()
 
     // かたまりの人数は固定文ではなく roleCounts（administrator=1）から出る
     const adminButton = screen.getAllByRole('button').find((button) => button.textContent?.includes('管理者'))
-    expect(adminButton?.textContent).toContain('1人')
+    expect(adminButton?.textContent).toContain('1 人')
 
     // 個人情報はプリセットの view（伏せて表示）と一致する
     expect(screen.getByText(/電話番号・住所・メールは伏せて表示します/)).toBeTruthy()
@@ -136,12 +140,16 @@ describe('権限詳細の説明欄は選択中の権限から生成する (#983)
     expect(screen.getAllByText(/出さない項目はありません/).length).toBeGreaterThan(0)
   })
 
-  it('個別設定の人は保存済みの内訳が取れないので「未確認」と出す', async () => {
+  it('個別設定の人は保存済みをそのまま出し、差分も保存済みと比べる（R497）', async () => {
+    // 保存済みは受信箱だけ変えられる（member の permissionKeys）。
+    // 受付プリセットへの当てはめはせず、未確認にもしない。
     state.users[0] = accessUser({ roleBundle: 'custom' })
     await openPermissionView()
 
-    expect(screen.getByText(/内訳は取得できていません（未確認）/)).toBeTruthy()
-    expect(screen.getByText(/変わる項目の内訳は未確認です/)).toBeTruthy()
+    expect(screen.queryByText(/内訳は取得できていません/)).toBeNull()
+    expect(screen.queryByText(/変わる項目の内訳は未確認です/)).toBeNull()
+    expect(screen.getByText(/いまの設定と同じ内容です/)).toBeTruthy()
+    expect(screen.queryByText('変更後の予定')).toBeNull()
   })
 
   it('「つながる先」は実リンクで遷移先を持つ', async () => {
@@ -153,3 +161,18 @@ describe('権限詳細の説明欄は選択中の権限から生成する (#983)
     expect(screen.getByRole('link', { name: '→ 予約設定' }).getAttribute('href')).toBe('/booking/menus')
   })
 })
+
+describe('ログインユーザーの右欄に作る人のメモを出さない (B1)', () => {
+  it('開発用のメモ欄は出さず、役割の案内は残す', async () => {
+    await act(async () => { render(<StaffPage />) })
+    await waitFor(() => expect(screen.getByRole('button', { name: '対象者の中身を見る' })).toBeTruthy())
+    expect(screen.queryByText('直したあとの列')).toBeNull()
+    expect(screen.queryByText(/表に足す列/)).toBeNull()
+    expect(screen.queryByText('役割でできること')).toBeNull()
+    expect(screen.getByRole('region', { name: '自分の設定' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '役割と権限' })).toBeTruthy()
+  })
+})
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

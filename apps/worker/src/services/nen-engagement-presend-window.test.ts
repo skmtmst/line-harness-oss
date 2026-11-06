@@ -8,7 +8,7 @@ import {
   saveNenCampaignAccountSetting,
 } from './nen-engagement.js';
 
-// #749 案2: 送信直前の窓の見直し。積む側の抑止は変えず、claim 後に最新の
+//  案2: 送信直前の窓の見直し。積む側の抑止は変えず、claim 後に最新の
 // アカウント別設定を正として代表1件だけ送る。実 SQLite＋実コードで見る。
 
 function seed(raw: SqliteD1['raw']) {

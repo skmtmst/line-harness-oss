@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import { jstNow } from '@line-crm/db';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { templates } from './templates.js';
 
@@ -103,14 +104,10 @@ describe('PERF-12 テンプレート選択のサーバー絞り込み', () => {
     const send = db.raw.prepare(`INSERT INTO messages_log
       (id, friend_id, direction, message_type, content, template_id_at_send, created_at)
       VALUES (?, 'fr-1', 'outgoing', 'text', 'sent', ?, ?)`);
-    /*
-     * 送信実績は「今月（日本時間）」の件数で数える。固定の年月を書くとその月を過ぎた時点で
-     * 全部0件になり、並びが作られた順（新しい順）に戻ってしまう。実際の時計の月に合わせる。
-     */
-    const jstMonth = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 7);
-    send.run('lg-1', 'tp-04', `${jstMonth}-01T00:00:00Z`);
-    send.run('lg-2', 'tp-04', `${jstMonth}-02T00:00:00Z`);
-    send.run('lg-3', 'tp-01', `${jstMonth}-01T00:00:00Z`);
+    const thisMonth = jstNow().slice(0, 7);
+    send.run('lg-1', 'tp-04', `${thisMonth}-01T00:00:00+09:00`);
+    send.run('lg-2', 'tp-04', `${thisMonth}-02T00:00:00+09:00`);
+    send.run('lg-3', 'tp-01', `${thisMonth}-01T00:00:00+09:00`);
     const data = ((await (await get('message_type=text&quick=frequent&page=1&limit=5')).json()) as Body).data;
     // 実績 2 > 1 > 0 の順。実績なし同士は新しい順。
     expect(data.items.map((t) => t.id)).toEqual(['tp-04', 'tp-01', 'tp-03', 'tp-02']);
@@ -127,5 +124,43 @@ describe('PERF-12 テンプレート選択のサーバー絞り込み', () => {
     expect(data.items.every((t) => t.id !== 'tp-x')).toBe(true);
     // 別アカウントの未分類1件は '' の件数に入らない。
     expect(data.folderCounts?.['']).toBe(1);
+  });
+});
+
+describe('入力欄へ入れられる文字の絞り込み', () => {
+  beforeEach(() => {
+    db.raw.prepare(`INSERT INTO templates
+      (id,name,category,message_type,message_content,question_json,folder_id,line_account_id,created_at)
+      VALUES ('tp-question','来店の質問','general','text','いつ来店しますか？',?, 'f2','account-a','2026-01-02T00:00:00Z')`)
+      .run(JSON.stringify({ text: 'いつ来店しますか？', choices: [{ label: '明日', actions: [] }, { label: '来週', actions: [] }] }));
+  });
+  it('指定しない場合と0の場合は、質問も画像も同じ件数・候補に残す', async () => {
+    const original = ((await (await get('page=1&limit=20&folder_counts=1')).json()) as Body).data;
+    const zero = ((await (await get('page=1&limit=20&folder_counts=1&text_only=0')).json()) as Body).data;
+    expect(original.total).toBe(6);
+    expect(original.items.map(item => item.id)).toContain('tp-question');
+    expect(original.items.map(item => item.id)).toContain('tp-05');
+    expect(original.folderCounts).toEqual({ f1: 1, f2: 3, '': 2 });
+    expect(zero).toEqual(original);
+  });
+  it('指定ありは質問をページに切る前に外し、最後まで重複なし・フォルダ件数も同じ条件にする', async () => {
+    const first = ((await (await get('page=1&limit=3&text_only=1&folder_counts=1')).json()) as Body).data;
+    const next = ((await (await get('page=2&limit=3&text_only=1&folder_counts=1')).json()) as Body).data;
+    expect(first.total).toBe(4);
+    expect(next.total).toBe(4);
+    expect(first.items).toHaveLength(3);
+    expect(next.items).toHaveLength(1);
+    expect([...first.items, ...next.items].map(item => item.id).sort()).toEqual(['tp-01', 'tp-02', 'tp-03', 'tp-04']);
+    expect(first.folderCounts).toEqual({ f1: 1, f2: 2, '': 1 });
+    expect(next.folderCounts).toEqual(first.folderCounts);
+    const end = ((await (await get('page=3&limit=3&text_only=1')).json()) as Body).data;
+    expect(end.items).toEqual([]);
+    expect(end.total).toBe(4);
+  });
+  it('検索とフォルダにも重ねられ、正しくない指定は400になる', async () => {
+    const data = ((await (await get('page=1&limit=3&text_only=1&folder_id=f1&q=予約')).json()) as Body).data;
+    expect(data.items.map(item => item.id).sort()).toEqual(['tp-01', 'tp-02']);
+    expect(data.total).toBe(2);
+    expect((await get('page=1&text_only=wrong')).status).toBe(400);
   });
 });

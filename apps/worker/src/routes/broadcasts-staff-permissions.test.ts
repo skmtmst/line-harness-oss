@@ -1,5 +1,5 @@
 /*
- * P0-8 一斉配信の staff 個別権限キー（v6-06 §6 の6キー）を効かせる。
+ * 一斉配信の staff 個別権限キー（-06 §6 の6キー）を効かせる。
  *
  * 要件の表：下書き作成・編集=definition.edit／テスト送信=test.send／
  * 予約・即時送信=definition.publish／緊急停止=job.stop／失敗再送=job.retry／
@@ -7,8 +7,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const mocks = vi.hoisted(() => ({
   getBroadcastById: vi.fn(),
@@ -47,8 +47,8 @@ vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: vi.fn(async () => true),
 }));
 vi.mock('@line-crm/line-sdk', () => ({ LineClient: vi.fn() }));
-vi.mock('../services/broadcast-preflight.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/broadcast-preflight.js')>()),
+vi.mock('../features/broadcasts/broadcast-preflight.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/broadcasts/broadcast-preflight.js')>()),
   previewAudience: mocks.previewAudience,
   hasRecentSimilarBroadcast: mocks.hasRecentSimilar,
 }));
@@ -168,6 +168,7 @@ describe('一斉配信の staff 個別権限キー', () => {
 
   it('作成の鍵を持つ staff は下書きを消せる（鍵なし staff は403）', async () => {
     mocks.getBroadcastById.mockResolvedValue(row({ status: 'draft' }));
+    mocks.deleteBroadcast.mockResolvedValue(true);
 
     const allowed = await app(staffWith('/broadcasts', 'broadcast.definition.edit'))
       .request('/api/broadcasts/broadcast-1', { method: 'DELETE' });
@@ -181,6 +182,24 @@ describe('一斉配信の staff 個別権限キー', () => {
     expect(mocks.deleteBroadcast).not.toHaveBeenCalled();
   });
 
+  it('D026: 送信中・送信済みは鍵があっても409で消さない', async () => {
+    mocks.deleteBroadcast.mockResolvedValue(false);
+
+    mocks.getBroadcastById.mockResolvedValue(row({ status: 'sending' }));
+    const sending = await app(staffWith('/broadcasts', 'broadcast.definition.edit'))
+      .request('/api/broadcasts/broadcast-1', { method: 'DELETE' });
+    expect(sending.status).toBe(409);
+    expect(await sending.json()).toMatchObject({ success: false });
+
+    mocks.getBroadcastById.mockResolvedValue(row({ status: 'sent' }));
+    const sent = await app(staffWith('/broadcasts', 'broadcast.definition.edit'))
+      .request('/api/broadcasts/broadcast-1', { method: 'DELETE' });
+    expect(sent.status).toBe(409);
+    expect(await sent.json()).toMatchObject({ success: false });
+
+    expect(mocks.deleteBroadcast).not.toHaveBeenCalled();
+  });
+
   it('owner は鍵なしで従来どおり通る', async () => {
     mocks.getBroadcastById.mockResolvedValue(row({ status: 'sending', stopped_at: '2026-09-25T01:00:00+09:00' }));
     const stopped = await app(owner)
@@ -188,6 +207,7 @@ describe('一斉配信の staff 個別権限キー', () => {
     expect(stopped.status).toBe(200);
 
     mocks.getBroadcastById.mockResolvedValue(row({ status: 'draft' }));
+    mocks.deleteBroadcast.mockResolvedValue(true);
     const deleted = await app(owner)
       .request('/api/broadcasts/broadcast-1', { method: 'DELETE' });
     expect(deleted.status).toBe(200);

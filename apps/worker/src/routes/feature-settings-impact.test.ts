@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID, FEATURE_IDS } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import type { StaffRole } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { StaffRole } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const access = vi.hoisted(() => ({ canAccess: vi.fn(async () => true) }));
@@ -28,7 +28,7 @@ function app(role: StaffRole = 'owner') {
   return instance;
 }
 
-const ENV = { RESTAURANT_TEST_ENABLED: 'true' } as Record<string, string>;
+const ENV = { DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Record<string, string>;
 
 function seedLiveWork(db: SqliteD1) {
   db.raw.exec(`
@@ -308,7 +308,12 @@ describe('feature off impact check', () => {
 
     // 空DBで全33種をオフにする変更案は通り、有効から変わる分だけ結果が返る。
     // 既定オフの種は遷移しないため対象外になる。
+    // 統括ゲート導入時のバックフィル（既存統括に restaurant を付与）後の
+    // 状態に合わせ、既定の統括にも付けておく。付けなければ restaurant_test は
+    // 最初からoffで、遷移対象から外れてしまう。
     const testDb = createTestD1();
+    testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`)
+      .run(DEFAULT_TENANT_ID);
     try {
       const features = Object.fromEntries(FEATURE_IDS.map((feature) => [feature, false]));
       const { status, body } = await postImpact(testDb, { expectedVersion: 0, features });

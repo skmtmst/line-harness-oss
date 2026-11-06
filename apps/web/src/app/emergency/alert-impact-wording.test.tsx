@@ -16,9 +16,9 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { OperationAlert, OperationHealthSnapshot } from '@/lib/api'
-import EmergencyPage from './page'
+import { HealthPanelV8 as HealthPanel, OpenAlerts as OperationAlertsPanel } from '@/v8/settings/emergency/health'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, '../../v8/settings/emergency/health.tsx'), 'utf8')
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -46,7 +46,6 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-const { HealthPanel, OperationAlertsPanel } = EmergencyPage.__test
 
 function alert(overrides: Partial<OperationAlert> = {}): OperationAlert {
   return {
@@ -119,16 +118,14 @@ afterEach(() => {
 
 describe('A32-01: 根拠のない影響を断定しない', () => {
   it('外部通知の不達・友だちの減少・配信の停滞を断定する文が残っていない', () => {
+    // 可能性として出すことは、下の3つの試験が異常を描いて見る。
     expect(PAGE).not.toContain('外部システムへの通知が届いていません。')
     expect(PAGE).not.toContain('友だちが急に減っています')
     expect(PAGE).not.toContain('予約した配信が時刻どおりに出ていません。')
-    expect(PAGE).toContain('外部システムへの通知が届いていない可能性があります')
-    expect(PAGE).toContain('友だちが急に減っている可能性があります')
-    expect(PAGE).toContain('予約した配信が時刻どおりに出ていない可能性があります')
   })
 
   it('実測された注意の異常では影響を可能性として案内する', () => {
-    render(<OperationAlertsPanel
+    render(<OperationAlertsPanel canManage
       alerts={[alert()]}
       failed={false}
       busyId={null}
@@ -136,11 +133,11 @@ describe('A32-01: 根拠のない影響を断定しない', () => {
       onRetry={vi.fn()}
     />)
 
-    expect(screen.getByText('外部システムへの通知が届いていない可能性があります。')).toBeTruthy()
+    expect(screen.getByTitle(/外部システムへの通知が届いていない可能性があります。/)).toBeTruthy()
   })
 
   it('友だち変化の異常でも減少を断定せず可能性として案内する', () => {
-    render(<OperationAlertsPanel
+    render(<OperationAlertsPanel canManage
       alerts={[alert({ checkKey: 'friend_change', summary: '友だち数が大きく減少しています' })]}
       failed={false}
       busyId={null}
@@ -148,12 +145,24 @@ describe('A32-01: 根拠のない影響を断定しない', () => {
       onRetry={vi.fn()}
     />)
 
-    expect(screen.getByText(/友だちが急に減っている可能性があります/)).toBeTruthy()
+    expect(screen.getByTitle(/友だちが急に減っている可能性があります/)).toBeTruthy()
     expect(screen.queryByText(/友だちが急に減っています/)).toBeNull()
   })
 
+  it('配信の異常でも出ていないと断定せず可能性として案内する', () => {
+    render(<OperationAlertsPanel canManage
+      alerts={[alert({ checkKey: 'dispatch_jobs', summary: '予約配信が遅れています' })]}
+      failed={false}
+      busyId={null}
+      onAcknowledge={vi.fn()}
+      onRetry={vi.fn()}
+    />)
+
+    expect(screen.getByTitle(/予約した配信が時刻どおりに出ていない可能性があります。/)).toBeTruthy()
+  })
+
   it('確認できていない(unknown)異常では影響の有無も未確認と出す', () => {
-    render(<OperationAlertsPanel
+    render(<OperationAlertsPanel canManage
       alerts={[alert({
         severity: 'unknown',
         summary: '友だち変化の比較記録が足りません',
@@ -166,34 +175,63 @@ describe('A32-01: 根拠のない影響を断定しない', () => {
     />)
 
     // 記録不足なのに「減っている可能性」すら断定調で出さない
-    expect(screen.getByText('この項目はまだ確認できていないため、影響の有無も未確認です。')).toBeTruthy()
-    expect(screen.queryByText(/友だちが急に減っている可能性があります/)).toBeNull()
+    expect(screen.getByTitle(/この項目はまだ確認できていないため、影響の有無も未確認です。/)).toBeTruthy()
+    expect(screen.queryByTitle(/友だちが急に減っている可能性があります/)).toBeNull()
   })
 })
 
 describe('A32-01: 期限切れ(stale)の健全性を現在の判定と混ぜない', () => {
-  it('古い実行の項目は「未確認」へ倒し、本文に古い結果と明示する', async () => {
+  it('古い実行の項目は「古い確認」の札にし、帯では確かめ直しへ誘導する', async () => {
     healthResponse.handler = () => Promise.resolve(staleSnapshot())
-    render(<HealthPanel accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
+    render(<HealthPanel canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
 
+    // 古い「正常」を現在の判定として出さない。板どおり「古い確認」の札。
+    // 札の文字は点と文字が別の要素なので、textContent で探す。
+    const stalePills = () => [...document.querySelectorAll('span')]
+      .filter((el) => el.textContent === '古い確認')
     await waitFor(() => {
-      expect(screen.getByText('古い結果です（再確認待ち）: LINE接続は正常です')).toBeTruthy()
+      expect(stalePills().length).toBeGreaterThan(0)
     })
-    // 全体の状態は「期限切れ」と分けて出し、過去の次回予定は案内しない
-    expect(screen.getByText('期限切れ（再確認待ち）')).toBeTruthy()
+    expect(screen.queryByText(/全体の状態：正常/)).toBeNull()
+    // 帯では期限切れと分け、自動確認の停止を疑って確かめ直しへ誘導する
+    expect(screen.getByText(/前回の確認結果が期限切れです/)).toBeTruthy()
     expect(screen.getByText(/自動確認が止まっている可能性があります/)).toBeTruthy()
     expect(screen.queryByText(/次は.*に自動で確かめます/)).toBeNull()
+  })
+
+  it('期限切れの実行は、全体の判定も古い「正常」ではなく未確認として知らせる', async () => {
+    // 9項目すべてが古い「正常」。期限切れを見なければ全体が正常に見えてしまう形。
+    const allNormal = staleSnapshot()
+    const keys = ['line_connection', 'message_quota', 'external_integrations', 'webhook', 'dispatch_jobs', 'friend_change', 'monitoring_heartbeat', 'infra_canary', 'credential_expiry'] as const
+    allNormal.data.latestRun.results = keys.map((checkKey, index) => ({
+      ...allNormal.data.latestRun.results[0], id: `result-${index}`, checkKey, observedAt: new Date().toISOString(),
+    }))
+    healthResponse.handler = () => Promise.resolve(allNormal)
+    const onSeverity = vi.fn()
+    render(<HealthPanel canManage accountId="account-1" manualRunRequest={0} onSeverity={onSeverity} />)
+    // 読み込み中も期限切れも判定は未確認のまま。古い結果の「正常」を知らせない。
+    await waitFor(() => {
+      expect([...document.querySelectorAll('span')].filter((el) => el.textContent === '古い確認').length).toBeGreaterThan(0)
+    })
+    await act(async () => { await Promise.resolve() })
+    expect(onSeverity).not.toHaveBeenCalledWith('normal')
   })
 
   it('期限内の実行はこれまでどおり実測の判定を出す', async () => {
     const fresh = staleSnapshot()
     fresh.data.overallStatus = 'normal'
+    // 項目ごとの古さ（10分より古いと「古い確認」）に当たらないよう、観測を現在にする
+    const now = new Date().toISOString()
+    fresh.data.latestRun.results[0].observedAt = now
+    fresh.data.lastCheckedAt = now
     healthResponse.handler = () => Promise.resolve(fresh)
-    render(<HealthPanel accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
+    render(<HealthPanel canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.getByText('LINE接続は正常です')).toBeTruthy()
+      expect(screen.getAllByText('LINE のアカウントとつながっているか').length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/正常/).length).toBeGreaterThan(0)
     })
     expect(screen.queryByText(/古い結果です/)).toBeNull()
+    expect([...document.querySelectorAll('span')].filter((el) => el.textContent === '古い確認').length).toBe(0)
   })
 })

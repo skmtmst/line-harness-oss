@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 /**
  * リマインダを自動で登録する。
  *
@@ -18,7 +20,9 @@ import {
   rescheduleV6RemindersForSource,
   type CancelV6RemindersResult,
   type RescheduleV6RemindersResult,
+  type V6WriteGuard,
 } from '@line-crm/db';
+
 import { matchesCondition, parseCondition } from './segment-query.js';
 
 export type ReminderTriggerType = 'manual' | 'booking' | 'event';
@@ -29,7 +33,7 @@ export interface ReminderTriggerRow {
   trigger_offset_minutes: number | null;
   send_at_time: string | null;
   target_tag_id: string | null;
-  /** 418: イベント起点を特定イベントへ絞る列。NULL は全イベント対象。 */
+  /** イベント起点を特定イベントへ絞る列。NULL は全イベント対象。 */
   trigger_event_id: string | null;
   current_published_version_id: string | null;
 }
@@ -78,7 +82,7 @@ export async function matchesReminderTargetCondition(
   try {
     return await matchesCondition(db, friendId, condition);
   } catch (err) {
-    console.error(`[reminder-trigger] target condition failed for reminder ${reminderId}`, err);
+    logger.error("reminder_trigger.matches_reminder_target_condition_failed");
     return false;
   }
 }
@@ -108,7 +112,7 @@ export function resolveAnchor(rule: ReminderTriggerRow, startsAtIso: string): st
   // リマインダそのものが黙って消える。
   if (!match) return shifted.toISOString();
 
-  const jst = new Date(shifted.getTime() + JST_OFFSET_MS);
+  const jst = japanCalendar(shifted);
   jst.setUTCHours(Number(match[1]), Number(match[2]), 0, 0);
   return new Date(jst.getTime() - JST_OFFSET_MS).toISOString();
 }
@@ -135,13 +139,18 @@ export async function enrollByTrigger(
     /** 追跡用の発生元区分。未指定なら triggerType (個別相談は 'meet' を渡す)。 */
     sourceKind?: string | null;
     /**
-     * 418: 起こったイベント定義のid (triggerType==='event' のとき)。
+     * 起こったイベント定義のid (triggerType==='event' のとき)。
      * trigger_event_id を持つルールは、このidと一致するときだけ登録する。
      * 未指定ならイベント限定ルールはどれにも登録しない（取り違え防止）。
      */
     eventId?: string | null;
     /** 必須。ルールと友だちがこの店舗のもの一致するときだけ登録する。 */
     lineAccountId: string;
+    /**
+     * 指定時は各書込みに AND で結び付ける。親が動いていたらその文は
+     * 0 件 (登録は V6_WRITE_GUARDED を投げて数えない)。省略時は従来どおり。
+     */
+    writeGuard?: V6WriteGuard;
   },
 ): Promise<number> {
   // 自動登録はテナント境界を越えない。友だちの所属と呼出元の店舗が違う
@@ -167,7 +176,7 @@ export async function enrollByTrigger(
 
   let enrolled = 0;
   for (const rule of rules.results) {
-    // 418: イベント限定ルールは、起こったイベントと一致するときだけ動く。
+    // イベント限定ルールは、起こったイベントと一致するときだけ動く。
     if (rule.trigger_event_id && rule.trigger_event_id !== (input.eventId ?? null)) continue;
     if (rule.target_tag_id) {
       const tagged = await db
@@ -202,6 +211,7 @@ export async function enrollByTrigger(
       .first<{ 1: number }>();
     if (existing) continue;
 
+    const guard = input.writeGuard;
     try {
       await enrollFriendInReminder(db, {
         friendId: input.friendId,
@@ -210,8 +220,11 @@ export async function enrollByTrigger(
         sourceKind: input.sourceKind ?? input.triggerType,
         sourceId: input.sourceId ?? null,
         sourceEventId: input.sourceEventId ?? null,
+        writeGuard: guard,
       });
     } catch (error) {
+      // ガードで止められたらこのルールは数えず次へ (敗者は何も残さない)。
+      if (error instanceof Error && error.message === 'V6_WRITE_GUARDED') continue;
       // 取消後に同じ発生元で作り直したとき、cancelled の行が一意鍵
       // (reminder_id, friend_id, source_event_id) を塞いでいる。
       // その行を起こして新しい起点へ移す。再送の重なりでも1行のまま。
@@ -222,10 +235,16 @@ export async function enrollByTrigger(
               SET status = 'active', target_date = ?, cancel_reason = NULL,
                   completed_at = NULL, updated_at = ?
             WHERE reminder_id = ? AND friend_id = ? AND source_event_id = ?
-              AND status = 'cancelled'`,
+              AND status = 'cancelled'
+              ${guard ? `AND (${guard.sql})` : ''}`,
         )
-        .bind(anchor, new Date().toISOString(), rule.id, input.friendId, input.sourceEventId)
+        .bind(
+          anchor, new Date().toISOString(), rule.id, input.friendId, input.sourceEventId,
+          ...(guard ? guard.binds : []),
+        )
         .run();
+      // ガードつきで 0 件なら親が動いた敗者。起こさず次へ。
+      if ((revived.meta?.changes ?? 0) === 0 && guard) continue;
       if ((revived.meta?.changes ?? 0) === 0) throw error;
     }
     enrolled++;
@@ -257,13 +276,18 @@ export interface CancelByTriggerInput {
    * (利用者操作の取消用。呼び出し側は 409 で再試行させる)。
    */
   failOnSendInFlight?: boolean;
+  /**
+   * 指定時は cancelV6RemindersForSource の各書込みに AND で結び付ける。
+   * 親が動いていたらその文は 0 件になる。省略時は従来どおり。
+   */
+  writeGuard?: V6WriteGuard;
 }
 
 /**
- * 取消を V6 へ連動する。未送信だけを止め、送信済み履歴は残す。
+ * 取消を へ連動する。未送信だけを止め、送信済み履歴は残す。
  *
  * 同じ取消通知の再送は active が無いため 0 件で返す。
- * 失敗は呼び出し側へ投げる。黙って握ると取消漏れ (N-065 そのもの) になる。
+ * 失敗は呼び出し側へ投げる。黙って握ると取消漏れ ( そのもの) になる。
  */
 export async function cancelByTrigger(
   db: D1Database,
@@ -281,6 +305,7 @@ export async function cancelByTrigger(
     allowLegacyFallback: input.allowLegacyFallback,
     now: input.now?.toISOString(),
     failOnSendInFlight: input.failOnSendInFlight,
+    writeGuard: input.writeGuard,
   });
 }
 
@@ -299,11 +324,11 @@ export interface RescheduleByTriggerInput {
 }
 
 /**
- * 日程変更を V6 へ連動する。送信済みを残し、未来予定だけ新基準日へ移す。
+ * 日程変更を へ連動する。送信済みを残し、未来予定だけ新基準日へ移す。
  *
  * 同じ変更通知の再送は from の起点が既に無いため 0 件で返す。
  *
- * R334: 既存登録の移動条件は、新規登録の条件と分ける。ルールの公開版が
+ * 既存登録の移動条件は、新規登録の条件と分ける。ルールの公開版が
  * 変わったり停止中でも、予約に紐づく既存登録は現在の予約日時へ追随させる。
  * タグ・対象条件の絞り込みは新規登録のためのもので、既にある登録の
  * 移動には使わない。旧起点の計算は、登録が固定する公開版の設定からも
@@ -401,7 +426,7 @@ export async function rescheduleByTrigger(
     if (!fromCurrent || !to || fromCurrent === to) continue;
     addMove(rule.id, fromCurrent, to);
   }
-  // R334: 版ずれの source 行は、登録が固定する公開版の起点で探す。
+  // 版ずれの source 行は、登録が固定する公開版の起点で探す。
   // 現行起点では一致しないため、上の移動だけでは残る。
   for (const row of rows) {
     const rule = ruleById.get(row.reminderId);
@@ -445,6 +470,11 @@ export interface ReconcileV6Input {
    * 友だち変更で「新規成功後に旧取消」の順序を作るための前段に使う。
    */
   leaveOtherFriends?: boolean;
+  /**
+   * 指定時は各書込みに AND で結び付ける。親が動いていたらその文は
+   * 0 件になり、古い操作が新版の通知予定を変えない。省略時は従来どおり。
+   */
+  writeGuard?: V6WriteGuard;
 }
 
 export interface ReconcileV6Result {
@@ -522,6 +552,9 @@ export async function reconcileV6ToStartsAt(
 
   const statements: D1PreparedStatement[] = [];
   const healReason = `${kind}_heal:${input.sourceEventId ?? input.sourceId}:by:system`;
+  const guard = input.writeGuard;
+  const guardSql = guard ? `AND (${guard.sql})` : '';
+  const guardBinds = guard ? guard.binds : [];
   const staleIds = input.leaveOtherFriends
     ? []
     : rows.filter((row) => row.friendId !== input.friendId).map((row) => row.id);
@@ -532,8 +565,9 @@ export async function reconcileV6ToStartsAt(
       db.prepare(
         `UPDATE friend_reminders
             SET status = 'cancelled', cancel_reason = ?, updated_at = ?
-          WHERE status = 'active' AND id IN (${placeholders})`,
-      ).bind(healReason, nowIso, ...chunk),
+          WHERE status = 'active' AND id IN (${placeholders})
+          ${guardSql}`,
+      ).bind(healReason, nowIso, ...chunk, ...guardBinds),
     );
   }
   const movedIds: string[] = [];
@@ -545,8 +579,9 @@ export async function reconcileV6ToStartsAt(
       db.prepare(
         `UPDATE friend_reminders
             SET target_date = ?, updated_at = ?
-          WHERE status = 'active' AND id = ?`,
-      ).bind(to, nowIso, row.id),
+          WHERE status = 'active' AND id = ?
+          ${guardSql}`,
+      ).bind(to, nowIso, row.id, ...guardBinds),
     );
     movedIds.push(row.id);
   }
@@ -559,8 +594,9 @@ export async function reconcileV6ToStartsAt(
       db.prepare(
         `UPDATE reminder_delivery_runs
             SET status = 'cancelled', completed_at = ?, updated_at = ?
-          WHERE status IN ('queued', 'retry_wait', 'claimed') AND friend_reminder_id IN (${placeholders})`,
-      ).bind(nowIso, nowIso, ...chunk),
+          WHERE status IN ('queued', 'retry_wait', 'claimed') AND friend_reminder_id IN (${placeholders})
+          ${guardSql}`,
+      ).bind(nowIso, nowIso, ...chunk, ...guardBinds),
     );
   }
   if (statements.length === 0) return empty;

@@ -1,8 +1,8 @@
 /*
- * #931 N-310: 投稿経路のメタデータ除去と寸法検査をルートで直接固定する。
- * ・EXIF 等は審査用派生（nen-photo-review/*）から外れ、原本はそのまま残る
- * ・寸法が読めない・20,000px 超の画像は 400 で止まり、R2 へも DB へも残らない
- * ・申告 MIME と実体が違うものは弾く
+ *  投稿経路のメタデータ除去と寸法検査をルートで直接固定する。
+ * EXIF 等は審査用派生（nen-photo-review/*）から外れ、原本はそのまま残る
+ * 寸法が読めない・20,000px 超の画像は 400 で止まり、R2 へも DB へも残らない
+ * 申告 MIME と実体が違うものは弾く
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
@@ -13,7 +13,8 @@ const mocks = vi.hoisted(() => ({
   jstNow: vi.fn(() => '2026-08-28 02:00:00'),
 }));
 vi.mock('../services/liff-auth.js', () => ({ verifyCallerLineIdentity: mocks.verifyIdentity }));
-vi.mock('@line-crm/db', () => ({
+vi.mock('@line-crm/db', async original => ({
+  ...await original<typeof import('@line-crm/db')>(),
   getFriendByLineUserIdForAccount: mocks.getFriend,
   jstNow: mocks.jstNow,
   resolveLineCredential: vi.fn(),
@@ -175,7 +176,7 @@ describe('POST /api/liff/nen/photos のメタデータ除去と寸法検査(#931
 
     // 公開されるURLは審査用派生を指す。原本キーは返さない。
     const body = await res.json() as { data: { imageUrl: string } };
-    expect(body.data.imageUrl).toContain('/images/nen-photo-review/');
+    expect(body.data.imageUrl).toBeNull(); // 検査記録を確定できない段ではURLを出さない
   });
 
   it('テキスト・EXIF付きPNGは審査用から付帯チャンクが外れ、IHDRは残る', async () => {

@@ -1,9 +1,11 @@
+import { safeNavigationPath } from './safe-navigation'
 import { isAccountIndependentRoute } from './store-route-guard'
 
 export const ACCOUNT_SELECTION_KEY = 'lh_selected_account'
 export const AUTH_SELECTION_CLEARED_KEY = 'lh_auth_selection_cleared'
 
 export const HQ_OPEN_TARGETS = {
+  scenarios: { label: 'シナリオ管理', destination: '/scenarios' },
   tags: { label: 'タグ', destination: '/tags' },
   templates: { label: 'テンプレート管理', destination: '/templates' },
   'rich-menus': { label: 'リッチメニュー管理', destination: '/rich-menus' },
@@ -96,8 +98,8 @@ export function resetAuthSelectionCleared(
  * 外部URL・`//host` 形式・店舗不要の画面（/hq・/login など）は捨てる。
  */
 export function resolveStoreReturnPath(value: string | null): string | null {
+  value = safeNavigationPath(value)
   if (!value) return null
-  if (!value.startsWith('/') || value.startsWith('//')) return null
   const pathname = value.split('?')[0].split('#')[0]
   if (!pathname || isAccountIndependentRoute(pathname)) return null
   return value

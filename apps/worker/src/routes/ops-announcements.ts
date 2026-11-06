@@ -1,3 +1,6 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -9,10 +12,13 @@ import {
   countNoticeLinkedStaff,
   countScreenReads,
   createPlatformAnnouncement,
+  createLineAccount,
+  deleteUncommittedLineAccount,
   deletePlatformAnnouncement,
   getLineAccounts,
   getPlatformAnnouncement,
   getPlatformSetting,
+  jstNow,
   listPlatformAnnouncements,
   markAnnouncementSending,
   NOTICE_LINE_ACCOUNT_KEY,
@@ -25,19 +31,27 @@ import {
   type AnnouncementInput,
   type PlatformAnnouncement,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/platform-admin.js';
 import { clientIp } from '../services/admin-session.js';
 import { dbFor } from '../services/db-router.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { deliverAnnouncement, loadNoticeLineAccount, previewAudience } from '../services/platform-announcements.js';
+import { prepareNoticeLineConnection, NoticeLineConnectError } from '../services/notice-line-connect.js';
+import { expectedWebhookUrl } from '../lib/webhook-endpoint.js';
+import { fetchBotProfile } from '../lib/bot-profile.js';
+import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
+import { CredentialEncryptionKeyError } from '@line-crm/db';
 
-/** 運営からのお知らせ配信 ★V6 37-7 `q2CokV`。運営マスターだけが呼べる。 */
+/** 運営からのお知らせ配信 ★37-7 `q2CokV`。運営マスターだけが呼べる。 */
 export const opsAnnouncements = new Hono<Env>();
 
 opsAnnouncements.use('/api/ops/announcements', requirePlatformAdmin());
 opsAnnouncements.use('/api/ops/announcements/*', requirePlatformAdmin());
 opsAnnouncements.use('/api/ops/notice-line-account', requirePlatformAdmin());
+opsAnnouncements.use('/api/ops/notice-line-account/*', requirePlatformAdmin());
 
 const SUBJECT_MAX = 120;
 const BODY_MAX = 4000;
@@ -54,7 +68,7 @@ function audienceLabel(a: PlatformAnnouncement, tenantNames: Map<string, string>
 async function tenantNameMap(db: D1Database, ids: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   if (ids.length === 0) return out;
-  const { results } = await db.prepare(`SELECT id, name FROM tenants WHERE id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all<{ id: string; name: string }>();
+  const { results } = await db.prepare(`SELECT id, name FROM tenants WHERE id IN (${sqlIdSet(ids).sql})`).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<{ id: string; name: string }>();
   for (const r of results ?? []) out.set(r.id, r.name);
   return out;
 }
@@ -108,7 +122,7 @@ function parseInput(body: Record<string, unknown>): { input: AnnouncementInput }
   if (typeof body.publishAt === 'string' && body.publishAt.trim()) {
     const parsed = Date.parse(body.publishAt);
     if (Number.isNaN(parsed)) return { error: '公開日時の形式が正しくありません' };
-    publishAt = new Date(parsed + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+    publishAt = japanCalendar(new Date(parsed)).toISOString().replace('Z', '+09:00');
   }
   return { input: { subject, body: text, audienceKind, audiencePlans, audienceTenantIds, channels, publishAt } };
 }
@@ -127,32 +141,89 @@ opsAnnouncements.get('/api/ops/notice-line-account', async (c) => {
   const current = await getPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY);
   const accounts = (await getLineAccounts(db)).filter((a) => (a.tenant_id ?? DEFAULT_TENANT_ID) === DEFAULT_TENANT_ID && !a.archived_at);
   const notice = await loadNoticeLineAccount(c.env);
+  const liveName = notice ? (await fetchBotProfile(notice.channelAccessToken)).displayName?.trim() : null;
   const linked = await countNoticeLinkedStaff(db, DEFAULT_TENANT_ID);
   return c.json({
     success: true,
     data: {
       currentId: current,
-      current: notice ? { id: notice.id, name: notice.name, basicId: notice.basicId, addFriendUrl: notice.addFriendUrl } : null,
-      candidates: accounts.map((a) => ({ id: a.id, name: a.name, basicId: a.line_basic_id })),
+      current: notice ? { id: notice.id, name: liveName || notice.name, basicId: notice.basicId, addFriendUrl: notice.addFriendUrl } : null,
+      candidates: accounts.map((a) => ({ id: a.id, name: a.id === notice?.id && liveName ? liveName : a.name, basicId: a.line_basic_id })),
       linked,
     },
   });
 });
 
-opsAnnouncements.put('/api/ops/notice-line-account', requirePlatformAdminWrite(), async (c) => {
+opsAnnouncements.put('/api/ops/notice-line-account', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const body = await c.req.json<{ lineAccountId?: unknown }>().catch(() => null);
   const id = typeof body?.lineAccountId === 'string' && body.lineAccountId ? body.lineAccountId : null;
   if (id) {
     const account = (await getLineAccounts(db)).find((a) => a.id === id);
     if (!account || (account.tenant_id ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID || account.archived_at) {
-      return c.json({ success: false, error: '運営会社に登録されたアカウントから選んでください' }, 400);
+      return inputError(c, { success: false, error: '運営会社に登録されたアカウントから選んでください' }, 400, ["lineAccountId"]);
     }
   }
   const before = await getPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY);
   await setPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY, id, c.get('staff').id);
   await audit(c, 'notice_line_account.change', { from: before, to: id });
   return c.json({ success: true, data: { currentId: id } });
+});
+
+/** 契約者向け通知専用LINE。LIFFやLINE Loginを作らず、Messaging APIの資格情報だけで接続する。 */
+opsAnnouncements.post('/api/ops/notice-line-account/connect', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
+  if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
+    return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
+  }
+  const body = await c.req.json<{ channelId?: unknown; channelSecret?: unknown; basicId?: unknown }>().catch(() => null);
+  const channelId = typeof body?.channelId === 'string' ? body.channelId.trim() : '';
+  const channelSecret = typeof body?.channelSecret === 'string' ? body.channelSecret.trim() : '';
+  const basicId = typeof body?.basicId === 'string' ? body.basicId.trim() : '';
+  if (!/^\d{6,30}$/.test(channelId) || !channelSecret || channelSecret.length > 200 || !/^@[A-Za-z0-9_-]{3,40}$/.test(basicId)) {
+    return inputError(c, { success: false, error: 'チャネルID、チャネルシークレット、LINEの@IDを確認してください' }, 422, ['channelId', 'channelSecret', 'basicId']);
+  }
+  const db = dbFor(c.env);
+  if (await db.prepare('SELECT id FROM line_accounts WHERE channel_id = ?').bind(channelId).first()) {
+    return c.json({ success: false, error: 'このMessaging APIチャネルは登録済みです' }, 409);
+  }
+  const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+  let prepared: Awaited<ReturnType<typeof prepareNoticeLineConnection>>;
+  try {
+    prepared = await prepareNoticeLineConnection({ channelId, channelSecret, expectedBasicId: basicId, webhookUrl: expectedWebhookUrl(base, channelId) });
+  } catch (error) {
+    const messages: Record<NoticeLineConnectError['code'], string> = {
+      credentials: 'Messaging APIのチャネルIDとシークレットを確認してください',
+      profile: 'LINE公式アカウントの情報を取得できませんでした',
+      identity: '入力した@IDとMessaging APIの公式アカウントが一致しません',
+      webhook_in_use: '別のWebhook URLが設定されています。接続先を確認してください',
+      webhook_inactive: 'LINE DevelopersでWebhookの利用をONにしてから再試行してください',
+      webhook_test: 'Webhookの受信確認に失敗しました。設定を確認して再試行してください',
+    };
+    return c.json({ success: false, error: error instanceof NoticeLineConnectError ? messages[error.code] : 'LINEへの接続を確認できませんでした' }, 400);
+  }
+  let account: Awaited<ReturnType<typeof createLineAccount>> | null = null;
+  const before = await getPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY);
+  let assigned = false;
+  try {
+    account = await createLineAccount(db, {
+      channelId, channelSecret, channelAccessToken: prepared.accessToken,
+      name: prepared.profile.displayName, role: 'platform_notice',
+      tenantId: DEFAULT_TENANT_ID, createdByStaffId: c.get('staff').id,
+      lineDisplayName: prepared.profile.displayName,
+      linePictureUrl: prepared.profile.pictureUrl,
+      lineBasicId: prepared.profile.basicId,
+      lineProfileSyncedAt: jstNow(),
+    }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    await setPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY, account.id, c.get('staff').id);
+    assigned = true;
+    await audit(c, 'notice_line_account.change', { operation: 'connect', accountId: account.id, basicId, channelId });
+  } catch (error) {
+    if (assigned) await setPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY, before, c.get('staff').id).catch(() => undefined);
+    if (account) await deleteUncommittedLineAccount(db, account.id).catch(() => undefined);
+    if (error instanceof CredentialEncryptionKeyError) return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
+    throw error;
+  }
+  return c.json({ success: true, data: { accountId: account.id, name: account.name, basicId: prepared.profile.basicId } }, 201);
 });
 
 // ---------------------------------------------------------------------------
@@ -167,7 +238,7 @@ opsAnnouncements.get('/api/ops/announcements', async (c) => {
   return c.json({ success: true, data, linked, noticeLineConfigured: (await getPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY)) !== null });
 });
 
-opsAnnouncements.post('/api/ops/announcements/preview', async (c) => {
+opsAnnouncements.post('/api/ops/announcements/preview', inputJsonBoundary(), async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
   const audienceKind = typeof body.audienceKind === 'string' && (ANNOUNCEMENT_AUDIENCES as readonly string[]).includes(body.audienceKind) ? (body.audienceKind as AnnouncementAudience) : 'all';
   const plans = Array.isArray(body.audiencePlans) ? body.audiencePlans.filter((p): p is string => typeof p === 'string') : [];
@@ -176,19 +247,66 @@ opsAnnouncements.post('/api/ops/announcements/preview', async (c) => {
   return c.json({ success: true, data: preview });
 });
 
-opsAnnouncements.post('/api/ops/announcements', requirePlatformAdminWrite(), async (c) => {
+/*
+ * 作成ボタンの二重押し・通信再送で同じお知らせが2件できないよう、
+ * Idempotency-Key を行IDにする（broadcasts と同じ決めごと）。キーが無い
+ * 従来の呼び出しはそのまま作る。同じキーで内容が違う再送は取り違えなので
+ * 409 で止める。再送の返しは送り直さず保存済みを返す。
+ */
+function sameAnnouncementRequest(existing: PlatformAnnouncement, input: AnnouncementInput, status: 'draft' | 'scheduled'): boolean {
+  return existing.subject === input.subject
+    && existing.body === input.body
+    && existing.audience_kind === input.audienceKind
+    && existing.status === status
+    && (existing.publish_at ?? null) === (input.publishAt ?? null)
+    && JSON.stringify(parseJsonArray(existing.audience_plans)) === JSON.stringify(input.audiencePlans)
+    && JSON.stringify(parseJsonArray(existing.audience_tenant_ids)) === JSON.stringify(input.audienceTenantIds)
+    && JSON.stringify(parseJsonArray(existing.channels)) === JSON.stringify(input.channels);
+}
+
+opsAnnouncements.post('/api/ops/announcements', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const staff = c.get('staff');
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body) return c.json({ success: false, error: '内容を読み取れませんでした' }, 400);
+  if (!body) return inputError(c, { success: false, error: '内容を読み取れませんでした' }, 400, []);
   const parsed = parseInput(body);
-  if ('error' in parsed) return c.json({ success: false, error: parsed.error }, 400);
+  if ('error' in parsed) return inputError(c, { success: false, error: parsed.error }, 400, ["subject","body","audienceKind","audiencePlans","audienceTenantIds","channels","publishAt"]);
   const mode = body.mode === 'schedule' ? 'schedule' : body.mode === 'send' ? 'send' : 'draft';
-  if (mode === 'schedule' && !parsed.input.publishAt) return c.json({ success: false, error: '配信を予約するには公開日時を入れてください' }, 400);
+  if (mode === 'schedule' && !parsed.input.publishAt) return inputError(c, { success: false, error: '配信を予約するには公開日時を入れてください' }, 400, ["mode","subject","body","audienceKind","audiencePlans","audienceTenantIds","channels","publishAt"]);
   if (parsed.input.channels.includes('line') && mode !== 'draft' && !(await loadNoticeLineAccount(c.env))) {
     return c.json({ success: false, error: '契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください' }, 409);
   }
-  const created = await createPlatformAnnouncement(db, { ...parsed.input, status: mode === 'schedule' ? 'scheduled' : 'draft', createdByStaffId: staff.id, createdByName: staff.name });
+  const rawKey = c.req.header('Idempotency-Key')?.trim() || null;
+  if (rawKey !== null && !isValidIdempotencyKey(rawKey)) {
+    return inputError(c, { success: false, error: '再実行キーの形式が正しくありません' }, 400, []);
+  }
+  const status = mode === 'schedule' ? 'scheduled' : 'draft';
+  if (rawKey) {
+    const existing = await getPlatformAnnouncement(db, rawKey);
+    if (existing) {
+      if (!sameAnnouncementRequest(existing, parsed.input, status)) {
+        return c.json({ success: false, code: 'IDEMPOTENCY_CONFLICT', error: '同じ再実行キーが別の内容に使われています' }, 409);
+      }
+      c.header('Idempotency-Replayed', 'true');
+      return c.json({ success: true, duplicate: true, data: await serialize(db, existing) }, 200);
+    }
+  }
+  let created: PlatformAnnouncement;
+  try {
+    created = await createPlatformAnnouncement(db, {
+      ...parsed.input, status, createdByStaffId: staff.id, createdByName: staff.name,
+      ...(rawKey ? { id: rawKey } : {}),
+    });
+  } catch (error) {
+    // 並行した再送が先に作ったときだけ保存済みを返す。それ以外は投げ直す。
+    const existing = rawKey ? await getPlatformAnnouncement(db, rawKey) : null;
+    if (!existing) throw error;
+    if (!sameAnnouncementRequest(existing, parsed.input, status)) {
+      return c.json({ success: false, code: 'IDEMPOTENCY_CONFLICT', error: '同じ再実行キーが別の内容に使われています' }, 409);
+    }
+    c.header('Idempotency-Replayed', 'true');
+    return c.json({ success: true, duplicate: true, data: await serialize(db, existing) }, 200);
+  }
   await audit(c, 'announcement.create', { id: created.id, mode, channels: parsed.input.channels, audienceKind: parsed.input.audienceKind });
   if (mode === 'send') {
     if (!(await markAnnouncementSending(db, created.id))) return c.json({ success: false, error: '送信の準備に失敗しました' }, 409);
@@ -198,22 +316,46 @@ opsAnnouncements.post('/api/ops/announcements', requirePlatformAdminWrite(), asy
   return c.json({ success: true, data: await serialize(db, (await getPlatformAnnouncement(db, created.id))!) }, 201);
 });
 
-opsAnnouncements.put('/api/ops/announcements/:id', requirePlatformAdminWrite(), async (c) => {
+opsAnnouncements.put('/api/ops/announcements/:id', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const existing = await getPlatformAnnouncement(db, c.req.param('id'));
   if (!existing) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
   if (existing.status !== 'draft' && existing.status !== 'scheduled') return c.json({ success: false, error: '配信済みのお知らせは変えられません' }, 409);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body) return c.json({ success: false, error: '内容を読み取れませんでした' }, 400);
+  if (!body) return inputError(c, { success: false, error: '内容を読み取れませんでした' }, 400, []);
   const parsed = parseInput(body);
-  if ('error' in parsed) return c.json({ success: false, error: parsed.error }, 400);
+  if ('error' in parsed) return inputError(c, { success: false, error: parsed.error }, 400, ["subject","body","audienceKind","audiencePlans","audienceTenantIds","channels","publishAt"]);
   const mode = body.mode === 'schedule' ? 'schedule' : body.mode === 'send' ? 'send' : 'draft';
-  if (mode === 'schedule' && !parsed.input.publishAt) return c.json({ success: false, error: '配信を予約するには公開日時を入れてください' }, 400);
+  if (mode === 'schedule' && !parsed.input.publishAt) return inputError(c, { success: false, error: '配信を予約するには公開日時を入れてください' }, 400, ["mode","subject","body","audienceKind","audiencePlans","audienceTenantIds","channels","publishAt"]);
   if (parsed.input.channels.includes('line') && mode !== 'draft' && !(await loadNoticeLineAccount(c.env))) {
     return c.json({ success: false, error: '契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください' }, 409);
   }
-  const updated = await updatePlatformAnnouncement(db, existing.id, { ...parsed.input, status: mode === 'schedule' ? 'scheduled' : 'draft' });
-  if (!updated) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
+  /*
+   * 古い画面からの保存は止めて最新を見せる。版（expectedUpdatedAt）が
+   * 送られてきたときだけ照合し、合わなければ最新の件名つきで409にする。
+   * 送られてこない従来の呼び出しはそのまま通す。
+   */
+  const expectedUpdatedAt = typeof body.expectedUpdatedAt === 'string' ? body.expectedUpdatedAt : null;
+  if (expectedUpdatedAt !== null && existing.updated_at !== expectedUpdatedAt) {
+    return c.json({
+      success: false, code: 'VERSION_CONFLICT',
+      error: 'ほかの人が先に保存しました。一覧を読み直してから、もう一度保存してください。',
+      data: { latest: await serialize(db, existing) },
+    }, 409);
+  }
+  const updated = await updatePlatformAnnouncement(db, existing.id, { ...parsed.input, status: mode === 'schedule' ? 'scheduled' : 'draft' }, expectedUpdatedAt);
+  if (!updated) {
+    const fresh = await getPlatformAnnouncement(db, existing.id);
+    if (!fresh) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
+    if (fresh.status !== 'draft' && fresh.status !== 'scheduled') {
+      return c.json({ success: false, error: '配信済みのお知らせは変えられません' }, 409);
+    }
+    return c.json({
+      success: false, code: 'VERSION_CONFLICT',
+      error: 'ほかの人が先に保存しました。一覧を読み直してから、もう一度保存してください。',
+      data: { latest: await serialize(db, fresh) },
+    }, 409);
+  }
   if (mode === 'send') {
     if (!(await markAnnouncementSending(db, updated.id))) return c.json({ success: false, error: '送信の準備に失敗しました' }, 409);
     const result = await deliverAnnouncement(c.env, (await getPlatformAnnouncement(db, updated.id))!);

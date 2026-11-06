@@ -1,0 +1,137 @@
+/*
+ * ★V8 設定の板（・・ ほか 8 枚）：「設定の中のメニュー」。
+ * 見出し「設定」＋印つきの8項目。いまの画面は薄い地＋太字。右に区切り線。
+ * 部品は v8 のときだけ描く（app-shell.tsx・設定の型でテーマを見て分岐）ので、ここの値は全部 v8 のもの。
+ *
+ * 置き方は2つ。
+ *   - inline（画面が白い板の中、題の下の左に置く）：いつも左の欄。絵の形。
+ *   - 外（まだ移っていない画面。app-shell が白い板の外に置く）：
+ *       PC は左の欄、1024px 未満は畳む。
+ */
+.root {
+  display: none;
+}
+
+.inline,
+.inline.root {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--tpl-setnav-gap);
+  box-sizing: content-box;
+  width: var(--tpl-setnav-w);
+  padding: var(--tpl-setnav-pad);
+  border-right: 1px solid var(--color-hairline);
+}
+
+/* 設定の型では、左列の幅に余白を含め、隣の本文が24pxの余白を持つ。 */
+:global([data-page-template='settings'] [data-template-region='navigation']) > .inline {
+  box-sizing: border-box;
+  border-right: 0;
+  box-shadow: var(--tpl-setnav-divider);
+}
+
+@media (min-width: 1024px) {
+  .root:not(.inline) {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: var(--tpl-setnav-gap);
+    box-sizing: content-box;
+    width: var(--tpl-setnav-w);
+    padding: var(--tpl-setnav-pad);
+    border-right: 1px solid var(--color-hairline);
+  }
+}
+
+/* 型（ListPage）のフォルダの列の中に置くとき（統括の設定）。幅・余白・仕切り線は型が持つ。 */
+.folder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-setnav-gap);
+}
+
+/* 見出し「設定」（11px・太字・薄い字）。 */
+.heading {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-setnav-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 項目：印 16＋字13・500。寸法は共通値から読む。 */
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-setnav-item-gap);
+  padding: var(--tpl-setnav-item-pad);
+  border-radius: var(--tpl-setnav-radius);
+  color: var(--color-ink-secondary);
+  font-size: var(--polish-text-body);
+  line-height: normal;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+.item:hover {
+  background: var(--color-nav-hover);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+/* いまの画面：左メニューと同じ白＋薄い影＋太字・濃い字。 */
+.itemActive {
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-nav-active);
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+/* 設定メニューで子項目が必要な場合の共通表示。 */
+.children {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-setnav-gap);
+  margin: var(--tpl-setnav-gap) 0 0 var(--tpl-setnav-child-indent);
+  padding: 0;
+  list-style: none;
+}
+
+.child {
+  display: flex;
+  align-items: center;
+  padding: var(--tpl-setnav-item-pad);
+  border-radius: var(--tpl-setnav-radius);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+  font-weight: 500;
+}
+
+.child:hover {
+  background: var(--color-nav-hover);
+  color: var(--color-ink);
+}
+
+.child:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.child.itemActive { font-weight: 600; }

@@ -6,7 +6,7 @@
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   listMenuVersions: null as null | (() => Promise<unknown>),
@@ -31,7 +31,8 @@ vi.mock('@/lib/api', () => {
   }
 })
 
-import MenuVersionHistory from './menu-version-history'
+import MenuVersionHistory from '@/v8/booking-menus/menu-version-history'
+import { ApiError } from '@/lib/api'
 
 afterEach(() => {
   cleanup()
@@ -74,7 +75,7 @@ describe('版の履歴の引き出し', () => {
   test('読み込み中はその旨を出す', () => {
     fixture.listMenuVersions = () => new Promise(() => {})
     renderHistory()
-    expect(screen.getByText('版の履歴を読み込んでいます')).toBeTruthy()
+    expect(screen.getByLabelText('版の履歴を読み込んでいます').getAttribute('aria-busy')).toBe('true')
   })
 
   test('正常時は版・札・ひとことが並ぶ', async () => {
@@ -134,4 +135,18 @@ describe('版の履歴の引き出し', () => {
     const revertButton = screen.getByText('この版に戻す').closest('button')
     expect(revertButton?.disabled).toBe(true)
   })
+})
+
+test('版を戻す409の理由は一覧の取得成功で消えない', async () => {
+  const list = vi.fn(async () => ({versions: VERSIONS}))
+  fixture.listMenuVersions = list
+  fixture.revertMenuVersion = async () => {throw new ApiError(409,'fixture conflict')}
+  renderHistory()
+  await screen.findByText('第1版')
+  fireEvent.click(screen.getByText('第1版'))
+  fireEvent.click(screen.getByText('この版に戻す'))
+  fireEvent.click(screen.getByText('新しい版を作る'))
+  await waitFor(() => expect(list).toHaveBeenCalledTimes(2))
+  const dialog = screen.getByRole('dialog', { name: '第1版に戻しますか？' })
+  expect(within(dialog).getByRole('alert').textContent).toContain('ほかの人が先に保存しました。最新の版を読み直しました。内容を確かめてから、もう一度お試しください。')
 })

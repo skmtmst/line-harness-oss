@@ -10,7 +10,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { encryptCredential } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { syncTiktokPnlForAccount, type TiktokPnlSettingsRow } from './tiktok-pnl.js';
 import type { GoogleSheetsIntegrationRow } from './google-sheets.js';

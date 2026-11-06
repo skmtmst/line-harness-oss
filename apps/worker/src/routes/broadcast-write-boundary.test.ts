@@ -1,5 +1,5 @@
 /*
- * 配信の作成・更新・送信の共通境界(N-061)。
+ * 配信の作成・更新・送信の共通境界。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物の broadcasts ルートを当てる。
  * 作成時は要求account、更新・送信時はDB行のaccountを共通土台へ渡す。
@@ -10,11 +10,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
-vi.mock('../services/broadcast.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../services/broadcast.js')>();
+vi.mock('../features/broadcasts/broadcast.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../features/broadcasts/broadcast.js')>();
   return {
     ...actual,
     processQueuedBroadcasts: vi.fn().mockResolvedValue(undefined),
@@ -31,7 +31,7 @@ const owner: AuthenticatedStaff = {
 };
 const keyStaff: AuthenticatedStaff = {
   id: 'staff-key', name: '配信権あり', role: 'staff', readOnly: false, tenantId: 'tenant-1',
-  // v6-06 §6：範囲の鍵に加え、操作ごとの個別キーも要る。
+  // -06 §6：範囲の鍵に加え、操作ごとの個別キーも要る。
   permissionKeys: [
     '/broadcasts',
     'broadcast.definition.edit',
@@ -228,7 +228,7 @@ describe('配信の共通境界(N-061)', () => {
     const badUrl = await postCreate({ ...CREATE_BODY, messageOptions: { buttons: [button({ value: 'not-a-url' })] } });
     expect(badUrl.status).toBe(400);
     await expect(badUrl.json()).resolves.toMatchObject({ error: 'ボタン1のURLは https:// から始めてください' });
-    // 直したら通る。
+
     const fixed = await postCreate({ ...CREATE_BODY, messageOptions: { buttons: [button({})] } });
     expect(fixed.status).toBe(201);
   });

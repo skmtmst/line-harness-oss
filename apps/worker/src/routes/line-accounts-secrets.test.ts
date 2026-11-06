@@ -2,8 +2,9 @@ import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@line-crm/db', () => ({
+  getLineAccountListStats: vi.fn().mockResolvedValue({}),
   getLineAccountById: vi.fn().mockResolvedValue({
-    id: 'acc-1', channel_id: '2011', name: 'TEST',
+    id: 'acc-1', channel_id: '2011', name: 'TEST', liff_id: 'dummy-public-liff-id',
     channel_access_token: 'SECRET-TOKEN', channel_secret: 'SECRET-CHANNEL',
     login_channel_secret: 'SECRET-LOGIN',
     is_active: 1, country: 'JP', role: 'main', display_order: 0,
@@ -24,7 +25,7 @@ vi.mock('@line-crm/db', () => ({
   jstNow: () => '2026-08-15T00:00:00+09:00',
 }));
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { lineAccounts } from './line-accounts.js';
 
 /**
@@ -66,6 +67,15 @@ describe('GET /api/line-accounts/:id — 保存済み資格情報を返さない
     expect(data.channelSecret).toBeUndefined();
     expect(data.loginChannelSecret).toBeUndefined();
     expect(data.channelAccessTokenConfigured).toBe(true);
+  });
+
+  it.each([false, true])('スタッフのreadOnly=%sでも公開LIFF設定を取得でき、鍵は返さない', async (readOnly) => {
+    const data = await fetchAccount('staff', readOnly);
+    expect(data.id).toBe('acc-1');
+    expect(data.liffId).toBe('dummy-public-liff-id');
+    expect(data.channelAccessToken).toBeUndefined();
+    expect(data.channelSecret).toBeUndefined();
+    expect(data.loginChannelSecret).toBeUndefined();
   });
 
   it('閲覧のみなら、オーナーでも鍵を返さない', async () => {

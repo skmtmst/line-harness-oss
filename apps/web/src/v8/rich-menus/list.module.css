@@ -1,0 +1,217 @@
+/*
+ * ★V8 リッチメニューの一覧（Pencil ・1152 ・閲覧のみ ・窓 ）。
+ * 枠・見出し・数の帯・フォルダの列・道具の段の余白は型（ListPage）が持つ。
+ * 寸法は globals.css の `--tpl-rml-*`。
+ */
+
+/* フォルダの列：作るボタンは列の幅いっぱい。 */
+.createWide { width: 100%; }
+
+/* 数の帯の数字は字の幅どおり（絵どおり。全体の既定は等幅）。 */
+
+/* 見るだけの人への帯。数の帯の上。薄い青の地・目の印・枠なし。 */
+.viewerBand { margin: 0 var(--tpl-head-pad-side) var(--tpl-rml-ro-after); }
+
+/* 道具の段：案内の帯は1行を取る。 */
+/* 案内の帯と道具の行の間は14（型の行の間8＋6）。 */
+.noticeRow { flex-basis: 100%; margin-bottom: var(--tpl-rml-notice-after); }
+.priorityNotice { width: 100%; }
+.chips { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+.spacer { flex: 1 1 0; }
+
+.perPageBox { flex-shrink: 0; }
+
+/* 1152 の板：案内の帯 → 1段目 → 2段目。 */
+.narrowTools {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-pad-block);
+}
+.narrowRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+.narrowRow + .narrowRow { margin-top: calc(var(--tpl-toolbar-gap) - var(--tpl-toolbar-pad-block)); margin-bottom: calc(var(--tpl-rml-narrow-row2-pad) - var(--tpl-toolbar-pad-block)); }
+.narrowFolder { width: var(--tpl-rml-folder-w); flex-shrink: 0; }
+.narrowFolder :global(*) { max-width: 100%; }
+.narrowFolder :global(button) { width: 100%; }
+.narrowSearch { width: var(--tpl-rml-search-w); flex-shrink: 0; }
+
+/* 表：列の幅＝中身＋欄の間16（端の列は端の24も）。 */
+.tableWrap { min-width: 0; }
+.tableWrap table { table-layout: fixed; }
+.colOrder { width: var(--tpl-rml-col-order); }
+.colThumb { width: var(--tpl-rml-col-thumb); }
+.colAudience { width: var(--tpl-rml-col-audience); }
+.colState { width: var(--tpl-rml-col-state); }
+.colCount { width: var(--tpl-rml-col-count); }
+.colMenu { width: var(--tpl-rml-col-menu); }
+
+.row { cursor: pointer; }
+.row > td { height: var(--tpl-rml-row-h); padding-block: 0; vertical-align: middle; }
+
+.orderInner { display: inline-flex; align-items: center; gap: var(--tpl-rml-order-gap); }
+/* つまみが押せない（閲覧のみ・絞り込み中）ときも番号の位置を変えない。 */
+.orderInner > :first-child { min-width: var(--tpl-rml-grip-w); }
+.orderCell { color: var(--color-hairline); }
+.orderNumber {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 見本（64×43・面の区切りを白い細線で）。画像があれば画像。 */
+.thumb {
+  display: flex;
+  flex-direction: column;
+  width: var(--tpl-rml-thumb-w);
+  height: var(--tpl-rml-thumb-h);
+  overflow: hidden;
+  border-radius: var(--tpl-rml-thumb-radius);
+  outline: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.thumbRow { display: flex; flex: 1 1 0; }
+.thumbCellPart { flex: 1 1 0; outline: 1px solid var(--color-canvas); }
+
+.nameCell, .audienceCell { min-width: 0; }
+.name {
+  display: block;
+  overflow: hidden;
+  color: var(--color-action);
+  font-size: var(--tpl-row-name-size);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.name:hover { text-decoration: underline; }
+.sub {
+  display: block;
+  margin-top: var(--tpl-row-sub-gap);
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-row-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
+.nameSub { padding-inline-start: var(--tpl-folder-dot-indent); }
+.audienceMain {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rml-main-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 副の行が無いときも、絵どおり名の行と同じ高さから始める。 */
+.audienceAlone { margin-bottom: var(--tpl-rml-alone-shift); }
+.audienceCell .sub { margin-top: var(--tpl-compact-gap); }
+
+.countMain {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.menuCell { text-align: right; }
+.menuBox { display: flex; align-items: center; justify-content: flex-end; }
+
+/* 表の下の件数（型の pagination 枠の中。件数は左、ページ送りは右）。 */
+.pagerRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--tpl-toolbar-gap); }
+.pagerCount {
+  padding: var(--tpl-rml-pager-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 操作の失敗の帯。 */
+
+.errorBand button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* 読み込み中の骨格の行。 */
+.skeletonRows { display: flex; flex-direction: column; }
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-large-gap);
+  height: var(--tpl-rml-row-h);
+  padding: 0 var(--tpl-row-pad-side);
+  border-bottom: 1px solid var(--color-divider);
+}
+.skeletonThumb {
+  flex-shrink: 0;
+  width: var(--tpl-rml-thumb-w);
+  height: var(--tpl-rml-thumb-h);
+  border-radius: var(--tpl-rml-thumb-radius);
+  background: var(--color-canvas-sunken);
+}
+.skeletonBar { flex: 1; height: var(--tpl-cell-gap-half); border-radius: var(--radius-pill); background: var(--color-canvas-sunken); }
+
+/* 空・失敗の1枚。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  margin: 0 var(--tpl-row-pad-side);
+  padding: var(--tpl-create-content-pad-block) var(--tpl-row-pad-side);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  text-align: center;
+  box-shadow: var(--card-shadow);
+}
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-chip-h);
+  height: var(--tpl-chip-h);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile);
+  color: var(--color-ink-secondary);
+}
+.stateIconError { background: var(--color-danger-bg); color: var(--color-danger); }
+.stateTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 600; }
+.stateDesc { margin: 0; color: var(--color-ink-faint); font-size: var(--text-label); }
+
+/* 窓の中身。 */
+.impact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cell-gap-half);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+.impact p { margin: 0; }
+.impact strong { color: var(--color-ink); }
+.impactDetail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+  padding-top: var(--tpl-cell-gap-half);
+  border-top: 1px solid var(--color-hairline);
+  font-size: var(--text-caption);
+}
+.impactDanger { color: var(--color-danger); font-weight: 600; }
+.impactFaint { color: var(--color-ink-faint); font-size: var(--text-caption); }
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-h); }
+/* 閲覧のみ：つまみと同じ大きさの見えない印で、順番の数字の位置を保つ。 */
+.gripSpace { display: inline-flex; padding: var(--tpl-compact-gap); visibility: hidden; }

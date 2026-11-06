@@ -1,4 +1,6 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
+import { encryptCredential } from './credential-crypto.js';
 
 // Google Calendar 連携クエリヘルパー
 
@@ -44,12 +46,12 @@ function calendarAccountScopeSql(
 ): { sql: string; binds: string[] } {
   const clauses: string[] = [];
   if (scope.allowedAccountIds.length > 0) {
-    clauses.push(`${column} IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`);
+    clauses.push(`${column} IN (${sqlIdSet(scope.allowedAccountIds).sql})`);
   }
   if (scope.includeUnassigned) clauses.push(`${column} IS NULL`);
   return {
     sql: clauses.length > 0 ? `(${clauses.join(' OR ')})` : '0 = 1',
-    binds: [...scope.allowedAccountIds],
+    binds: scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [],
   };
 }
 
@@ -90,9 +92,16 @@ export async function createCalendarConnection(
     apiKey?: string;
   },
   scope: CalendarAccountScope,
+  encryptionKey?: string,
 ): Promise<GoogleCalendarConnectionRow | null> {
   if (!scope.allowedAccountIds.includes(input.lineAccountId)) return null;
 
+  // Existing TEXT columns store authenticated ciphertext. Never fall back to plaintext.
+  const protect = (value: string | undefined) => value
+    ? encryptCredential(value, encryptionKey) : Promise.resolve(null);
+  const [accessToken, refreshToken, apiKey] = await Promise.all([
+    protect(input.accessToken), protect(input.refreshToken), protect(input.apiKey),
+  ]);
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
@@ -106,9 +115,9 @@ export async function createCalendarConnection(
       input.lineAccountId,
       null,
       input.authType,
-      input.accessToken ?? null,
-      input.refreshToken ?? null,
-      input.apiKey ?? null,
+      accessToken,
+      refreshToken,
+      apiKey,
       now,
       now,
     )

@@ -1,12 +1,17 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
+// @vitest-environment happy-dom
+import React from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import TemplateDeleteDialog from '@/v8/templates/delete-dialog'
+import { DELETE_UNUSED_DESCRIPTION } from '@/v8/templates/words'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { templateDeleteDescription } from './template-delete-message'
+import { templateDeleteDescription } from '@/v8/template-detail/model'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 
 /**
  * 名前で見つけた関数の本体だけを切り出す。
@@ -30,74 +35,58 @@ function fnBody(src: string, decl: string): string {
   throw new Error(`${decl} の本体が閉じていません`)
 }
 
-/** `<ConfirmDialog` から閉じまでを切り出す。 */
-function dialog(src: string, end: string): string {
-  const from = src.indexOf('<ConfirmDialog')
-  if (from < 0) throw new Error('<ConfirmDialog が見つかりません')
-  const to = src.indexOf(end, from)
-  if (to < 0) throw new Error(`${end} が見つかりません`)
-  return src.slice(from, to + end.length)
-}
+afterEach(cleanup)
 
 describe('テンプレート一覧の削除確認', () => {
   it('ブラウザのconfirmを使わず、共通の確認窓へ移す', () => {
-    expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
     expect(PAGE.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, ''))
       .not.toMatch(/[^.\w]confirm\(/)
   })
 
-  // 2026-09-02: development (#433) が「使用中は消さず使用先へ送る」を足し、
-  // 覚えの名前が deleteTarget → pendingDelete、押した先が
-  // handleDelete → confirmDelete になった。**見張る中身は変えていない。**
-  it('削除の処理が二度押しを受け付けない', () => {
-    const body = fnBody(PAGE, 'const confirmDelete = async ()')
-    expect(body, '押している間の二度押しを止めていない').toContain('if (!pendingDelete || deleting) return')
-    expect(body, '処理中の印を立てていない').toContain('setDeleting(true)')
-    expect(body, '処理中の印を必ず戻していない').toMatch(/finally\s*\{[\s\S]*setDeleting\(false\)/)
-  })
+  // 二度押し・処理中の Esc・処理中の印を戻すことは templates-list-behavior.test.tsx の
+  // 「削除の確認」で、削除を待たせて押して確かめる。
 
   it('削除の失敗を握りつぶさず、窓の中に運用の言葉で出す', () => {
+    // 窓を閉じないこと・運用の言葉で出すことは templates-list-behavior.test.tsx で断らせて確かめる。
     const body = fnBody(PAGE, 'const confirmDelete = async ()')
-    expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
-    expect(body, '失敗を窓に出していない').toContain(
-      "setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')",
-    )
     expect(body, '生のAPIエラーをそのまま出している').not.toMatch(/setDeleteError\(\s*(res\.error|String\(|e\b)/)
-    expect(body, '成功していないのに閉じている').toMatch(
-      /throw new Error\(res\.error\)[\s\S]*setPendingDelete\(null\)/,
-    )
   })
 
   it('確認窓が取り消せない操作として出て、処理中は閉じられない', () => {
-    const jsx = dialog(PAGE, '/>')
-    expect(jsx, '対象の名前を読ませていない').toContain('pendingDelete?.name')
-    expect(jsx, '何が起きるかを本文で読ませていない').toContain('templateDeleteDescription(pendingDelete?.usageCount ?? 0)')
-    expect(jsx, '取り消せない操作の色になっていない').toContain('destructive')
-    expect(jsx).toContain('confirmLabel="削除する"')
-    expect(jsx, '処理中でも押せてしまう').toContain('busy={deleting}')
-    expect(jsx, '失敗が窓の中に出ない').toContain('error={deleteError}')
-    expect(jsx, '処理中に閉じられてしまう').toContain('if (deleting) return')
+    const remove = vi.fn(), cancel = vi.fn()
+    const { rerender } = render(React.createElement(TemplateDeleteDialog, {
+      open: true, title: '「秋のご案内」を削除しますか？', description: DELETE_UNUSED_DESCRIPTION,
+      busy: true, onConfirm: remove, onCancel: cancel,
+    }))
+    // 一覧の側の対象・実行中・失敗・取消の接続は templates-list-behavior.test.tsx で一覧から開いて確かめる。
+    expect(screen.getByRole('alertdialog').textContent).toContain('秋のご案内')
+    expect(screen.getByRole('alertdialog').textContent).toContain('すでに送ったメッセージは残ります')
+    expect(screen.getByRole('alert').textContent).toContain('削除は元に戻せません')
+    for (const button of screen.getAllByRole('button')) expect((button as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(cancel).not.toHaveBeenCalled()
+    expect(remove).not.toHaveBeenCalled()
+    rerender(React.createElement(TemplateDeleteDialog, {
+      open: true, title: '「秋のご案内」を削除しますか？', description: DELETE_UNUSED_DESCRIPTION,
+      error: '削除できませんでした', onConfirm: remove, onCancel: cancel,
+    }))
+    expect(screen.getAllByRole('alert').some(el => el.textContent?.includes('削除できませんでした'))).toBe(true)
+    expect((screen.getByRole('button', { name: '削除する' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.getByRole('button', { name: '削除する' }).getAttribute('data-dialog-action')).toBe('danger')
   })
 
   it('削除を押しただけでは消えず、窓を開くだけにする', () => {
-    const body = fnBody(PAGE, 'const handleDelete = (template:')
+    // 窓を開くだけで消さないことは v8/templates/list.test.tsx の「決まり2」で押して確かめる。
+    const body = fnBody(PAGE, 'const handleDelete = (t:')
     expect(body, '押した時点で消しにいっている').not.toContain('api.templates.delete')
-    expect(body, '窓を開いていない').toContain('setPendingDelete({ id, name, usageCount })')
   })
 
   it('使用中は消さず、使用先と差し替え導線を確認窓に出す', () => {
-    const body = fnBody(PAGE, 'const handleDelete = (template:')
-    expect(body, '使用中でも窓を開いてしまう').toMatch(
-      /if \(usageCount > 0\)[\s\S]*setBlockedDelete\(\{ id, name, usageCount \}\)[\s\S]*return/,
-    )
-    expect(PAGE, '使用中の行から使用先へ行けない').toContain('使用先を見る')
-    expect(PAGE).toContain('使用中のテンプレートは削除できません')
-    expect(PAGE).toContain('replacementDestinations.map')
-    // N-135: 使用先が複数あっても各行が個別のリンクになる。
-    // 「差し替える画面へ」ボタンが replacementDestinations[0] だけを
+    // 使用中の窓・使用先の行・説明は v8/templates/list.test.tsx・usage-destinations.test.tsx・
+    // templates-list-behavior.test.tsx で一覧から開いて確かめる。
+    // N-135: 「差し替える画面へ」ボタンが replacementDestinations[0] だけを
     // 開いていた退行を固定する。
     expect(PAGE, '1件目だけを開く導線に戻ってはいけない').not.toContain('replacementDestinations[0]')
-    expect(PAGE, '使用先の行が個別リンクになっていない').toContain('href={href}')
   })
 })
 

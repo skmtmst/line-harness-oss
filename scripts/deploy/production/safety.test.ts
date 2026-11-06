@@ -1,0 +1,153 @@
+import { readFileSync } from 'node:fs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as common from './common.js';
+import { assertProductionApproval, assertReleaseSource, assertStagingRun, assertStagingSource } from './preflight.js';
+import { assertBootstrap, assertHeaderRules, headerRules } from './artifacts.js';
+import { assertApproved, assertUnchanged } from './database.js';
+import { assertBackupPolicy, decryptBackup, encryptBackup } from './backup.js';
+import { assertResponse } from './responses.js';
+
+const sha = 'a'.repeat(40), repository = 'owner/repository';
+const context = { GITHUB_REPOSITORY: repository, GITHUB_SHA: sha, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main`, GITHUB_RUN_ID: '456', GITHUB_ACTOR: 'skmtmst', GITHUB_TRIGGERING_ACTOR: 'skmtmst' };
+const run = { repository: { full_name: repository }, head_repository: { full_name: repository }, path: '.github/workflows/deploy-cloudflare-staging.yml', head_sha: sha, head_branch: 'codex/development', status: 'completed', conclusion: 'success', event: 'workflow_dispatch' };
+const jobs = { jobs: [{ name: 'deploy', conclusion: 'success', steps: [
+  { name: 'Deploy Worker to staging', conclusion: 'success' },
+  { name: 'Deploy Admin Panel to staging', conclusion: 'success' },
+  { name: 'Verify public source revisions', conclusion: 'success' },
+] }] };
+const historicalSha = '4482ab95c890276cd1e2dcc4e25e43d3a5042821';
+const releaseBranch = 'codex/masato-production-release-20261104';
+afterEach(() => vi.restoreAllMocks());
+
+describe('approved production source and staging proof', () => {
+  it('requires the full current main revision and the authorized parent', () => {
+    expect(() => assertReleaseSource(sha, sha, sha, context)).not.toThrow();
+    const mergedMain = 'b'.repeat(40);
+    expect(() => assertReleaseSource(sha, mergedMain, sha, { ...context, GITHUB_SHA: mergedMain }, true)).not.toThrow();
+    expect(() => assertReleaseSource(sha, mergedMain, sha, { ...context, GITHUB_SHA: mergedMain })).toThrow();
+    for (const [candidate, main, actual, env] of [[sha.slice(0, 12), sha, sha, context], [sha, 'b'.repeat(40), sha, context], [sha, sha, 'b'.repeat(40), context], [sha, sha, sha, { ...context, GITHUB_REF: 'refs/heads/feature' }], [sha, sha, sha, { ...context, GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/other.yml@refs/heads/main` }]] as const) expect(() => assertReleaseSource(candidate, main, actual, env)).toThrow();
+  });
+  it('does not accept a staging dry-run/replay, old SHA, foreign repo or failed public verification', () => {
+    expect(() => assertStagingRun(run, jobs, sha, repository)).not.toThrow();
+    expect(() => assertStagingRun({ ...run, head_branch: 'codex/masato-production-release-20261104' }, jobs, sha, repository)).not.toThrow();
+    for (const mutation of [{ head_sha: 'b'.repeat(40) }, { head_branch: 'codex/unknown-release' }, { conclusion: 'failure' }, { status: 'in_progress' }, { path: '.github/workflows/other.yml' }, { head_repository: { full_name: 'attacker/fork' } }]) expect(() => assertStagingRun({ ...run, ...mutation }, jobs, sha, repository)).toThrow();
+    expect(() => assertStagingRun(run, { jobs: [{ conclusion: 'success', steps: [] }] }, sha, repository)).toThrow();
+    for (const step of jobs.jobs[0].steps) {
+      expect(() => assertStagingRun(run, { jobs: [{ ...jobs.jobs[0], steps: jobs.jobs[0].steps.map(current => current === step ? { ...current, conclusion: 'skipped' } : current) }] }, sha, repository)).toThrow();
+    }
+  });
+  it('accepts the one-time published source only when later paths are release proof files', () => {
+    const releaseSha = 'b'.repeat(40);
+    const command = vi.spyOn(common, 'command').mockImplementation((_binary, args) =>
+      args.includes('--name-only') ? '.github/workflows/required-pr-gate.yml\0scripts/deploy/production/preflight.ts\0' : '');
+    expect(() => assertStagingSource(historicalSha, releaseSha, releaseBranch)).not.toThrow();
+    expect(() => assertStagingRun({ ...run, head_sha: historicalSha, head_branch: releaseBranch }, jobs, releaseSha, repository)).not.toThrow();
+    expect(command.mock.calls.some(([, args]) => args.includes('--is-ancestor'))).toBe(true);
+    for (const path of [
+      'apps/web/src/v8/hq-templates/console-draft-review.test.tsx',
+      'apps/web/src/v8/restaurant/line-followup/followup-unsaved-navigation.test.tsx',
+      'apps/web/src/v8/form-edit/edit.test.tsx',
+    ]) {
+      command.mockImplementation((_binary, args) => args.includes('--name-only') ? `${path}\0` : '');
+      expect(() => assertStagingSource(historicalSha, releaseSha, releaseBranch)).not.toThrow();
+    }
+    expect(() => assertStagingSource(historicalSha, releaseSha, 'codex/development')).toThrow('staging_run');
+    expect(() => assertStagingSource('c'.repeat(40), releaseSha, releaseBranch)).toThrow('staging_run');
+    command.mockImplementation((_binary, args) => args.includes('--name-only') ? 'apps/worker/src/index.ts\0' : '');
+    expect(() => assertStagingSource(historicalSha, releaseSha, releaseBranch)).toThrow('staging_source_mismatch');
+    command.mockImplementation((_binary, args) => args.includes('--name-only') ? 'scripts/deploy/production/preflight.ts' : '');
+    expect(() => assertStagingSource(historicalSha, releaseSha, releaseBranch)).toThrow('staging_source_mismatch');
+    command.mockImplementation((_binary, args) => { if (args.includes('--is-ancestor')) throw new Error('not_ancestor'); return ''; });
+    expect(() => assertStagingSource(historicalSha, releaseSha, releaseBranch)).toThrow('not_ancestor');
+  });
+  it('requires GitHub to identify the owner as both initiator and rerun initiator', () => {
+    const ownerRun = { id: 456, repository: { full_name: repository }, head_repository: { full_name: repository }, head_sha: sha, head_branch: 'main', event: 'workflow_dispatch', path: '.github/workflows/deploy-cloudflare-production.yml', actor: { login: 'skmtmst' }, triggering_actor: { login: 'skmtmst' } };
+    expect(() => assertProductionApproval(ownerRun, context, repository)).not.toThrow();
+    for (const mutation of [
+      { actor: { login: 'collaborator' } }, { triggering_actor: { login: 'collaborator' } },
+      { id: 789 }, { head_sha: 'b'.repeat(40) }, { head_branch: 'feature' },
+      { repository: { full_name: 'other/repository' } }, { head_repository: { full_name: 'other/repository' } },
+      { event: 'push' }, { path: '.github/workflows/other.yml' },
+    ]) expect(() => assertProductionApproval({ ...ownerRun, ...mutation }, context, repository)).toThrow();
+    for (const mutation of [{ GITHUB_ACTOR: 'collaborator' }, { GITHUB_TRIGGERING_ACTOR: 'collaborator' }, { GITHUB_RUN_ID: '789' }]) expect(() => assertProductionApproval(ownerRun, { ...context, ...mutation }, repository)).toThrow();
+    expect(() => assertProductionApproval({}, context, repository)).toThrow();
+  });
+});
+describe('approved SQL and backup boundaries', () => {
+  const migrations = [{ name: '999_example.sql', sha256: 'c'.repeat(64) }];
+  it('requires every pending file, checksum and order; no migration is an explicit empty plan', () => {
+    expect(() => assertApproved(migrations, migrations)).not.toThrow();
+    expect(() => assertApproved(migrations, [{ sha256: migrations[0].sha256, name: migrations[0].name }])).not.toThrow();
+    expect(() => assertApproved([], [])).not.toThrow();
+    for (const wrong of [[], [{ ...migrations[0], sha256: 'd'.repeat(64) }], [...migrations, ...migrations], null]) expect(() => assertApproved(migrations, wrong)).toThrow();
+    expect(() => assertUnchanged({ pending: migrations, ledgerExists: false }, { pending: migrations, ledgerExists: true })).toThrow();
+  });
+  const policy = { bucket: 'private-backups', prefix: 'approved/', retentionDays: 7, approval: 'owner-decision' };
+  const lifecycle = { rules: [{ enabled: true, conditions: { prefix: 'approved/' }, deleteObjectsTransition: { condition: { type: 'Age', maxAge: 7 * 86400 } } }] };
+  it('requires private storage, owner-defined retention, and a bucket outside live bindings', () => {
+    const check = (p = policy, managed: unknown = { enabled: false }, custom: unknown = { domains: [] }, rules: unknown = lifecycle, live = ['images']) => assertBackupPolicy(p, managed, custom, rules, live);
+    expect(() => check()).not.toThrow();
+    for (const bad of [() => check({ ...policy, approval: '' }), () => check(policy, { enabled: true }), () => check(policy, {}, {}), () => check(policy, { enabled: false }, { domains: [{ enabled: true }] }), () => check(policy, undefined, undefined, { rules: [] }), () => check(policy, undefined, undefined, lifecycle, [policy.bucket]), () => check({ ...policy, retentionDays: 8 })]) expect(bad).toThrow();
+  });
+  it('requires a lifecycle prefix that covers the actual backup location', () => {
+    const check = (prefix: string) => assertBackupPolicy(policy, { enabled: false }, { domains: [] }, {
+      rules: [{ ...lifecycle.rules[0], conditions: { prefix } }],
+    }, []);
+    expect(() => check('')).not.toThrow();
+    expect(() => check('approved/')).not.toThrow();
+    expect(() => check('approved/subdirectory/')).toThrow('backup_retention');
+    expect(() => check('other/')).toThrow('backup_retention');
+    expect(() => assertBackupPolicy(policy, { enabled: false }, { domains: [] }, {
+      rules: [...lifecycle.rules, {
+        enabled: true, conditions: { prefix: 'approved/a' },
+        deleteObjectsTransition: { condition: { type: 'Age', maxAge: 86400 } },
+      }],
+    }, [])).toThrow('backup_retention');
+  });
+  it('authenticates encrypted exports; tamper, truncation and wrong keys cannot pass readback', () => {
+    const key = Buffer.alloc(32, 9), plain = Buffer.from('synthetic SQL and bookmark');
+    const encrypted = encryptBackup(plain, key);
+    expect(encrypted.includes(plain)).toBe(false);
+    expect(decryptBackup(encrypted, key)).toEqual(plain);
+    const tampered = Buffer.from(encrypted); tampered[tampered.length - 1] ^= 1;
+    expect(() => decryptBackup(tampered, key)).toThrow();
+    expect(() => decryptBackup(encrypted, Buffer.alloc(32, 8))).toThrow();
+    expect(() => decryptBackup(encrypted.subarray(0, 31), key)).toThrow();
+  });
+});
+describe('build and public response headers follow each response kind', () => {
+  it('requires every local script file and rejects executable inline scripts, preserving inert JSON', () => {
+    const html = '<script src="/_next/static/a.js"></script><script type="application/json">{}</script>';
+    expect(() => assertBootstrap(html, file => file === '/_next/static/a.js')).not.toThrow();
+    expect(() => assertBootstrap(html, () => false)).toThrow();
+    expect(() => assertBootstrap('<script>window.test=1</script>', () => true)).toThrow();
+  });
+  for (const kind of ['admin', 'worker'] as const) {
+    const source = readFileSync(kind === 'admin' ? 'apps/web/public/_headers' : 'apps/worker/public/_headers', 'utf8');
+    it(`${kind}: keeps every required header and enforced CSP`, () => {
+      expect(() => assertHeaderRules(source, source, kind)).not.toThrow();
+      for (const line of source.split('\n').filter(line => /^  [A-Za-z-]+:/.test(line))) expect(() => assertHeaderRules(source, source.replace(line, ''), kind)).toThrow();
+      expect(() => assertHeaderRules(source, source.replace("object-src 'none'", "object-src *"), kind)).toThrow();
+    });
+  }
+  it('requires Pages security headers on JSON and 404 too, without applying LIFF framing rules', () => {
+    const source = readFileSync('apps/web/public/_headers', 'utf8');
+    for (const [kind, status, type] of [['admin-json', 200, 'application/json'], ['admin-error', 404, 'text/html'], ['admin-static', 200, 'application/javascript']] as const) {
+      const headers = new Headers(Object.fromEntries(headerRules(source))); headers.set('Content-Type', type);
+      expect(() => assertResponse(new Response('synthetic', { status, headers }), kind, status, source)).not.toThrow();
+      headers.delete('Content-Security-Policy');
+      expect(() => assertResponse(new Response('synthetic', { status, headers }), kind, status, source)).toThrow();
+    }
+  });
+  it('checks JSON and 401/403/404/500 errors without imposing HTML CSP or leaking body/cookies', () => {
+    const headers = { 'Content-Type': 'application/json', 'X-Request-ID': 'synthetic-request', 'X-Robots-Tag': 'noindex, nofollow', 'Cache-Control': 'no-store' };
+    expect(() => assertResponse(new Response('{}', { headers }), 'json', 200)).not.toThrow();
+    for (const status of [401, 403, 404, 500]) {
+      expect(() => assertResponse(new Response('synthetic body', { status, headers }), 'error', status)).not.toThrow();
+      for (const missing of ['X-Request-ID', 'X-Robots-Tag', 'Cache-Control']) {
+        const bad = new Headers(headers); bad.delete(missing);
+        expect(() => assertResponse(new Response('{}', { status, headers: bad }), 'error', status)).toThrow();
+      }
+    }
+  });
+});

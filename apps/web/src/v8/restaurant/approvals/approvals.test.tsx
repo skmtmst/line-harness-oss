@@ -1,0 +1,101 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+// @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import React from 'react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+
+const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), decideApproval: vi.fn(), role: 'owner' as string | null }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
+vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { snapshot: fixture.snapshot, decideApproval: fixture.decideApproval } }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManageRole: (role: string | null) => role === 'owner' || role === 'admin' }))
+import ApprovalsV8 from './approvals'
+
+const data = {
+  organization: { id: 'org', name: '試験組織' },
+  stores: [{ id: 'store', name: '試験店', code: 'S', status: 'active', line_account_id: 'account-1', capacity: 10 }],
+  approvals: [
+    { id: 'apr-1', store_id: 'store', kind: 'menu_change', title: '価格改定', status: 'pending', requested_by: '申請者', review_comment: null, created_at: '2026-09-29T09:40:00Z', payload_json: JSON.stringify({ before: '¥3,800', after: '¥4,200' }) },
+    { id: 'apr-2', store_id: null, kind: 'line_message', title: 'お礼', status: 'returned', requested_by: '申請者', review_comment: '期限を書いてください', created_at: '2026-09-27T06:02:00Z', payload_json: JSON.stringify({ title: 'ありがとう', body: '本文' }) },
+  ],
+  memberships: [], reservations: [], tables: [], inventory: [], menuItems: [], connectors: [], reviews: [], posts: [], lineFlows: [],
+}
+
+beforeEach(() => {
+  fixture.role = verifiedStaffRole('owner')
+  fixture.snapshot.mockResolvedValue({ data })
+  fixture.decideApproval.mockResolvedValue({ data: { menuChangeStatus: 'applied' } })
+})
+afterEach(() => { cleanup(); vi.resetAllMocks() })
+
+it('空白の差し戻し理由を送らず、入力すると操作できる', async () => {
+  render(<ApprovalsV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: '差戻し' }))
+  const submit = screen.getByRole('button', { name: '差し戻す' }) as HTMLButtonElement
+  expect(submit.disabled).toBe(true)
+  expect(submit.title).toBe('差し戻す理由を入力してください')
+  const reason = screen.getByRole('textbox')
+  const explanation = screen.getByText('差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。')
+  expect(explanation.closest('[role="dialog"]')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: /差し戻す理由.*の説明/ })).toBeNull()
+  fireEvent.change(reason, { target: { value: '   ' } })
+  expect(submit.disabled).toBe(true)
+  expect(fixture.decideApproval).not.toHaveBeenCalled()
+  fireEvent.change(reason, { target: { value: '  原価を確認してください  ' } })
+  expect(submit.disabled).toBe(false)
+  expect(submit.title).toBe('')
+  fireEvent.click(submit)
+  await waitFor(() => expect(fixture.decideApproval).toHaveBeenCalledWith('account-1', 'apr-1', 'return', '原価を確認してください'))
+})
+
+it('管理者は承認待ちのカードで承認でき、改定の前後と差戻しのコメントが見える', async () => {
+  render(<ApprovalsV8 />)
+  expect(await screen.findByText('価格改定')).toBeTruthy()
+  expect(document.querySelectorAll('[data-kpi-number]')).toHaveLength(4)
+  expect(document.querySelectorAll('[data-kpi-icon]')).toHaveLength(0)
+  expect(screen.getByText('¥3,800')).toBeTruthy()
+  const reason = screen.getByText('期限を書いてください').closest('[role=note]')!
+  expect(reason.getAttribute('data-appearance')).toBe('soft')
+  expect(reason.querySelector('[data-notice-dot]')).not.toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '承認する' }))
+  await waitFor(() => expect(fixture.decideApproval).toHaveBeenCalledWith('account-1', 'apr-1', 'approve', undefined))
+})
+
+it('閲覧のみには帯を出し、差戻し・承認するのボタンを置かない', async () => {
+  fixture.role = verifiedStaffRole('staff')
+  render(<ApprovalsV8 />)
+  expect(await screen.findByText('価格改定')).toBeTruthy()
+  expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
+  expect(document.querySelectorAll('[data-kpi-number]')).toHaveLength(4)
+  expect(document.querySelectorAll('[data-kpi-icon]')).toHaveLength(0)
+  expect(screen.queryByRole('button', { name: '承認する' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '差戻し' })).toBeNull()
+  expect(fixture.decideApproval).not.toHaveBeenCalled()
+})
+
+it('86: 2店以上の時は［店舗：…］の選ぶ欄を出し、下線のタブは出さない', async () => {
+  fixture.snapshot.mockResolvedValue({ data: { ...data, stores: [...data.stores, { ...data.stores[0], id: 'store-2', name: '二号店' }] } })
+  render(<ApprovalsV8 />)
+  expect(await screen.findByText('価格改定')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '店舗' })).toBeTruthy()
+  expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
+})
+
+it('86: 「すべての店舗」を足す画面は1店でも選ぶ欄を出す（選ぶ意味がある）', async () => {
+  render(<ApprovalsV8 />)
+  expect(await screen.findByText('価格改定')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '店舗' })).toBeTruthy()
+  expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
+})
+
+// 109: 承認は主（右）、差戻しは赤い文字だけ。並びは［差戻し］［承認する］。
+it('承認待ちの並びは［差戻し］［承認する］で承認が主', async () => {
+  render(<ApprovalsV8 />)
+  const approve = await screen.findByRole('button', { name: '承認する' })
+  const back = screen.getByRole('button', { name: '差戻し' })
+  expect(back.getAttribute('data-variant')).toBe('text')
+  expect(approve.getAttribute('data-variant')).toBe('primary')
+  expect(Boolean(back.compareDocumentPosition(approve) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+})
+
+afterEach(() => { verifiedStaffRole(null) })

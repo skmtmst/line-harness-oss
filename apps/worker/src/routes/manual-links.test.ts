@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
- * マニュアルの正本表。設計 ★V6 34-4。台帳 #134。
+ * マニュアルの正本表。設計 ★34-4。台帳。
  *
  * 守りたいのは 2 点。
  *   **確かめていない URL を「開けます」と言わない**
@@ -62,6 +62,15 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('画面から URL を引く', () => {
+  it('ガイドはtaskを明示したときだけ引けて、未設定・不正な種類ではURLを返さない', async () => {
+    db.getManualLink.mockResolvedValue({ ...ROW, key_kind: 'task' });
+    const read = (suffix: string) => makeApp('staff').request('/api/manual-links/lookup?key=onboarding-line-guide'+suffix,{},env);
+    expect(await (await read('')).json()).toMatchObject({data:{url:null,status:'unset'}});
+    expect(await (await read('&keyKind=task')).json()).toMatchObject({data:{url:ROW.url,status:'ok'}});
+    expect((await read('&keyKind=other')).status).toBe(400);
+    db.getManualLink.mockResolvedValue({...ROW,key_kind:'task',status:'broken'});
+    expect(await (await read('&keyKind=task')).json()).toMatchObject({data:{url:null,status:'broken'}});
+  });
   it('確かめて開けるものだけ返す', async () => {
     const res = await makeApp().fetch(
       new Request('https://example.com/api/manual-links/lookup?screen=2-1'),
@@ -137,6 +146,15 @@ describe('直す', () => {
     );
     expect(res.status).toBe(422);
     expect(db.upsertManualLink).not.toHaveBeenCalled();
+  });
+
+  it('UI2-C01 空にしたURLは以前のURLへ戻さない', async () => {
+    const res = await makeApp().fetch(new Request('https://example.com/api/manual-links/2-1', {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url: null, expectedVersion: 1 }),
+    }), env);
+    expect(res.status).toBe(200);
+    expect(db.upsertManualLink).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ url: null }));
   });
 
   it('正しい URL は保存する', async () => {
@@ -245,4 +263,11 @@ describe('いま全部を確かめる', () => {
     expect(await res.json()).toMatchObject({ data: { checked: 0, unsafe: 1 } });
     expect(fetch).not.toHaveBeenCalled();
   });
+});
+
+// URL の実検査と HEAD は保ち、公開 DNS の応答だけを差し替える。
+vi.mock('../services/manual-link-check.js', async original => {
+  const actual = await original<typeof import('../services/manual-link-check.js')>();
+  return { ...actual, checkAllManualLinks: (...[db, options]: Parameters<typeof actual.checkAllManualLinks>) =>
+    actual.checkAllManualLinks(db, { ...options, lookupHost: async () => ['93.184.216.34'] }) };
 });

@@ -1,6 +1,7 @@
+import { logger } from '@line-crm/shared/server';
 import type { MiddlewareHandler } from 'hono';
 import { auditDeviceFamily, maskAuditIp, recordAuditEvent } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { canonicalDenyAuditFor } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -12,6 +13,20 @@ export const ACCOUNT_QUERY_KEYS = [
   'line_account_id',
   'account',
 ] as const;
+
+/** 統括・アカウント列のない保存済みデータは、既定統括で制限のない利用者だけに許可する。owner/admin は統括内の役割であり、他の統括を読む権限ではない。 */
+export function isLegacyGlobalApi(path: string): boolean {
+  return path === '/api/account-settings/link-base-url'
+    || path === '/api/account-settings/tracked-link-base-url'
+    || path === '/api/search-console/performance'
+    || path === '/api/entry-route-genres'
+    || path.startsWith('/api/entry-route-genres/')
+    || path.startsWith('/api/nen-members/photo-reward-policy/')
+    || path === '/api/manual-links'
+    || path.startsWith('/api/manual-links/')
+    || path === '/api/message-templates'
+    || path.startsWith('/api/message-templates/');
+}
 
 /**
  * 認証済みの管理APIが、別の統括に属するLINEアカウントをクエリで指定するのを防ぐ。
@@ -25,18 +40,16 @@ export const tenantScopeMiddleware: MiddlewareHandler<Env> = async (c, next) => 
   const candidates = ACCOUNT_QUERY_KEYS
     .map((key) => c.req.query(key))
     .filter((value): value is string => Boolean(value));
-  if (candidates.length === 0) return next();
+  const legacyGlobal = isLegacyGlobalApi(c.req.path);
+  if (candidates.length === 0 && !legacyGlobal) return next();
 
   const scope = await getVisibleLineAccountScope(dbFor(c.env), staff);
+  if (legacyGlobal && !scope.canSeeUnassigned) {
+    return c.json({ success: false, error: 'この情報を操作する権限がありません' }, 403);
+  }
   for (const id of candidates) {
     if (!scope.ids.includes(id)) {
-      console.warn({
-        event: 'tenant_boundary_denied',
-        staff_id: staff.id,
-        staff_tenant_id: staff.tenantId ?? null,
-        requested_account_id: id,
-        path: c.req.path,
-      });
+      logger.warn("tenant_boundary_denied");
       recordBoundaryDenial(c, id);
       return c.json({
         success: false,
@@ -83,7 +96,7 @@ function recordBoundaryDenial(
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
   }).catch((error: unknown) => {
-    console.error('boundary audit insert failed:', error instanceof Error ? error.name : 'unknown');
+    logger.error("middleware_tenant_scope_failed");
   });
   try {
     c.executionCtx.waitUntil(task);

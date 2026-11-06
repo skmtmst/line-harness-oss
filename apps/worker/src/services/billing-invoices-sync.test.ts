@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const listInvoices = vi.hoisted(() => vi.fn());
@@ -82,7 +82,8 @@ describe('Stripe請求書同期', () => {
     );
     expect(result).toMatchObject({ imported: 1, failed: 1, completed: false, syncedAt: null });
     expect(testDb.raw.prepare(`SELECT value FROM platform_settings WHERE key = 'billing_invoices_last_synced_at'`).get()).toBeUndefined();
-    expect(warn.mock.calls.join(' ')).toContain('tenant-a');
+    expect(warn.mock.calls.join(' ')).toContain('billing_invoice_sync_failed');
+    expect(warn.mock.calls.join(' ')).not.toContain('tenant-a');
     expect(warn.mock.calls.join(' ')).not.toContain('9,800');
     warn.mockRestore();
   });

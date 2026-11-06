@@ -9,7 +9,7 @@ import {
   getFormById,
   getFormDeleteImpact,
   getFormsWithStats,
-} from '../src/forms.js';
+} from '../src/forms/index.js';
 
 function asD1(sqlite: Database.Database): D1Database {
   return {
@@ -95,7 +95,7 @@ describe('回答フォームの削除影響と保管', () => {
       // 影響の版。`form_accounts` への紐づけでトリガが進めるので 2 になる。
       revision: 2,
       /*
-       * 編集の版(#723)。**1 のまま。**編集していないので進まない。
+       * 編集の版。**1 のまま。**編集していないので進まない。
        * ここが `revision` と同じ数になったら、編集の版が来訪や利用先の
        * 出入りで動いていることになり、編集保存が誤って 409 になる。
        */

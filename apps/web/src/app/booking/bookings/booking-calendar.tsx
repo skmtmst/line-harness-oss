@@ -1,10 +1,19 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
+import { jstDate as japanDate } from '@/lib/jst-datetime'
+
+import KpiBand from '@/components/shared/kpi-band'
+import { BookingPageStats, BookingPageContent } from '@/components/templates/booking-page'
+import { CalendarDays, CalendarPlus, CircleAlert, CalendarX } from 'lucide-react'
+import KpiCard from '@/components/shared/kpi-card'
 import { useMemo } from 'react'
 import Link from 'next/link'
 import type { BookingRequest } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import { formatDay, formatRange, formatTime, formatNumber } from '@/lib/format'
 
 // BOOKING-01: 9〜18時の固定10マスは「空き枠」ではなく、空き枠APIの実績が
 // まだ届いていないときの表示レンジ。実際に受け付けられる枠が届いたら、
@@ -39,7 +48,7 @@ export interface CalendarAvailability {
 }
 
 function jstDay(iso: string): string {
-  return new Date(new Date(iso).getTime() + 9 * 3_600_000).toISOString().slice(0, 10)
+  return japanDate(new Date(iso))
 }
 
 function todayKey(): string {
@@ -57,37 +66,18 @@ export function startOfWeek(day: string): string {
   return moveDay(day, -offset)
 }
 
-function dateLabel(day: string, weekday = true): string {
-  return new Date(`${day}T00:00:00+09:00`).toLocaleDateString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    weekday: weekday ? 'short' : undefined,
-    timeZone: 'Asia/Tokyo',
-  })
-}
-
-function longDateLabel(day: string): string {
-  return new Date(`${day}T00:00:00+09:00`).toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-    timeZone: 'Asia/Tokyo',
-  })
+function dateLabel(day: string): string {
+  return formatDay(`${day}T00:00:00+09:00`)
 }
 
 const sep = '\u0000'
 
 function bookingHour(booking: BookingRequest): number {
-  return new Date(new Date(booking.starts_at).getTime() + 9 * 3_600_000).getUTCHours()
+  return japanCalendar(new Date(new Date(booking.starts_at).getTime())).getUTCHours()
 }
 
 function bookingTime(booking: BookingRequest): string {
-  return new Date(booking.starts_at).toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatTime(booking.starts_at)
 }
 
 /**
@@ -119,17 +109,7 @@ const CARD_STATUS_LABEL: Record<string, string> = {
 }
 
 function money(value: number): string {
-  return `¥${value.toLocaleString('ja-JP')}`
-}
-
-function Kpi({ title, value, detail }: { title: string; value: string; detail: string }) {
-  return (
-    <div className="rounded-card border-hairline bg-canvas border px-4 py-3 shadow-sm">
-      <p className="text-ink-secondary text-xs font-medium">{title}</p>
-      <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{value}</p>
-      <p className="text-ink-faint mt-1 text-xs">{detail}</p>
-    </div>
-  )
+  return `${formatYen(value)}`
 }
 
 function BookingCard({ booking, compact = false, onOpen }: {
@@ -143,7 +123,7 @@ function BookingCard({ booking, compact = false, onOpen }: {
     <button
       type="button"
       onClick={() => onOpen(booking.id)}
-      className={`w-full rounded-md border-l-4 px-2 py-1.5 text-left transition hover:brightness-95 ${
+      className={`w-full rounded-mini border-l-4 px-2 py-1.5 text-left transition hover:brightness-95 ${
         phone
           ? 'border-action bg-action-soft text-action'
           : 'border-success bg-success-bg text-success'
@@ -170,12 +150,7 @@ function BookingCard({ booking, compact = false, onOpen }: {
  * R316: 日の見出し（9月30日(火)）。集計・注意の見出しで選んだ日を名指しする。
  */
 export function slotDateLabel(day: string): string {
-  return new Date(`${day}T00:00:00+09:00`).toLocaleDateString('ja-JP', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDay(`${day}T00:00:00+09:00`)
 }
 
 export function slotAriaLabel(input: { day: string; time: string; staffName?: string }): string {
@@ -190,7 +165,7 @@ function EmptyCell({ href, label }: { href?: string; label?: string }) {
   // 受け付けられる枠だけが入口になり、取れないマス（営業時間外・休み・
   // 満席・まだ読み込み中）は「—」で示す。
   if (!href) {
-    // ★V7：受け付けていないマスは空のまま（読み上げだけ伝える）。全マスに「—」が並ぶと、表が記号で埋まって
+    // ★管理画面：受け付けていないマスは空のまま（読み上げだけ伝える）。全マスに「—」が並ぶと、表が記号で埋まって
     // 「あき ＋」の入口が目立たなかった。
     return <span className="sr-only">受け付けていない時間</span>
   }
@@ -237,13 +212,13 @@ function CalendarFrame({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-sm">
+    <section className="rounded-card border-hairline bg-canvas min-w-0 overflow-hidden border shadow-card-surface">
       <div className="border-hairline flex min-h-12 flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={onPrevious} aria-label="前の期間" className="h-8 w-8">‹</Button>
-          <Button variant="secondary" onClick={onNext} aria-label="次の期間" className="h-8 w-8">›</Button>
+          <Button variant="secondary" onClick={onPrevious} aria-label="前の期間" className="w-8">‹</Button>
+          <Button variant="secondary" onClick={onNext} aria-label="次の期間" className="w-8">›</Button>
           <p className="text-ink text-sm font-semibold">{title}</p>
-          <button type="button" onClick={onToday} className="rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep hover:brightness-95">今日</button>
+          <button type="button" onClick={onToday} className="rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep hover:brightness-95 inline-flex h-9 items-center">今日</button>
         </div>
         <p className="text-ink-secondary text-xs tabular-nums">{meta}</p>
       </div>
@@ -320,7 +295,7 @@ function DayGrid({ items, staff, day, hours, bookable, canCreate, onOpen }: {
   )
 }
 
-function WeekGrid({ days, items, hours, bookable, canCreate, onOpen }: {
+function WeekGrid({ days, items, hours, bookable, canCreate, onOpen, onDateClick }: {
   days: string[]
   items: BookingRequest[]
   hours: number[]
@@ -328,6 +303,8 @@ function WeekGrid({ days, items, hours, bookable, canCreate, onOpen }: {
   bookable: Map<string, CalendarSlot>
   canCreate: boolean
   onOpen: (id: string) => void
+  /** V8 の「週」：日付を押すとその日の「日」へ。渡さなければ従来どおり押せない。 */
+  onDateClick?: (day: string) => void
 }) {
   const columns = '64px repeat(7, minmax(0, 1fr))'
   // 格子ごとにfilterし直さない。日×時間の辞書へ1回で束ねる(点検#516の中1)。
@@ -365,8 +342,14 @@ function WeekGrid({ days, items, hours, bookable, canCreate, onOpen }: {
           const count = dayCounts.get(day) ?? 0
           return (
             <div key={day} className="border-hairline border-l px-1 py-2 text-center">
-              <p className="text-ink text-xs font-semibold">{dateLabel(day)}</p>
-              <p className="text-success mt-0.5 text-xs font-semibold">{count}件</p>
+              {onDateClick ? (
+                <button type="button" className="text-ink text-xs font-semibold hover:underline" onClick={() => onDateClick(day)} aria-label={`${dateLabel(day)}の日で見る`}>
+                  {dateLabel(day)}
+                </button>
+              ) : (
+                <p className="text-ink text-xs font-semibold">{dateLabel(day)}</p>
+              )}
+              <p className="text-ink mt-0.5 text-xs font-semibold">{formatNumber(count)}件</p>
             </div>
           )
         })}
@@ -408,8 +391,9 @@ function WeekGrid({ days, items, hours, bookable, canCreate, onOpen }: {
 }
 
 function SidePanel({ title, children, tone = 'plain' }: { title: string; children: React.ReactNode; tone?: 'plain' | 'warning' }) {
+  if (tone === 'warning') return <Notice tone="warn" heading={<h2>{title}</h2>}>{children}</Notice>
   return (
-    <section className={`rounded-card border p-4 ${tone === 'warning' ? 'border-warning bg-warning-bg' : 'border-hairline bg-canvas'}`}>
+    <section className="rounded-card border border-hairline bg-canvas p-4">
       <h2 className="text-ink text-sm font-semibold">{title}</h2>
       <div className="text-ink-secondary mt-3 space-y-2 text-xs leading-5">{children}</div>
     </section>
@@ -471,12 +455,12 @@ function hoursText(ms: number): string {
   return `${hours}時間`
 }
 
-export default function BookingCalendar({ mode, items, onOpen, staffNames, canCreate = false, anchorDay, onAnchorChange, availability, onRetryAvailability, dataState = 'ready' }: {
+export default function BookingCalendar({ mode, items, onOpen, staffNames, canCreate = false, anchorDay, onAnchorChange, availability, onRetryAvailability, dataState = 'ready', onDateClick }: {
   mode: 'day' | 'week'
   items: BookingRequest[]
   onOpen: (id: string) => void
   /**
-   * ★V7：一覧の読み込み状態。取れていない間、カレンダー内の件数に 0 を
+   * ★管理画面：一覧の読み込み状態。取れていない間、カレンダー内の件数に 0 を
    * 出さない。「—」と出し、読み込み中と失敗を言い分ける。
    */
   dataState?: 'loading' | 'error' | 'ready'
@@ -498,6 +482,8 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
    * 失敗の帯の中に置く。渡さないときは開き直しの案内だけを出す。
    */
   onRetryAvailability?: () => void
+  /** V8 の「週」：日付を押すとその日の「日」へ。渡さなければ従来どおり。 */
+  onDateClick?: (day: string) => void
 }) {
   const weekStart = startOfWeek(anchorDay)
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => moveDay(weekStart, index)), [weekStart])
@@ -636,10 +622,9 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
         ? `受付${hoursText(capacity.acceptableMs)}のうち${hoursText(capacity.bookedMs)}を使用中`
         : '受付可能な時間がありません'
 
-  // ★V7：一覧が取れていない間、カレンダー内の件数に 0 を出さない。
+  // ★管理画面：一覧が取れていない間、カレンダー内の件数に 0 を出さない。
   const listMissing = dataState !== 'ready'
   const listMissingDetail = dataState === 'error' ? '読み込めませんでした' : '読み込んでいます'
-  const countOrDash = (text: string) => (listMissing ? '—' : text)
 
   /*
    * R316: 集計・注意の見出しは、選んでいる日・週そのものを名指しする。
@@ -648,7 +633,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
    * 今日の情報と読み違える。
    */
   const dayHead = slotDateLabel(anchorDay)
-  const weekHead = `${dateLabel(days[0], false)}〜${dateLabel(days[6], false)} の週`
+  const weekHead = `${formatRange(`${days[0]}T00:00:00+09:00`, `${days[6]}T00:00:00+09:00`)} の週`
   const isToday = anchorDay === todayKey()
   const isThisWeek = days.includes(todayKey())
   const periodHead = mode === 'day' ? dayHead : weekHead
@@ -658,21 +643,36 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
 
   return (
     <div data-design-node={mode === 'day' ? 'TV2DI' : 'SbuUI'}>
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Kpi title={`${periodWithToday}の予約`} value={countOrDash(`${activeItems.length}件`)} detail={listMissing ? listMissingDetail : `LINEから ${lineCount}・電話 ${phoneCount}`} />
-        <Kpi
+      <BookingPageStats><KpiBand layout="booking">
+        <KpiCard
+          value={listMissing ? null : activeItems.length} unit="件" unitSpacing="tight"
+          icon={<CalendarDays size={16} />} presentation="band"
+          title={mode === 'day' && isToday ? '今日の予約' : `${periodWithToday}の予約`}
+          help={periodWithToday}
+          detail={listMissing ? listMissingDetail : `LINEから ${lineCount}・電話 ${phoneCount}`}
+        />
+        <KpiCard
+          value={listMissing || availability.status !== 'ready' ? null : capacity.freeSlots}
+          unit="枠" unitSpacing="tight" icon={<CalendarPlus size={16} />} presentation="band"
           title={mode === 'day' ? 'まだ空いている枠' : 'うまっている割合'}
-          value={listMissing ? '—' : mode === 'day' ? (availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—') : weekRateValue}
-          detail={listMissing ? listMissingDetail : mode === 'day' ? availabilityNote : weekRateDetail}
+          valueText={mode === 'week' ? (listMissing ? '—' : weekRateValue) : undefined}
+          help={mode === 'day' ? availabilityNote : weekRateDetail} helpDisplay={mode === 'day' ? 'question' : 'label'}
+          detail={listMissing ? listMissingDetail : availability.status === 'ready' ? (mode === 'day' ? (isToday ? '今日の残り' : '選んだ日の残り') : weekRateDetail) : availabilityNote}
         />
-        <Kpi
+        <KpiCard
+          value={listMissing ? null : mode === 'day' ? requested : availability.status === 'ready' ? capacity.freeSlots : null}
+          unit={mode === 'day' ? '件' : '枠'} unitSpacing="tight" icon={<CircleAlert size={16} />} presentation="band"
           title={mode === 'day' ? '未承認・要対応' : 'あいている枠'}
-          value={listMissing ? '—' : mode === 'day' ? `${requested}件` : availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—'}
-          detail={listMissing ? listMissingDetail : mode === 'day' ? (requested > 0 ? '確認が必要です' : '現在、確認待ちはありません') : availabilityNote}
+          detail={listMissing ? listMissingDetail : mode === 'day' ? `確認待ち ${requested}件` : availabilityNote}
         />
-        <Kpi title="キャンセル" value={countOrDash(`${cancelled}件`)} detail={listMissing ? listMissingDetail : mode === 'day' ? '選んだ日' : 'この1週間'} />
-      </div>
+        <KpiCard
+          value={listMissing ? null : cancelled} unit="件" unitSpacing="tight"
+          icon={<CalendarX size={16} />} presentation="band" title="キャンセル"
+          detail={listMissing ? listMissingDetail : mode === 'day' ? (isToday ? '今日' : '選んだ日') : 'この1週間'}
+        />
+      </KpiBand></BookingPageStats>
 
+      <BookingPageContent>
       {/* ★V7：常に出ていた説明の帯は、色の見方だけを小さな凡例にした。 */}
       <p className="text-ink-secondary mb-3 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs">
         <span><span aria-hidden="true" className="text-accent-deep">●</span> LINEからの予約</span>
@@ -708,8 +708,8 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
         <div className="min-w-0 flex-1">
           {mode === 'day' ? (
             <CalendarFrame
-              title={longDateLabel(anchorDay)}
-              meta={listMissing ? '—' : `${activeItems.length}件 ／ 売上見込み ${money(sales)}`}
+              title={dateLabel(anchorDay)}
+              meta={listMissing ? '—' : `${formatNumber(activeItems.length)}件 ／ 売上見込み ${money(sales)}`}
               onPrevious={() => onAnchorChange(moveDay(anchorDay, -1))}
               onNext={() => onAnchorChange(moveDay(anchorDay, 1))}
               onToday={() => onAnchorChange(todayKey())}
@@ -718,13 +718,13 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
             </CalendarFrame>
           ) : (
             <CalendarFrame
-              title={`${dateLabel(days[0], false)}〜${dateLabel(days[6])}`}
-              meta={listMissing ? '—' : `${activeItems.length}件 ／ 売上見込み ${money(sales)}`}
+              title={`${formatRange(`${days[0]}T00:00:00+09:00`, `${days[6]}T00:00:00+09:00`)}`}
+              meta={listMissing ? '—' : `${formatNumber(activeItems.length)}件 ／ 売上見込み ${money(sales)}`}
               onPrevious={() => onAnchorChange(moveDay(anchorDay, -7))}
               onNext={() => onAnchorChange(moveDay(anchorDay, 7))}
               onToday={() => onAnchorChange(todayKey())}
             >
-              <WeekGrid days={days} items={weekItems} hours={hours} bookable={bookableByDayHour} canCreate={canCreate} onOpen={onOpen} />
+              <WeekGrid days={days} items={weekItems} hours={hours} bookable={bookableByDayHour} canCreate={canCreate} onOpen={onOpen} onDateClick={onDateClick} />
             </CalendarFrame>
           )}
         </div>
@@ -736,15 +736,15 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
           {!listMissing ? (
             <SidePanel title={`${periodWithToday} 気をつけること`} tone={requested > 0 || phoneCount > 0 ? 'warning' : 'plain'}>
               {requested > 0 && <p>● 未承認の予約が {requested}件あります。内容を確認してください。</p>}
-              {phoneCount > 0 && <p>● 電話予約が {phoneCount}件あります。LINE未連携の方には当日の連絡ができません。</p>}
+              {phoneCount > 0 && <p>● 電話予約が {formatNumber(phoneCount)}件あります。LINE未連携の方には当日の連絡ができません。</p>}
               {requested === 0 && phoneCount === 0 && <p>いま確認が必要な予約はありません。</p>}
             </SidePanel>
           ) : null}
           {/* R316: 日の内訳も週と同じ「内訳」にそろえ、選んだ期間を名指しする。 */}
           <SidePanel title={`${periodHead}の内訳`}>
-            <p className="flex justify-between"><span>予約</span><strong>{listMissing ? '—' : `${activeItems.length}件`}</strong></p>
-            <p className="flex justify-between"><span>うちLINEから</span><strong className="text-success">{listMissing ? '—' : `${lineCount}件`}</strong></p>
-            <p className="flex justify-between"><span>うち電話</span><strong className="text-action">{listMissing ? '—' : `${phoneCount}件`}</strong></p>
+            <p className="flex justify-between"><span>予約</span><strong>{listMissing ? '—' : `${formatNumber(activeItems.length)}件`}</strong></p>
+            <p className="flex justify-between"><span>うちLINEから</span><strong className="text-success">{listMissing ? '—' : `${formatNumber(lineCount)}件`}</strong></p>
+            <p className="flex justify-between"><span>うち電話</span><strong className="text-action">{listMissing ? '—' : `${formatNumber(phoneCount)}件`}</strong></p>
             <p className="flex justify-between"><span>売上見込み</span><strong>{listMissing ? '—' : money(sales)}</strong></p>
           </SidePanel>
           <SidePanel title="つながる先">
@@ -755,6 +755,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
           </SidePanel>
         </aside>
       </div>
+      </BookingPageContent>
     </div>
   )
 }

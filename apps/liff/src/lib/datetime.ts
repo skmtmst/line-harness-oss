@@ -1,12 +1,8 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 // All helpers operate in JST. The Worker accepts UTC ISO8601 — we convert
 // at the boundary (jstStartsAtIso) before posting.
 
-const JST_OFFSET_MS = 9 * 3600_000;
-
-export function jstToday(): string {
-  const now = new Date();
-  return new Date(now.getTime() + JST_OFFSET_MS).toISOString().slice(0, 10);
-}
+export { jstDate as jstToday } from '@line-crm/shared';
 
 export function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -31,8 +27,21 @@ export function formatWeekday(date: string): string {
   return '日月火水木金土'[d.getUTCDay()];
 }
 
+/** '2026-10-02' → '10月2日（金）'。週の空き・確認の行で使う。 */
+export function formatJpLong(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${'日月火水木金土'[d.getUTCDay()]}）`;
+}
+
+/** '13:00' + 105 → '14:45'。選んだ時間の終わり (13:00〜14:45) で使う。 */
+export function addMinutesHm(hhmm: string, minutes: number): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const t = h * 60 + m + minutes;
+  return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+}
+
 function jstParts(utcIso: string): string {
-  return new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
+  return japanCalendar(new Date(utcIso)).toISOString();
 }
 
 /** UTC ISO → '10/1' (JST)。履歴の日付の四角で使う。 */
@@ -68,12 +77,55 @@ export function formatJstEventSpan(startsAt: string, endsAt: string): string {
   return `${head} 〜 ${formatJstEventAt(endsAt)}`;
 }
 
+/** 始まりの何時間前かの締め切り → '10月10日 18:00' (JST)。イベントの申し込み確認の注意で使う。 */
+export function formatJstDeadline(startsAt: string, hoursBefore: number): string {
+  const d = jstParts(new Date(new Date(startsAt).getTime() - hoursBefore * 3600_000).toISOString());
+  return `${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日 ${d.slice(11, 16)}`;
+}
+
+/** 取っておく残り時間 (秒) → '23時間 41分'。1時間未満は '41分'。空きが出た案内で使う。 */
+export function formatHoldLeft(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return h > 0 ? `${h}時間 ${m}分` : `${m}分`;
+}
+
+/**
+ * 選んだ枠の開始を API へ送る ISO にする。空き枠が返した開始の瞬間
+ * （startUtc・店のタイムゾーンで計算済み）があればそれを使う。無い・読めない
+ * ときだけ、日付と時刻を日本時間として読む（古い応答・前回の予約など）。
+ * 正しい枠かどうかはサーバーがもう一度確かめる。
+ */
+export function slotStartsAtIso(slot: { date: string; start: string; startUtc?: string | null }): string {
+  if (slot.startUtc) {
+    const ms = Date.parse(slot.startUtc);
+    if (Number.isFinite(ms)) return new Date(ms).toISOString();
+  }
+  return jstStartsAtIso(slot.date, slot.start);
+}
+
 export function jstStartsAtIso(date: string, hhmm: string): string {
   // `+09:00` suffix tells JS to treat the wall-clock time as JST.
   return new Date(`${date}T${hhmm}:00+09:00`).toISOString();
 }
 
+/**
+ * 日時の詳しい書き方 '2026年10月25日 17:51'。締め切り・期限・申し込んだ枠など、年まで読む所で使う。
+ * timeZone を渡すと店の時間帯で出す。読めない値は空の文字にする。
+ */
+export function formatDateTimeLong(value: string, timeZone = 'Asia/Tokyo'): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('ja-JP', { timeZone, year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).map(part => [part.type, part.value]));
+  return `${parts.year}年${parts.month}月${parts.day}日 ${parts.hour}:${parts.minute}`;
+}
+
+/** 日付の詳しい書き方 '2026年10月25日'（日本時間）。 */
+export function formatDateLong(value: string): string {
+  return formatDateTimeLong(value).replace(/ \d{2}:\d{2}$/, '');
+}
+
 export function utcToJstDisplay(utcIso: string): string {
-  const d = new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
+  const d = japanCalendar(new Date(utcIso)).toISOString();
   return `${d.slice(0, 10)} ${d.slice(11, 16)}`;
 }

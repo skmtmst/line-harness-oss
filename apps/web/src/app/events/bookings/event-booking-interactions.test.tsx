@@ -1,11 +1,16 @@
+// @vitest-environment happy-dom
 import React, { act, type ReactElement } from 'react'
-import type { Root } from 'react-dom/client'
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
+import { readStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
 
 const apiMocks = vi.hoisted(() => ({
   listBookings: vi.fn(),
-  getEvent: vi.fn(),
+  absence: vi.fn(),
   getBookingSummary: vi.fn(),
+  getEvent: vi.fn(),
   updateBooking: vi.fn(),
   decideBooking: vi.fn(),
   adminCancelBooking: vi.fn(),
@@ -21,11 +26,13 @@ const apiMocks = vi.hoisted(() => ({
 }))
 
 const accountMock = vi.hoisted(() => ({ selectedAccountId: 'account-a', role: 'owner' as string | null }))
+vi.mock('@/lib/api/helpers/gap2', () => ({ bookingMakeupApi: { absenceByStore: apiMocks.absence } }))
 
-vi.mock('@/lib/api', () => ({ eventsApi: apiMocks, api: { broadcasts: { send: apiMocks.sendOccurrenceBroadcast } } }))
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams('id=event-1'),
-}))
+vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
+  const actual = await importOriginal()
+  return { ...actual, eventsApi: { ...actual.eventsApi, ...apiMocks }, api: { ...actual.api, broadcasts: { ...actual.api.broadcasts, send: apiMocks.sendOccurrenceBroadcast }, staff: { ...actual.api.staff, me: vi.fn(async () => ({ success: true, data: { id: 'me', role: accountMock.role, isActive: true } })) } } }
+})
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useSearchParams: () => new URLSearchParams('id=event-1') }))
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
@@ -38,21 +45,7 @@ vi.mock('@/contexts/account-context', () => ({
     ],
   }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
-vi.mock('@/components/shared/confirm-dialog', () => ({
-  default: ({ open, children, onConfirm }: { open: boolean; children?: React.ReactNode; onConfirm?: () => void }) => (
-    open ? <div>{children}<button data-confirm-dialog="confirm" onClick={onConfirm}>確認する</button></div> : null
-  ),
-}))
-vi.mock('@/components/shared/button', () => ({
-  default: ({ children, href, ...props }: React.ComponentProps<'button'> & { href?: string }) => (
-    href !== undefined ? <a href={href} {...props}>{children}</a> : <button {...props}>{children}</button>
-  ),
-}))
-vi.mock('@/components/shared/list-state', () => ({
-  default: ({ kind }: { kind: string }) => <div>{kind}</div>,
-}))
-vi.mock('@/components/shared/pagination', () => ({ default: () => <div>ページ送り</div> }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock() }))
 vi.mock('@/components/shared/select', () => ({
   default: ({ value, onChange, options, size: _size, ...props }: {
     value: string
@@ -66,183 +59,20 @@ vi.mock('@/components/shared/select', () => ({
   ),
 }))
 
-import EventBookingsPage from './page'
-import EventsListPage from '../page'
+import EventBookingsPage from '@/v8/events/bookings'
 
-type Listener = (event: unknown) => void
-
-class FakeNode {
-  nodeType: number
-  nodeName: string
-  ownerDocument: FakeDocument
-  parentNode: FakeNode | null = null
-  childNodes: FakeNode[] = []
-
-  constructor(nodeType: number, nodeName: string, ownerDocument: FakeDocument) {
-    this.nodeType = nodeType
-    this.nodeName = nodeName
-    this.ownerDocument = ownerDocument
-  }
-
-  appendChild<T extends FakeNode>(child: T): T {
-    if (child.parentNode) child.parentNode.removeChild(child)
-    child.parentNode = this
-    this.childNodes.push(child)
-    return child
-  }
-
-  insertBefore<T extends FakeNode>(child: T, before: FakeNode | null): T {
-    if (before === null) return this.appendChild(child)
-    const index = this.childNodes.indexOf(before)
-    if (index < 0) throw new Error('insert target not found')
-    if (child.parentNode) child.parentNode.removeChild(child)
-    child.parentNode = this
-    this.childNodes.splice(index, 0, child)
-    return child
-  }
-
-  removeChild<T extends FakeNode>(child: T): T {
-    const index = this.childNodes.indexOf(child)
-    if (index < 0) throw new Error('child not found')
-    this.childNodes.splice(index, 1)
-    child.parentNode = null
-    return child
-  }
-
-  get firstChild(): FakeNode | null { return this.childNodes[0] ?? null }
-  get lastChild(): FakeNode | null { return this.childNodes.at(-1) ?? null }
-  get nextSibling(): FakeNode | null {
-    if (!this.parentNode) return null
-    const index = this.parentNode.childNodes.indexOf(this)
-    return this.parentNode.childNodes[index + 1] ?? null
-  }
-  get textContent(): string { return this.childNodes.map((child) => child.textContent).join('') }
-  set textContent(value: string) {
-    this.childNodes = []
-    if (value) this.appendChild(this.ownerDocument.createTextNode(value))
-  }
-}
-
-class FakeText extends FakeNode {
-  nodeValue: string
-  constructor(value: string, ownerDocument: FakeDocument) {
-    super(3, '#text', ownerDocument)
-    this.nodeValue = value
-  }
-  override get textContent(): string { return this.nodeValue }
-  override set textContent(value: string) { this.nodeValue = value }
-}
-
-class FakeElement extends FakeNode {
-  tagName: string
-  namespaceURI = 'http://www.w3.org/1999/xhtml'
-  style: Record<string, string> & { setProperty: (name: string, value: string) => void }
-  attributes = new Map<string, string>()
-  listeners = new Map<string, Set<Listener>>()
-  disabled = false
-  value = ''
-  checked = false
-  selected = false
-  defaultSelected = false
-  multiple = false
-
-  constructor(tagName: string, ownerDocument: FakeDocument) {
-    super(1, tagName.toUpperCase(), ownerDocument)
-    this.tagName = tagName.toUpperCase()
-    const style = {} as FakeElement['style']
-    style.setProperty = (name, value) => { style[name] = value }
-    this.style = style
-  }
-
-  setAttribute(name: string, value: string): void { this.attributes.set(name, String(value)) }
-  removeAttribute(name: string): void { this.attributes.delete(name) }
-  getAttribute(name: string): string | null { return this.attributes.get(name) ?? null }
-  addEventListener(type: string, listener: Listener): void {
-    const listeners = this.listeners.get(type) ?? new Set<Listener>()
-    listeners.add(listener)
-    this.listeners.set(type, listeners)
-  }
-  removeEventListener(type: string, listener: Listener): void { this.listeners.get(type)?.delete(listener) }
-  focus(): void { this.ownerDocument.activeElement = this }
-  get options(): FakeElement[] {
-    return this.childNodes.filter((child): child is FakeElement => (
-      child instanceof FakeElement && child.tagName === 'OPTION'
-    ))
-  }
-}
-
-class FakeDocument extends FakeNode {
-  defaultView: Record<string, unknown>
-  documentElement: FakeElement
-  body: FakeElement
-  activeElement: FakeElement | null = null
-  listeners = new Map<string, Set<Listener>>()
-
-  constructor() {
-    const placeholder = {} as FakeDocument
-    super(9, '#document', placeholder)
-    this.ownerDocument = this
-    this.documentElement = new FakeElement('html', this)
-    this.body = new FakeElement('body', this)
-    this.documentElement.appendChild(this.body)
-    this.defaultView = {}
-  }
-
-  createElement(tagName: string): FakeElement { return new FakeElement(tagName, this) }
-  createElementNS(_namespace: string, tagName: string): FakeElement { return this.createElement(tagName) }
-  createTextNode(value: string): FakeText { return new FakeText(value, this) }
-  createComment(value: string): FakeText { return new FakeText(value, this) }
-  addEventListener(type: string, listener: Listener): void {
-    const listeners = this.listeners.get(type) ?? new Set<Listener>()
-    listeners.add(listener)
-    this.listeners.set(type, listeners)
-  }
-  removeEventListener(type: string, listener: Listener): void { this.listeners.get(type)?.delete(listener) }
-}
-
-let documentStub: FakeDocument
-let createRoot: typeof import('react-dom/client').createRoot
 const mountedRoots: Root[] = []
 
-beforeAll(async () => {
-  documentStub = new FakeDocument()
-  const windowStub = documentStub.defaultView
-  Object.assign(windowStub, {
-    document: documentStub,
-    Node: FakeNode,
-    Element: FakeElement,
-    HTMLElement: FakeElement,
-    HTMLIFrameElement: class extends FakeElement {},
-    getSelection: () => null,
-  })
-  Object.assign(globalThis, {
-    React,
-    window: windowStub,
-    document: documentStub,
-    Node: FakeNode,
-    Element: FakeElement,
-    HTMLElement: FakeElement,
-    IS_REACT_ACT_ENVIRONMENT: true,
-  })
-  ;({ createRoot } = await import('react-dom/client'))
-})
-
 beforeEach(() => {
-  vi.clearAllMocks()
+  Object.values(apiMocks).forEach((mock) => mock.mockReset())
+  apiMocks.listBookings.mockResolvedValue({ items: [], total: 0 })
+  apiMocks.getBookingSummary.mockImplementation((accountId: string) => Promise.resolve({ requested: accountId === 'account-a' ? 7 : 0, confirmed: 2, cancelled: 0, totalCapacity: 10 }))
+  document.documentElement.dataset.theme = 'v8'
+  ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   accountMock.selectedAccountId = 'account-a'
   accountMock.role = 'owner'
   apiMocks.getEvent.mockResolvedValue({ id: 'event-1', name: '相談会', waitlist_enabled: 1 })
-  apiMocks.getBookingSummary.mockResolvedValue({
-    requested: 0,
-    confirmed: 2,
-    rejected: 0,
-    cancelled: 0,
-    expired: 0,
-    attended: 0,
-    no_show: 0,
-    waitlist: 0,
-    totalCapacity: 10,
-  })
+
   apiMocks.decideBooking.mockResolvedValue({ ok: true })
   apiMocks.adminCancelBooking.mockResolvedValue({ ok: true })
   apiMocks.listEvents.mockResolvedValue({ items: [], total: 0 })
@@ -267,7 +97,8 @@ afterEach(async () => {
   await act(async () => {
     while (mountedRoots.length > 0) mountedRoots.pop()?.unmount()
   })
-  documentStub.body.textContent = ''
+  document.body.textContent = ''
+  delete document.documentElement.dataset.theme
 })
 
 async function flush(): Promise<void> {
@@ -277,18 +108,20 @@ async function flush(): Promise<void> {
 }
 
 async function mount(element: ReactElement) {
-  const container = documentStub.createElement('div')
-  documentStub.body.appendChild(container)
+  const container = document.createElement('div')
+  document.body.appendChild(container)
   const root = createRoot(container as unknown as HTMLElement)
   mountedRoots.push(root)
   await act(async () => { root.render(element) })
   await flush()
+  await openRecords()
   return {
-    container,
+    container: document.body,
     root,
     rerender: async (next: ReactElement) => {
       await act(async () => { root.render(next) })
       await flush()
+      await openRecords()
     },
     /*
      * **commit と effect の隙間で応答を返す。** `flushSync` で新しい
@@ -321,61 +154,99 @@ async function mount(element: ReactElement) {
         Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', actEnvironment)
       }
       await flush()
+      await openRecords()
     },
   }
 }
 
-function elements(root: FakeNode): FakeElement[] {
-  return root.childNodes.flatMap((child) => [
-    ...(child instanceof FakeElement ? [child] : []),
-    ...elements(child),
-  ])
+async function openRecords() {
+  const details = document.querySelector('details')
+  if (details && !details.open) {
+    await act(async () => { details.open = true; fireEvent(details, new Event('toggle')) })
+    await flush()
+  }
 }
 
-function propsOf(element: FakeElement): Record<string, unknown> {
+function elements(root: Node): HTMLElement[] {
+  return [...(root as ParentNode).querySelectorAll<HTMLElement>('*')].filter((element) => !element.closest('[data-closing]'))
+}
+
+function isConfirm(element: HTMLElement) {
+  return element.tagName === 'BUTTON' && element.getAttribute('data-dialog-action') === 'primary' && Boolean(element.closest('[role=dialog]:not([data-closing]), [role=alertdialog]:not([data-closing])'))
+}
+
+function propsOf(element: HTMLElement): Record<string, unknown> {
   const key = Object.keys(element).find((name) => name.startsWith('__reactProps$'))
   const props = key ? (element as unknown as Record<string, Record<string, unknown>>)[key] : undefined
   if (!props) throw new Error(`React props not found: ${element.tagName}`)
   return props
 }
 
-function actionButton(container: FakeElement, bookingId: string, action: string): FakeElement {
+function actionButton(container: HTMLElement, bookingId: string, action: string): HTMLElement {
+  const label = action === 'no_show' ? '無断' : action === 'cancel' ? 'キャンセルにする' : action === 'reject' ? '断る' : action
+  if (action === 'attended') {
+    const primary = elements(container).find((element) => (
+      element.tagName === 'BUTTON'
+      && element.getAttribute('data-booking-id') === bookingId
+      && element.getAttribute('data-booking-action') === action
+    ))
+    if (!primary) throw new Error(`primary action not found: ${bookingId}/${action}`)
+    return primary
+  }
   const found = elements(container).find((element) => (
     element.tagName === 'BUTTON'
     && element.getAttribute('data-booking-id') === bookingId
-    && element.getAttribute('data-booking-action') === action
+    && element.getAttribute('data-booking-action') === 'menu'
   ))
   if (!found) throw new Error(`button not found: ${bookingId}/${action}`)
+  fireEvent.click(found)
+  const menuItem = elements(document.body).find((element) => element.getAttribute('role') === 'menuitem' && (element.getAttribute('aria-label') ?? element.textContent?.trim()) === label)
+  if (!menuItem) throw new Error(`menu item not found: ${bookingId}/${action}`)
+  return menuItem
+}
+
+function occurrenceActionButton(container: HTMLElement, _action: string): HTMLElement {
+  const found = elements(container).find((element) => element.tagName === 'BUTTON' && !(element as HTMLButtonElement).disabled && ['次の方へ案内する', '予約に繰上げ'].includes(element.textContent?.trim() ?? ''))
+  if (!found) throw new Error('promotion button not found')
   return found
 }
 
-function occurrenceActionButton(container: FakeElement, action: string): FakeElement {
-  const found = elements(container).find((element) => (
-    element.tagName === 'BUTTON' && element.getAttribute('data-occurrence-action') === action
-  ))
-  if (!found) throw new Error(`occurrence action button not found: ${action}`)
-  return found
-}
-
-function buttonByText(container: FakeElement, text: string): FakeElement {
-  const found = elements(container).find((element) => element.tagName === 'BUTTON' && element.textContent === text)
+function buttonByText(container: HTMLElement, text: string): HTMLElement {
+  const preview = text === '対象と内容を確認'
+  const found = elements(container).find((element) => element.tagName === 'BUTTON' && (preview ? !element.closest('[role=dialog], [role=alertdialog]') && ['送る', '確認中…'].includes(element.textContent?.trim() ?? '') : element.textContent === text))
   if (!found) throw new Error(`button not found: ${text}`)
   return found
 }
 
-async function click(button: FakeElement): Promise<void> {
-  const onClick = propsOf(button).onClick
-  if (typeof onClick !== 'function') throw new Error('button has no onClick')
-  await act(async () => {
-    onClick({ currentTarget: button, target: button, preventDefault: () => undefined })
-  })
+async function click(button: HTMLElement): Promise<void> {
+  await act(async () => { button.click() })
   await flush()
 }
 
+it.each([0, 1])('名簿の入口%sから欠席し、正規の読取で人数と予約の記録を更新する', async index => {
+  apiMocks.getEvent.mockResolvedValue({ id: 'event-1', line_account_id: 'account-a', name: '相談会', makeup_rule_json: JSON.stringify({ enabled: true, cutoffHours: 3, validDays: 30, monthlyCap: 2, target: 'same_kind', targetIds: [] }) })
+  apiMocks.listBookings.mockResolvedValue({ items: [{ id: 'booking-1', event_id: 'event-1', slot_id: 'slot-1', friend_id: 'friend-booking', status: 'confirmed', slot_starts_at: '2099-06-01T01:00:00Z', friend_display_name: '申込 太郎' }], total: 1 })
+  apiMocks.absence.mockImplementation(async () => {
+    const previous = await apiMocks.getOccurrenceApplicants()
+    apiMocks.getOccurrenceApplicants.mockResolvedValue({ ...previous, occurrence: { ...previous.occurrence, activeSeats: 0 }, applicants: [] })
+    apiMocks.listBookings.mockResolvedValue({ items: [], total: 0 })
+    return { data: { eventBooking: { id: 'booking-1', status: 'absent' }, makeupCredit: null, reasonIfNone: 'monthly_cap' } }
+  })
+  const view = await mount(<EventBookingsPage />)
+  const buttons = elements(view.container).filter(el => el.getAttribute('data-booking-action') === 'absence')
+  expect(buttons).toHaveLength(2)
+  await click(buttons[index])
+  await click(buttonByText(view.container, '欠席にする'))
+  expect(apiMocks.absence).toHaveBeenCalledWith('account-a', 'booking-1', { grantMakeup: true })
+  expect(view.container.textContent).toContain('今月の振替の上限に達しているため')
+  expect(apiMocks.listBookings.mock.calls.length).toBeGreaterThan(1)
+  expect(elements(view.container).filter(el => el.getAttribute('data-booking-action') === 'absence')).toHaveLength(0)
+})
+
 /** U: 待ち操作の確認窓に理由を書いて確認する。 */
-async function confirmWaitlistDialog(container: FakeElement, reason: string): Promise<void> {
+async function confirmWaitlistDialog(container: HTMLElement, reason: string): Promise<void> {
   const area = elements(container).find((element) => (
-    element.tagName === 'TEXTAREA' && propsOf(element)['aria-label'] === '操作の理由'
+    element.tagName === 'TEXTAREA' && Boolean(element.closest('[role=dialog]:not([data-closing])'))
   ))
   if (!area) throw new Error('reason textarea not found')
   await act(async () => {
@@ -383,7 +254,7 @@ async function confirmWaitlistDialog(container: FakeElement, reason: string): Pr
     onChange({ target: { value: reason } })
   })
   await flush()
-  await click(elements(container).find((element) => element.getAttribute('data-confirm-dialog') === 'confirm')!)
+  await click(elements(container).find((element) => isConfirm(element))!)
 }
 
 function deferred<T>() {
@@ -430,13 +301,15 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(view.container.textContent).toContain('案内中')
     expect(view.container.textContent).not.toContain('キャンセル待ち 1番')
     expect(view.container.textContent).toContain('待機 花子')
-    expect(view.container.textContent).toContain('2099/05/04')
+    expect(view.container.textContent).toContain('5/4 10:00')
     const talk = elements(view.container).find((element) => element.tagName === 'A' && element.textContent === '個別トーク')
     expect(talk && propsOf(talk).href).toBe('/chats?friend=friend-waiting')
 
     const button = occurrenceActionButton(view.container, 'promote-waitlist')
     await click(button)
     await click(button)
+    expect(view.container.textContent).toContain('LINEアカウント')
+    expect(view.container.textContent).toContain('環境')
     // U: 理由の確認窓が先。理由なしでは送らない。
     expect(apiMocks.promoteOccurrenceWaitlist).toHaveBeenCalledTimes(0)
     await confirmWaitlistDialog(view.container, '空きが出たため順番どおり案内します')
@@ -446,7 +319,7 @@ describe('Issue #684 イベント予約の実操作', () => {
     await flush()
   })
 
-  it('待機中だけを順位に数え、案内中・受諾済みを日本語で区別する', async () => {
+  it('採用済みの待ち順は案内中・受諾済みも数え、それぞれの状態を区別する', async () => {
     apiMocks.getOccurrenceApplicants.mockResolvedValue({
       occurrence: { id: 'slot-1', eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 1, version: 4 },
       summary: { bookingCount: 0, waitingCount: 1, activeSeats: 1 },
@@ -462,28 +335,13 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(view.container.textContent).toContain('案内中')
     expect(view.container.textContent).toContain('受諾済み')
     expect(view.container.textContent).toContain('待機中')
-    expect(view.container.textContent).toContain('キャンセル待ち 1番')
-    expect(view.container.textContent).not.toContain('キャンセル待ち 2番')
-    expect(view.container.textContent).not.toContain('キャンセル待ち 3番')
+    expect(view.container.textContent).toContain('キャンセル待ち 1 番')
+    expect(view.container.textContent).toContain('キャンセル待ち 2 番')
+    expect(view.container.textContent).toContain('キャンセル待ち 3 番')
   })
 
   it('IDEA-29: 残席・待機/案内中の人数・繰上げ履歴・当日受付を人数で分けて出す', async () => {
-    apiMocks.getBookingSummary.mockResolvedValue({
-      requested: 1,
-      confirmed: 1,
-      rejected: 0,
-      cancelled: 0,
-      expired: 0,
-      attended: 1,
-      no_show: 0,
-      waitlist: 2,
-      requestedSeats: 2,
-      confirmedSeats: 1,
-      waitingSeats: 3,
-      offeredSeats: 2,
-      activeSeats: 5,
-      totalCapacity: 5,
-    })
+
     apiMocks.getOccurrenceApplicants.mockResolvedValue({
       occurrence: { id: 'slot-1', eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 5, version: 4 },
       summary: {
@@ -513,20 +371,22 @@ describe('Issue #684 イベント予約の実操作', () => {
     const view = await mount(<EventBookingsPage />)
 
     // 開催回パネル: 申込を確定/承認待ちへ分け、待機と案内中を人数で分ける。
-    expect(view.container.textContent).toContain('申込 3人 （確定 1人・承認待ち 2人）')
+    expect(view.container.textContent).toContain('申込 3人（確定 1人・承認待ち 2人）')
     expect(view.container.textContent).toContain('キャンセル待ち 3人・案内中 2人')
     expect(view.container.textContent).toContain('満席（定員 5人）')
     // 上部の集計カードも人数基準: 待ち列は待機+案内中=5人。
-    expect(view.container.textContent).toContain('待機 3人・案内中 2人')
+    expect(view.container.textContent).toContain('キャンセル待ち 3人・案内中 2人')
     // 当日受付: 記録済みを人数で出し、確定のままの人は受付前として残す。
-    expect(view.container.textContent).toContain('当日の受付')
-    expect(view.container.textContent).toContain('参加済 2人・無断欠席 1人・受付前 1人')
+    const attendance = view.container.querySelector('[aria-label="当日の受付"]')!
+    expect(attendance.textContent).toContain('参加済 2人')
+    expect(attendance.textContent).toContain('無断欠席 1人')
+    expect(attendance.textContent).toContain('受付前 1人')
     expect(view.container.textContent).toContain('参加 済子')
     expect(view.container.textContent).toContain('無断 欠子')
     // 繰上げ履歴: 予約化・期限切れを運用の言葉で出す。
-    expect(view.container.textContent).toContain('繰上げ・案内の履歴')
+    expect(view.container.querySelector('[aria-label="キャンセル待ち"]')).toBeTruthy()
     expect(view.container.textContent).toContain('予約に繰上げ')
-    expect(view.container.textContent).toContain('案内が期限切れ')
+    expect(view.container.textContent).toContain('期限切れ')
     expect(view.container.textContent).toContain('繰上 太郎')
   })
 
@@ -535,12 +395,12 @@ describe('Issue #684 イベント予約の実操作', () => {
     const view = await mount(<EventBookingsPage />)
 
     // 行から数え直した人数で出る(確定1人・待機2人・案内中0人・残席4)。
-    expect(view.container.textContent).toContain('申込 1人 （確定 1人・承認待ち 0人）')
+    expect(view.container.textContent).toContain('申込 1人（確定 1人・承認待ち 0人）')
     expect(view.container.textContent).toContain('キャンセル待ち 2人・案内中 0人')
     expect(view.container.textContent).toContain('残席 4席（定員 5人）')
     // 履歴・受付は「0件」ではなく「まだ取得できていません」と区別する。
-    expect(view.container.textContent).toContain('履歴はまだ取得できていません')
-    expect(view.container.textContent).toContain('受付の記録はまだ取得できていません')
+    expect(view.container.textContent).toContain('履歴はまだ読み込めていません')
+    expect(view.container.textContent).toContain('受付の記録はまだ読み込めていません')
   })
 
   it('待ち案内の失敗後は最新一覧を読み直しても理由を残す', async () => {
@@ -552,10 +412,10 @@ describe('Issue #684 イベント予約の実操作', () => {
     await confirmWaitlistDialog(view.container, '空きが出たため順番どおり案内します')
 
     expect(apiMocks.getOccurrenceApplicants).toHaveBeenCalledTimes(readsBeforeAction + 1)
-    // 失敗しても窓は閉じず、書いた理由は残る（確認試験の窓は error を描かないため、窓と理由で見る）。
-    expect(elements(view.container).some((element) => element.getAttribute('data-confirm-dialog') === 'confirm')).toBe(true)
+    // 実際の窓で失敗を伝え、閉じずに書いた理由を残す。
+    expect(elements(view.container).some((element) => isConfirm(element))).toBe(true)
     const area = elements(view.container).find((element) => (
-      element.tagName === 'TEXTAREA' && propsOf(element)['aria-label'] === '操作の理由'
+      element.tagName === 'TEXTAREA' && Boolean(element.closest('[role=dialog]:not([data-closing])'))
     ))!
     expect(propsOf(area).value).toBe('空きが出たため順番どおり案内します')
     expect(view.container.textContent).toContain('待機 花子')
@@ -565,9 +425,10 @@ describe('Issue #684 イベント予約の実操作', () => {
     apiMocks.skipOccurrenceWaitlist.mockResolvedValue({ success: true, occurrence_version: 5, waitlist_id: 'wait-1', log_id: 'log-1' })
     const view = await mount(<EventBookingsPage />)
     await click(buttonByText(view.container, '見送る'))
-    // 理由が空のままは確認が押せない（本物の窓では確認ボタン自体が出ない）。
-    const confirm = elements(view.container).find((element) => element.getAttribute('data-confirm-dialog') === 'confirm')!
-    expect(typeof propsOf(confirm).onClick).not.toBe('function')
+    // 理由が空のままは実際の確認ボタンを押せない。
+    const confirm = elements(view.container).find((element) => isConfirm(element))!
+    expect((confirm as HTMLButtonElement).disabled).toBe(true)
+    await click(confirm)
     expect(apiMocks.skipOccurrenceWaitlist).not.toHaveBeenCalled()
     await confirmWaitlistDialog(view.container, '連絡がつかないため今回は見送ります')
     expect(apiMocks.skipOccurrenceWaitlist).toHaveBeenCalledWith('account-a', 'slot-1', {
@@ -589,9 +450,10 @@ describe('Issue #684 イベント予約の実操作', () => {
     })
     apiMocks.reorderOccurrenceWaitlist.mockResolvedValue({ success: true, occurrence_version: 5, order: ['wait-2', 'wait-1'], log_id: 'log-2' })
     const view = await mount(<EventBookingsPage />)
-    const upButtons = elements(view.container).filter((element) => element.tagName === 'BUTTON' && element.textContent === '上へ')
-    expect(upButtons).toHaveLength(2)
-    await click(upButtons[1])
+    const reorderButtons = elements(view.container).filter((element) => element.tagName === 'BUTTON' && element.textContent === '待ち順を変える')
+    expect(reorderButtons).toHaveLength(2)
+    await click(reorderButtons[1])
+    await click(buttonByText(view.container, '上へ'))
     await confirmWaitlistDialog(view.container, '車いすの方を先にします')
     expect(apiMocks.reorderOccurrenceWaitlist).toHaveBeenCalledWith('account-a', 'slot-1', {
       ordered_ids: ['wait-2', 'wait-1'],
@@ -602,31 +464,77 @@ describe('Issue #684 イベント予約の実操作', () => {
 
   it('owner/adminだけが申込者への一斉送信を操作できる', async () => {
     const ownerView = await mount(<EventBookingsPage />)
-    expect(ownerView.container.textContent).toContain('この開催回の申込者へ一斉送信')
-    expect(elements(ownerView.container).some((element) => element.tagName === 'TEXTAREA')).toBe(true)
+    expect(ownerView.container.textContent).toContain('お知らせを送る')
+    expect(elements(ownerView.container).some((element) => element.tagName === 'INPUT' && element.id === 'ev-bk-message')).toBe(true)
 
+    await act(async () => { mountedRoots.pop()!.unmount() })
+    document.body.textContent = ''
     accountMock.role = 'admin'
     const adminView = await mount(<EventBookingsPage />)
-    expect(adminView.container.textContent).toContain('この開催回の申込者へ一斉送信')
-    expect(elements(adminView.container).some((element) => element.tagName === 'TEXTAREA')).toBe(true)
+    expect(adminView.container.textContent).toContain('お知らせを送る')
+    expect(elements(adminView.container).some((element) => element.tagName === 'INPUT' && element.id === 'ev-bk-message')).toBe(true)
   })
 
-  it.each([null, 'staff', 'unknown'] as const)('権限が%sのときは一斉送信だけを隠し、申込者操作は残す', async (role) => {
+  it.each([null, 'staff', 'unknown'] as const)('権限が%sのときも一斉送信の場所を残し、実行を止める', async (role) => {
     accountMock.role = role
     const view = await mount(<EventBookingsPage />)
 
-    expect(view.container.textContent).not.toContain('この開催回の申込者へ一斉送信')
-    expect(elements(view.container).some((element) => element.tagName === 'TEXTAREA')).toBe(false)
-    expect(view.container.textContent).toContain('CSVを書き出す')
+    expect(view.container.textContent).toContain('お知らせを送る')
+    expect(view.container.querySelector<HTMLInputElement>('#ev-bk-message')?.readOnly).toBe(true)
+    const send = buttonByText(view.container, '送る') as HTMLButtonElement
+    expect(send.disabled || send.getAttribute('aria-disabled') === 'true').toBe(true)
+    await click(send)
+    expect(apiMocks.previewOccurrenceBroadcast).not.toHaveBeenCalled()
+    expect(view.container.textContent).toContain('CSVで書き出す')
     expect(view.container.textContent).toContain('個別トーク')
-    expect(occurrenceActionButton(view.container, 'promote-waitlist')).toBeDefined()
+    expect(view.container.textContent).toContain('次の方へ案内する')
+  })
+
+  it('閲覧のみでも申込操作を残し、焦点と理由を示して全ての更新を拒否する', async () => {
+    accountMock.role = 'viewer'
+    const view = await mount(<EventBookingsPage />)
+    expect(view.container.querySelector('[data-read-only-notice]')).toBeTruthy()
+    await expectPermissionLocked(actionButton(view.container, 'booking-1', 'attended'))
+    await expectPermissionLocked(occurrenceActionButton(view.container, 'promote-waitlist'))
+    await expectPermissionLocked(buttonByText(view.container, 'CSVで書き出す'))
+    await expectPermissionLocked(buttonByText(view.container, '送る'))
+    await expectPermissionLocked(actionButton(view.container, 'booking-1', 'no_show'))
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
+    for (const method of [apiMocks.updateBooking, apiMocks.decideBooking, apiMocks.adminCancelBooking,
+      apiMocks.promoteOccurrenceWaitlist, apiMocks.reorderOccurrenceWaitlist, apiMocks.skipOccurrenceWaitlist,
+      apiMocks.downloadOccurrenceApplicantsCsv, apiMocks.previewOccurrenceBroadcast, apiMocks.sendOccurrenceBroadcast]) {
+      expect(method).not.toHaveBeenCalled()
+    }
+  })
+
+  it('確認窓を開いた後で閲覧のみへ変わったら窓を閉じ、更新しない', async () => {
+    const view = await mount(<EventBookingsPage />)
+    await click(actionButton(view.container, 'booking-1', 'cancel'))
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeTruthy()
+    expect(document.body.textContent).toContain('LINEアカウント')
+    expect(document.body.textContent).toContain('環境')
+    await act(async () => { rememberStaffIdentity({ ...readStaffIdentity()!, role: 'viewer' }) })
+    await flush()
+    expect(elements(document.body).some((element) => ['dialog', 'alertdialog'].includes(element.getAttribute('role') ?? ''))).toBe(false)
+    await expectPermissionLocked(actionButton(view.container, 'booking-1', 'attended'))
+    expect(apiMocks.adminCancelBooking).not.toHaveBeenCalled()
+  })
+
+  it('申込を断る確認に操作先と環境を示す', async () => {
+    const data = await apiMocks.getOccurrenceApplicants()
+    data.applicants[0].status = 'requested'
+    const view = await mount(<EventBookingsPage />)
+    await click(actionButton(view.container, 'booking-1', 'reject'))
+    expect(document.body.textContent).toContain('LINEアカウント')
+    expect(document.body.textContent).toContain('環境')
+    expect(apiMocks.decideBooking).not.toHaveBeenCalled()
   })
 
   it('一斉送信はサーバーで固定した対象を確認してから送り、二重押しでpreviewを増やさない', async () => {
     const preview = deferred<{ broadcastId: string; recipientCount: number }>()
     apiMocks.previewOccurrenceBroadcast.mockReturnValue(preview.promise)
     const view = await mount(<EventBookingsPage />)
-    const message = elements(view.container).find((element) => element.tagName === 'TEXTAREA')!
+    const message = elements(view.container).find((element) => element.tagName === 'INPUT' && element.id === 'ev-bk-message')!
     await act(async () => {
       const onChange = propsOf(message).onChange as (event: { target: { value: string } }) => void
       onChange({ target: { value: '開催回のご案内です' } })
@@ -641,28 +549,30 @@ describe('Issue #684 イベント予約の実操作', () => {
     )
     preview.resolve({ broadcastId: 'broadcast-snapshot-1', recipientCount: 2 })
     await flush()
-    expect(view.container.textContent).toContain('送信対象 2人')
-    await click(buttonByText(view.container, '送信前の最終確認へ'))
-    await click(elements(view.container).find((element) => element.getAttribute('data-confirm-dialog') === 'confirm')!)
+    expect(view.container.textContent).toContain('2 人に送りますか')
+    expect(document.querySelector('[role=dialog]:not([data-closing])')).toBeTruthy()
+    expect(view.container.textContent).toContain('LINEアカウント')
+    expect(view.container.textContent).toContain('環境')
+    await click(elements(view.container).find((element) => isConfirm(element))!)
     expect(apiMocks.sendOccurrenceBroadcast).toHaveBeenCalledWith('broadcast-snapshot-1')
   })
 
   it('アカウント切替前の一斉送信previewは確認・送信できない', async () => {
     const view = await mount(<EventBookingsPage />)
-    const message = elements(view.container).find((element) => element.tagName === 'TEXTAREA')!
+    const message = elements(view.container).find((element) => element.tagName === 'INPUT' && element.id === 'ev-bk-message')!
     await act(async () => {
       const onChange = propsOf(message).onChange as (event: { target: { value: string } }) => void
       onChange({ target: { value: '開催回のご案内です' } })
     })
     await flush()
     await click(buttonByText(view.container, '対象と内容を確認'))
-    await click(buttonByText(view.container, '送信前の最終確認へ'))
-    expect(elements(view.container).some((element) => element.getAttribute('data-confirm-dialog') === 'confirm')).toBe(true)
+    expect(document.querySelector('[role=dialog]:not([data-closing])')).toBeTruthy()
+    expect(elements(view.container).some((element) => isConfirm(element))).toBe(true)
 
     accountMock.selectedAccountId = 'account-b'
     await view.rerender(<EventBookingsPage />)
 
-    expect(elements(view.container).some((element) => element.getAttribute('data-confirm-dialog') === 'confirm')).toBe(false)
+    expect(elements(view.container).some((element) => isConfirm(element))).toBe(false)
     expect(apiMocks.sendOccurrenceBroadcast).not.toHaveBeenCalled()
   })
 
@@ -670,7 +580,7 @@ describe('Issue #684 イベント予約の実操作', () => {
     const oldPreview = deferred<{ broadcastId: string; recipientCount: number }>()
     apiMocks.previewOccurrenceBroadcast.mockReturnValueOnce(oldPreview.promise)
     const view = await mount(<EventBookingsPage />)
-    const firstMessage = elements(view.container).find((element) => element.tagName === 'TEXTAREA')!
+    const firstMessage = elements(view.container).find((element) => element.tagName === 'INPUT' && element.id === 'ev-bk-message')!
     await act(async () => {
       const onChange = propsOf(firstMessage).onChange as (event: { target: { value: string } }) => void
       onChange({ target: { value: 'Aの案内です' } })
@@ -680,7 +590,7 @@ describe('Issue #684 イベント予約の実操作', () => {
 
     accountMock.selectedAccountId = 'account-b'
     await view.rerender(<EventBookingsPage />)
-    const secondMessage = elements(view.container).find((element) => element.tagName === 'TEXTAREA')!
+    const secondMessage = elements(view.container).find((element) => element.tagName === 'INPUT' && element.id === 'ev-bk-message')!
     await act(async () => {
       const onChange = propsOf(secondMessage).onChange as (event: { target: { value: string } }) => void
       onChange({ target: { value: 'Bの案内です' } })
@@ -695,15 +605,15 @@ describe('Issue #684 イベント予約の実操作', () => {
     const oldSend = deferred<{ success: true }>()
     apiMocks.sendOccurrenceBroadcast.mockReturnValueOnce(oldSend.promise)
     const view = await mount(<EventBookingsPage />)
-    const message = elements(view.container).find((element) => element.tagName === 'TEXTAREA')!
+    const message = elements(view.container).find((element) => element.tagName === 'INPUT' && element.id === 'ev-bk-message')!
     await act(async () => {
       const onChange = propsOf(message).onChange as (event: { target: { value: string } }) => void
       onChange({ target: { value: 'Aの案内です' } })
     })
     await flush()
     await click(buttonByText(view.container, '対象と内容を確認'))
-    await click(buttonByText(view.container, '送信前の最終確認へ'))
-    await click(elements(view.container).find((element) => element.getAttribute('data-confirm-dialog') === 'confirm')!)
+    expect(document.querySelector('[role=dialog]:not([data-closing])')).toBeTruthy()
+    await click(elements(view.container).find((element) => isConfirm(element))!)
 
     accountMock.selectedAccountId = 'account-b'
     await view.rerender(<EventBookingsPage />)
@@ -732,17 +642,160 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(apiMocks.promoteOccurrenceWaitlist).toHaveBeenCalledWith('account-b', 'slot-1', 4, 'Bの空きを案内します')
   })
 
+  it('開催回を切り替えた後に古いpreviewが返っても、新しい開催回の確認・送信に使えない', async () => {
+    apiMocks.listOccurrenceSelector.mockResolvedValue({
+      items: [
+        { id: 'slot-1', starts_at: '2099-06-01T01:00:00.000Z', ends_at: '2099-06-01T02:00:00.000Z', is_active: 1 },
+        { id: 'slot-2', starts_at: '2099-06-08T01:00:00.000Z', ends_at: '2099-06-08T02:00:00.000Z', is_active: 1 },
+      ],
+    })
+    apiMocks.getOccurrenceApplicants.mockImplementation(async (_accountId: string, occurrenceId: string) => ({
+      occurrence: { id: occurrenceId, eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 1, version: 4 },
+      summary: { bookingCount: 1, waitingCount: 0, activeSeats: 1 },
+      snapshotId: `snapshot-${occurrenceId}`, snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
+      applicants: [],
+    }))
+    const oldPreview = deferred<{ broadcastId: string; recipientCount: number }>()
+    apiMocks.previewOccurrenceBroadcast.mockReturnValueOnce(oldPreview.promise)
+    const view = await mount(<EventBookingsPage />)
+    const message = elements(view.container).find((element) => (
+      element.tagName === 'INPUT' && element.id === 'ev-bk-message'
+    ))!
+    await act(async () => {
+      const onChange = propsOf(message).onChange as (event: { target: { value: string } }) => void
+      onChange({ target: { value: '開催回のご案内です' } })
+    })
+    await flush()
+    await click(buttonByText(view.container, '対象と内容を確認'))
+    expect(apiMocks.previewOccurrenceBroadcast).toHaveBeenCalledWith(
+      'account-a', 'slot-1', expect.objectContaining({ snapshotId: 'snapshot-slot-1' }), expect.any(String),
+    )
+
+    // 開催回2へ切り替え、申込者の表示が切り替わるのを待つ。
+    const selector = elements(view.container).find((element) => (
+      element.tagName === 'SELECT' && element.getAttribute('aria-label') === '開催回を選ぶ'
+    ))!
+    await act(async () => {
+      fireEvent.change(selector, { target: { value: 'slot-2' } })
+    })
+    await flush()
+    expect(apiMocks.getOccurrenceApplicants).toHaveBeenLastCalledWith('account-a', 'slot-2')
+
+    // 切り替え前の古いpreview応答が今返る。
+    oldPreview.resolve({ broadcastId: 'slot-1-draft', recipientCount: 97 })
+    await flush()
+
+    expect(view.container.textContent).not.toContain('97 人に送りますか')
+    expect(elements(view.container).some(isConfirm)).toBe(false)
+    expect(apiMocks.sendOccurrenceBroadcast).not.toHaveBeenCalled()
+  })
+
+  it('Aへ戻って押し直した後に古いpreviewが返っても最新の対象を置き換えない', async () => {
+    apiMocks.listOccurrenceSelector.mockResolvedValue({
+      items: [
+        { id: 'slot-1', starts_at: '2099-06-01T01:00:00.000Z', ends_at: '2099-06-01T02:00:00.000Z', is_active: 1 },
+        { id: 'slot-2', starts_at: '2099-06-08T01:00:00.000Z', ends_at: '2099-06-08T02:00:00.000Z', is_active: 1 },
+      ],
+    })
+    apiMocks.getOccurrenceApplicants.mockImplementation(async (_accountId: string, occurrenceId: string) => ({
+      occurrence: { id: occurrenceId, eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 1, version: 4 },
+      summary: { bookingCount: 1, waitingCount: 0, activeSeats: 1 },
+      snapshotId: `snapshot-${occurrenceId}`, snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
+      applicants: [],
+    }))
+    const oldPreview = deferred<{ broadcastId: string; recipientCount: number }>()
+    apiMocks.previewOccurrenceBroadcast.mockReturnValueOnce(oldPreview.promise)
+    const view = await mount(<EventBookingsPage />)
+    const message = elements(view.container).find((element) => (
+      element.tagName === 'INPUT' && element.id === 'ev-bk-message'
+    ))!
+    await act(async () => {
+      const onChange = propsOf(message).onChange as (event: { target: { value: string } }) => void
+      onChange({ target: { value: '開催回のご案内です' } })
+    })
+    await flush()
+    const selectOccurrence = async (id: string) => {
+      const selector = elements(view.container).find((element) => (
+        element.tagName === 'SELECT' && element.getAttribute('aria-label') === '開催回を選ぶ'
+      ))!
+      await act(async () => {
+        fireEvent.change(selector, { target: { value: id } })
+      })
+      await flush()
+    }
+    await click(buttonByText(view.container, '対象と内容を確認'))
+    await selectOccurrence('slot-2')
+    await selectOccurrence('slot-1')
+    await act(async () => { fireEvent.change(document.querySelector('#ev-bk-message')!, { target: { value: '戻った開催回への案内です' } }) })
+    apiMocks.previewOccurrenceBroadcast.mockResolvedValueOnce({ broadcastId: 'fresh-A', recipientCount: 2 })
+    await click(buttonByText(view.container, '対象と内容を確認'))
+    expect(view.container.textContent).toContain('2 人に送りますか')
+
+    // 1回目の古い応答が今返っても、最新のAの対象を置き換えない。
+    oldPreview.resolve({ broadcastId: 'obsolete-A', recipientCount: 97 })
+    await flush()
+    expect(view.container.textContent).not.toContain('97 人に送りますか')
+    expect(view.container.textContent).toContain('2 人に送りますか')
+    expect(apiMocks.sendOccurrenceBroadcast).not.toHaveBeenCalled()
+  })
+
+  it('古いAの後片付けで処理中のBの操作中表示を消さない', async () => {
+    apiMocks.listOccurrenceSelector.mockResolvedValue({
+      items: [
+        { id: 'slot-1', starts_at: '2099-06-01T01:00:00.000Z', ends_at: '2099-06-01T02:00:00.000Z', is_active: 1 },
+        { id: 'slot-2', starts_at: '2099-06-08T01:00:00.000Z', ends_at: '2099-06-08T02:00:00.000Z', is_active: 1 },
+      ],
+    })
+    apiMocks.getOccurrenceApplicants.mockImplementation(async (_accountId: string, occurrenceId: string) => ({
+      occurrence: { id: occurrenceId, eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 1, version: 4 },
+      summary: { bookingCount: 1, waitingCount: 0, activeSeats: 1 },
+      snapshotId: `snapshot-${occurrenceId}`, snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
+      applicants: [],
+    }))
+    const oldPreview = deferred<{ broadcastId: string; recipientCount: number }>()
+    const freshPreview = deferred<{ broadcastId: string; recipientCount: number }>()
+    apiMocks.previewOccurrenceBroadcast.mockReturnValueOnce(oldPreview.promise).mockReturnValueOnce(freshPreview.promise)
+    const view = await mount(<EventBookingsPage />)
+    const message = elements(view.container).find((element) => (
+      element.tagName === 'INPUT' && element.id === 'ev-bk-message'
+    ))!
+    await act(async () => {
+      const onChange = propsOf(message).onChange as (event: { target: { value: string } }) => void
+      onChange({ target: { value: '開催回のご案内です' } })
+    })
+    await flush()
+    await click(buttonByText(view.container, '対象と内容を確認'))
+    const selector = elements(view.container).find((element) => (
+      element.tagName === 'SELECT' && element.getAttribute('aria-label') === '開催回を選ぶ'
+    ))!
+    await act(async () => {
+      fireEvent.change(selector, { target: { value: 'slot-2' } })
+    })
+    await flush()
+    await act(async () => { fireEvent.change(document.querySelector('#ev-bk-message')!, { target: { value: '新しい開催回への案内です' } }) })
+    await click(buttonByText(view.container, '対象と内容を確認'))
+    expect(propsOf(buttonByText(view.container, '対象と内容を確認')).disabled).toBe(true)
+
+    // 古いAの応答が返っても、Bの処理中表示は残る。
+    oldPreview.resolve({ broadcastId: 'old-A', recipientCount: 97 })
+    await flush()
+    expect(propsOf(buttonByText(view.container, '対象と内容を確認')).disabled).toBe(true)
+    freshPreview.resolve({ broadcastId: 'new-B', recipientCount: 2 })
+    await flush()
+    expect(view.container.textContent).toContain('2 人に送りますか')
+    expect(view.container.textContent).not.toContain('97 人に送りますか')
+    expect(apiMocks.sendOccurrenceBroadcast).not.toHaveBeenCalled()
+  })
+
   it('同じ行を連打しても更新は1回だけ送る', async () => {
     const pending = deferred<{ ok: true }>()
     apiMocks.listBookings.mockResolvedValue({ items: [booking('booking-a', '青木さん')], total: 1 })
     apiMocks.updateBooking.mockReturnValue(pending.promise)
     const view = await mount(<EventBookingsPage />)
     const button = actionButton(view.container, 'booking-a', 'attended')
-    const onClick = propsOf(button).onClick as (event: unknown) => void
-
     await act(async () => {
-      onClick({})
-      onClick({})
+      button.click()
+      button.click()
     })
     await flush()
 
@@ -814,17 +867,9 @@ describe('Issue #684 イベント予約の実操作', () => {
       name: accountId === 'account-a' ? '相談会A' : '相談会B',
       waitlist_enabled: 1,
     }))
-    apiMocks.getBookingSummary.mockImplementation((accountId: string) => Promise.resolve({
-      requested: accountId === 'account-a' ? 7 : 0,
-      confirmed: 2,
-      rejected: 0,
-      cancelled: 0,
-      expired: 0,
-      attended: 0,
-      no_show: 0,
-      waitlist: 0,
-      totalCapacity: 10,
-    }))
+
+    const originalApplicants = await apiMocks.getOccurrenceApplicants.getMockImplementation()!('account-a', 'slot-1')
+    apiMocks.getOccurrenceApplicants.mockImplementation((accountId: string) => Promise.resolve({ ...originalApplicants, summary: { ...originalApplicants.summary, requestedSeats: accountId === 'account-a' ? 7 : 0 } }))
     apiMocks.updateBooking.mockReturnValue(oldSuccess.promise)
 
     const view = await mount(<EventBookingsPage />)
@@ -843,7 +888,7 @@ describe('Issue #684 イベント予約の実操作', () => {
     const before = {
       list: callsFor(apiMocks.listBookings, 'account-a'),
       event: callsFor(apiMocks.getEvent, 'account-a'),
-      summary: callsFor(apiMocks.getBookingSummary, 'account-a'),
+      summary: callsFor(apiMocks.getOccurrenceApplicants, 'account-a'),
     }
 
     // ここでようやく旧アカウントの更新が成功で返る。
@@ -853,14 +898,14 @@ describe('Issue #684 イベント予約の実操作', () => {
     // 前のアカウントの取り直しも集計も走らせない。
     expect(callsFor(apiMocks.listBookings, 'account-a')).toBe(before.list)
     expect(callsFor(apiMocks.getEvent, 'account-a')).toBe(before.event)
-    expect(callsFor(apiMocks.getBookingSummary, 'account-a')).toBe(before.summary)
+    expect(callsFor(apiMocks.getOccurrenceApplicants, 'account-a')).toBe(before.summary)
     // 画面はBのまま。Aの予約者・イベント名・承認待ち件数を出さない。
     expect(view.container.textContent).toContain('井上さん')
     expect(view.container.textContent).not.toContain('青木さん')
     expect(view.container.textContent).toContain('相談会B')
     expect(view.container.textContent).not.toContain('相談会A')
-    expect(view.container.textContent).toContain('確認待ちはありません')
-    expect(view.container.textContent).not.toContain('対応が必要：7件を確認してください')
+    expect(view.container.textContent).toContain('承認待ち 0人')
+    expect(view.container.textContent).not.toContain('承認待ち 7人')
     // Bの行を勝手に参加済へ書き換えない（書き換わると操作ボタンが消える）。
     expect(() => actionButton(view.container, 'booking-a', 'attended')).not.toThrow()
     expect(propsOf(actionButton(view.container, 'booking-a', 'attended')).disabled).toBe(false)
@@ -878,17 +923,9 @@ describe('Issue #684 イベント予約の実操作', () => {
       name: accountId === 'account-a' ? '相談会A' : '相談会B',
       waitlist_enabled: 1,
     }))
-    apiMocks.getBookingSummary.mockImplementation((accountId: string) => Promise.resolve({
-      requested: accountId === 'account-a' ? 7 : 0,
-      confirmed: 2,
-      rejected: 0,
-      cancelled: 0,
-      expired: 0,
-      attended: 0,
-      no_show: 0,
-      waitlist: 0,
-      totalCapacity: 10,
-    }))
+
+    const originalApplicants = await apiMocks.getOccurrenceApplicants.getMockImplementation()!('account-a', 'slot-1')
+    apiMocks.getOccurrenceApplicants.mockImplementation((accountId: string) => Promise.resolve({ ...originalApplicants, summary: { ...originalApplicants.summary, requestedSeats: accountId === 'account-a' ? 7 : 0 } }))
     apiMocks.updateBooking.mockReturnValue(oldSuccess.promise)
 
     const view = await mount(<EventBookingsPage />)
@@ -901,7 +938,7 @@ describe('Issue #684 イベント予約の実操作', () => {
     const before = {
       list: callsFor(apiMocks.listBookings, 'account-a'),
       event: callsFor(apiMocks.getEvent, 'account-a'),
-      summary: callsFor(apiMocks.getBookingSummary, 'account-a'),
+      summary: callsFor(apiMocks.getOccurrenceApplicants, 'account-a'),
     }
 
     /*
@@ -916,13 +953,13 @@ describe('Issue #684 イベント予約の実操作', () => {
 
     expect(callsFor(apiMocks.listBookings, 'account-a')).toBe(before.list)
     expect(callsFor(apiMocks.getEvent, 'account-a')).toBe(before.event)
-    expect(callsFor(apiMocks.getBookingSummary, 'account-a')).toBe(before.summary)
+    expect(callsFor(apiMocks.getOccurrenceApplicants, 'account-a')).toBe(before.summary)
     expect(view.container.textContent).toContain('井上さん')
     expect(view.container.textContent).not.toContain('青木さん')
     expect(view.container.textContent).toContain('相談会B')
     expect(view.container.textContent).not.toContain('相談会A')
-    expect(view.container.textContent).toContain('確認待ちはありません')
-    expect(view.container.textContent).not.toContain('対応が必要：7件を確認してください')
+    expect(view.container.textContent).toContain('承認待ち 0人')
+    expect(view.container.textContent).not.toContain('承認待ち 7人')
     expect(() => actionButton(view.container, 'booking-a', 'attended')).not.toThrow()
     expect(propsOf(actionButton(view.container, 'booking-a', 'attended')).disabled).toBe(false)
     expect(view.container.textContent).not.toContain('来場・不参加の記録を変えられませんでした。')
@@ -964,22 +1001,8 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(view.container.textContent).not.toContain('来場・不参加の記録を変えられませんでした。')
   })
 
-  it('一覧上部の件数は「表示のみ」で、タブやボタンとして扱わない', async () => {
-    // ★V7: 集計帯は下の集計カードとの重複なので出さない。上部の件数は集計カードで見る。
-    const view = await mount(<EventsListPage />)
-    const kpis = elements(view.container).find((element) => (
-      element.getAttribute('data-design') === 'KPIs'
-    ))
-    expect(kpis).toBeDefined()
-    expect(kpis?.textContent).toContain('これからの回')
-    /*
-     * R79/R80: 数の数え方は見出し横の「？」へ入れる（共通ルール 2-1b）。
-     * 「？」は補足の開閉だけで、数自体を押させはしない。タブ・リンク・
-     * 操作ボタンは引き続き置かない。
-     */
-    const pressable = kpis ? elements(kpis).filter((element) => ['BUTTON', 'A'].includes(element.tagName)) : []
-    const nonHelp = pressable.filter((element) => element.getAttribute('aria-label')?.endsWith('の説明') !== true)
-    expect(nonHelp).toHaveLength(0)
-    expect(pressable.length).toBeGreaterThan(0)
-  })
+
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

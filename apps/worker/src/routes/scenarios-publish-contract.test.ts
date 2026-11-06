@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const accountAccessMocks = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(),
@@ -26,7 +26,7 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
-vi.mock('../services/scenario-stats.js', () => ({
+vi.mock('../features/scenarios/scenario-stats.js', () => ({
   computeScenarioStats: vi.fn(),
 }));
 
@@ -73,7 +73,7 @@ beforeEach(() => {
 });
 
 /**
- * 票 #644（点検 #495 / N-050）の公開口の契約。
+ * 票 の公開口の契約。
  *
  * 公開操作は配信へ直結するので、他アカウント・権限不足・確認キーなしを
  * 止め、再試行と連打で二重版を作らない（DB 側の冪等と対になる）。

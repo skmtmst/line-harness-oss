@@ -1,6 +1,7 @@
 'use client'
 import Notice from '@/components/shared/notice'
 import styles from './message-type-tabs.module.css'
+import Button from '@/components/shared/button'
 
 /*
  * 送るものの種別を選ぶタブ。
@@ -43,19 +44,19 @@ interface KindDef {
  */
 export const STEP_MESSAGE_KINDS: KindDef[] = [
   { value: 'text', label: 'テキスト' },
-  { value: 'sticker', label: 'スタンプ' },
   { value: 'image', label: '画像' },
-  { value: 'question', label: '質問' },
+  { value: 'video', label: '動画' },
+  { value: 'audio', label: '音声' },
+  { value: 'sticker', label: 'スタンプ' },
   { value: 'carousel', label: 'カルーセル' },
   { value: 'location', label: '位置情報' },
+  { value: 'question', label: '質問' },
   {
     value: 'intro',
     label: '紹介',
     disabledReason:
       '他のLINEアカウントの紹介は、LINE側に該当するメッセージの種別がありません。テキストに友だち追加のURLを書くか、カードタイプのテンプレートにボタンを置いてください。',
   },
-  { value: 'audio', label: '音声' },
-  { value: 'video', label: '動画' },
 ]
 
 export function isStepMessageKindAvailable(kind: StepMessageKind): boolean {
@@ -87,24 +88,15 @@ export default function MessageTypeTabs({ value, onChange, children }: MessageTy
           const disabled = Boolean(kind.disabledReason)
           const active = kind.value === value
           return (
-            <button
-              key={kind.value}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              disabled={disabled}
-              title={kind.disabledReason}
-              onClick={() => !disabled && onChange(kind.value)}
-              className={`${styles.tab} px-3 text-micro font-bold transition-colors ${
+            <Button variant="secondary" className={(`${styles.tab} px-3 text-micro font-medium transition-colors ${
                 active
                   ? 'border-hairline bg-canvas text-ink border'
                   : disabled
                     ? 'text-ink-faint cursor-not-allowed opacity-50'
                     : 'text-ink-secondary hover:bg-canvas'
-              }`}
-            >
+              }`) + ' h-auto whitespace-normal'} key={kind.value} type="button" role="tab" aria-selected={active} disabled={disabled} title={kind.disabledReason}  onClick={() => !disabled && onChange(kind.value)}>
               {kind.label}
-            </button>
+            </Button>
           )
         })}
       </div>

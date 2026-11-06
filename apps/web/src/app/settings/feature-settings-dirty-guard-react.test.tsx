@@ -55,6 +55,7 @@ beforeEach(() => {
   })
   vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return Promise.resolve(response({ success: true, data: { role: 'owner' } }))
     const accountId = new URL(path, 'http://localhost').searchParams.get('account_id') ?? 'account-a'
     if (path.includes('/api/settings/features/impact')) {
       return response({ success: true, data: { version: 3, impacts: [], requiresConfirmation: false, impactToken: null } })
@@ -98,15 +99,15 @@ async function settle() {
 }
 
 function button(label: string): HTMLButtonElement {
-  const found = [...document.body.querySelectorAll('button')].find((item) => item.textContent?.trim() === label)
+  const found = [...document.body.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === label || item.textContent?.trim() === label)
   if (!found) throw new Error(`ボタンが見つかりません: ${label}`)
   return found
 }
 
 async function makeDirty() {
-  const toggle = [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]')]
-    .find((item) => !item.disabled && item.getAttribute('aria-checked') === 'false')
-    ?? [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]')].find((item) => !item.disabled)
+  const toggle = [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]:not([aria-label*="まとめて"])')]
+    .find((item) => !item.disabled && String((item as HTMLElement).getAttribute('aria-checked') === 'true') === 'false')
+    ?? [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]:not([aria-label*="まとめて"])')].find((item) => !item.disabled)
   if (!toggle) throw new Error('切替可能な機能がありません')
   await act(async () => { toggle.click(); await Promise.resolve() })
   expect(button('機能設定を保存').disabled).toBe(false)
@@ -134,18 +135,20 @@ describe('N-445 機能設定の未保存離脱確認', () => {
     await render()
     await makeDirty()
     await act(async () => { button('並びを変える').click() })
-    const link = [...host.querySelectorAll('a')].find((item) => item.getAttribute('href') === '/settings/manual-links')
+    expect(host.querySelector('a[href="/accounts"]')).toBeNull()
+    expect(host.querySelector('a[href="/line-notifications"]')).toBeNull()
+    const link = [...host.querySelectorAll('a')].find((item) => item.getAttribute('href') === '/emergency')
     if (!link) throw new Error('画面内遷移のLinkがありません')
     await act(async () => { link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })) })
     expect(document.body.textContent).toContain('保存していない変更があります')
     expect(navigation.push).not.toHaveBeenCalled()
     await act(async () => { button('編集を続ける').click() })
-    expect(document.body.textContent).not.toContain('保存せずに移動')
+    expect(document.body.textContent).not.toContain('保存せずに移る')
     expect(button('機能設定を保存').disabled).toBe(false)
     await act(async () => { link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })) })
-    await act(async () => { button('保存せずに移動').click() })
+    await act(async () => { button('保存せずに移る').click() })
     expect(navigation.push).toHaveBeenCalledTimes(1)
-    expect(navigation.push).toHaveBeenCalledWith('/settings/manual-links')
+    expect(navigation.push).toHaveBeenCalledWith('/emergency')
   })
 
   it('dirtyの戻る操作は復元側popstateを一度だけ通し、次の戻るで確認を出す', async () => {
@@ -162,7 +165,7 @@ describe('N-445 機能設定の未保存離脱確認', () => {
     expect(back).not.toHaveBeenCalled()
     await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
     expect(go).toHaveBeenCalledTimes(2)
-    await act(async () => { button('保存せずに移動').click() })
+    await act(async () => { button('保存せずに移る').click() })
     expect(back).toHaveBeenCalledTimes(1)
   })
 
@@ -198,7 +201,7 @@ describe('N-445 機能設定の未保存離脱確認', () => {
     await render()
     expect(beforeUnload().defaultPrevented).toBe(false)
     expect(document.body.textContent).not.toContain('保存していない変更があります')
-    expect(button('機能設定を保存').disabled).toBe(true)
+    expect([...document.body.querySelectorAll('button')].some(button => button.textContent?.includes('機能設定を保存'))).toBe(false)
     expect(add.mock.calls.filter(([name]) => name === 'beforeunload')).toHaveLength(1)
     expect(addDocument.mock.calls.filter(([name]) => name === 'click')).toHaveLength(1)
   })

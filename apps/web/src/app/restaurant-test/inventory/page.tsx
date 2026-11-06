@@ -1,2 +1,7 @@
-import RestaurantConsole from '../restaurant-console'
-export default function Page() { return <RestaurantConsole view="inventory" /> }
+'use client'
+
+import InventoryPage from '@/v8/restaurant/inventory/inventory'
+
+export default function Page() {
+  return <InventoryPage />
+}

@@ -1,5 +1,5 @@
 /*
- * 1通目の下見の実寸（設計 `V6 5 kk8dz`）。
+ * 1通目の下見の実寸（設計 `管理画面 5 kk8dz`）。
  *
  * 幅500・角丸10・帯26・吹き出しの角（14,14,14,4）は、どれもトークンに
  * 無い設計固有の数。Tailwindの任意値記法で書くと、規格から外れた値が
@@ -10,7 +10,7 @@
 .preview {
   width: 100%;
   max-width: 500px;
-  border-radius: 10px;
+  border-radius: var(--radius-card);
 }
 
 /* 届く日時の帯。設計 h=26・角丸は全周。 */
@@ -20,5 +20,5 @@
 
 /* 吹き出し。設計は左下だけ角を落とす。 */
 .bubble {
-  border-radius: 14px 14px 14px 4px;
+  border-radius: var(--radius-card) var(--radius-card) var(--radius-card) var(--radius-mini);
 }

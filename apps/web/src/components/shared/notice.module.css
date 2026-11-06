@@ -1,109 +1,91 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
-/*
- * 帯（Notice）。★V7 共通部品その2 §1。
- *
- * 黄・青・赤・緑を画面ごとに手書きしていた帯を1本にまとめたもの。
- * 種類は4つ（案内・うまくいった・注意・危険）。左に線のアイコン、
- * 本文は1〜2文、右に操作1つまで。`note-bar.tsx` はこの部品への
- * 互換品（props をそのまま渡すだけ。中身はここが持つ）。
- *
- * 使い分け: 読まなくても操作できる説明は帯にせず HelpTip へ（§2-1b）。
- * 読み込めなかったときは帯でなく ListState error。1画面2つまで。
- */
-
-/* 帯の土台。幅は持たない（呼び出し側が className で渡す。§5-2）。 */
+/* 知らせの面・印・操作は、画面や窓によらずここが持つ。 */
 .notice {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: var(--radius-control);
-  font-size: var(--text-label);
-  font-weight: 400;
-  line-height: 1.6;
-}
-
-.notice[hidden] {
-  display: none;
-}
-
-.icon {
-  width: 16px;
-  height: 16px;
-  flex: none;
-}
-
-/* 本文。1〜2文。長い定義の補足は HelpTip（?）へ入れ、箱を高くしない。 */
-.message {
-  min-width: 0;
-  flex: 1;
-}
-
-/* 帯の右に置く操作（1つまで）。 */
-.action {
-  margin-left: auto;
-  flex: none;
-}
-
-/* 案内（青）。地は info-bg、文字は ink-secondary（★V7 画面の決まり）。 */
-.info {
-  background: var(--color-info-bg);
-  color: var(--color-ink-secondary);
-}
-
-/*
- * うまくいった（緑）。
- * #669 成功の通知の文字は success に1本化する（status-badge と同じ）。
- * 地は同値（#e8f8ee）の success-bg に名前をそろえる。
- */
-.success {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-/* 注意（黄）。文字は必ず warn-deep（地に warn は読めないため）。 */
-.warn {
-  border: 1px solid var(--color-status-warn);
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
-}
-
-/* 危険（赤）。止まっている・失敗していることだけに使う。 */
-.danger {
-  border: 1px solid var(--color-status-danger);
-  background: var(--color-status-danger-soft);
-  color: var(--color-status-danger);
-}
-
-/* 閉じる印。帯の右端。 */
-.close {
-  display: inline-flex;
-  width: 32px;
-  height: 32px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
+  gap: var(--polish-space-field);
+  margin: 0;
+  padding: var(--space-14) var(--polish-space-card);
   border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: currentcolor;
-  cursor: pointer;
+  border-radius: var(--radius-raised-card);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-card);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--tpl-ro-band-lh);
+}
+.notice[hidden] { display: none; }
+.content { display: flex; align-items: baseline; gap: var(--polish-space-field); min-width: 0; flex: 1; min-height: calc((var(--tpl-ro-band-lh) + var(--space-8)) / 2); }
+/* 点と札に必要な最小の高さだけ確保し、本文を下へ押さない。 */
+.content:has([data-notice-status-word]) { min-height: var(--tpl-ro-band-lh); }
+/* 高さ0の行から書体の基準線だけを取り出し、段落の余白へ点を追従させる。 */
+.dotLine { display: inline-block; position: relative; flex: none; width: var(--space-8); height: 0; line-height: 0; }
+.dotLine::before { content: "\200b"; }
+.dot {
+  position: absolute;
+  top: calc(-1 * var(--space-8) / 2);
+  display: block;
+  flex: none;
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--color-status-info);
+  /* 題（題が無ければ本文）の1行目の上下の真ん中。行の高さは題も本文も同じ値を読む。 */
+  margin-top: 0;
+}
+.info .dot { background: var(--color-status-info); }
+.success .dot { background: var(--color-success); }
+.warn .dot { background: var(--color-status-warn); }
+.danger .dot { background: var(--color-status-danger); }
+.message { min-width: 0; flex: 1; overflow-wrap: anywhere; text-wrap: pretty; }
+/* 全体の自動句切りで文の途中に空きを残さず、本文・リンク・強調も同じ改行規則で幅を使う。 */
+.message, .message :where(:not([data-notice-heading], [data-notice-heading] *, [data-notice-status-word])) { word-break: normal; }
+.notice[data-has-action] .content { flex-basis: 24em; }
+.headingRow { display: flex; align-items: center; gap: var(--space-6); }
+.heading { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; }
+/* 「要確認：」「失敗：」。題（題が無い時は本文）の頭に濃い文字で置く。段落の中でも同じ行内に置き、2行目の幅を狭めない。 */
+.statusWord { white-space: nowrap; color: var(--color-ink); font-weight: 600; }
+.description { display: block; color: var(--color-ink-secondary); }
+.action { display: flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); margin-left: auto; max-width: 100%; }
+.message [data-notice-inline-action][data-shared-button] { margin-inline-start: var(--polish-space-row); }
+.action [data-shared-button] { flex-shrink: 0; }
+.action .close { align-self: center; }
+.action > a:not([data-shared-button]) { white-space: nowrap; color: var(--color-link); font-weight: var(--font-weight-ui); }
+.close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--space-32); height: var(--space-32); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink-secondary); cursor: pointer; }
+.close:hover { background: var(--color-surface-pearl); }
+.close:focus-visible, .notice a:focus-visible { outline: revert; }
+.twoLine { align-items: flex-start; }
+.states { display: flex; flex-wrap: wrap; gap: var(--polish-space-row) var(--polish-space-card); padding: 0; margin: var(--polish-space-field) 0 0; list-style: none; font-size: var(--text-micro); }
+.state { display: inline-flex; align-items: center; gap: var(--space-6); }
+.stateMark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--space-14); height: var(--space-14); border-radius: var(--radius-pill); }
+.stateMark[data-state='done'] { background: var(--color-success); color: var(--color-on-accent); }
+.stateMark[data-state='pending'] { box-shadow: inset 0 0 0 var(--choice-ring) var(--color-status-warn); }
+:root .notice .stateMark > svg { width: var(--space-10); height: var(--space-10); }
+.footer { margin-top: var(--polish-space-field); padding-top: var(--polish-space-row); border-top: 1px solid var(--color-hairline); }
+/* 小さな欄の知らせも同じ面を使い、文を省略したときは全文のtitleを保つ。 */
+.notice[data-compact] { min-height: 36px; padding: var(--space-6) var(--space-10); gap: var(--space-6); font-size: var(--text-micro); }
+.notice[data-compact] .content { gap: var(--space-6); }
+.notice[data-compact] .close { margin-block: calc(-1 * var(--space-6)); }
+.notice[data-compact] .message { flex-basis: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* 警告・失敗の文は切らずに折り返す（何が起きたかを全部読めるように）。1行の省略は案内と成功だけ。 */
+.notice[data-compact]:is([data-tone='warn'], [data-tone='danger'], [role='alert']) .message { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+.notice[data-action-layout='stack-on-narrow'] .content { flex-basis: 24em; }
+
 }
 
-.close:hover {
-  background: color-mix(in srgb, currentcolor 9%, transparent);
+/* 配置先の帯用クラスや余白の指定に頼らず、前後の部品から最低12px離す。 */
+:root .notice { margin-block: var(--polish-space-field); }
+
+/* PCの狭幅では、長い説明を読める幅を残して操作を次の行へ送る。 */
+@media (max-width: 1279px) {
+  :root .notice[data-action-layout='stack-on-narrow'] .action { flex-basis: 100%; justify-content: flex-end; }
 }
 
-.close:focus-visible {
-  outline: revert;
-}
+:root .notice .stateMark > svg { width: var(--space-10); height: var(--space-10); }
 
-/*
- * 操作の中のリンク（「くわしく」など）。押せるものとして輪郭を出す。
- * HelpTip 側が持つ見た目は変えない。ここでは存在だけ示す。
- */
-.notice a:focus-visible {
-  outline: 2px solid var(--color-status-info);
-  outline-offset: 1px;
-}
-}
+/* 並べる帯だけは段間が余白を持つ。単独の帯の既定には触れない。 */
+:root .stack { display: flex; flex-direction: column; gap: var(--polish-space-field); min-width: 0; margin-block: var(--polish-space-field); }
+:root .stack > .notice { margin-block: 0; }

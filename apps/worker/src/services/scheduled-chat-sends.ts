@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   claimDueScheduledChatSends,
   getFriendById,
@@ -10,18 +11,24 @@ import {
   activeTenantLineAccountSql,
   recordSkippedDelivery,
 } from '@line-crm/db';
+
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { resolveLineToken } from './line-token.js';
-import { classifyLineOutboundFailure } from './outbound-idempotency.js';
+import { reserveOutboundSend, hashOutboundPayload, completeOutboundSendStatement, classifyLineOutboundFailure } from './outbound-idempotency.js';
+import { buildChatMessage, ChatAttachmentError } from './chat-attachments.js';
+import type { Message } from '@line-crm/line-sdk';
 import { renderChatMessageContent } from './manual-send-interpolation.js';
 
-// N-025: 期限が来た送信予約をLINEへpushするcron側の処理。
+// 期限が来た送信予約をLINEへpushするcron側の処理。
 // 二重送信防止は3層: claimのCAS(status) + lease_token照合 + LINEへ同じ
 // idempotency_keyを渡す(retry-key)。送信結果がunknownのときは自動再送しない。
 
 type ScheduleDispatchEnv = {
+  API_KEY?: string;
   DB: D1Database;
   LINE_CHANNEL_ACCESS_TOKEN: string;
+  IMAGES?: R2Bucket;
+  WORKER_URL?: string;
 };
 
 const RETRY_BACKOFF_MS = 5 * 60_000;
@@ -71,8 +78,16 @@ async function dispatchOne(
     return;
   }
 
+  if (target.friend.is_following !== 1) {
+    await markScheduledChatSendFailed(env.DB, {
+      id: row.id, leaseToken: row.lease_token!, errorCode: 'friend_not_following',
+      error: 'ブロックまたは友だち解除された相手のため送信しませんでした', retryable: false, now: nowIso,
+    });
+    return;
+  }
+
   /*
-   * アカウント停止中（X-1、v6-33 §10-1）。既定アカウントのトークンへ
+   * アカウント停止中（X-1、-33 §10-1）。既定アカウントのトークンへ
    * 逃がすと別名義で届いてしまうので、送らずに失敗行として残す。
    * 再開しても自動では送り直さない（retryable=false）。
    */
@@ -93,7 +108,7 @@ async function dispatchOne(
         title: null,
       });
     } catch (skipError) {
-      console.error('[scheduled-chat-sends] skipped ledger write failed:', skipError);
+      logger.error("scheduled_chat_sends.dispatch_one_failed");
     }
     return;
   }
@@ -110,7 +125,7 @@ async function dispatchOne(
     quoteToken = quoted?.quote_token ?? null;
   }
 
-  // N-026: 差し込みは送信時の情報で解決する(予約時点と値が変わり得る)。
+  // 差し込みは送信時の情報で解決する(予約時点と値が変わり得る)。
   // 解決しきれない `{{…}}` が残るなら LINE を呼ばず、行だけ失敗で残す。
   const rendered = await renderChatMessageContent(
     env.DB, target.friend, row.message_type, row.content, target.liffId,
@@ -134,29 +149,45 @@ async function dispatchOne(
     return;
   }
 
-  // 展開でLINEの上限を超えた分はLINEを呼ばず失敗で残す(400で落ちるのが分かりきっている)。
-  if (rendered.content.length > 5000) {
+  let message: Message;
+  let renewalMessage: Message | undefined;
+  try {
+    const built = await buildChatMessage({ messageType: row.message_type, content: rendered.content,
+      bucket: env.IMAGES, signingSecret: env.API_KEY, origin: env.WORKER_URL ?? '',
+      owner: { friendId: target.friend.id, lineAccountId: target.friend.line_account_id ?? null },
+    });
+    message = built.message;
+    renewalMessage = built.renewalMessage;
+    rendered.content = built.content;
+  } catch (error) {
+    if (!(error instanceof ChatAttachmentError)) throw error;
     await markScheduledChatSendFailed(env.DB, {
-      id: row.id,
-      leaseToken: row.lease_token!,
-      errorCode: 'content_too_long',
-      error: '差し込みを解決した本文が5000文字を超えています',
-      retryable: false,
-      now: nowIso,
+      id: row.id, leaseToken: row.lease_token!, errorCode: error.code,
+      error: error.message, retryable: false, now: nowIso,
     });
     return;
   }
-
+  if (quoteToken) message.quoteToken = quoteToken;
   const { LineClient } = await import('@line-crm/line-sdk');
   const lineClient = new LineClient(target.accessToken);
-  const message = {
-    type: 'text' as const,
-    text: rendered.content,
-    ...(quoteToken ? { quoteToken } : {}),
-  };
+  const hasSignedAttachment = row.message_type === 'file' || row.message_type === 'video'
+    || (row.message_type === 'image' && row.content.includes('/images/chat-attachments/'));
 
+  const reservation = await reserveOutboundSend(env.DB, {
+    key:row.idempotency_key,channel:'line',resourceId:`scheduled-chat:${row.id}`,
+    // 署名 URL は再試行で変わるため、永続的な送信の意図を比較する。
+    payloadHash:await hashOutboundPayload(JSON.stringify(hasSignedAttachment
+      ? { messageType: row.message_type, content: row.content, quoteToken: quoteToken ?? null } : message)),lineAccountId:row.line_account_id,
+    retryInProgress:true,now:nowIso,
+  });
+  if (reservation.kind !== 'acquired' && reservation.kind !== 'retry' && reservation.kind !== 'replay') {
+    await markScheduledChatSendFailed(env.DB, {id:row.id,leaseToken:row.lease_token!,
+      errorCode:reservation.kind === 'unknown' ? reservation.code : 'LINE_DELIVERY_UNKNOWN',
+      error:'届いたか分からないため確認が必要です',retryable:false,now:nowIso});
+    return;
+  }
   try {
-    await lineClient.pushMessage(target.friend.line_user_id, [message], row.idempotency_key);
+    if (reservation.kind !== 'replay') await lineClient.pushMessage(target.friend.line_user_id, [message, ...(renewalMessage ? [renewalMessage] : [])], row.idempotency_key);
   } catch (error) {
     const failure = classifyLineOutboundFailure(error, nowIso);
     // unknown(送達可否が分からない)は自動再送すると二重送信になり得るため
@@ -214,6 +245,9 @@ async function dispatchOne(
     return;
   }
 
+  await env.DB.batch([completeOutboundSendStatement(env.DB, {
+    key:row.idempotency_key,responseId:messageId,now:nowIso,
+  })]);
   await markScheduledChatSendSent(env.DB, {
     id: row.id,
     leaseToken: row.lease_token!,
@@ -235,8 +269,7 @@ export async function processDueScheduledChatSends(
   options: { now?: string; limit?: number } = {},
 ): Promise<{ claimed: number; sent: number; failed: number }> {
   const now = options.now ?? new Date().toISOString();
-  // Due while stopped is a terminal cancellation, not a retry. This preserves
-  // the unsent row and prevents restore from creating an overdue push burst.
+  // 停止中の期限到達は終端の取消にし、未送信行を保って復旧後の一斉送信を防ぐ。
   await env.DB.prepare(
     `UPDATE scheduled_chat_sends
         SET status = 'cancelled', cancelled_at = ?, updated_at = ?,
@@ -259,7 +292,7 @@ export async function processDueScheduledChatSends(
     try {
       await dispatchOne(env, row);
     } catch (error) {
-      console.error('scheduled chat send dispatch error:', row.id, error);
+      logger.error("scheduled_chat_sends.dispatch_due_failed");
       failed += 1;
       continue;
     }

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -6,72 +6,76 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 
 const TARGETS = [
-  'affiliates/tabs.tsx',
+  '../v8/affiliates/affiliators.tsx',
+  '../v8/affiliates/offers.tsx',
+  '../v8/affiliates/approvals.tsx',
   'booking/menus/page.tsx',
-  'broadcasts/page.tsx',
-  'form-submissions/page.tsx',
-  'friend-add-settings/publish/page.tsx',
-  'friends/page.tsx',
+  '../v8/friend-add-publish/publish.tsx',
+  '../components/friends/friend-list-table.tsx',
   'line-notifications/page.tsx',
-  'line-notifications/operator-notification-rules.tsx',
-  'mileage/action-score-tab.tsx',
-  'mileage/page.tsx',
-  'nen-members/page.tsx',
+  '../v8/settings/line-notifications/operator-tab.tsx',
+  '../v8/mileage/score.tsx',
+  '../v8/mileage/balances.tsx',
+  '../v8/mileage/earning-rules.tsx',
+  'nen-members/photo-review-v8.tsx',
   'rich-menus/connections/page.tsx',
-  'scenarios/page.tsx',
-  'scenarios/results/page.tsx',
-  'tags/marks/edit/page.tsx',
+  // 失敗表示を持つ本体を指定し、別の詳細画面・ダイアログは取り込まない。
+  '../v8/scenarios/results.tsx',
+  '../v8/tags/mark-editor.tsx',
   '../components/broadcasts/segment-preset-controls.tsx',
-  '../components/friend-fields/field-list.tsx',
-  '../components/friend-fields/mark-list.tsx',
-  '../components/friend-fields/tags-page-v4.tsx',
+  '../v8/tags/fields-tab.tsx',
+  '../v8/tags/marks-tab.tsx',
+  '../v8/tags/tags-tab.tsx',
   '../components/friends/bulk-run-dialog.tsx',
-  '../components/merged-person/merged-person-detail.tsx',
-  '../components/users/users-table.tsx',
+  '../components/merged-person/merged-person-detail-v8.tsx',
+  '../v8/friends/merged/merged.tsx',
 ] as const
 
 function failureDisplays(source: string) {
-  // 取得失敗の面は ListState か ★V7 TargetMissing のどちらか。どちらも
-  // 再読み込み口（onRetry）を持ち、古い個別ボタン（action）は持たない。
+  // 一覧・対象取得の本体だけを読み、共通の失敗表示の再読み込み口を確認する。
   const tags = [
     ...source.matchAll(/<ListState\b[\s\S]*?\/>/g),
     ...source.matchAll(/<TargetMissing\b[\s\S]*?\/>/g),
+    ...source.matchAll(/<TableStateRow\b[\s\S]*?\/>/g),
+    ...source.matchAll(/<StateCard\b[\s\S]*?\/>/g),
   ].map(([tag]) => tag)
-  return tags.filter((tag) => tag.includes('kind="error"'))
+  // 権限不足は通信失敗と別。権限を頼む案内へ、再取得の操作を強制しない。
+  return tags.filter((tag) => (tag.includes('kind="error"') || tag.includes('tone="error"')) && !tag.includes('permissionDeniedMessage(') && !tag.includes('を見る権限がありません'))
 }
 
 describe('一覧の取得失敗からその場で読み直せる契約', () => {
   it('対象画面の取得失敗には、共通の再読み込み口を渡す', () => {
-    let errorCount = 0
-
     for (const target of TARGETS) {
       const source = readFileSync(join(HERE, target), 'utf8')
       const errors = failureDisplays(source)
-      errorCount += errors.length
+      expect(errors.length, `${target} の取得失敗表示が検査から消えています`).toBeGreaterThan(0)
 
       for (const errorState of errors) {
-        expect(errorState, `${target} の取得失敗`).toContain('onRetry=')
-        expect(errorState, `${target} に古い個別ボタンが残っています`).not.toContain('action=')
+        expect(errorState, `${target} の取得失敗`).toMatch(/onRetry=|action=\{(?:<>)?<Button(?:[^>]*?) onClick=|action=\{<RetryButton onRetry=/)
       }
     }
+  })
 
-    // 友だち一覧の状態表示を FriendListTable へ集約した後の実測値。
-    // #543: 回答フォーム一覧の到達不能な回答表（M2削除）にあった失敗表示ぶん1減。
-    // #1014: 項目・対応マーク・タグの一覧に、取得失敗とは別の
-    //        読み込み直し口（ListState kind="error" + onRetry）を足して3増。
-    // SCENARIO-10: シナリオ結果の購読一覧に、取得失敗専用の再読み込み口を足して1増。
-    // NOTIFY-04: どこからも使われていない古い運用者一覧（名前がリンクでない
-    //        置き忘れの写し）を消したぶん1減。生きている一覧は
-    //        app/line-notifications/operator-notification-rules.tsx。
-    // #634: 一斉配信の失敗表示へ再読み込み口を足し（1増）、既に onRetry を
-    //        持っていた LINE通知の2画面も契約の対象へ加えた（2増）。
-    // #772: 統合ユーザー表の失敗表示を ListState から TableStateRow へ
-    //        移したぶん1減。再読み込み口は TableStateRow の onRetry に
-    //        そのまま残し、数だけが減る。
-    // V7 TargetMissing: 追加設定の公開・つながり・シナリオ結果の本体の
-    //        失敗表示を TargetMissing の error へ寄せた（ListState 23＋
-    //        TargetMissing 3で合計は変わらない）。
-    expect(errorCount).toBe(26)
+  it('V8の専用失敗表示も、その場で一覧を読み直せる', () => {
+    for (const [target, message, retry] of [
+      ['../v8/broadcasts/list.tsx', '一斉配信を読み込めませんでした', 'onClick={() => loadList((page - 1) * pageSize)}'],
+      // 一斉配信・回答フォーム・シナリオは入口が src/v8 の新しい一覧を出す（古い list-v8.tsx はもう描かれない）。
+      ['../v8/forms/list.tsx', "loadFailureCopy(loadFailure, '回答フォーム')", 'onClick={() => loadForms()}'],
+      ['../v8/auto-replies/list.tsx', "visibleLoadState === 'error' || visibleLoadState === 'forbidden'", 'onClick={() => load()}'],
+      ['../v8/scenarios/list.tsx', 'シナリオを読み込めませんでした', 'onClick={() => void loadScenarios()}'],
+      ['reminders/list-v8.tsx', 'リマインダを読み込めませんでした', 'onClick={reminderList.retry}'],
+    ]) {
+      const source = readFileSync(join(HERE, target), 'utf8')
+      const failureAt = source.lastIndexOf(message)
+      expect(failureAt, `${target} の取得失敗表示`).toBeGreaterThan(-1)
+      // 失敗表示の中で、押したら読み直すボタンにつながっていることを確認する。
+      expect(source.slice(failureAt, failureAt + 1200), target).toContain(retry)
+    }
+    const forms = readFileSync(join(HERE, '../v8/forms/list.tsx'), 'utf8')
+    // 403 は共通の案内（loadFailureCopy）が retryable=false を返し、読み直しを出さない。
+    expect(forms).toContain('failure.retryable ? (')
+    const friends = readFileSync(join(HERE, '../v8/friends/list/list.tsx'), 'utf8')
+    expect(friends).toContain('onRetry={() => void loadFriends()}')
   })
 
   it('URLだけでは対象を特定できない状態に、直らない再読み込みを出さない', () => {
@@ -80,7 +84,7 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
 
     expect(markEdit).toContain('編集する対応マークが指定されていません')
     expect(markEdit).toContain('if (!id)')
-    // 対象未指定は ★V7 TargetMissing の unspecified（一覧へ戻るだけ）。
+    // 対象未指定は ★管理画面 TargetMissing の unspecified（一覧へ戻るだけ）。
     expect(connections).toContain('kind="unspecified"')
     expect(connections).toContain('つながりを見るメニューが指定されていません')
     expect(connections).toContain('backHref="/rich-menus"')

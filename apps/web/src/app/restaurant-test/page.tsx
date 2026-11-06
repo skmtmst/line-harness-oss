@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
+import { legacyRouteDestination } from '@/lib/canonical-route'
 
-export default function RestaurantTestIndexPage() {
-  redirect('/hq')
+export default function Page() {
+  redirect(legacyRouteDestination('/restaurant-test'))
 }

@@ -1,3 +1,7 @@
+import { parseOffsetPaging, buildOffsetListResponse, boundedListInteger } from '../lib/list-paging.js';
+import { fail } from '../lib/fail.js';
+import { logger } from '@line-crm/shared/server';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type {
@@ -6,7 +10,7 @@ import type {
   IdentityCandidateStatus,
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
   candidateAccountIds,
@@ -15,10 +19,10 @@ import {
   IdentityCandidateError,
   listIdentityCandidates,
   undoIdentityCandidate,
-} from '../services/identity-candidates.js';
-import { detectFriendDuplicateCandidates } from '../services/friend-duplicate-candidates.js';
+} from '../features/identity/identity-candidates/index.js';
+import { detectFriendDuplicateCandidates } from '../features/friends/friend-duplicate-candidates/index.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { getFriendProfileCandidates } from '../services/friend-profile-candidates.js';
+import { getFriendProfileCandidates } from '../features/friends/friend-profile-candidates/index.js';
 
 const KINDS = new Set<IdentityCandidateKind>(['friend_duplicate', 'ec_member']);
 const STATUSES = new Set<IdentityCandidateStatus>([
@@ -40,11 +44,6 @@ function canUseKind(c: Parameters<typeof getStaff>[0], kind: IdentityCandidateKi
   if (!staff || staff.role === 'owner' || staff.role === 'admin') return Boolean(staff);
   const permission = kind === 'friend_duplicate' ? '/friends' : '/ec-commerce';
   return staff.permissionKeys?.includes(permission) ?? false;
-}
-
-function positiveInt(value: string | undefined, fallback: number, max: number): number {
-  const parsed = Number(value ?? fallback);
-  return Number.isInteger(parsed) && parsed >= 0 ? Math.min(parsed, max) : fallback;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -134,20 +133,16 @@ async function safeBody(c: { req: { json<T>(): Promise<T> } }): Promise<unknown>
 
 function errorResponse(c: Context<Env>, error: unknown): Response {
   if (error instanceof IdentityCandidateError) {
-    return c.json({ success: false, error: error.message, code: error.code }, error.status);
+    return fail(c, error.status, error.code, { error: error.message }, []);
   }
-  console.error('identity candidates error:', error);
-  return c.json(
-    { success: false, error: '本人照合の記録を処理できませんでした', code: 'INTERNAL_ERROR' },
-    500,
-  );
+  throw error;
 }
 
 identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const kind = c.req.query('kind') as IdentityCandidateKind | undefined;
     /*
-      FRIEND-11: 'all' は状態で絞らない。画面の「すべて」が従来は
+      'all' は状態で絞らない。画面の「すべて」が従来は
       status 未指定 = pending だけを見せていたため、「すべて」と
       表示しながら確認済み・保留・別人の候補が隠れていた。
     */
@@ -170,26 +165,26 @@ identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin',
     const data = await listIdentityCandidates(c.env.DB, {
       tenantId: tenantId(c), kind, status,
       allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
-      limit: Math.max(1, positiveInt(c.req.query('limit'), 20, 100)),
-      offset: positiveInt(c.req.query('offset'), 0, 100_000),
-      // FRIEND-11: 名前・根拠の検索は全件へかける。
+      limit: parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: { fallback: 'nonnegative-integer', minimum: 1, maximum: 100 } }).limit,
+      offset: parseOffsetPaging({ offset: c.req.query('offset') }, { offsetPolicy: { fallback: 'nonnegative-integer', maximum: 100_000 } }).offset,
+      // 名前・根拠の検索は全件へかける。
       q: c.req.query('q') ?? undefined,
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: data.limit, offset: data.offset }, sort: [{ field: 'detectedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
   } catch (error) {
     return errorResponse(c, error);
   }
 });
 
-identityCandidates.post('/api/identity-candidates/detect', requireRole('owner', 'admin'), async (c) => {
+identityCandidates.post('/api/identity-candidates/detect', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const kind = c.req.query('kind') as IdentityCandidateKind | undefined;
     if (kind !== 'friend_duplicate') {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: '検出する候補の種類が正しくありません',
         code: 'INVALID_DETECTION_KIND',
-      }, 400);
+      }, 400, ["kind"]);
     }
     if (!canUseKind(c, kind)) {
       return c.json({ success: false, error: '候補を検出する権限がありません', code: 'FORBIDDEN' }, 403);
@@ -198,7 +193,7 @@ identityCandidates.post('/api/identity-candidates/detect', requireRole('owner', 
     const data = await detectFriendDuplicateCandidates(c.env.DB, {
       tenantId: tenantId(c),
       allowedAccountIds: scope.allowedAccountIds,
-      limit: positiveInt(c.req.query('limit'), 50, 100),
+      limit: boundedListInteger(c.req.query('limit'), 50, 100),
       after: c.req.query('after') ?? null,
     });
     return c.json({ success: true, data });
@@ -223,7 +218,7 @@ identityCandidates.get('/api/identity-candidates/:id', requireRole('owner', 'adm
   }
 });
 
-identityCandidates.post('/api/identity-candidates/:id/decide', requireRole('owner', 'admin'), async (c) => {
+identityCandidates.post('/api/identity-candidates/:id/decide', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const current = await getIdentityCandidate(c.env.DB, tenantId(c), c.req.param('id'));
     if (!canUseKind(c, current.kind)) {
@@ -246,7 +241,7 @@ identityCandidates.post('/api/identity-candidates/:id/decide', requireRole('owne
   }
 });
 
-identityCandidates.post('/api/identity-candidates/:id/undo', requireRole('owner', 'admin'), async (c) => {
+identityCandidates.post('/api/identity-candidates/:id/undo', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const current = await getIdentityCandidate(c.env.DB, tenantId(c), c.req.param('id'));
     if (!canUseKind(c, current.kind)) {
@@ -284,7 +279,7 @@ identityCandidates.get(
 identityCandidates.patch(
   '/api/friends/duplicates/:id',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const current = await friendDuplicateDetail(c, c.req.param('id'));
       const staff = getStaff(c)!;

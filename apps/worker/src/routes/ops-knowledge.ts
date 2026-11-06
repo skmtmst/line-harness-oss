@@ -1,10 +1,14 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { fail } from '../lib/fail.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   HQ_SUPPORT_KINDS, editKnowledgeArticle, getKnowledgeArticle, getSupportTicket,
   knowledgeFeedback, knowledgeForTicket, listKnowledgeArticles, listSupportMessages, recordPlatformAudit,
   retryKnowledgeJob, reviewKnowledgeArticle, type KnowledgeArticle, type KnowledgeArticleInput,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/platform-admin.js';
 import { dbFor } from '../services/db-router.js';
 import { knowledgeNames, knowledgeSources, processKnowledgeJob, redactKnowledgeText,
@@ -31,14 +35,15 @@ const conflict = { success: false, error: '内容が更新されました。読�
 
 opsKnowledge.get('/api/ops/knowledge', async c => {
   const { q, kind, articleKind, state } = c.req.query();
-  const offset = Number(c.req.query('offset') || 0);
+  const offset = parseOffsetPaging({ offset: c.req.query('offset') || undefined }, { offsetPolicy: {} }).offset;
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1_000_000 || (q?.length ?? 0) > 200 ||
     (kind && !HQ_SUPPORT_KINDS.some(value => value === kind)) ||
     (articleKind && articleKind !== 'verified' && articleKind !== 'answer_example') ||
     (state && !['pending', 'approved', 'needs_review', 'dismissed'].includes(state))) return c.json(invalid, 400);
   const result = await listKnowledgeArticles(dbFor(c.env), { q, kind,
     articleKind: articleKind as 'verified' | 'answer_example' | undefined, state, offset });
-  return c.json({ success: true, data: result.articles.map(serializeKnowledge), total: result.total });
+  const responseItems = result.articles.map(serializeKnowledge);
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems, total: result.total, items: responseItems, paging: { limit: 50, offset }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }));
 });
 
 opsKnowledge.get('/api/ops/knowledge/:id', async c => {
@@ -51,7 +56,7 @@ opsKnowledge.get('/api/ops/knowledge/:id', async c => {
   return c.json({ success: true, data: { ...serializeKnowledge(article), sourceSubject } });
 });
 
-opsKnowledge.put('/api/ops/knowledge/:id', requirePlatformAdminWrite(), async c => {
+opsKnowledge.put('/api/ops/knowledge/:id', requirePlatformAdminWrite(), inputJsonBoundary(), async c => {
   const db = dbFor(c.env);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   if (!body || !Number.isSafeInteger(body.version) || Number(body.version) < 1 ||
@@ -59,11 +64,11 @@ opsKnowledge.put('/api/ops/knowledge/:id', requirePlatformAdminWrite(), async c 
     typeof body.question !== 'string' || body.question.length > 1000 ||
     typeof body.answer !== 'string' || body.answer.length > 12000 ||
     !HQ_SUPPORT_KINDS.some(value => value === body.kind) || !Array.isArray(body.keywords) ||
-    body.keywords.length > 12 || body.keywords.some(word => typeof word !== 'string' || word.length > 40)) return c.json(invalid, 400);
+    body.keywords.length > 12 || body.keywords.some(word => typeof word !== 'string' || word.length > 40)) return inputError(c, invalid, 400, ["version","title","question","answer","kind","keywords"]);
   const before = await getKnowledgeArticle(db, c.req.param('id'));
   if (!before) return c.json({ success: false, error: '記事が見つかりません' }, 404);
   const ticket = await getSupportTicket(db, before.source_request_id);
-  if (!ticket) return c.json(conflict, 409);
+  if (!ticket) return fail(c, 409, 'CONFLICT', conflict);
   const messages = await listSupportMessages(db, ticket.id);
   const names = knowledgeNames(ticket, messages);
   const input: KnowledgeArticleInput = {
@@ -71,56 +76,55 @@ opsKnowledge.put('/api/ops/knowledge/:id', requirePlatformAdminWrite(), async c 
     answer: redactKnowledgeText(body.answer, names), kind: body.kind as KnowledgeArticleInput['kind'],
     keywords: (body.keywords as string[]).map(word => redactKnowledgeText(word, names)).filter(Boolean),
   };
-  if (!input.title) return c.json(invalid, 400);
+  if (!input.title) return inputError(c, invalid, 400, ["title"]);
   const contentChanged = input.question !== before.question || input.answer !== before.answer;
   const articleKind = contentChanged ? 'answer_example' : before.article_kind;
   const evidence = contentChanged
     ? retainExistingKnowledgeEvidence(JSON.parse(before.evidence), knowledgeSources(ticket, messages))
     : JSON.parse(before.evidence);
-  if (!(await editKnowledgeArticle(db, before.id, Number(body.version), input, articleKind, evidence))) return c.json(conflict, 409);
+  if (!(await editKnowledgeArticle(db, before.id, Number(body.version), input, articleKind, evidence))) return fail(c, 409, 'CONFLICT', conflict);
   const staff = c.get('staff');
   await recordPlatformAudit(db, { staffId: staff.id, staffName: staff.name, action: 'knowledge.update',
     detail: { articleId: before.id, version: before.version + 1, articleKind }, visibleToTenant: false });
   return c.json({ success: true, data: serializeKnowledge((await getKnowledgeArticle(db, before.id))!) });
 });
 
-opsKnowledge.post('/api/ops/knowledge/:id/review', requirePlatformAdminWrite(), async c => {
+opsKnowledge.post('/api/ops/knowledge/:id/review', requirePlatformAdminWrite(), inputJsonBoundary(), async c => {
   const db = dbFor(c.env);
   const body = await c.req.json<{ action?: unknown; version?: unknown; confirmed?: unknown }>().catch(() => null);
-  if (!body || !Number.isSafeInteger(body.version) || !['approve', 'dismiss', 'disable'].includes(String(body.action))) return c.json(invalid, 400);
+  if (!body || !Number.isSafeInteger(body.version) || !['approve', 'dismiss', 'disable'].includes(String(body.action))) return inputError(c, invalid, 400, ["version","action"]);
   const article = await getKnowledgeArticle(db, c.req.param('id'));
   if (!article) return c.json({ success: false, error: '記事が見つかりません' }, 404);
   const action = body.action as 'approve' | 'dismiss' | 'disable';
   if (action === 'approve') {
-    if (body.confirmed !== true || !article.question.trim() || !article.answer.trim()) return c.json(invalid, 400);
+    if (body.confirmed !== true || !article.question.trim() || !article.answer.trim()) return inputError(c, invalid, 400, ["confirmed"]);
     if (article.article_kind === 'verified') {
       const ticket = await getSupportTicket(db, article.source_request_id);
       const messages = ticket ? await listSupportMessages(db, ticket.id) : [];
-      if (!ticket || !validateKnowledgeEvidence(JSON.parse(article.evidence), knowledgeSources(ticket, messages))) return c.json(conflict, 409);
+      if (!ticket || !validateKnowledgeEvidence(JSON.parse(article.evidence), knowledgeSources(ticket, messages))) return fail(c, 409, 'CONFLICT', conflict);
     }
   }
   const staff = c.get('staff');
-  if (!(await reviewKnowledgeArticle(db, article.id, Number(body.version), action, staff.id))) return c.json(conflict, 409);
+  if (!(await reviewKnowledgeArticle(db, article.id, Number(body.version), action, staff.id))) return fail(c, 409, 'CONFLICT', conflict);
   await recordPlatformAudit(db, { staffId: staff.id, staffName: staff.name, action: 'knowledge.status',
     detail: { articleId: article.id, action, version: Number(body.version) + 1,
       articleKind: article.article_kind }, visibleToTenant: false });
   return c.json({ success: true, data: serializeKnowledge((await getKnowledgeArticle(db, article.id))!) });
 });
 
-opsKnowledge.post('/api/ops/knowledge/:id/feedback', requirePlatformAdminWrite(), async c => {
+opsKnowledge.post('/api/ops/knowledge/:id/feedback', requirePlatformAdminWrite(), inputJsonBoundary(), async c => {
   const body = await c.req.json<{ requestId?: unknown; feedback?: unknown }>().catch(() => null);
-  if (!body || typeof body.requestId !== 'string' || (body.feedback !== 'helpful' && body.feedback !== 'unhelpful')) return c.json(invalid, 400);
+  if (!body || typeof body.requestId !== 'string' || (body.feedback !== 'helpful' && body.feedback !== 'unhelpful')) return inputError(c, invalid, 400, ["requestId","feedback"]);
   const db = dbFor(c.env);
-  if (!(await knowledgeFeedback(db, c.req.param('id'), body.requestId, body.feedback))) return c.json(conflict, 409);
+  if (!(await knowledgeFeedback(db, c.req.param('id'), body.requestId, body.feedback))) return fail(c, 409, 'CONFLICT', conflict);
   const staff = c.get('staff');
   await recordPlatformAudit(db, { staffId: staff.id, staffName: staff.name, action: 'knowledge.feedback',
     detail: { articleId: c.req.param('id'), requestId: body.requestId, feedback: body.feedback }, visibleToTenant: false });
   return c.json({ success: true, data: null });
 });
 
-// Await on this dedicated request, not waitUntil (45s AI budget exceeds its 30s
-// post-response lifetime). Resolution stays fast; no scheduled notification job runs.
-opsKnowledge.post('/api/ops/knowledge/tickets/:id/process', requirePlatformAdminWrite(), async c => {
+// AI の45秒予算は waitUntil の応答後30秒を超えるため、専用要求内で完了を待つ。通知の定期ジョブは実行しない。
+opsKnowledge.post('/api/ops/knowledge/tickets/:id/process', requirePlatformAdminWrite(), inputJsonBoundary(), async c => {
   const db = dbFor(c.env);
   const id = c.req.param('id');
   if (!(await getSupportTicket(db, id))) return c.json({ success: false, error: '問い合わせが見つかりません' }, 404);
@@ -133,9 +137,9 @@ opsKnowledge.post('/api/ops/knowledge/tickets/:id/process', requirePlatformAdmin
   } });
 });
 
-opsKnowledge.post('/api/ops/knowledge/tickets/:id/retry', requirePlatformAdminWrite(), async c => {
+opsKnowledge.post('/api/ops/knowledge/tickets/:id/retry', requirePlatformAdminWrite(), inputJsonBoundary(), async c => {
   const db = dbFor(c.env);
-  if (!(await retryKnowledgeJob(db, c.req.param('id')))) return c.json(conflict, 409);
+  if (!(await retryKnowledgeJob(db, c.req.param('id')))) return fail(c, 409, 'CONFLICT', conflict);
   const staff = c.get('staff');
   await recordPlatformAudit(db, { staffId: staff.id, staffName: staff.name, action: 'knowledge.update',
     detail: { requestId: c.req.param('id'), operation: 'retry' }, visibleToTenant: false });

@@ -9,7 +9,7 @@
 
 import { LineHarness } from '@line-harness/sdk'
 import { MyServiceClient } from './external-api.js'
-import type { Env } from './index.js'
+import type { Env } from './env.js';
 
 function createClients(env: Env) {
   const harness = new LineHarness({
@@ -97,11 +97,11 @@ export async function syncExternalData(env: Env): Promise<void> {
         await harness.friends.addTag(friend.id, currentTierTagId)
       }
 
-      console.log(`[Sync] Updated friend ${friend.id} (${customer.id})`)
-    } catch (error) {
-      console.error(`[Sync] Failed for customer ${customer.id}:`, error)
+      console.log('[Sync] customer_updated')
+    } catch {
+      console.error('[Sync] customer_update_failed')
     }
   }
 
-  console.log(`[Sync] Completed. Processed ${customers.length} customers.`)
+  console.log('[Sync] completed')
 }

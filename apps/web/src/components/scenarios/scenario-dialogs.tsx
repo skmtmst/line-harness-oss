@@ -1,31 +1,32 @@
 'use client'
 
+import CloseButton from '@/components/shared/close-button'
+import { useContentChangeAccess, type ContentChangeAccess } from '@/components/shared/use-content-change-access'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { api, type ScenarioFriendPlan } from '@/lib/api';
+import { shortDateTime } from '@/lib/hq-banners';
+import { scenarioReferenceData } from './scenario-reference-data';
+import { useAccount } from '@/contexts/account-context';
+import Button from '@/components/shared/button';
+import Checkbox from '@/components/shared/checkbox';
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
+import Notice from '@/components/shared/notice';
+import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed';
+import ConditionBuilder, { findConditionDraftIssue, findInvalidRangeIssue, isEmptyCondition, isRuleComplete, isStructurallyEmpty, pruneCondition, type SegmentCondition, type SegmentRule } from '@/components/shared/condition-builder';
+import { useOverlayFocus } from '@/components/shared/overlay-utils';
+import { formatDateTime } from '@/lib/format';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import type { ScenarioFriendPlanStep } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 /*
  * シナリオ詳細で使う小さな窓。
  *
  * 詳細画面は既に長いので、窓の中身はここに分けてある。1ファイルに足すと
  * 「どこを直すと何が変わるか」が追えなくなる。
  */
-
-import { useCallback, useEffect, useId, useState } from 'react'
-import { api, type ScenarioFriendPlan, type ScenarioFriendPlanStep } from '@/lib/api'
-import { shortDateTime } from '@/lib/hq-banners'
-import { scenarioReferenceData } from './scenario-reference-data'
-import { useAccount } from '@/contexts/account-context'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
-import ConditionBuilder, {
-  findInvalidRangeIssue,
-  isEmptyCondition,
-  isRuleComplete,
-  pruneCondition,
-  type SegmentCondition,
-  type SegmentRule,
-} from '@/components/shared/condition-builder'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 function Shell({
   title,
@@ -52,23 +53,16 @@ function Shell({
   const panelRef = useOverlayFocus(true, onClose)
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="rounded-panel flex w-full flex-col shadow-lg" style={wide ? { marginBlock: 68, height: 912, maxWidth: 1120, background: 'var(--color-canvas)' } : { maxWidth: '48rem', background: 'var(--color-canvas)' }}>
-        <div className={`border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 ${wide ? 'py-5' : 'py-4'}`}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="rounded-panel flex w-full flex-col shadow-float" style={wide ? { marginBlock: 68, height: 912, maxHeight: 'calc(100dvh - 168px)', maxWidth: 1120, background: 'var(--color-canvas)' } : { maxWidth: '48rem', background: 'var(--color-canvas)' }}>
+        <div className={`border-hairline flex shrink-0 flex-wrap items-start justify-between gap-3 border-b px-6 ${wide ? 'py-5' : 'py-4'}`}>
           <div className="min-w-0">
             <h2 id={titleId} className="text-ink text-lg font-bold">{title}</h2>
             {description && <p className="text-ink-secondary mt-0.5 text-sm">{description}</p>}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ink-secondary shrink-0 px-2 text-2xl leading-none"
-            aria-label="閉じる"
-          >
-            ×
-          </button>
+          <CloseButton onClick={onClose} />
         </div>
-        <div className={`flex-1 px-6 ${wide ? 'pb-5 pt-0' : 'py-5'}`}>{children}</div>
-        {footer && <div className={`border-hairline flex justify-end gap-2 border-t px-6 ${wide ? 'py-3' : 'py-4'}`}>{footer}</div>}
+        <div className={`min-h-0 flex-1 overflow-y-auto px-6 ${wide ? 'pb-5 pt-0' : 'py-5'}`}>{children}</div>
+        {footer && <div className={`border-hairline flex shrink-0 justify-end gap-2 border-t px-6 ${wide ? 'py-3' : 'py-4'}`}>{footer}</div>}
       </div>
     </div>
   )
@@ -85,7 +79,7 @@ function Shell({
  */
 const RULE_TYPE_LABEL: Record<string, string> = {
   name: '名前',
-  private_memo: '個別メモ',
+  private_memo: 'メモ',
   status_message: 'ステータスメッセージ',
   registered_at: '友だち登録日',
   support_mark: '対応マーク',
@@ -112,44 +106,56 @@ function describeRule(rule: SegmentRule): string {
   return isRuleComplete(rule) ? label : `${label}（書きかけ）`
 }
 
+function ConditionRemoveButton({ permission, onRemove }: { permission: ReturnType<typeof useContentChangeAccess>; onRemove: () => void }) {
+  if (!permission.provided) return <button type="button" onClick={onRemove} className="text-danger shrink-0 text-xs">削除する</button>
+  return <Button variant="text" size="inline" textTone="danger" className="shrink-0" disabled={permission.disabled} lockedReason={permission.lockedReason} onClick={onRemove}>削除する</Button>
+}
+
 export function ConditionDialog({
   title,
   description,
   value,
   onSave,
   onClose,
+  disabled,
+  lockedReason,
+  canChangeNow,
 }: {
   title: string
   description: string
   value: SegmentCondition | null
   onSave: (next: SegmentCondition | null) => Promise<void>
   onClose: () => void
-}) {
+} & ContentChangeAccess) {
+  const permission = useContentChangeAccess({ disabled, lockedReason, canChangeNow })
+  const mounted = useRef(true)
+  const savingRef = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  const canChange = () => (!permission.provided || mounted.current) && permission.canChangeNow()
+  const saveErrors = useSaveFormErrors()
+
   const [draft, setDraft] = useState<SegmentCondition | null>(value)
+  const updateDraft: typeof setDraft = permission.provided ? next => { if (canChange()) setDraft(next) } : setDraft
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   /* R247: 入力済みの不正範囲は欄の下で知らせて止める。保存済みは維持する。 */
   const [rangeError, setRangeError] = useState('')
+  /* S4-OR: 空のかたまり・未完成の行は黙って落とさず、直し方を案内して止める。 */
+  const [draftError, setDraftError] = useState('')
 
   return (
-    <Shell
+    <SaveErrorScope errors={saveErrors}><Shell
       title="配信条件を設定"
       description="外部サービスと同じ条件軸を組み合わせ、このメッセージを届ける友だちを決めます。"
       onClose={onClose}
       wide
       footer={
         <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-          >
+          <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={async () => {
+          </Button>
+          <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving || permission.disabled} lockedReason={permission.lockedReason} onClick={async () => {
+              if (!canChange() || (permission.provided && savingRef.current)) return
               /*
                * R247: 入力済みの不正範囲（上下限の逆転など）は落とさず、
                * 欄の下で知らせて止める。保存済みの条件は維持する。
@@ -160,27 +166,41 @@ export function ConditionDialog({
                 return
               }
               setRangeError('')
+              /*
+               * S4-OR: 空の「いずれか」のかたまり・未完成の行は、そのまま
+               * 反映すると広い相手へ送られる。落とさず、直し方を案内する。
+               */
+              const draftIssue = findConditionDraftIssue(draft)
+              if (draftIssue) {
+                setDraftError(draftIssue)
+                return
+              }
+              setDraftError('')
+              if (permission.provided) savingRef.current = true
               setSaving(true)
               setError('')
               try {
                 // 書きかけの行は落として保存する。残すと、誰にも一致しない
                 // 条件になって配信が黙って止まる。
                 await onSave(pruneCondition(draft))
+                if (permission.provided && (!mounted.current || !permission.canChangeNow())) return
                 onClose()
-              } catch {
+              } catch (saveFailure) {
+                if (permission.provided && (!mounted.current || !permission.canChangeNow())) return
+                const fieldFailure = saveErrors.capture(saveFailure)
+
                 /*
                  * 呼び出し側の保存が例外で落ちても「保存中」のままにしない
                  * （SCENARIO-05）。窓は開いたまま、下書きも残す。
                  */
-                setError('条件を保存できませんでした。通信状態を確認して、もう一度お試しください。')
+                { if (!fieldFailure) setError('条件を保存できませんでした。通信状態を確認して、もう一度お試しください。') }
               } finally {
-                setSaving(false)
+                savingRef.current = false
+                if (!permission.provided || mounted.current) setSaving(false)
               }
-            }}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
-          >
-            {saving ? '保存中…' : 'この条件を反映'}
-          </button>
+            }} busy={saving} busyLabel="保存中…" widthReserve="idle">
+            {'この条件を反映'}
+          </Button>
         </>
       }
     >
@@ -188,7 +208,10 @@ export function ConditionDialog({
         <Notice tone="danger" className="mb-4" message={error} />
       )}
       {rangeError && (
-        <Notice tone="validation" className="mb-4" message={rangeError} />
+        <Notice tone="warn" className="mb-4" message={rangeError} />
+      )}
+      {draftError && (
+        <Notice tone="warn" className="mb-4" message={draftError} />
       )}
       <span className="sr-only">{title}{description}</span>
       <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-5">
@@ -201,7 +224,7 @@ export function ConditionDialog({
             */}
             <p className="text-ink mt-2 text-sm font-bold">{describeCondition(draft)}</p>
           </div>
-          <Button onClick={() => setDraft(null)}>
+          <Button disabled={permission.disabled} lockedReason={permission.lockedReason} onClick={() => updateDraft(null)}>
             条件を初期化
           </Button>
         </div>
@@ -213,43 +236,40 @@ export function ConditionDialog({
               <li key={`rule-${i}`} className="flex items-center justify-between gap-3">
                 <p className="text-ink text-sm font-bold">
                   条件 {i + 1}
-                  <span className="text-ink-secondary ml-2 text-xs font-normal">
+                  <span className="text-ink-secondary ml-2 text-xs font-medium">
                     {describeRule(rule)}
                   </span>
                 </p>
-                <button
-                  type="button"
-                  onClick={() => {
+                <ConditionRemoveButton permission={permission}
+                  onRemove={() => {
                     const next = { ...draft, rules: draft.rules.filter((_, r) => r !== i) }
-                    setDraft(isEmptyCondition(next) ? null : next)
+                    /*
+                     * S4-OR: 残った空のかたまりは下書きとして残す。素の空
+                     * （行もかたまりも無し）のときだけ null へ戻す。
+                     */
+                    updateDraft(isStructurallyEmpty(next) ? null : next)
                   }}
-                  className="text-danger shrink-0 text-xs"
-                >
-                  削除
-                </button>
+                />
               </li>
             ))}
             {(draft.groups ?? []).map((group, gi) => (
               <li key={`group-${gi}`} className="flex items-center justify-between gap-3">
                 <p className="text-ink text-sm font-bold">
                   or条件のかたまり {gi + 1}
-                  <span className="text-ink-secondary ml-2 text-xs font-normal">
-                    {group.rules.length}件
+                  <span className="text-ink-secondary ml-2 text-xs font-medium">
+                    {formatNumber(group.rules.length)}件
                   </span>
                 </p>
-                <button
-                  type="button"
-                  onClick={() => {
+                <ConditionRemoveButton permission={permission}
+                  onRemove={() => {
                     const next = {
                       ...draft,
                       groups: (draft.groups ?? []).filter((_, g) => g !== gi),
                     }
-                    setDraft(isEmptyCondition(next) ? null : next)
+                    /* S4-OR: 消したかたまり以外は残す。素の空のときだけ null。 */
+                    updateDraft(isStructurallyEmpty(next) ? null : next)
                   }}
-                  className="text-danger shrink-0 text-xs"
-                >
-                  削除
-                </button>
+                />
               </li>
             ))}
           </ul>
@@ -271,16 +291,17 @@ export function ConditionDialog({
         <h3 className="text-ink text-sm font-bold">足せる条件</h3>
         <p className="text-ink-secondary mt-2 text-xs font-medium">下の「詳しい条件を編集」を開くと出る追加ボタンと同じ並び</p>
         <div className="mt-2 space-y-3">{[
-          ['名前','個別メモ','ステータスメッセージ','友だち登録日'],
+          ['名前','メモ','ステータスメッセージ','友だち登録日'],
           ['対応マーク','タグ','友だち情報','シナリオ購読','シナリオ'],
           ['回答フォーム','最終反応日','反応状態','行動スコア'],
+          ['来店の回数','購入の合計金額','最後の来店・購入の日','会員ランク'],
           ['ブロック状態','表示状態'],
         ].map((line) => <div key={line[0]} className="flex gap-2">{line.map((label) => <span key={label} className="border-hairline rounded-pill border px-2.5 py-1.5 text-xs text-ink-secondary">{label}</span>)}</div>)}</div>
         <p className="text-ink-faint mt-2 text-xs">対応マーク・友だち情報は、任意機能をオンにしているアカウントだけで出ます。</p>
       </section>
       <Notice tone="info" className="mt-5">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。</Notice>
-      <details className="mt-3"><summary className="text-action cursor-pointer text-xs">詳しい条件を編集</summary><div className="mt-3"><ConditionBuilder value={draft} onChange={setDraft} /></div></details>
-    </Shell>
+      <details className="mt-3"><summary className="text-action cursor-pointer text-xs">詳しい条件を編集</summary><div className="mt-3"><ConditionBuilder value={draft} onChange={updateDraft} disabled={permission.disabled} lockedReason={permission.lockedReason} /></div></details>
+    </Shell></SaveErrorScope>
   )
 }
 
@@ -338,7 +359,7 @@ export function MoveReferrersNotice({ scenarioId }: { scenarioId: string }) {
   return (
     <div>
       <p className="text-warning text-sm font-medium">
-        このシナリオは{items.length}件のシナリオの終了後の移動先になっています。
+        このシナリオは{formatNumber(items.length)}件のシナリオの終了後の移動先になっています。
       </p>
       <p className="text-ink-secondary mt-1 text-xs">
         {shown.map((s) => s.name).join('、')}
@@ -379,6 +400,8 @@ export function OnCompleteDialog({
   onOpenActions: () => void
   actionCount: number
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [draftMode, setDraftMode] = useState<OnCompleteMode>(mode)
   const [draftTarget, setDraftTarget] = useState<string | null>(targetScenarioId)
   /* R239: 移動先の未選択は入力不足として欄の下で案内し、通信失敗と分ける。 */
@@ -440,10 +463,12 @@ export function OnCompleteDialog({
         setSavedTargetName(saved?.success ? saved.data.name : null)
       }
       setCandidatesState('ready')
-    } catch {
-      if (!isStale()) setCandidatesState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+      if (!isStale()) { if (!fieldFailure) setCandidatesState('error') }
     }
-  }, [scenarioId, selectedAccountId, targetScenarioId])
+  }, [scenarioId, selectedAccountId, targetScenarioId, saveErrors])
 
   useEffect(() => {
     let stale = false
@@ -454,23 +479,16 @@ export function OnCompleteDialog({
   }, [loadCandidates])
 
   return (
-    <Shell
+    <SaveErrorScope errors={saveErrors}><Shell
       title="最終ステップ後の処理"
       description="最後の1通を配り終えた人をどうするか"
       onClose={onClose}
       footer={
         <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-          >
-            やめる
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={async () => {
+          <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
+            キャンセル
+          </Button>
+          <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R250 + R239: 移動先のない「次のシナリオへ移動」は保存しない。
                * 欠落したまま送ると400になるだけなので、欄の下と窓の上で理由を出す。
@@ -490,25 +508,25 @@ export function OnCompleteDialog({
                   return
                 }
                 onClose()
-              } catch {
+              } catch (saveFailure) {
+                const fieldFailure = saveErrors.capture(saveFailure)
+
                 /*
                  * onSave が業務失敗を返す形と、例外で落ちる形の両方がある。
                  * 例外でも「保存中」のままにしない（SCENARIO-05）。
                  */
-                setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
+                { if (!fieldFailure) setError('保存できませんでした。通信状態を確認して、もう一度お試しください。') }
               } finally {
                 setSaving(false)
               }
-            }}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
-          >
-            {saving ? '保存中…' : '変更する'}
-          </button>
+            }} busy={saving} busyLabel="保存中…" widthReserve="idle">
+            {'編集'}
+          </Button>
         </>
       }
     >
       {error && <Notice tone="danger" className="mb-4" message={error} />}
-      <RadioCardGroup legend="最後の1通を配り終えた人をどうするか" className="space-y-3">
+      <SaveErrorField names={["scenario-complete-action","value","opt.value","draftMode"]}><RadioCardGroup legend="最後の1通を配り終えた人をどうするか" className="space-y-3">
         {(
           [
             {
@@ -539,25 +557,21 @@ export function OnCompleteDialog({
             note={opt.hint}
           />
         ))}
-      </RadioCardGroup>
+      </RadioCardGroup></SaveErrorField>
 
       <div className="border-hairline mt-5 border-t pt-5">
         <p className="text-ink text-sm font-bold">その他のアクション</p>
         <p className="text-ink-secondary mt-0.5 mb-2 text-xs">
           配り終えた人に対して、タグ・友だち情報・対応マークなどを動かします。
         </p>
-        <button
-          type="button"
-          onClick={onOpenActions}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-4 text-sm"
-        >
-          アクション設定{actionCount > 0 ? `（${actionCount} 件）` : ''}
-        </button>
+        <Button variant="secondary" className="text-ink-secondary px-4 whitespace-normal" type="button" onClick={onOpenActions}>
+          アクション設定{actionCount > 0 ? `（${formatNumber(actionCount)} 件）` : ''}
+        </Button>
       </div>
 
       {draftMode === 'move' && (
         <div className="mt-4">
-          <label className="text-ink text-sm font-medium" htmlFor="on-complete-move-target">
+          <label className="text-ink text-sm font-semibold" htmlFor="on-complete-move-target">
             移動先のシナリオ
           </label>
           {/*
@@ -568,17 +582,17 @@ export function OnCompleteDialog({
           {candidatesState === 'error' ? (
             <p className="text-danger mt-1.5 flex flex-wrap items-center gap-3 text-sm" role="alert">
               移動先の候補を読み込めませんでした。
-              <button
-                type="button"
-                className="text-info font-medium hover:underline"
-                onClick={() => void loadCandidates(() => false)}
+              <Button
+                variant="text"
+                size="inline"
+                onClick={() => loadCandidates(() => false)}
               >
                 もう一度読み込む
-              </button>
+              </Button>
             </p>
           ) : (
             <>
-              <Select
+              <SaveErrorField names={["draftTarget","draft_target"]}><EntitySelect kind="scenario"
                 aria-label="移動先のシナリオ"
                 id="on-complete-move-target"
                 value={draftTarget ?? ''}
@@ -593,7 +607,7 @@ export function OnCompleteDialog({
                     value: '',
                     label: candidatesState === 'loading' ? '候補を読み込んでいます' : '選んでください',
                   },
-                  ...scenarios.map((s) => ({ value: s.id, label: s.name })),
+                  ...scenarios.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name })),
                   // SCENARIO-14: 保存済みの移動先が候補に無いときは、現在の保存値を選択肢に残す。
                   ...(savedTargetMissing && targetScenarioId
                     ? [{ value: targetScenarioId, label: savedTargetName ?? '現在の保存値（名前を取得できません）' }]
@@ -601,7 +615,7 @@ export function OnCompleteDialog({
                 ]}
                 size="full"
                 className="mt-1.5"
-              />
+              /></SaveErrorField>
               {savedTargetMissing ? (
                 <p className="text-warning mt-1.5 text-xs">
                   保存されている移動先はこのアカウントの候補にありません（別アカウント・削除済み・権限外の可能性）。そのまま保存すると現在の値が維持されます。
@@ -621,7 +635,7 @@ export function OnCompleteDialog({
           )}
         </div>
       )}
-    </Shell>
+    </Shell></SaveErrorScope>
   )
 }
 
@@ -631,6 +645,7 @@ export function OnCompleteDialog({
 export interface TestSendStep {
   id: string
   stepOrder: number
+  displayOrder?: number
   timing: string
   kind: string
 }
@@ -857,7 +872,7 @@ export function TestSendDialog({
   ]
   const recipientLabel =
     recipientClass === 'staff'
-      ? `スタッフ連携のLINE（${staffName ?? '担当者'}）`
+      ? `スタッフ連携のLINE（${staffName ?? 'スタッフ'}）`
       : recipientClass === 'test'
         ? 'テスト受信者'
         : recipientClass === 'general'
@@ -868,14 +883,17 @@ export function TestSendDialog({
   // 送る通。呼び出し側から steps が来ないときは preview の実データで組み立てる。
   const confirmSteps =
     steps.length > 0
-      ? steps.map((row) => ({ stepOrder: row.stepOrder, timing: row.timing, kind: row.kind }))
+      ? steps.map((row) => ({ stepOrder: row.stepOrder, displayOrder: row.displayOrder ?? row.stepOrder, timing: row.timing, kind: row.kind }))
       : Object.entries(stepBodies)
           .map(([order, body]) => ({
             stepOrder: Number(order),
+            displayOrder: 0,
             timing: '',
             kind: TEST_MESSAGE_TYPE_LABEL[body.messageType] ?? body.messageType,
           }))
-          .sort((a, b) => a.stepOrder - b.stepOrder)
+          .sort((a, b) => a.stepOrder - b.stepOrder).map((row, index) => ({ ...row, displayOrder: index + 1 }))
+
+  const contentConfirmed = bodiesStatus === 'ready' && confirmSteps.length > 0 && confirmSteps.every((step) => Boolean(stepBodies[step.stepOrder]))
 
   const openConfirm = () => {
     setConfirmChecks(Array(REQUIRED_CONFIRMATION_COUNT).fill(false))
@@ -884,7 +902,7 @@ export function TestSendDialog({
   }
 
   const sendTest = async () => {
-    if (!selected || sending) return
+    if (!selected || sending || !allConfirmed || !contentConfirmed) return
     setSending(true)
     setResult(null)
     try {
@@ -900,9 +918,9 @@ export function TestSendDialog({
             ? {
                 ok: false,
                 partial: true,
-                message: `${res.data.sent} 件のメッセージだけ届きました。残りは送れていない可能性があります。`,
+                message: `${formatNumber(res.data.sent)} 件のメッセージだけ届きました。残りは送れていない可能性があります。`,
               }
-            : { ok: true, message: `${res.data.sent} 件のメッセージを送りました。` },
+            : { ok: true, message: `${formatNumber(res.data.sent)} 件のメッセージを送りました。` },
         )
         if (!partial) await loadTestHistory()
       } else {
@@ -911,7 +929,7 @@ export function TestSendDialog({
     } catch (sendError) {
       setResult({
         ok: false,
-        message: sendError instanceof Error ? sendError.message : 'テスト送信に失敗しました。',
+        message: describeApiFailure(sendError, '送信'),
       })
     } finally {
       setSending(false)
@@ -932,19 +950,19 @@ export function TestSendDialog({
           {/* #1015 CHK-01 残存対応: 2列の固定比は狭い幅で本文が潰れるので、lg未満は1列に畳む。 */}
           <div className="mt-5 grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
             <section><h2 className="text-ink text-xl font-bold">選択した1名へ実際に送信</h2><p className="text-ink-secondary mt-1 text-sm">選んだ友だちのLINEへ、実際のメッセージが届きます。操作者専用の宛先ではありません。</p>
-              <div className="border-hairline mt-5 rounded-panel border p-5"><h3 className="font-bold">テスト対象</h3><dl className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">LINEアカウント</dt><dd className="font-medium">{accountName ?? '取得できていません'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">送信先</dt><dd className="font-medium">{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">区分</dt><dd className="font-medium">{recipientLabel}</dd></div></dl></div>
+              <div className="border-hairline mt-5 rounded-panel border p-5"><h3 className="font-semibold">テスト対象</h3><dl className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">LINEアカウント</dt><dd className="font-semibold">{accountName ?? '取得できていません'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">送信先</dt><dd className="font-semibold">{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">区分</dt><dd className="font-semibold">{recipientLabel}</dd></div></dl></div>
               <div className="border-hairline mt-4 rounded-panel border p-5"><h3 className="font-bold">テスト内容</h3><p className="text-ink-secondary mt-2 text-sm">{confirmSteps.length > 1 ? `選択した${confirmSteps.length}通を、通と通のあいだの待機を省略して順番に送信します。` : 'この1通だけを送信します。'}</p>
-                <ul className="mt-4 space-y-2 text-sm">{confirmSteps.map((row) => (<li key={row.stepOrder} className="flex flex-wrap items-baseline gap-x-3"><span className="text-ink shrink-0 font-medium tabular-nums">{row.stepOrder}通目</span>{row.timing ? <span className="text-ink-secondary shrink-0">{row.timing}</span> : null}<span className="text-ink-secondary min-w-0 flex-1 truncate">{row.kind}</span></li>))}</ul>
+                <ul className="mt-4 space-y-2 text-sm">{confirmSteps.map((row) => (<li key={row.stepOrder} className="flex flex-wrap items-baseline gap-x-3"><span className="text-ink shrink-0 font-medium tabular-nums">{row.displayOrder}通目</span>{row.timing ? <span className="text-ink-secondary shrink-0">{row.timing}</span> : null}<span className="text-ink-secondary min-w-0 flex-1 truncate">{row.kind}</span></li>))}</ul>
                 <p className="text-ink-faint mt-2 text-xs">タグ・情報欄の変更などのアクションは実行しません。購読の登録も増えません。</p></div>
             </section>
-            <aside className="space-y-4"><div className="border-hairline rounded-panel border p-5"><h3 className="font-bold">設定サマリー</h3><p className="text-ink-faint mt-1 text-xs">テスト送信の内容を確認します。選んだ相手のLINEへ実際に届きます。</p><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><dt>送信先</dt><dd>{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt>送る通</dt><dd>{confirmSteps.length}通</dd></div></dl></div><div className="border-hairline rounded-panel border p-5"><h3 className="font-bold">メッセージプレビュー</h3><p className="text-ink-faint mt-1 text-xs">{friendName}さんへの表示例。名前などの差し込みは送信時に実値へ置き換わります。</p>
+            <aside className="space-y-4"><div className="border-hairline rounded-panel border p-5"><h3 className="font-medium">設定サマリー</h3><p className="text-ink-faint mt-1 text-xs">テスト送信の内容を確認します。選んだ相手のLINEへ実際に届きます。</p><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><dt>送信先</dt><dd>{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt>送る通</dt><dd>{confirmSteps.length}通</dd></div></dl></div><div className="border-hairline rounded-panel border p-5"><h3 className="font-medium">メッセージプレビュー</h3><p className="text-ink-faint mt-1 text-xs">{friendName}さんへの表示例。名前などの差し込みは送信時に実値へ置き換わります。</p>
                 {bodiesStatus === 'loading' && <p className="text-ink-faint mt-4 text-sm">本文を読み込んでいます。</p>}
                 {bodiesStatus === 'error' && <p className="text-danger mt-4 text-sm">本文を読み込めませんでした。送る通と種類は左の一覧どおりです。</p>}
                 {bodiesStatus === 'ready' && confirmSteps.map((row) => {
                   const body = stepBodies[row.stepOrder]
                   return (
                     <div key={row.stepOrder} className="mt-4">
-                      <p className="text-ink-faint text-xs">{row.stepOrder}通目</p>
+                      <p className="text-ink-faint text-xs">{row.displayOrder}通目</p>
                       <div className="bg-info-bg mt-1 whitespace-pre-wrap rounded-panel p-4 text-sm">
                         {body && body.messageType === 'text'
                           ? expandTestPreviewBody(body.content, selectedFriend)
@@ -962,7 +980,7 @@ export function TestSendDialog({
           「戻る」「テスト送信を開始」へ必ず到達できるようにする。
         */}
         <div className="fixed inset-0 z-10 flex items-start justify-center overflow-y-auto px-6 pb-6" style={{ paddingTop: 'min(265px, 30vh)', background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
-          <div ref={confirmPanelRef} role="dialog" aria-modal="true" aria-labelledby="test-send-confirm-title" className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 id="test-send-confirm-title" className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<Checkbox key={label} checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onCheckedChange={(checked) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? checked : v)))}>{label}</Checkbox>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
+          <div ref={confirmPanelRef} role="dialog" aria-modal="true" aria-labelledby="test-send-confirm-title" className="w-full rounded-panel shadow-float" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 id="test-send-confirm-title" className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<SaveErrorField names={["confirmChecks","confirm_checks"]} key={label}><Checkbox key={label} checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onCheckedChange={(checked) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? checked : v)))}>{label}</Checkbox></SaveErrorField>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
             {sending && <Notice tone="info">送信中です。完了までこの画面のまま待ってください。</Notice>}
             {result && (
               <Notice tone={result.ok ? 'success' : 'danger'}>
@@ -973,7 +991,7 @@ export function TestSendDialog({
                 )}
               </Notice>
             )}
-          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>完了</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed} onClick={() => void sendTest()}>{sending ? '送信中…' : result ? 'もう一度送信' : 'テスト送信を開始'}</Button></>)}</div></div>
+          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>閉じる</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed || !contentConfirmed} onClick={() => sendTest()} busy={sending} busyLabel="送信中…">{result ? 'もう一度送る' : 'テストを送る'}</Button></>)}</div></div>
         </div>
       </div>
     )
@@ -990,21 +1008,12 @@ export function TestSendDialog({
       // ここに確認中のフッターは要らない。
       footer={
         <>
-        <button
-          type="button"
-          onClick={onClose}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-        >
+        <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
           キャンセル
-        </button>
-        <button
-          type="button"
-          disabled={!selected || sending}
-          onClick={openConfirm}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
-        >
+        </Button>
+        <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={!selected || sending} onClick={openConfirm}>
           内容を確認
-        </button>
+        </Button>
         </>
       }
     >
@@ -1023,7 +1032,7 @@ export function TestSendDialog({
 
       {lastTest ? (
         <Notice tone="info" className="mb-4">
-          前回のテスト送信：{new Date(lastTest.sentAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}・{lastTest.messageCount}通
+          前回のテスト送信：{formatDateTime(lastTest.sentAt)}・{formatNumber(lastTest.messageCount)}通
         </Notice>
       ) : null}
 
@@ -1031,7 +1040,7 @@ export function TestSendDialog({
       {steps.length > 0 && (
         <div className="border-hairline rounded-panel mb-4 border">
           <div className="border-hairline flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-2.5">
-            <p className="text-ink text-xs font-bold">送る内容</p>
+            <p className="text-ink text-xs font-medium">送る内容</p>
             <p className="text-ink-faint text-xs tabular-nums">{steps.length}通</p>
           </div>
           <ul>
@@ -1040,7 +1049,7 @@ export function TestSendDialog({
                 key={row.id}
                 className="border-hairline text-ink-secondary flex flex-wrap items-baseline gap-x-3 border-b px-4 py-2 text-xs last:border-b-0"
               >
-                <span className="text-ink shrink-0 tabular-nums">{row.stepOrder}通目</span>
+                <span className="text-ink shrink-0 tabular-nums">{row.displayOrder ?? row.stepOrder}通目</span>
                 <span className="shrink-0">{row.timing}</span>
                 <span className="min-w-0 flex-1 truncate">{row.kind}</span>
                 {/* 1通ごとの結果は返ってこない（口が返すのは送った合計だけ）。
@@ -1055,12 +1064,12 @@ export function TestSendDialog({
         </div>
       )}
 
-      <input
+      <SaveErrorField names={["search"]}><SharedTextField
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="名前で探す"
         className="border-hairline rounded-control text-ink h-10 w-full border px-3 text-sm"
-      />
+      /></SaveErrorField>
       <div className="border-hairline rounded-panel mt-3 max-h-64 overflow-y-auto border">
         {friendsStatus === 'ready' && friends.map((friend) => (
           <button
@@ -1086,38 +1095,12 @@ export function TestSendDialog({
       </div>
       </>
       {result && (
-        <p
-          className={`rounded-panel mt-3 px-4 py-3 text-sm ${
-            result.ok ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'
-          }`}
-        >
+        <Notice tone={result.ok ? 'success' : 'danger'}>
           {result.message}
-        </p>
+        </Notice>
       )}
     </Shell>
   )
-}
-
-/* ------------------------------------------- 友だち別の配信予定（IDEA-05） */
-
-/*
- * シナリオ確認（配信結果）の中で、選んだ検証顧客へ現在のシナリオが
- * どう配られるかを表示する。試算口（GET …/friends/:friendId/plan）は
- * 送信・購読登録・タグ更新を一切行わない。応答の sideEffects:false が
- * その証左なので、画面でも「送らない確認」だと断る。
- *
- * 予定の判定は配信処理と同じ関数を通る（条件分岐 evaluateCondition・
- * 絞り込み matchesCondition・日時 computeNextDeliveryAt）。配信時点の
- * 状態で結果が変わる条件は dynamic=true で返るので「未確定」と出し、
- * 確定した日時に見せない（NEXT-01〜04 の「確認が嘘をつかない」に揃える）。
- */
-
-const FRIEND_PLAN_OUTCOME: Record<ScenarioFriendPlanStep['outcome'], string> = {
-  deliver: '届く見通し',
-  skip: '送らず次へ',
-  branch: '条件で分岐',
-  pause: 'この通のあと停止',
-  undetermined: '未確定',
 }
 
 const FRIEND_PLAN_STATUS: Record<string, string> = {
@@ -1131,39 +1114,6 @@ const FRIEND_PLAN_BASIS: Record<ScenarioFriendPlan['basis'], string> = {
   pinned: '購読に固定された公開版',
   published: '現在の公開版',
   draft: '下書き（公開版がないため参考）',
-}
-
-/** 予定1行。時刻が無い・動的条件で変わるものは「未確定」を添える。 */
-function FriendPlanStepRow({ step }: { step: ScenarioFriendPlanStep }) {
-  return (
-    <li className="border-hairline border-b px-4 py-2.5 text-sm last:border-b-0">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-ink shrink-0 font-medium tabular-nums">{step.stepOrder}通目</span>
-        <span className="text-ink-secondary shrink-0 tabular-nums">
-          {step.scheduledAt ?? '—'}
-        </span>
-        <span
-          className={`rounded-pill shrink-0 border px-2 py-0.5 text-xs ${
-            step.outcome === 'deliver'
-              ? 'border-success bg-success-bg text-success'
-              : step.outcome === 'branch' || step.outcome === 'pause'
-                ? 'border-warning bg-warning-bg text-warning'
-                : step.outcome === 'skip'
-                  ? 'border-hairline text-ink-secondary'
-                  : 'border-hairline text-ink-faint'
-          }`}
-        >
-          {FRIEND_PLAN_OUTCOME[step.outcome]}
-        </span>
-        {step.dynamic ? (
-          <span className="text-ink-faint shrink-0 text-xs">未確定</span>
-        ) : null}
-      </div>
-      {step.reason ? (
-        <p className="text-ink-secondary mt-1 text-xs leading-relaxed">{step.reason}</p>
-      ) : null}
-    </li>
-  )
 }
 
 export function FriendPlanDialog({
@@ -1266,13 +1216,13 @@ export function FriendPlanDialog({
         </Notice>
       ) : null}
 
-      <input
+      <SaveErrorField names={["search"]}><SharedTextField
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="名前で探す"
         className="border-hairline rounded-control text-ink h-10 w-full border px-3 text-sm"
         aria-label="確認する友だちを名前で探す"
-      />
+      /></SaveErrorField>
       <div className="border-hairline divide-hairline rounded-panel mt-3 max-h-48 divide-y overflow-y-auto border">
         {friendsStatus === 'ready' && friends.map((friend) => (
           <button
@@ -1315,7 +1265,7 @@ export function FriendPlanDialog({
             <div className="flex flex-wrap justify-between gap-2">
               <dt className="text-ink-faint">いまの状態</dt>
               <dd className="text-ink">
-                {plan.subscription
+                {plan.subscription?.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedBadge /> : plan.subscription
                   ? FRIEND_PLAN_STATUS[plan.subscription.status] ?? plan.subscription.status
                   : 'まだ開始していません'}
               </dd>
@@ -1330,7 +1280,7 @@ export function FriendPlanDialog({
               <div className="flex flex-wrap justify-between gap-2">
                 <dt className="text-ink-faint">止まっている理由</dt>
                 <dd className="text-ink">
-                  {plan.subscription.pauseReason === 'delivery_failed'
+                  {plan.subscription.pauseReason === 'delivery_unconfirmed' ? DELIVERY_UNCONFIRMED_REASON : plan.subscription.pauseReason === 'delivery_failed'
                     ? '配信失敗'
                     : plan.subscription.pauseReason === 'after_send'
                       ? 'この通を送ったあと止める設定'
@@ -1345,11 +1295,12 @@ export function FriendPlanDialog({
             <div className="flex flex-wrap justify-between gap-2">
               <dt className="text-ink-faint">試算した時刻</dt>
               <dd className="text-ink tabular-nums">
-                {new Date(plan.computedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                {formatDateTime(plan.computedAt)}
               </dd>
             </div>
           </dl>
 
+          {plan.subscription?.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedNotice action={<Button href={`/chats?friend=${encodeURIComponent(plan.friendId)}`}>トークの送信記録を確認</Button>} /> : null}
           {plan.start.state === 'blocked' ? (
             <Notice tone="warn">
               <p className="font-semibold">いまはこの友だちへ配信されません</p>
@@ -1402,3 +1353,60 @@ export function describeCondition(condition: SegmentCondition | null): string {
   if (groups === 0) return `${rules} 個の条件`
   return `${rules} 個の条件 ＋ or条件 ${groups} かたまり`
 }
+
+/* ------------------------------------------- 友だち別の配信予定（IDEA-05） */
+
+/*
+ * シナリオ確認（配信結果）の中で、選んだ検証顧客へ現在のシナリオが
+ * どう配られるかを表示する。試算口（GET …/friends/:friendId/plan）は
+ * 送信・購読登録・タグ更新を一切行わない。応答の sideEffects:false が
+ * その証左なので、画面でも「送らない確認」だと断る。
+ *
+ * 予定の判定は配信処理と同じ関数を通る（条件分岐 evaluateCondition・
+ * 絞り込み matchesCondition・日時 computeNextDeliveryAt）。配信時点の
+ * 状態で結果が変わる条件は dynamic=true で返るので「未確定」と出し、
+ * 確定した日時に見せない（NEXT-01〜04 の「確認が嘘をつかない」に揃える）。
+ */
+
+const FRIEND_PLAN_OUTCOME: Record<ScenarioFriendPlanStep['outcome'], string> = {
+  deliver: '届く見通し',
+  skip: '送らず次へ',
+  branch: '条件で分岐',
+  pause: 'この通のあと停止',
+  undetermined: '未確定',
+}
+
+/** 予定1行。時刻が無い・動的条件で変わるものは「未確定」を添える。 */
+function FriendPlanStepRow({ step }: { step: ScenarioFriendPlanStep }) {
+  return (
+    <li className="border-hairline border-b px-4 py-2.5 text-sm last:border-b-0">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-ink shrink-0 font-medium tabular-nums">{step.displayOrder ? `${step.displayOrder}通目` : '通の順番は未取得'}</span>
+        <span className="text-ink-secondary shrink-0 tabular-nums">
+          {step.scheduledAt ?? '—'}
+        </span>
+        <span
+          className={`rounded-pill shrink-0 border px-2 py-0.5 text-xs ${
+            step.outcome === 'deliver'
+              ? 'border-success bg-success-bg text-success'
+              : step.outcome === 'branch' || step.outcome === 'pause'
+                ? 'border-warning bg-warning-bg text-warning'
+                : step.outcome === 'skip'
+                  ? 'border-hairline text-ink-secondary'
+                  : 'border-hairline text-ink-faint'
+          }`}
+        >
+          {FRIEND_PLAN_OUTCOME[step.outcome]}
+        </span>
+        {step.dynamic ? (
+          <span className="text-ink-faint shrink-0 text-xs">未確定</span>
+        ) : null}
+      </div>
+      {step.reason ? (
+        <p className="text-ink-secondary mt-1 text-xs leading-relaxed">{step.reason}</p>
+      ) : null}
+    </li>
+  )
+}
+
+export { FRIEND_PLAN_OUTCOME, FriendPlanStepRow }

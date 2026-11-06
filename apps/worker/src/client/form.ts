@@ -1,25 +1,32 @@
-/**
- * LIFF Form Page — Dynamic form renderer for LINE surveys / questionnaires
- *
- * Flow:
- * 1. Fetch form definition from API using form ID from query params
- * 2. Render form fields dynamically (text, email, select, radio, etc.)
- * 3. On submit: POST to /api/forms/:id/submit with user's lineUserId
- * 4. Show success message (auto-close in LINE app)
- *
- * URL format: https://liff.line.me/{LIFF_ID}?page=form&id={FORM_ID}
- */
-
-/*
- * 送信ヘッダの組み立ては共有部品に寄せる(#729)。Idempotency-Key の
- * 付け忘れは型で落ちる形にする。fetch・認証取得・再送フローはここに残す。
- */
+import { escapeHtml } from '../lib/html-escape.js';
+import { legacyApiErrorBody, readApiError } from '@line-crm/shared';
+import { createClientLogger } from '@line-crm/shared';
 import {
   buildFormSubmitHeaders,
   newFormIdempotencyKey,
   toFormIdempotencyKey,
   type FormIdempotencyKey,
+  type FormAvailability,
+  type FormLayout,
+  collectInputs,
 } from '@line-crm/shared';
+
+import '../../../liff/src/card-surface.css';
+import { choiceReceptionLabel } from '../../../liff/src/lib/form-reception.js';
+import {applyCustomerFormTheme} from './customer-look.js';
+
+
+/*
+ * 送信ヘッダの組み立ては共有部品に寄せる。Idempotency-Key の
+ * 付け忘れは型で落ちる形にする。fetch・認証取得・再送フローはここに残す。
+ */
+
+
+
+
+import { customerMessage } from './customer-message.js';
+const clientLogger = createClientLogger('embedded');
+
 
 declare const liff: {
   init(config: { liffId: string }): Promise<void>;
@@ -32,7 +39,7 @@ declare const liff: {
 };
 
 const UUID_STORAGE_KEY = 'lh_uuid';
-const FORM_VERSION = '2.0.0'; // cache buster
+const FORM_VERSION = '2.0.0'; // 古いキャッシュが表示されないよう、取得先を区別する。
 
 interface FormField {
   name: string;
@@ -51,6 +58,8 @@ interface FormDef {
   fields: FormField[];
   isActive: boolean;
   hideProfile?: boolean;
+  availability?: FormAvailability;
+  layout?: FormLayout;
   hasSubmitWebhook: boolean;
   webhookOrigin: string | null;
   webhookGateId: string | null;
@@ -66,6 +75,7 @@ interface XFollowerSuggestion {
 
 interface FormState {
   formDef: FormDef | null;
+  receptionHtml: string;
   xHarnessBaseUrl: string | null;
   profile: { userId: string; displayName: string; pictureUrl?: string } | null;
   friendId: string | null;
@@ -77,17 +87,13 @@ interface FormState {
   submitIdempotencyKey: FormIdempotencyKey | null;
   submitting: boolean;
   verifiedXUsername: string;
-  /**
-   * Tracked link id that brought the user to this form (`?ref=` query param,
-   * propagated from /r/:ref → LIFF). When present, the server uses the
-   * tracked link's reward_template_id (per-campaign reward) instead of the
-   * friend's first-touch attribution.
-   */
+  /** 流入リンクの ?ref= がある場合、報酬は友だちの初回流入でなく、そのキャンペーンの reward_template_id に帰属させる。 */
   refTrackedLinkId: string | null;
 }
 
 const state: FormState = {
   formDef: null,
+  receptionHtml: '',
   xHarnessBaseUrl: null,
   profile: null,
   friendId: null,
@@ -97,14 +103,10 @@ const state: FormState = {
   refTrackedLinkId: null,
 };
 
-// Replier pool loading state (shared between renderFormPage and attachXAutocomplete)
+// 同じ読込状態を renderFormPage と attachXAutocomplete で共有する。
 let _replierPoolReady = false;
 
-function escapeHtml(str: string): string {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+
 
 function apiCall(path: string, options?: RequestInit): Promise<Response> {
   const idToken = liff.getIDToken();
@@ -129,12 +131,25 @@ function getApp(): HTMLElement {
 
 // ========== Field Rendering ==========
 
-function renderField(field: FormField): string {
+function choiceCapacity(field: FormField, label: string) {
+  const block = state.formDef?.layout && collectInputs(state.formDef.layout).find(b => b.name === field.name);
+  const choice = block?.choices?.find(c => c.label === label);
+  const choices = state.formDef?.availability?.choices[field.name];
+  return choices?.[choice?.id ?? label];
+}
+function disabledChoice(field: FormField, label: string): string {
+  return choiceCapacity(field, label)?.full ? ' disabled' : '';
+}
+function receptionOption(field: FormField, label: string): string {
+  return escapeHtml(label + choiceReceptionLabel(choiceCapacity(field, label)));
+}
+
+export function renderField(field: FormField): string {
   const required = field.required ? ' required' : '';
   const placeholder = field.placeholder ? ` placeholder="${escapeHtml(field.placeholder)}"` : '';
   const requiredMark = field.required ? '<span class="required-mark">*</span>' : '';
 
-  // If this is an x_username field, render a fuzzy-search autocomplete input
+
   if (field.name === 'x_username') {
     return `
       <div class="form-field">
@@ -173,7 +188,7 @@ function renderField(field: FormField): string {
 
     case 'select': {
       const opts = (field.options ?? [])
-        .map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`)
+        .map((o) => `<option value="${escapeHtml(o)}"${disabledChoice(field, o)}>${receptionOption(field, o)}</option>`)
         .join('');
       inputHtml = `<select
         name="${escapeHtml(field.name)}"
@@ -190,8 +205,8 @@ function renderField(field: FormField): string {
         .map(
           (o) =>
             `<label class="radio-label">
-              <input type="radio" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}"${required} />
-              ${escapeHtml(o)}
+              <input type="radio" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}"${required}${disabledChoice(field, o)} />
+              ${receptionOption(field, o)}
             </label>`,
         )
         .join('');
@@ -200,12 +215,13 @@ function renderField(field: FormField): string {
     }
 
     case 'checkbox': {
+      const block = state.formDef?.layout && collectInputs(state.formDef.layout).find(block => block.name === field.name);
       const boxes = (field.options ?? [])
         .map(
           (o) =>
             `<label class="checkbox-label">
-              <input type="checkbox" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}" />
-              ${escapeHtml(o)}
+              <input type="checkbox" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}"${disabledChoice(field, o)} />
+              ${receptionOption(field, o)}${block?.fixedField === 'allergy' && block.choices?.some(choice => choice.label === o && choice.isOther) ? `<input type="text" data-allergy-other="${escapeHtml(field.name)}" aria-label="そのほかのアレルギー" maxlength="100" placeholder="自由に書く" />` : ''}
             </label>`,
         )
         .join('');
@@ -247,7 +263,7 @@ function injectStyles(): void {
     .form-profile { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; }
     .form-profile img { width: 36px; height: 36px; border-radius: 50%; }
     .form-profile span { font-size: 14px; font-weight: 600; }
-    .form-body { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .form-body { background: #fff; border-radius: 12px; padding: 20px; box-shadow: var(--liff-card-shadow); }
     .form-field { margin-bottom: 20px; }
     .form-label { display: block; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 6px; }
     .required-mark { color: #e53e3e; margin-left: 2px; }
@@ -273,8 +289,8 @@ function injectStyles(): void {
       border-color: #06C755; background: #e8faf0;
     }
     .radio-label input, .checkbox-label input { accent-color: #06C755; width: 18px; height: 18px; }
-    .radio-label input[type="radio"] { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; border: 2px solid #ccc; border-radius: 50%; background: #fff; cursor: pointer; }
-    .radio-label input[type="radio"]:checked { background: #fff; border-color: #06C755; border-width: 5px; }
+    .radio-label input[type="radio"] { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; border: 1.5px solid var(--color-choice-border, #c9ced6); border-radius: 50%; background: #fff; cursor: pointer; }
+    .radio-label input[type="radio"]:checked { border-color: var(--color-selection-border, #087a3e); background: radial-gradient(circle, var(--color-selection-border, #087a3e) calc(var(--liff-radio-dot) / 2), #fff calc(var(--liff-radio-dot) / 2)); }
     .submit-btn {
       width: 100%; padding: 14px; border: none; border-radius: 8px;
       background: #06C755; color: #fff; font-size: 16px; font-weight: 700;
@@ -401,6 +417,8 @@ function render(): void {
 
   injectStyles();
   const app = getApp();
+  const receptionHtml = state.receptionHtml;
+  const closed = formDef.availability?.accepting === false;
   const profileHtml = (formDef.hideProfile || !profile?.pictureUrl)
     ? ''
     : `<div class="form-profile">
@@ -408,7 +426,7 @@ function render(): void {
         <span>${escapeHtml(profile.displayName)} さん</span>
       </div>`;
 
-  // Split fields: survey fields (page 1) vs x_username field (page 2)
+
   const surveyFields = formDef.fields.filter((f) => f.name !== 'x_username');
   const xUsernameField = formDef.fields.find((f) => f.name === 'x_username');
   const hasTwoPages = !!xUsernameField && formDef.hasSubmitWebhook;
@@ -424,12 +442,13 @@ function render(): void {
           <h1>${escapeHtml(formDef.name).replace(/\\n|\n/g, '<br>')}</h1>
           ${formDef.description && !formDef.hasSubmitWebhook ? `<p class="form-description">${escapeHtml(formDef.description).replace(/\\n|\n/g, '<br>')}</p>` : ''}
           ${profileHtml}
+          ${receptionHtml}
         </div>
         <!-- Page 1: Survey -->
         <div id="form-page-1">
           <form id="survey-form" class="form-body" novalidate>
             ${surveyFieldsHtml}
-            <button type="submit" class="submit-btn" id="nextBtn">次へ →</button>
+            <button type="submit" class="submit-btn" id="nextBtn"${closed ? ' disabled' : ''}>次へ →</button>
           </form>
         </div>
         <!-- Page 2: X-Link -->
@@ -439,7 +458,7 @@ function render(): void {
           </div>
           <form id="liff-form" class="form-body" novalidate>
             ${xFieldHtml}
-            <button type="submit" class="submit-btn" id="submitBtn">X Harness を受け取る</button>
+            <button type="submit" class="submit-btn" id="submitBtn"${closed ? ' disabled' : ''}>受け取る</button>
           </form>
         </div>
       </div>
@@ -449,7 +468,8 @@ function render(): void {
     document.getElementById('survey-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      // Validate survey fields
+      if (closed) return;
+
       for (const field of surveyFields) {
         if (!field.required) continue;
         if (field.type === 'checkbox') {
@@ -473,7 +493,7 @@ function render(): void {
         }
       }
 
-      // Save survey data (partial submit)
+
       const nextBtn = document.getElementById('nextBtn') as HTMLButtonElement;
       nextBtn.disabled = true;
       nextBtn.textContent = '保存中...';
@@ -481,7 +501,7 @@ function render(): void {
       const surveyData: Record<string, unknown> = {};
       for (const field of surveyFields) {
         if (field.type === 'checkbox') {
-          surveyData[field.name] = Array.from(document.querySelectorAll<HTMLInputElement>(`input[name="${field.name}"]:checked`)).map((el) => el.value);
+          surveyData[field.name] = collectFormData()[field.name];
         } else if (field.type === 'radio') {
           surveyData[field.name] = document.querySelector<HTMLInputElement>(`input[name="${field.name}"]:checked`)?.value ?? '';
         } else {
@@ -496,12 +516,12 @@ function render(): void {
         });
       } catch { /* non-blocking */ }
 
-      // Transition to page 2
+
       document.getElementById('form-page-1')!.hidden = true;
       document.getElementById('form-page-2')!.hidden = false;
       window.scrollTo(0, 0);
 
-      // Show loading overlay if replier pool is still loading
+
       if (!_replierPoolReady) {
         const xInput = document.querySelector<HTMLInputElement>('.x-autocomplete-input');
         if (xInput) xInput.disabled = true;
@@ -526,10 +546,11 @@ function render(): void {
           <h1>${escapeHtml(formDef.name).replace(/\\n|\n/g, '<br>')}</h1>
           ${formDef.description && !formDef.hasSubmitWebhook ? `<p class="form-description">${escapeHtml(formDef.description).replace(/\\n|\n/g, '<br>')}</p>` : ''}
           ${profileHtml}
+          ${receptionHtml}
         </div>
         <form id="liff-form" class="form-body" novalidate>
           ${fieldsHtml}
-          <button type="submit" class="submit-btn" id="submitBtn">送信する</button>
+          <button type="submit" class="submit-btn" id="submitBtn"${closed ? ' disabled' : ''}>送信する</button>
         </form>
       </div>
     `;
@@ -553,10 +574,10 @@ async function showSubmitConditions(conditions: Record<string, boolean | null>, 
 
   const card = document.getElementById('condition-card')!;
 
-  // Animate each condition one by one
+
   for (const [key, label] of labels) {
     const val = conditions[key];
-    if (val === null || val === undefined) continue; // skip non-required
+    if (val === null || val === undefined) continue;
 
     // Show "checking" state
     const row = document.createElement('div');
@@ -564,10 +585,10 @@ async function showSubmitConditions(conditions: Record<string, boolean | null>, 
     row.innerHTML = `<div class="x-condition-check checking"><span class="spin">⏳</span></div><span>${label}を確認中...</span>`;
     card.appendChild(row);
 
-    // Wait for dramatic effect
+    // 条件の確認経過が分かるよう、表示の間隔を空ける。
     await new Promise(r => setTimeout(r, 600));
 
-    // Reveal result
+
     if (val) {
       row.innerHTML = `<div class="x-condition-check pass">✓</div><span>${label}</span>`;
     } else {
@@ -575,7 +596,7 @@ async function showSubmitConditions(conditions: Record<string, boolean | null>, 
     }
   }
 
-  // Final summary after all checks
+
   await new Promise(r => setTimeout(r, 400));
 
   const summary = document.createElement('div');
@@ -633,7 +654,7 @@ function renderSuccess(): void {
     }
   });
 
-  // Auto-close after 3s inside LINE
+
   if (liff.isInClient()) {
     setTimeout(() => {
       try { liff.closeWindow(); } catch { /* ignore */ }
@@ -691,6 +712,12 @@ function collectFormData(): Record<string, unknown> {
           `input[name="${field.name}"]:checked`,
         ),
       ).map((el) => el.value);
+      const block = formDef.layout && collectInputs(formDef.layout).find(block => block.name === field.name && block.fixedField === 'allergy');
+      const other = block?.choices?.find(choice => choice.isOther);
+      if (other && checked.includes(other.label)) {
+        const value = document.querySelector<HTMLInputElement>(`[data-allergy-other="${CSS.escape(field.name)}"]`)?.value.trim() ?? '';
+        checked.splice(checked.indexOf(other.label), 1, value);
+      }
       result[field.name] = checked;
     } else if (field.type === 'radio') {
       const checked = document.querySelector<HTMLInputElement>(
@@ -711,6 +738,10 @@ function collectFormData(): Record<string, unknown> {
 function validateForm(): string | null {
   const { formDef } = state;
   if (!formDef) return null;
+  const values = collectFormData();
+  for (const block of formDef.layout ? collectInputs(formDef.layout) : []) {
+    if (block.fixedField === 'allergy' && Array.isArray(values[block.name]) && (values[block.name] as string[]).includes('')) return 'そのほかのアレルギーを書いてください';
+  }
 
   for (const field of formDef.fields) {
     if (!field.required) continue;
@@ -765,7 +796,8 @@ export async function postFormSubmit(
     headers: buildFormSubmitHeaders(key),
     body: JSON.stringify(body),
   });
-  const json = await res.clone().json().catch(() => null) as FormSubmitPayload['json'];
+  const payload: unknown = await res.clone().json().catch(() => null);
+  const json = (res.ok || payload === null ? payload : { ...legacyApiErrorBody(payload) as object, error: readApiError(payload).message }) as FormSubmitPayload['json'];
   return { status: res.status, json };
 }
 
@@ -813,7 +845,13 @@ function throwOnFormSubmitError(payload: FormSubmitPayload, fallback: string): v
 }
 
 async function submitForm(): Promise<void> {
-  if (state.submitting || !state.formDef) return;
+  if (state.submitting || !state.formDef || state.formDef.availability?.accepting === false) return;
+  // DOMを書き換えて満杯の選択肢を選んでも送信しない。最終判断はAPIで行う。
+  for (const field of state.formDef.fields) {
+    if (!field.options) continue;
+    const selected = Array.from(document.querySelectorAll<HTMLInputElement | HTMLOptionElement>(`[name="${CSS.escape(field.name)}"]:checked, [name="${CSS.escape(field.name)}"] option:checked`));
+    if (selected.some(el => choiceCapacity(field, el.value)?.full)) { showFieldError('受付終了の選択肢があります。選び直してください。'); return; }
+  }
 
   const validationError = validateForm();
   if (validationError) {
@@ -840,11 +878,11 @@ async function submitForm(): Promise<void> {
 
   try {
     const data = collectFormData();
-    console.log('Form data collected:', JSON.stringify(data));
+    clientLogger.log("client_form_log");
 
-    // Webhook gate — pre-verified by /repliers endpoint
+    // /repliers で確認済みの参加資格を使う。
     if (state.formDef.hasSubmitWebhook) {
-      // Check that user was selected from pre-verified repliers list
+      // 未確認の入力で通過しないよう、確認済みの候補から選ばれたことを検証する。
       const xField = ((data.x_username as string) ?? '').trim().replace(/^@/, '');
       if (!xField || xField !== state.verifiedXUsername) {
         state.submitting = false;
@@ -861,7 +899,7 @@ async function submitForm(): Promise<void> {
         return;
       }
 
-      // Show success animation (conditions already verified by repliers endpoint)
+      // 条件は /repliers で確認済みなので、その結果を表示する。
       const allPassConditions: Record<string, boolean | null> = {
         reply: true,
         like: true,
@@ -872,11 +910,10 @@ async function submitForm(): Promise<void> {
       await showSubmitConditions(allPassConditions, true);
       await new Promise(r => setTimeout(r, 500));
 
-      // Webhook passed — submit data to server, then show success
-      // If message is Flex JSON, show generic success (Flex is sent via LINE push)
+      // Flex 自体は LINE の push で届けるため、画面では一般的な完了表示を使う。
       const rawMsg = state.formDef.onSubmitMessageContent || '条件をクリアしました！';
       const successMsg = rawMsg.trimStart().startsWith('{') ? '特典をLINEでお送りしました！' : rawMsg;
-      // Fall through to submit below, then show webhook success
+
       const webhookBody: Record<string, unknown> = { data: { ...data } };
       if (state.refTrackedLinkId) webhookBody.trackedLinkId = state.refTrackedLinkId;
 
@@ -886,7 +923,7 @@ async function submitForm(): Promise<void> {
         idemKey,
       );
       throwOnFormSubmitError(webhookPayload, '送信に失敗しました');
-      // Check server-side webhook recheck result
+      // クライアントの判定だけを信じず、サーバーの再確認結果を検証する。
       if (webhookPayload.json?.data?.webhookPassed === false) {
         throw new Error(state.formDef.onSubmitWebhookFailMessage || '条件を満たしていません');
       }
@@ -896,14 +933,14 @@ async function submitForm(): Promise<void> {
 
     const body: Record<string, unknown> = { data };
     if (state.refTrackedLinkId) body.trackedLinkId = state.refTrackedLinkId;
-    console.log('Submitting to:', `/api/forms/${state.formDef.id}/submit`);
+    clientLogger.log("client_form_log");
 
     const { payload } = await postFormSubmitWithResume(
       `/api/forms/${state.formDef.id}/submit`,
       body,
       idemKey,
     );
-    console.log('Response status:', payload.status);
+    clientLogger.log("client_form_log");
     throwOnFormSubmitError(payload, '送信に失敗しました');
 
     renderSuccess();
@@ -924,7 +961,7 @@ async function submitForm(): Promise<void> {
         ? '送信の有効期限が切れました。もう一度送る場合は下のボタンから送り直してください。'
         : '送信済みの内容と異なるため、そのままでは送れません。別の回答として送る場合は下のボタンから送り直してください。';
     } else {
-      errEl.textContent = err instanceof Error ? err.message : '送信に失敗しました';
+      errEl.textContent = customerMessage(err, '送信に失敗しました');
     }
     const btn = document.getElementById('submitBtn');
     btn?.parentElement?.insertBefore(errEl, btn);
@@ -957,7 +994,7 @@ function attachXAutocomplete(): void {
   let focusedIndex = -1;
   let replierPool: XFollowerSuggestion[] = [];
 
-  // Prefetch repliers on form load
+
   const gateIdForPool = getGateId();
   if (state.xHarnessBaseUrl && gateIdForPool) {
     fetch(`${state.xHarnessBaseUrl}/api/engagement-gates/${encodeURIComponent(gateIdForPool)}/repliers`)
@@ -965,7 +1002,7 @@ function attachXAutocomplete(): void {
       .then((json: { success: boolean; data?: XFollowerSuggestion[] }) => {
         replierPool = json.data ?? [];
         _replierPoolReady = true;
-        // If page 2 is already visible, remove loading overlay
+
         const overlay = document.getElementById('x-loading-overlay');
         if (overlay) {
           overlay.remove();
@@ -1046,7 +1083,7 @@ function attachXAutocomplete(): void {
 
     const conditions = result.conditions ?? [];
 
-    // Build a lookup by type
+
     const condMap: Record<string, VerifyCondition> = {};
     for (const c of conditions) {
       condMap[c.type] = c;
@@ -1055,7 +1092,7 @@ function attachXAutocomplete(): void {
     let rowsHtml = '';
     for (const def of conditionDefs) {
       const cond = condMap[def.key];
-      if (!cond) continue; // not part of this gate, skip
+      if (!cond) continue;
       if (!cond.required) {
         rowsHtml += `
           <div class="x-condition-row">
@@ -1108,17 +1145,16 @@ function attachXAutocomplete(): void {
       const verifyData = json.data;
       if (verifyData) {
         renderConditions(verifyData);
-        // Mark as verified so submit is allowed even without selecting from suggestions
-        // Allow submit for any verified user (server-side webhook does final eligibility check)
+        // 候補から選ばなくても確認済みの利用者は送信可能にする。参加資格の最終判定はサーバーの Webhook が行う。
         if (!verifyData.userNotFound) {
           state.verifiedXUsername = clean;
-          if (input) input.value = clean; // normalize input (strip @)
+          if (input) input.value = clean;
         }
       }
     } catch {
-      // Hide stale gate condition rows before showing the error message
+      // エラー時に古い条件の確認結果を見せないよう、先に隠す。
       hideConditions();
-      // Show helpful message on verify error (e.g. X API down)
+      // 外部 API の失敗でも、利用者が次の行動を選べる説明を出す。
       if (conditionsResult) {
         conditionsResult.innerHTML = '⚠️ 確認中にエラーが発生しました<br><span style="font-size:11px;font-weight:normal">しばらく待ってからもう一度お試しください</span>';
         conditionsResult.className = 'x-conditions-summary fail';
@@ -1158,7 +1194,7 @@ function attachXAutocomplete(): void {
         </div>
       `;
       li.addEventListener('mousedown', (e) => {
-        e.preventDefault(); // prevent input blur before click
+        e.preventDefault(); // クリック処理より先に入力欄がフォーカスを失わないようにする。
         selectSuggestion(s.username);
       });
       suggestList!.appendChild(li);
@@ -1167,9 +1203,9 @@ function attachXAutocomplete(): void {
   }
 
   input.addEventListener('input', () => {
-    const q = input.value.trim().replace(/^@/, ''); // strip leading @
+    const q = input.value.trim().replace(/^@/, '');
     if (verifyTimer !== null) clearTimeout(verifyTimer);
-    // Clear verified flag when user types manually
+    // 手入力で値が変わった場合は、前の確認済み状態を引き継がない。
     if (q !== state.verifiedXUsername) state.verifiedXUsername = '';
 
     if (!q) {
@@ -1217,10 +1253,10 @@ function attachXAutocomplete(): void {
   });
 
   input.addEventListener('blur', () => {
-    // Small delay so mousedown on suggestion can fire first
+    // 候補の mousedown が先に発火するよう、フォーカス喪失の処理を少し遅らせる。
     setTimeout(() => {
       hideSuggestions();
-      // Trigger verify on blur if input has a value
+
       const username = input.value.trim().replace(/^@/, '');
       if (username && getGateId()) {
         if (verifyTimer !== null) clearTimeout(verifyTimer);
@@ -1243,7 +1279,7 @@ function attachFormEvents(): void {
 
 // ========== Init ==========
 
-export async function initForm(formId: string | null): Promise<void> {
+export async function initForm(formId: string | null, openBookingForm?: () => Promise<void>): Promise<void> {
   if (!formId) {
     renderFormError('フォームIDが指定されていません');
     return;
@@ -1252,7 +1288,7 @@ export async function initForm(formId: string | null): Promise<void> {
   renderLoading();
 
   try {
-    // Fetch profile and form definition in parallel
+
     const [profile, res] = await Promise.all([
       liff.getProfile(),
       apiCall(`/api/forms/${formId}`),
@@ -1260,14 +1296,14 @@ export async function initForm(formId: string | null): Promise<void> {
 
     state.profile = profile;
 
-    // Try to get friendId from local storage (set by main UUID linking flow)
+
     try {
       state.friendId = localStorage.getItem(UUID_STORAGE_KEY);
     } catch {
       // silent
     }
 
-    // Silent UUID linking (best-effort, so friend metadata saves correctly)
+    // 友だち情報を正しく保存できるよう、UUID の結び付けを試す。失敗しても画面は継続する。
     const rawIdToken = liff.getIDToken();
     if (rawIdToken) {
       apiCall('/api/liff/link', {
@@ -1310,10 +1346,20 @@ export async function initForm(formId: string | null): Promise<void> {
       return;
     }
 
-    state.formDef = json.data;
+    // 予約ブロックは共通の画面へ。通常のフォームの既存受付・再送は保つ。
+    if (json.data.layout && collectInputs(json.data.layout).some(block => block.type === 'booking')) {
+      if (!openBookingForm) throw new Error('booking_form_opener_missing');
+      await openBookingForm();
+      return;
+    }
 
-    // Use only the trusted origin derived from the stored webhook. The raw
-    // webhook path/query and secret headers never reach the browser.
+    state.formDef = json.data;
+    applyCustomerFormTheme(json.data.layout?.options.theme);
+    state.receptionHtml = json.data.availability ? (await import('./form-reception.js')).renderFormReception(json.data.availability) : '';
+    // ブラウザ・LINE の上の帯に出る題。フォームの名前（1行目）にする。
+    document.title = json.data.name.split(/\\n|\n/)[0] || document.title;
+
+    // 保存した Webhook から導いた信頼できる origin だけを使い、生のパス・クエリ・秘密ヘッダをブラウザへ渡さない。
     const urlParams = new URLSearchParams(window.location.search);
     const xhParam = urlParams.get('xh');
     const requestedOrigin = xhParam?.replace(/\/$/, '') ?? null;
@@ -1322,7 +1368,7 @@ export async function initForm(formId: string | null): Promise<void> {
         ? requestedOrigin
         : json.data.webhookOrigin;
 
-    // Capture tracked link ref so submit can attribute reward to this campaign
+    // キャンペーンへ報酬を帰属できるよう、流入リンクの ref を回答まで引き継ぐ。
     const refParam = urlParams.get('ref');
     if (refParam) {
       state.refTrackedLinkId = refParam;
@@ -1330,12 +1376,14 @@ export async function initForm(formId: string | null): Promise<void> {
 
     render();
 
-    // Record form open event (fire-and-forget)
+    // 開封の記録失敗でフォーム表示を止めない。
     apiCall(`/api/forms/${state.formDef!.id}/opened`, {
       method: 'POST',
       body: JSON.stringify({}),
     }).catch(() => { /* silent */ });
   } catch (err) {
-    renderFormError(err instanceof Error ? err.message : 'エラーが発生しました');
+    // 内部の英語の文（通信の失敗など）はお客さまに出さない。
+    clientLogger.error("client_form_failed");
+    renderFormError('フォームを読み込めませんでした。時間をおいて、もう一度開いてください。');
   }
 }

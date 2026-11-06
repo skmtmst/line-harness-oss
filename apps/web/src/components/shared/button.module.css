@@ -1,56 +1,39 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 9px 13px;
-  border: 1px solid;
+  gap: var(--polish-space-row); /* 印と文字の間は 8（§6.5 の 5） */
   border-radius: var(--radius-control);
   /*
    * #976 U079/U083: ボタンの文字は入力欄と同じ `$size-body`(14px)。
    * 以前は `$size-label`(13px) で、同じ行に並ぶ入力欄より小さかった。
    */
-  font-size: var(--text-body);
-  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  transition:
-    background-color var(--motion-fast) var(--motion-ease-out),
-    border-color var(--motion-fast) var(--motion-ease-out),
-    filter var(--motion-fast) var(--motion-ease-out),
-    scale var(--motion-instant) var(--motion-ease-out);
 }
 
+/* 同じ操作の段では、部品の小型指定より共通の高さを優先する。 */
+html:root :is([data-toolbar-row], [data-control-row]) .button { height: var(--control-h); min-height: var(--control-h); }
+
 /*
- * 押したら少し沈む（★V7 修正方針 §4・ボタン板「押した」）。0.96 は better-ui の値。
+ * 押したら少し沈む（★管理画面 仕上げ §2「押した」: 0.98倍・motion-instant 80ms）。
  * 動きを減らす設定では大きさを変えない（色の変化だけ残る）。
  */
-@media (prefers-reduced-motion: no-preference) {
-  .button:active:not(:disabled) {
-    scale: 0.96;
-  }
-}
 
 /*
  * #976 U083: PC標準は40pxにそろえる（入力欄・検索欄と同じ高さ）。
  * Pencil V5の実測は36pxだったが、共通デザイン仕様（監査 #976）で
  * 「主要ボタン・入力・検索・選択はPC 40px」と決め直した。
  */
-.standard {
-  height: 40px;
-}
-
-.field {
-  height: 40px;
-}
 
 /*
- * 行内用は32px（★V7：行内の操作は32）。アイコン操作（32×32）と
+ * 行内用は32px（★管理画面：行内の操作は32）。アイコン操作（32×32）と
  * 同じ高さにそろえる。文字サイズ・余白は共通のまま変えない。
  */
 .compact {
-  height: 32px;
+  height: var(--control-h-compact);
 }
 
 /* タッチ端末は指の当たり判定のため44pxを確保する（#976 U083）。 */
@@ -66,13 +49,8 @@
   display: none;
 }
 
-.button:focus-visible {
-  outline: revert;
-}
-
 .button:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
 }
 
 /*
@@ -87,7 +65,7 @@
  * （文字が乗らない用途）。
  */
 .primary {
-  border-color: var(--color-accent-deep);
+  border-color: var(--color-accent-edge);
   background: var(--color-accent-deep);
   color: var(--color-on-accent);
 }
@@ -103,7 +81,7 @@
 }
 
 .secondary {
-  border-color: var(--color-hairline);
+  border-color: var(--color-field-border);
   background: var(--color-canvas);
   color: var(--color-ink);
 }
@@ -122,12 +100,357 @@
  * と同じ考え方。
  */
 .danger {
-  border-color: var(--color-danger);
-  background: var(--color-danger);
+  border-color: var(--color-danger-action);
+  background: var(--color-danger-action);
   color: var(--color-on-accent);
 }
 
 .danger:hover:not(:disabled) {
   filter: brightness(0.92);
 }
+
+/*
+ * LINE ログインのボタン。LINE の緑 #06c755 の地に白文字。
+ * 高さ・角丸は主ボタンと同じ。白文字との比は 2.26:1 だが、LINE の決まりで
+ * 色は変えない。そのぶん文字を 15px・700 にして読みやすくする（末尾の規定）。
+ * 乗せた時・押した時だけ少し濃くする。
+ */
+.line {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
+
+.line:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.line:active:not(:disabled) {
+  background: var(--color-accent-hover);
+  filter: var(--press-dim);
+}
+
+/*
+ * ★管理画面 仕上げ §2「保存中」の回る印。文字の切り替えと幅の固定は
+ * 部品側（button.tsx）が持つ——DOM に出す文字は今のラベル1つだけで、
+ * 平常時の幅を min-width に留めてぶれを防ぐ。
+ * 減らす設定では globals.css が動きを止める。
+ */
+.spin {
+  flex: none;
+  animation: button-spin var(--motion-slow) linear infinite;
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/*
+ * ★V8「ボタン」（doYdE・u101P・LrB2L）。
+ * 高さ36・余白 0 16・文字13px。主は  の墨色の影、副は白地に
+ * 細い枠と薄い影。compact（行内の操作）はV8に別寸法が無いので32のまま。
+ */
+:root .button {
+  padding: 0 var(--tpl-button-pad-side);
+  font-size: var(--text-body);
+}
+
+:root .standard,
+:root .field {
+  height: var(--tpl-button-h);
+}
+
+:root .primary {
+  box-shadow: var(--shadow-primary-action);
+}
+
+:root .secondary {
+  box-shadow: var(--control-shadow);
+}
+
+/*
+ * ★V8 仕上げ（M10）：押した沈みは 120ms（乗せた色変化と同じ速さ）。
+ * 互換経路は 80ms のまま。キーボードの印は action の 2px の輪
+ * （文字ボタン text-action と同じ色にそろえる）。
+ */
+:root .button {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    filter var(--motion-fast) var(--motion-ease-out),
+    scale var(--motion-snap) var(--motion-spring);
+}
+
+/*
+ * 押した感じ（動きの点検 6 番・2026-10-07）：押している間は乗せたときより
+ * 暗く（塗りは --press-dim、白地は --press-dim-soft）、ごく少し縮める
+ * （--press-scale・--motion-fast）。離すとばねで戻る（160ms spring）。
+ * 以前は乗せる 0.92・押す 0.95 で、押すと明るく戻る逆の手応えだった。
+ * 動きを減らす設定では大きさを変えない（暗くするだけ残る）。
+ */
+:root .button:active:not(:disabled) {
+  filter: var(--press-dim);
+}
+
+:root .secondary:active:not(:disabled) {
+  filter: var(--press-dim-soft);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root .button:active:not(:disabled) {
+    scale: var(--press-scale);
+    transition:
+      background-color var(--motion-fast) var(--motion-ease-out),
+      border-color var(--motion-fast) var(--motion-ease-out),
+      filter var(--motion-fast) var(--motion-ease-out),
+      scale var(--motion-fast) var(--motion-ease-out);
+  }
+}
+
+:root .button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
+:root .button { border: 0; line-height: 20px; font-family: var(--font-sans); }
+:root .primary { border: 0; outline: 1px solid var(--color-primary-border); outline-offset: -1px; border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
+:root .line { border: 0; outline: 1px solid var(--color-accent); outline-offset: -1px; border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
+:root .secondary { outline: 1px solid var(--color-control-border); outline-offset: -1px; }
+.text { border-color: transparent; }
+:root .text { background: transparent; color: var(--color-ink-secondary); box-shadow: none; }
+
+:root .button:is([data-presentation='account-inline'], [data-presentation='registration-inline']) {
+  flex-shrink: 0; min-height: 0; height: auto; border: 0; padding: 0;
+  background: transparent; box-shadow: none; font-family: inherit; font-weight: var(--tpl-button-weight); line-height: inherit;
+}
+:root .button[data-presentation='account-inline'] { color: var(--color-accent-deep); font-size: var(--tpl-acd-label-size); }
+:root .button[data-presentation='registration-inline'] { color: var(--color-action); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); }
+:root .button:is([data-presentation='account-inline'], [data-presentation='registration-inline']):hover:not(:disabled) { text-decoration: underline; }
+:root .button > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex: none; }
+/* 一覧から取消の確認を開く副ボタン。確定の danger はそのまま。 */
+.danger-outline { border-color: var(--color-hairline); }
+:root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 1px solid transparent; box-shadow: var(--shadow-raised-control); }
+
+/* 本文中の小さな操作。通常のボタンの高さは変えない。 */
+:root .inline { height: auto; min-height: 0; padding: 0; font-size: var(--text-caption); line-height: 19px; }
+:root .inline.text { color: var(--color-action); }
+
+:root .slot { min-height: 0; height: var(--tpl-button-h); padding: 0 var(--tpl-button-pad-side); font-size: var(--text-caption); line-height: 17px; }
+}
+
+/* 節の見出しと同じ行に置く文字の操作。ほかの高さは変えない。 */
+:root .button.inline { min-height: 0; height: auto; padding: 0; font-size: var(--text-caption); line-height: var(--tpl-fdt-small-lh); }
+:root .button[data-align='start'] { justify-content: flex-start; }
+
+/* 画像選択用の正方形。通常のボタンの既定値は変えない。 */
+:root .button.thumbnail {
+  width: var(--tpl-rt-picker-size); height: var(--tpl-rt-picker-size); min-height: 0;
+  padding: 0; overflow: hidden; border: 0; border-radius: var(--tpl-rt-inner-radius);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  background: var(--color-table-head);
+}
+:root .button.thumbnail:is(:hover, :focus-visible) { outline: var(--tpl-rt-focus-ring-accent); }
+:root .button.thumbnail > img { width: 100%; height: 100%; object-fit: cover; }
+/* 文字だけの行内操作。通常のボタンの見た目は変えない。 */
+:root .button.inline.text {
+  height: auto; min-height: 0; padding: 0; border: 0; background: none;
+  color: var(--color-action); font-size: var(--text-caption); font-weight: var(--tpl-button-weight); line-height: var(--tpl-rs-lh-12);
+}
+
+:root .button.inline.text.textInk { color: var(--color-ink); }
+
+/*
+ * 字の色だけを絵へ合わせる指定（`textTone`）。白地・細枠の形はそのままで、字の色だけ変える。
+ * 渡したボタンだけに束ねが付くので、既定のボタンと他の画面の見た目は変わらない。
+ * ★V8 デリバリー受注：kDQHr の `HKAi1`/`AuCyJ`「拒否」は字が #4a5565（quiet）、
+ * `WvPd6`/`jEsnn`「準備完了」とサービス札の「再開」は濃い緑（accent）、
+ * サービス札の「停止」は赤（danger）。
+ * 画面CSSから共通ボタンを上書きする書き方（設計ルール2節・★V8 §24）の代わりにここへ置く。
+ */
+:root .button.textDanger { color: var(--color-danger); }
+:root .button.textAccent { color: var(--color-accent-deep); }
+:root .button.textQuiet { color: var(--color-ink-secondary); }
+
+:root .button.composer { height: var(--tpl-button-h); min-height: var(--tpl-button-h); padding: 0 var(--tpl-button-pad-side); font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
+
+:root .button.composer-small { min-height: var(--tpl-msg-composer-small-button-h); height: var(--tpl-msg-composer-small-button-h); padding: 0 8px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
+/* ：返信する前の道具。共通Buttonが寸法を持ち、画面で上書きしない。 */
+:root .button.inbox-tool { min-height: var(--tpl-inbox-composer-btn-h); height: var(--tpl-inbox-composer-btn-h); padding: 0 var(--tpl-inbox-composer-input-pad); gap: var(--tpl-inbox-composer-gap); font-size: var(--polish-text-body); line-height: var(--tpl-inbox-row-preview-lh); }
+
+/* ②：ボタン文字は太字の例外。文字だけの操作は本文の太さを保つ。 */
+:root .button { font-weight: var(--tpl-button-weight); }
+:root .button.inline.text { font-weight: var(--font-weight-bold); }
+
+/* ・仕上げ7 */
+:root .button:disabled { opacity: var(--polish-disabled-opacity); }
+/* 送っている間の主ボタンは押せないが薄くしない（緑のまま回る印。押せないのか確かめ中なのかを分ける）。 */
+:root .button.primary[aria-busy='true']:disabled { opacity: 1; cursor: progress; }
+:root .button:is(:hover, :active):not(:disabled) { filter: none; }
+/* ・ の電話予約。標準の高さを保ち、印と文字の間を絵へ合わせる。 */
+:root .button.booking { height: var(--tpl-chip-h); padding-inline: var(--tpl-booking-button-pad); gap: var(--tpl-body-gap); }
+
+@layer components {
+:root .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:var(--tpl-button-weight);padding-inline:16px;}
+}
+/* ：共通ボタンを選ぶ札として使う画面も同じ形。 */
+html:root .button:not([data-permission-locked]):not([data-part='row-name']):not([data-part='attention-star']):not([data-part='folder-row']):not([data-part='joined-segment']):not([data-part='funnel-row'])[aria-pressed='true'] { background: var(--polish-selection-bg); color: var(--polish-selection-ink); border-color: var(--polish-selection-ink); box-shadow: var(--polish-selection-shadow); }
+
+:root .button[data-full-width] { width: 100%; justify-content: center; text-align: center; }
+
+html:root .button.filterActive { outline: 1px solid var(--color-focus-ring); color: var(--color-action); }
+
+/*
+ * 白い副操作は線ではなく影で浮かせる。
+ * 文字・アイコンだけの口と主操作（緑）はそれぞれ保つ。
+ */
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']) {
+  border: 0;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+  font-size: var(--polish-control-text); font-weight: var(--polish-control-weight);
+}
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):hover:not(:disabled) { background: var(--color-canvas-sunken); }
+:root .button:is(.text, .inline.text)[data-presentation], :root .button.inline.text { color: var(--color-ink); font-weight: var(--polish-control-weight); }
+:root .button.text:hover:not(:disabled) { text-decoration: underline; }
+html:root .button.filterActive { outline-color: var(--color-control-border); color: var(--color-ink); }
+
+:root .button.secondary:not([data-permission-locked])[aria-pressed='true']:not([data-presentation]) { background: var(--polish-selection-bg); color: var(--polish-selection-ink); }
+
+/* 文字の操作は緑で区別し、選択状態・明示色・押せない理由の表示は保つ。 */
+:root .button.text[data-text-content]:not(:is(.textInk, .textDanger, .textAccent, .textQuiet)):not(.filterActive):not([aria-pressed='true']):not(:disabled):not([aria-disabled='true']):not([data-permission-locked]) {
+  color: var(--color-accent-deep);
+}
+:root .button.text[data-text-content]:is(:hover, :focus-visible):not(:disabled):not([aria-disabled='true']):not([data-permission-locked]) { text-decoration: underline; }
+html:root .button.text[data-shared-button]:is(:disabled, [aria-disabled='true'], [data-permission-locked]) {
+  color: var(--color-ink-secondary);
+  text-decoration: none;
+}
+
+/* 明示された危険・成功の文字色は、文字だけの操作でも保持する。 */
+:root .button.inline.text.textDanger { color: var(--color-danger); }
+:root .button.inline.text.textAccent { color: var(--color-accent-deep); }
+
+/* 灰色の面でもキーボードの焦点だけは輪で示す。 */
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):not(:focus-visible) { outline-color: transparent; }
+html:root .button:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):active:not(:disabled) { background: var(--polish-control-hover); }
+
+/* 窓の取消・副操作は線のない淡い面。 */
+html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) :global([data-window-actions]) .secondary {
+  outline-color: transparent;
+  border-color: transparent;
+  background: var(--polish-window-cancel-bg);
+  box-shadow: none;
+}
+html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) :global([data-window-actions]) .secondary:hover:not(:disabled) {
+  background: var(--polish-hover);
+}
+html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) :global([data-window-actions]) .secondary:focus-visible {
+  outline: var(--polish-focus-width) solid var(--polish-focus);
+  outline-offset: var(--polish-focus-offset);
+}
+
+html:root .button:is(.standard, .field, .compact)[data-text-content]:is(:not([data-presentation]), [data-presentation='row-action']) { padding-block-start: var(--polish-text-center-inset); }
+
+/* 設定行の操作は札から区別できる白地の枠。通常の副操作は灰色のまま。 */
+html:root .button.secondary[data-presentation='row-action'] {
+  border: 0;
+  outline-color: transparent;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+  color: var(--color-ink);
+  font-size: var(--polish-control-text);
+  font-weight: var(--polish-control-weight);
+}
+html:root .button.secondary[data-presentation='row-action'].textAccent {
+  border-color: var(--color-primary-border);
+  color: var(--color-accent-deep);
+}
+html:root .button.secondary[data-presentation='row-action']:is(:hover, :active):not(:disabled) { background: var(--polish-hover); }
+html:root .button.secondary[data-presentation='row-action']:focus-visible {
+  outline: var(--polish-focus-width) solid var(--polish-focus);
+  outline-offset: var(--polish-focus-offset);
+}
+/* 主ボタンと白い副ボタンは、文字 14/600・印 16（線 1.75）・間 8。高さは変えない。 */
+:root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action']) {
+  gap: var(--polish-space-row);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+:root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action']) > svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: var(--polish-icon-stroke);
+  flex: none;
+}
+
+/*
+ * 奥行き（くっきり版）。値は globals.css の共通の値だけを読む。
+ * 緑の主ボタン：薄いグラデと上端の光、乗せると影が少し深く、押すと 0.5px 沈む。
+ * 白い副ボタン：白から #fafafc への薄いグラデと、外周 1px の影。
+ */
+:root .button.primary { background: var(--gradient-primary-action) var(--color-accent-deep); }
+:root .button.primary:hover:not(:disabled) { box-shadow: var(--shadow-primary-action-hover); }
+/* 窓の取消（淡い面）・選んだ札・乗せた時・押した時は、それぞれの規則（詳しさが上）が勝つ。 */
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']) { background: var(--gradient-raised-control) var(--color-canvas); }
+@media (prefers-reduced-motion: no-preference) {
+  :root .button.primary:active:not(:disabled) { transform: var(--press-primary-shift); }
+}
+/* 文字の上下の真ん中：行の高さだけで真ん中に置き、上に足す 1px の補正は使わない（英数字が Inter になったため）。 */
+html:root .button:is(.standard, .field, .compact)[data-text-content]:is(:not([data-presentation]), [data-presentation='row-action']) { padding-block: 0; }
+
+/* ［LINE でログイン］は LINE の決まりの明るい緑。画面の緑（--color-accent＝深い緑）をこのボタンの中だけ LINE の緑に読み替える。 */
+:root .line { --color-accent: var(--color-line-green); --color-accent-hover: var(--color-line-green-hover); }
+
+/* ［LINE でログイン］：色は LINE の決まりのまま、文字を大きく太くして読みやすくする。高さは主ボタンと同じ。 */
+:root .button.line:not([data-presentation]) {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.disabledReason {
+  flex-basis: 100%;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  text-align: center;
+}
+
+/* 縦の段でも通常の操作は内容幅。全幅の指定は呼ぶ側の契約を保つ。 */
+:root .button:not([data-full-width]) { align-self: center; }
+html:root .button[data-permission-locked], html:root .button[data-permission-locked]:is(:hover, :active) {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  border-color: var(--color-field-border);
+  cursor: not-allowed;
+  opacity: var(--polish-disabled-opacity);
+  box-shadow: none;
+  transform: none;
+  scale: none;
+}
+html:root .button.inline.text[data-permission-locked], html:root .button.inline.text[data-permission-locked]:is(:hover, :active), html:root .button.text[data-presentation][data-permission-locked], html:root .button.text[data-presentation][data-permission-locked]:is(:hover, :active), html:root .button.secondary[data-presentation='row-action'][data-permission-locked], html:root .button.secondary[data-presentation='row-action'][data-permission-locked]:is(:hover, :active) { color: var(--color-ink-secondary); }
+html:root .button.primary[data-permission-locked]:not(:focus-visible) {
+  outline-color: var(--color-field-border);
+}
+html:root .button[data-permission-locked][aria-pressed='true']:not(:focus-visible) { outline: var(--choice-card-ring) solid var(--color-ink-secondary); }
+.conditionCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-20);
+  height: var(--space-20);
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  line-height: 1;
+  font-weight: var(--font-weight-bold);
+}
+/* 同じ操作の段では、部品の小型指定より共通の高さを優先する。 */
+html:root :is([data-toolbar-row], [data-control-row]) .button { height: var(--control-h); min-height: var(--control-h); }

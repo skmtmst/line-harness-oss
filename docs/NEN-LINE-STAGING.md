@@ -1,3 +1,5 @@
+> 文書：然-NEN- LINE管理システム検証環境｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 然-NEN- LINE管理システム検証環境
 
 ## 環境の役割
@@ -8,22 +10,9 @@
 - 検証用D1には、本番の友だち、配信予約、LINEアカウント、認証情報をコピーしません。
 - 検証用Workerにはcronを設定しません。管理画面操作だけでなく、予約済み処理からの自動通知も止めるためです。
 
-## 現在の接続状態（2026-08-13）
+## 接続の確認
 
-- LINE Developersプロバイダー: `然-NEN- TEST`
-- 検証専用Messaging API: 接続済み
-- 検証専用LINE Login: 接続済み
-- 検証専用LIFF: 接続済み
-- Webhook URL: `https://nen-line-stg.skmtmst.workers.dev/webhook`
-- LINE DevelopersのWebhook検証: 成功
-- LINE Loginコールバック: `https://nen-line-stg.skmtmst.workers.dev/api/auth/line/callback`
-- 検証EC-CUBE LINE Loginコールバック: `https://stg.nen-petfood.com/line/login/callback`
-- LIFFエンドポイント: `https://nen-line-stg.skmtmst.workers.dev`
-- Workerの定期実行cron: 無効のまま
-- 検証EC-CUBE: `https://stg.nen-petfood.com` と署名付きで相互接続
-- 問い合わせ受信・送信元: `test-shed@stg.nen-petfood.com`
-- メール受信Webhook: `https://nen-line-stg.skmtmst.workers.dev/webhooks/xserver/support-email`
-- メール返信中継: `https://stg.nen-petfood.com/_system/support-mail-relay.php`
+設定上の公開先は下のCloudflareリソース表を参照する。LINE Developers側のチャネル・LIFF・コールバックと、EC・メール連携の現在の疎通は、配備する版で別に確認する。古い台帳の「接続済み」「検証成功」を現在の証拠にしない。今回の文書整理では外部ログイン・実送信・稼働DBの確認は行っていない。
 
 ## Cloudflareリソース
 
@@ -98,9 +87,9 @@ LINEのユーザーIDは**プロバイダーごとに違う値**になる。チ�
 4. `musubo` にLINE Loginチャネルを作り、本番用のコールバックURL2件を登録する
 5. 本番Workerに同じ2つのsecretを設定する（本番リリースと同じ回に行う）
 
-### 旧記録（然-NEN- チャネルでのmusubo.jpコールバック）
+### 既存チャネルを切り替える前
 
-検証チャネル `2011090925`（`然-NEN- TEST`）には `https://stg-api.musubo.jp/api/auth/line/callback` を登録済みで、ログイン成功も確認した（2026-09-29）。この登録は自社EC-CUBE用の登録と同居しているため削除しない。上の乗り換えが済んだら、管理画面ログインは `musubo TEST` のチャネル側を使う。
+管理画面とECのコールバックが同居している場合、使われている側の登録を推測で削除しない。実環境の現在の登録を担当者が確認してから、上の承認・確認手順を進める。古い登録の実値や実測は[過去資料の保管先](document-archives.md#s05)へ分離した。
 
 ## 通知事故を防ぐルール
 

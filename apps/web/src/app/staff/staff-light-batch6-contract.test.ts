@@ -1,9 +1,10 @@
-import fs from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
+const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { PERMISSION_LABELS } from './permission-labels'
+import { PERMISSION_LABELS } from '@/v8/settings/staff/permission-labels'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const NEW_PAGE = fs.readFileSync(path.join(__dirname, 'new', 'page.tsx'), 'utf8')
@@ -21,15 +22,15 @@ const EMAIL_PATTERN = String.raw`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`
 
 describe('ログインユーザーの軽修正(#581)', () => {
   it('編集窓が追加画面・サーバーと同じ形式チェックを先に行う', () => {
-    const body = slice(PAGE, 'const save = async (stepUpToken?: string) => { if (!email.trim())', 'await onSaved(); onClose()')
+    const body = slice(PAGE, 'const validateFields = () => {', 'setFieldErrors(errors)')
     expect(body, '形式チェックが無い').toContain(`if (!${EMAIL_PATTERN}.test(email.trim()))`)
-    expect(body, '文言がサーバーと違う').toContain("setError('正しいメールアドレスを入力してください')")
+    expect(body, '文言がサーバーと違う').toContain("errors.email = '正しいメールアドレスを入力してください'")
+    expect(PAGE).toContain('if (!validateFields()) return')
     expect(NEW_PAGE, '追加画面の形式チェックが変わっている').toContain(`!${EMAIL_PATTERN}.test(email.trim())`)
   })
 
-  it('設計の言葉「2段階の確認」を変えていない(設計が正本、#581)', () => {
-    expect(PAGE, '設計の言葉が消えている').toContain('2段階の確認')
-  })
+  // 設計の言葉「二段階認証」は、言葉の表の見張り（glossary-contract.test.ts の TM-W02）と
+  // staff-two-factor-disable-dialog-react.test.tsx が守る。
 
   it('権限の表示名は正本の表とずれない', () => {
     const editPaths = slice(PAGE, 'const EDIT_PERMISSION_PATHS = [', '] as const')
@@ -49,7 +50,7 @@ describe('ログインユーザーの軽修正(#581)', () => {
     // 操作権限は定数参照で分類表に載せる（魔法文字列を増やさない）。
     expect(groupBlock, '操作権限が分類表に無い').toContain('CONVERSION_APPROVAL_EDIT_KEY')
     expect(PERMISSION_LABELS['conversion.approval.edit'], '操作権限の表示名が正本に無い').toBe('成果を承認・却下する')
-    // 一斉配信の操作キー（v6-06 §6・P0-8）。
+    // 一斉配信の操作キー（管理画面-06 §6・P0-8）。
     expect(PERMISSION_LABELS['broadcast.definition.edit']).toBe('一斉配信の下書き作成・編集')
     expect(PERMISSION_LABELS['broadcast.test.send']).toBe('一斉配信のテスト送信')
     expect(PERMISSION_LABELS['broadcast.definition.publish']).toBe('一斉配信の予約・送信')

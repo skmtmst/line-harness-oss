@@ -292,8 +292,8 @@ describe('二者承認の見た目', () => {
     cleanup(requester)
   })
 
-  it('承認まわりの日時は「8月24日（月）10:00」の書き方', () => {
-    expect(formatApprovalDateTime('2026-09-25T20:10:00+09:00')).toBe('9月25日（金）20:10')
+  it('承認まわりの日時は今年なら年を省く', () => {
+    expect(formatApprovalDateTime('2026-09-25T20:10:00+09:00')).toBe('9月25日 20:10')
     expect(formatApprovalDateTime(null)).toBe('—')
     expect(formatApprovalDateTime('壊れた値')).toBe('—')
   })
@@ -363,3 +363,6 @@ describe('二者承認の見た目', () => {
     cleanup(mismatched)
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

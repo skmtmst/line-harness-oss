@@ -1,0 +1,187 @@
+/*
+ * ★V8 外部連携「やり取りの記録」（・中身 ）。
+ * 枠・見出し・タブ・数の帯・ページ送りの余白は型（ListPage）が持つ。ここは道具の中身と表だけ。
+ */
+.noticeRow {
+  flex-basis: 100%;
+  margin-bottom: var(--tpl-wh-notice-after);
+}
+.chips {
+  display: flex;
+  gap: var(--tpl-toolbar-gap);
+}
+.smallSelect {
+  width: var(--tpl-wh-small-select-w);
+}
+.smallSelect :global(*) { max-width: 100%; }
+.smallSelect :global(button) { width: 100%; }
+
+/* 表：絵の列の並び（見出し 13/20・行 9/20・欄の間16・行 53.5）。 */
+.tableWrap {
+  min-width: 0;
+}
+.colWhen { width: var(--tpl-wh-col-when); }
+.colBody { width: var(--tpl-wh-log-body-w); min-width: 0; }
+.colReply { width: var(--tpl-wh-log-reply-w); }
+.colTime { width: var(--tpl-wh-log-time-w); }
+.colOps { width: var(--tpl-wh-log-ops-w); }
+.colWhen,
+.colName,
+.colBody,
+.colTime {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--tpl-row-sub-gap);
+}
+.main {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sub {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-row-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footNote {
+  margin: 0;
+  padding: var(--tpl-wb-foot-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+
+/* 読み込み中の骨。 */
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-wh-col-gap);
+  padding: var(--tpl-wh-skel-pad);
+  box-shadow: var(--shadow-row-line);
+}
+.skeletonDot {
+  width: var(--tpl-wh-skel-dot);
+  height: var(--tpl-wh-skel-dot);
+  border-radius: var(--radius-pill);
+}
+.skeletonBar {
+  flex: 1;
+  height: var(--tpl-wh-skel-bar);
+}
+
+/*
+ * やり取りの中身の窓。枠・頭（題・説明・×）は共通の窓。ここは本文と下の段だけ。
+ * 絵：頭と項目の間14・項目は上の線＋上下7（1行31）・ラベル幅110・本文 12・中身の箱・下の段は線＋上14。
+ */
+:global(:root [data-design-part='dialog']):has(.dialogBody) {
+  position: relative;
+}
+:global(:root [data-design-part='dialog']):has(.dialogBody) h2 {
+  font-weight: var(--tpl-wb-ix-title-weight);
+  line-height: var(--tpl-wb-ix-title-lh);
+}
+:global(:root [data-design-part='dialog']):has(.dialogBody) h2 + p {
+  margin-top: var(--tpl-wb-ix-sub-after-title);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wb-ix-sub-lh);
+}
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wb-ix-gap);
+  align-self: stretch;
+  margin-block: var(--tpl-wb-ix-body-pull);
+}
+/* 技術的な記録の下に、伏せた後の記録の JSON を開く。 */
+.dialogJson {
+  min-width: 0;
+}
+.dialogList {
+  margin: 0;
+  padding: 0;
+}
+.dialogRow {
+  display: flex;
+  gap: var(--tpl-wb-ix-row-gap);
+  padding: var(--tpl-wb-ix-row-pad);
+  box-shadow: var(--tpl-wb-ix-line-t);
+  line-height: var(--tpl-wb-ix-row-lh);
+}
+.dialogRow dt {
+  flex-shrink: 0;
+  width: var(--tpl-wb-ix-key-w);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  white-space: nowrap;
+}
+.dialogRow dd {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+.dialogRowPill dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-wb-ix-row-gap);
+}
+.dialogWhy {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+.danger {
+  color: var(--color-danger);
+}
+.dialogHeading {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: var(--tpl-wb-ix-title-weight);
+  line-height: var(--tpl-wb-ix-heading-lh);
+}
+/* 中身の箱は薄い灰（黒にしない：オーナー「黒がいや」）。寸法は絵（上下12・左右14・1行17）。 */
+.payloadBox {
+  margin: 0;
+  padding: var(--tpl-wb-ix-payload-pad);
+  border-radius: var(--tpl-wb-ix-payload-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-surface-pearl);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-micro);
+  line-height: var(--tpl-wb-ix-payload-lh);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dialogNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-wb-ix-note-lh);
+}
+.dialogFoot {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  margin: var(--tpl-wb-ix-foot-margin);
+  padding-top: var(--tpl-wb-ix-gap);
+  box-shadow: var(--tpl-wb-ix-line-t);
+}
+.dialogFootSpacer {
+  flex: 1;
+}

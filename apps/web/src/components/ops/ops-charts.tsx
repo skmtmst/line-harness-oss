@@ -1,7 +1,9 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
+import { formatNumber } from '@/lib/format'
 
 /**
- * 運営ダッシュボード（★V6 37-2）の絵。棒グラフ `月ごとの売上` とドーナツ `プラン別の契約`。
+ * 運営ダッシュボード（★管理画面 37-2）の絵。棒グラフ `月ごとの売上` とドーナツ `プラン別の契約`。
  *
  * 色は CSS の色トークンだけを使う（Pencil のトークン表に無い色は作らない）。
  * - 今月の棒: accent-deep ／ 過去の棒: surface-pearl
@@ -9,16 +11,12 @@
  * プランの分類色に緑は使わない（緑は「正常」の意味だけ）。
  */
 
-export function formatYen(yen: number): string {
-  // 数字でない値が来ても「¥NaN」を出さない。未取得は「—」が決まり。
-  if (typeof yen !== 'number' || !Number.isFinite(yen)) return '—'
-  return `¥${Math.round(yen).toLocaleString('ja-JP')}`
-}
+export { formatYen };
 
 /** 軸の目盛り。¥450万 のように「万」で丸める。 */
 export function formatYenShort(yen: number): string {
   if (yen === 0) return '¥0'
-  if (yen >= 10_000) return `¥${Math.round(yen / 10_000).toLocaleString('ja-JP')}万`
+  if (yen >= 10_000) return `¥${formatNumber(Math.round(yen / 10_000))}万`
   return formatYen(yen)
 }
 
@@ -48,7 +46,7 @@ export function RevenueBars({ rows, width = 920, height = 220 }: { rows: Array<{
         return (
           <g key={i}>
             <line x1={left} x2={width - 16} y1={y} y2={y} stroke="var(--color-hairline)" strokeWidth={1} />
-            <text x={left - 8} y={y + 4} textAnchor="end" fontSize={11} fill="var(--color-ink-faint)">{formatYenShort(t)}</text>
+            <text x={left - 8} y={y + 4} textAnchor="end" fontSize={12} fill="var(--color-ink-faint)">{formatYenShort(t)}</text>
           </g>
         )
       })}
@@ -63,7 +61,7 @@ export function RevenueBars({ rows, width = 920, height = 220 }: { rows: Array<{
             {r.current && current ? (
               <g>
                 <rect x={x + barW / 2 - 44} y={Math.max(y - 30, 2)} width={88} height={24} rx={6} fill="var(--color-ink)" />
-                <text x={x + barW / 2} y={Math.max(y - 30, 2) + 16} textAnchor="middle" fontSize={12} fontWeight={700} fill="var(--color-on-accent)">{formatYen(current.yen)}</text>
+                <text x={x + barW / 2} y={Math.max(y - 30, 2) + 16} textAnchor="middle" fontSize={12} fontWeight={600} fill="var(--color-on-accent)">{formatYen(current.yen)}</text>
               </g>
             ) : null}
           </g>
@@ -91,7 +89,7 @@ export function PlanDonut({ rows, total, size = 190 }: { rows: Array<{ key: stri
   const circumference = 2 * Math.PI * r
   let offset = 0
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} role="img" aria-label={`契約先 ${total} 件の内訳`}>
+    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} role="img" aria-label={`契約先 ${formatNumber(total)} 件の内訳`}>
       <circle cx={c} cy={c} r={r} fill="none" stroke="var(--color-surface-pearl)" strokeWidth={24} />
       {total > 0
         ? rows.filter((row) => row.count > 0).map((row) => {
@@ -114,7 +112,7 @@ export function PlanDonut({ rows, total, size = 190 }: { rows: Array<{ key: stri
           return el
         })
         : null}
-      <text x={c} y={c - 2} textAnchor="middle" fontSize={26} fontWeight={700} fill="var(--color-ink)">{total}</text>
+      <text x={c} y={c - 2} textAnchor="middle" fontSize={26} fontWeight={600} fill="var(--color-ink)">{total}</text>
       <text x={c} y={c + 20} textAnchor="middle" fontSize={12} fill="var(--color-ink-secondary)">契約先</text>
     </svg>
   )

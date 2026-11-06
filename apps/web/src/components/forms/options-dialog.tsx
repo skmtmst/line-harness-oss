@@ -1,5 +1,8 @@
 'use client'
 
+import CloseButton from '@/components/shared/close-button'
+import { jstDateOffset as japanDateOffset } from '@/lib/jst-datetime'
+
 /**
  * オプション設定。
  *
@@ -19,6 +22,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import DateTimeField from '@/components/shared/date-time-field'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /**
  * 期限を初めてONにしたときの初期値。日本時間で「7日後の23:59」。
@@ -26,8 +30,7 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
  * そのまま保存されてしまうため、ONにした時点で実値を入れる。
  */
 function defaultDeadlineEndsAt(): string {
-  const jst = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 9 * 60 * 60 * 1000)
-  return `${jst.toISOString().slice(0, 10)}T23:59`
+  return `${japanDateOffset(7)}T23:59`
 }
 
 export default function OptionsDialog({
@@ -67,16 +70,14 @@ export default function OptionsDialog({
       */}
       <div
         ref={panelRef}
-        className={`bg-canvas flex w-full flex-col overflow-hidden rounded-panel shadow-lg ${styles.panel}`}
+        className={`bg-canvas flex w-full flex-col overflow-hidden rounded-panel shadow-float ${styles.panel}`}
       >
         <div className="border-hairline flex shrink-0 items-center justify-between border-b px-5 py-3">
           <div>
             <h2 className="text-ink text-base font-bold">オプション設定</h2>
             <p className="mt-0.5 text-xs text-ink-faint">答え終わったあとの動きと、受付のきまり</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="text-ink-faint hover:text-ink px-2 text-lg">
-            ×
-          </button>
+          <CloseButton onClick={onClose} />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
@@ -88,10 +89,10 @@ export default function OptionsDialog({
                 削除が画面の外へ出ていた。幅いっぱいに広げ、中の行は折り返す。
               */}
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <p className="text-ink text-xs font-bold">実行すること</p>
+                <p className="text-ink text-xs font-medium">実行すること</p>
                 <details className="group min-w-0">
                   <summary className="border-accent text-accent-deep rounded-control inline-block cursor-pointer list-none border px-3 py-2 text-xs font-medium">アクションを設定</summary>
-                  <div className="bg-canvas mt-3 min-w-0 p-3 shadow-lg">
+                  <div className="bg-canvas mt-3 min-w-0 p-3 shadow-float">
                     <ActionEditor value={value.afterActions ?? []} onChange={(afterActions: FormAction[]) => patch({ afterActions })} refs={refs} />
                   </div>
                 </details>
@@ -110,8 +111,8 @@ export default function OptionsDialog({
           </section>
 
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FieldLine label="答えたあとに開くページ（任意）"><input type="url" value={value.thanksUrl ?? ''} onChange={(e) => patch({ thanksUrl: e.target.value || null })} placeholder="https://..." className={fieldInput} /></FieldLine>
-            <FieldLine label="ページを使わないときに出す文"><input value={value.thanksText ?? ''} onChange={(e) => patch({ thanksText: e.target.value })} placeholder="ご回答ありがとうございました。" className={fieldInput} /></FieldLine>
+            <FieldLine label="答えたあとに開くページ（任意）"><SharedTextField type="url" value={value.thanksUrl ?? ''} onChange={(e) => patch({ thanksUrl: e.target.value || null })} placeholder="https://..." className={fieldInput} /></FieldLine>
+            <FieldLine label="ページを使わないときに出す文"><SharedTextField value={value.thanksText ?? ''} onChange={(e) => patch({ thanksText: e.target.value })} placeholder="ご回答ありがとうございました。" className={fieldInput} /></FieldLine>
           </div>
 
           <section className="mt-3">
@@ -126,13 +127,13 @@ export default function OptionsDialog({
 
           {value.deadline?.enabled && <div className="bg-accent-soft mt-2 grid grid-cols-1 gap-3 rounded-control p-3 sm:grid-cols-2">
             <FieldLine label="受付の期限"><DateTimeField aria-label="受付の期限" value={value.deadline.endsAt ?? ''} onChange={(v) => patch({ deadline: { ...value.deadline, enabled: true, endsAt: v } })} /></FieldLine>
-            <FieldLine label="期限を過ぎた人に出す文"><input type="text" value={value.deadline.message ?? ''} onChange={(e) => patch({ deadline: { ...value.deadline, enabled: true, message: e.target.value } })} className={fieldInput} /></FieldLine>
+            <FieldLine label="期限を過ぎた人に出す文"><SharedTextField type="text" value={value.deadline.message ?? ''} onChange={(e) => patch({ deadline: { ...value.deadline, enabled: true, message: e.target.value } })} className={fieldInput} /></FieldLine>
           </div>}
 
           <section className="mt-4">
             <h3 className="text-ink text-sm font-bold">見た目の言葉</h3>
             <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3"><FieldLine label="ページの題名">
-            <input
+            <SharedTextField
               type="text"
               value={value.pageTitle ?? ''}
               onChange={(e) => patch({ pageTitle: e.target.value || null })}
@@ -143,7 +144,7 @@ export default function OptionsDialog({
 
           <FieldLine label="送信ボタンの文字">
             <div>
-              <input
+              <SharedTextField
                 type="text"
                 value={value.submitLabel ?? ''}
                 onChange={(e) => patch({ submitLabel: e.target.value })}
@@ -154,7 +155,7 @@ export default function OptionsDialog({
               />
             </div>
           </FieldLine>
-          <FieldLine label="ページ送りの文字"><div className="flex gap-2"><input value={value.prevLabel ?? ''} onChange={(e) => patch({ prevLabel: e.target.value })} className={fieldInput} aria-label="前へボタンの文字" /><input value={value.nextLabel ?? ''} onChange={(e) => patch({ nextLabel: e.target.value })} className={fieldInput} aria-label="次へボタンの文字" /></div></FieldLine></div>
+          <FieldLine label="ページ送りの文字"><div className="flex gap-2"><SharedTextField value={value.prevLabel ?? ''} onChange={(e) => patch({ prevLabel: e.target.value })} className={fieldInput} aria-label="前へボタンの文字" /><SharedTextField value={value.nextLabel ?? ''} onChange={(e) => patch({ nextLabel: e.target.value })} className={fieldInput} aria-label="次へボタンの文字" /></div></FieldLine></div>
           </section>
         </div>
 

@@ -15,6 +15,7 @@ import {
   parseBundleStream,
   verifyBundleHashes,
   assertHashesMatch,
+  verifyBundleIntegrity,
 } from '../src/bundle.js';
 
 // ─── Fixture helpers ──────────────────────────────────────────────────────────
@@ -39,11 +40,13 @@ function buildFixture(): Fixture {
   const adminDir = join(stageDir, 'admin');
   const adminSubDir = join(adminDir, 'sub');
   const liffDir = join(stageDir, 'liff');
+  const workerAssetsDir = join(stageDir, 'worker-assets');
   const migrationsDir = join(stageDir, 'migrations');
   mkdirSync(workerDir);
   mkdirSync(adminDir);
   mkdirSync(adminSubDir);
   mkdirSync(liffDir);
+  mkdirSync(workerAssetsDir);
   mkdirSync(migrationsDir);
 
   const workerBytes = Buffer.from('// worker bundle\nconsole.log("hi");\n', 'utf8');
@@ -56,13 +59,14 @@ function buildFixture(): Fixture {
   writeFileSync(join(adminDir, 'index.html'), adminIndex);
   writeFileSync(join(adminSubDir, 'app.js'), adminSubApp);
   writeFileSync(join(liffDir, 'index.html'), liffIndex);
+  writeFileSync(join(workerAssetsDir, 'index.html'), '<html>worker client</html>');
   writeFileSync(join(migrationsDir, '041_x.sql'), migration);
 
   // Build tar.gz using system tar (deterministic enough for testing).
   // COPYFILE_DISABLE=1 suppresses macOS AppleDouble (._*) sidecar files which
   // would otherwise leak into the archive and break hash-determinism tests.
   const tarball = join(tmpDir, 'bundle.tar.gz');
-  execSync(`tar czf ${tarball} -C ${stageDir} worker admin liff migrations`, {
+  execSync(`tar czf ${tarball} -C ${stageDir} worker worker-assets admin liff migrations`, {
     stdio: 'pipe',
     env: { ...process.env, COPYFILE_DISABLE: '1' },
   });
@@ -120,6 +124,7 @@ describe('parseBundleStream', () => {
     expect(parsed.workerJs.equals(fixture.workerBytes)).toBe(true);
     expect(parsed.adminFiles.get('index.html')?.equals(fixture.adminIndex)).toBe(true);
     expect(parsed.liffFiles.get('index.html')?.equals(fixture.liffIndex)).toBe(true);
+    expect(parsed.workerAssetsFiles?.get('index.html')?.toString()).toBe('<html>worker client</html>');
     expect(parsed.migrations.get('041_x.sql')?.equals(fixture.migration)).toBe(true);
   });
 
@@ -157,6 +162,7 @@ describe('verifyBundleHashes', () => {
     expect(hashes.worker).toMatch(re);
     expect(hashes.admin).toMatch(re);
     expect(hashes.liff).toMatch(re);
+    expect(hashes.workerAssets).toMatch(re);
   });
 
   it('is deterministic (same bundle → same hashes)', async () => {
@@ -175,6 +181,7 @@ describe('verifyBundleHashes', () => {
     // Admin/LIFF: directory-style hash (sorted keys, NUL-delimited)
     expect(hashes.admin).toBe(refHashContentMap(parsed.adminFiles));
     expect(hashes.liff).toBe(refHashContentMap(parsed.liffFiles));
+    expect(hashes.workerAssets).toBe(refHashContentMap(parsed.workerAssetsFiles!));
 
     // Spot-check admin against the exact content we know
     const expectedAdmin = (() => {
@@ -233,4 +240,16 @@ describe('assertHashesMatch', () => {
       }),
     ).toThrow(/bundle liff hash mismatch/);
   });
+});
+
+
+it('Worker client の hash を独立に検証し、欠落と内容変更を拒否する', () => {
+ const bundle={workerJs:Buffer.from('worker'),adminFiles:new Map(),liffFiles:new Map(),migrations:new Map(),workerAssetsFiles:new Map([['index.html',Buffer.from('worker client')]])};
+ const hashes=verifyBundleHashes(bundle);
+ const entry={version:'1.0.0',worker_bundle_hash:hashes.worker,admin_hash:hashes.admin,liff_hash:hashes.liff,worker_assets_hash:hashes.workerAssets,migrations_hash:hashes.migrations};
+ expect(()=>verifyBundleIntegrity(hashes,entry)).not.toThrow();
+ expect(()=>verifyBundleIntegrity({...hashes,workerAssets:undefined},entry)).toThrow('worker assets hash');
+ expect(()=>verifyBundleIntegrity(hashes,{...entry,worker_assets_hash:undefined})).toThrow('worker assets hash');
+ bundle.workerAssetsFiles.set('index.html',Buffer.from('different client'));
+ expect(()=>verifyBundleIntegrity(verifyBundleHashes(bundle),entry)).toThrow('worker assets hash');
 });

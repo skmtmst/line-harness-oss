@@ -1,0 +1,10 @@
+.panel {
+  --completion-actions-height: calc(var(--liff-space-3, 12px) + var(--liff-action-height, 48px) + var(--liff-space-2, 8px) + var(--liff-touch-size, 44px) + max(var(--liff-safe-bottom, 30px), env(safe-area-inset-bottom)));
+  display: flex;
+  min-height: calc(100dvh - var(--liff-header-h) - 1px);
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--liff-space-4, 16px);
+  padding-block: var(--liff-space-4, 16px);
+  padding-bottom: calc(var(--liff-space-4, 16px) + var(--completion-actions-height));
+}

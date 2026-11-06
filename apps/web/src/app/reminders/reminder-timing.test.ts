@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatTriggerOffset } from './reminder-timing'
+import { formatTriggerOffset } from '../../v8/reminders/reminder-timing'
 
 /** #489-21：後の通知が「前」と誤表示されないこと。 */
 describe('formatTriggerOffset', () => {

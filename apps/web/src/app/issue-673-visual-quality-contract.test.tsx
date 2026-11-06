@@ -1,21 +1,19 @@
-// @vitest-environment happy-dom
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import React, { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 /*
  * #673 視覚品質基盤の契約。
  *
- * A. カードの影は `--shadow-card` / `--shadow-float` の層状影（Beautiful
- *    shadows）に統一し、画面個別の任意値 shadow を残さない。
+ * A. カードの影は `--card-shadow`（2026-10-09 案A）へ統一する。
+ *    浮く面の影は `--shadow-float` などの既存値を保つ。
  * B. 押した感触・行ホバー・メニューの出入り・指標カードの骨組みを、
  *    共通のベースCSSと主要な指標カードへ入れる。
  *
- * 文字列を読むだけの契約では、読み込み中に骨組みが本当に描画されるか
- * 見えないので、InboxKpis を実Reactで mount して確かめる。
+ * 2026-10-07：受信箱の指標カード（components/chats/inbox-kpis.tsx）はどの画面からも
+ * 描かれないので消した。それを実Reactで mount して骨組みを見ていた試験は、今の受信箱
+ * （app/chats/page.tsx）に同じ指標カードが無いため付け替えられず、外した。
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -24,64 +22,35 @@ const GLOBALS = readFileSync(join(HERE, 'globals.css'), 'utf8')
 /** 注釈を落としたCSS。宣言だけを見る。 */
 const GLOBALS_CODE = GLOBALS.replace(/\/\*[\s\S]*?\*\//g, '')
 
-vi.mock('@/lib/api', () => ({
-  api: {
-    chatStats: {
-      get: vi.fn(),
-    },
-  },
-}))
-
-import { api } from '@/lib/api'
-import InboxKpis from '@/components/chats/inbox-kpis'
-
-const chatStatsGet = vi.mocked(api.chatStats.get)
-
-let host: HTMLDivElement
-let root: Root
-
-beforeEach(() => {
-  ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-  host = document.createElement('div')
-  document.body.appendChild(host)
-  root = createRoot(host)
-})
-
-afterEach(async () => {
-  await act(async () => { root.unmount() })
-  host.remove()
-  vi.clearAllMocks()
-})
-
 describe('#673 A. カード・パネルの立体感', () => {
-  it('カードの影は層状影（近距離の薄い影＋下端の光＋1pxリング）', () => {
-    const card = GLOBALS_CODE.match(/--shadow-card:\s*([^;]+);/)?.[1] ?? ''
-    // 3層の影。輪郭の1pxリングが罫線の代わりになる。
-    expect(card.split(',').length).toBeGreaterThanOrEqual(3)
-    expect(card).toContain('0px 0px 0px 1px')
+  it('カードの影は共通の値で、ぼかしは 8px まで', () => {
+    const card = GLOBALS_CODE.match(/--card-shadow:\s*([^;]+);/)?.[1] ?? ''
+    // ぼかしの大きい層（12px・24px）を足さない。縁を線と影の外周で二重にしない。
+    expect(card).not.toMatch(/\s(?:9|[1-9]\d+)px\s/)
+    expect(GLOBALS_CODE).not.toMatch(/--card-edge:\s*rgba/)
+    expect(GLOBALS_CODE).toMatch(/--shadow-card-surface:\s*var\(--card-shadow\);/)
   })
 
-  it('浮いて見える面の影はカードより一段強い層状影', () => {
+  it('浮く面はV8の8px・24pxの影', () => {
     const float = GLOBALS_CODE.match(/--shadow-float:\s*([^;]+);/)?.[1] ?? ''
-    expect(float.split(',').length).toBeGreaterThanOrEqual(3)
-    expect(float).toContain('0px 0px 0px 1px')
+    expect(float).toBe('var(--shadow-controls-pop)')
+    expect(GLOBALS_CODE).toContain('--shadow-controls-pop: 0 8px 24px rgba(29, 29, 31, 0.12)')
   })
 
   it('モーダル・フォルダパネル・パネル内メニューは属性入口でトークンを読む', () => {
     // components/shared/ は変更できないため、globals.css の属性規定で上書きする。
-    expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\[data-design-node\]\s*\{[^}]*var\(--shadow-float\)/)
-    expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\]\s*\{[^}]*var\(--shadow-card\)/)
+    // ★管理画面: ダイアログは最前面（段3）の影 `--shadow-overlay`。
+    expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\[data-design-node\]\s*\{[^}]*var\(--shadow-overlay\)/)
+    expect(GLOBALS_CODE).toMatch(/:root aside\[aria-label="フォルダ"\]\s*\{[^}]*box-shadow:\s*none/)
     expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\] \.shadow-lg\s*\{[^}]*var\(--shadow-float\)/)
   })
 
   it('主要画面の任意値 shadow をトークンへ寄せた', () => {
     const migrated = [
-      ['components/chats/inbox-kpis.tsx', 'shadow-card'],
-      ['components/chats/template-picker.tsx', 'shadow-card'],
       ['components/dashboard/qr-dialog.tsx', 'shadow-float'],
-      ['components/dashboard/dashboard-editor.tsx', 'shadow-card'],
+      ['v8/dashboard/dashboard-editor.module.css', 'var(--shadow-card)'],
       ['app/chats/page.tsx', 'shadow-card'],
-      ['app/duplicates/page.tsx', 'shadow-card'],
+      ['app/friends/friends-v8.module.css', 'var(--card-shadow)'],
     ] as const
     for (const [file, token] of migrated) {
       const source = readFileSync(join(SRC, file), 'utf8')
@@ -89,15 +58,20 @@ describe('#673 A. カード・パネルの立体感', () => {
       expect(source, `${file} に旧カード影が残っている`).not.toContain('shadow-[1px_1px_2px')
     }
     // ダッシュボード編集の引き出しは方向付きの直書きをやめ、浮く面の影へ。
-    const editor = readFileSync(join(SRC, 'components/dashboard/dashboard-editor.tsx'), 'utf8')
-    expect(editor).toContain('shadow-float')
+    const editor = readFileSync(join(SRC, 'v8/dashboard/dashboard-editor.tsx'), 'utf8')
+    const drawer = readFileSync(join(SRC, 'components/shared/drawer.module.css'), 'utf8')
+    expect(editor).toContain('width="editor"')
   })
 })
 
 describe('#673 B. 触った感触', () => {
-  it('ボタンは160msのease-outで scale(0.97) に沈む', () => {
-    expect(GLOBALS_CODE).toMatch(/button:not\(:disabled\):active[\s\S]*?transform:\s*scale\(0\.97\)/)
-    expect(GLOBALS_CODE).toMatch(/transform 160ms var\(--motion-ease-out\)/)
+  it("ボタンは motion-instant(80ms) で 0.98倍に沈む", () => {
+    // 0.98 は変数（--press-scale）に置いた（動きの点検 6 番）。
+    expect(GLOBALS_CODE).toMatch(/--press-scale:\s*0\.98;/)
+    expect(GLOBALS_CODE).toMatch(/:active[\s\S]*?scale:\s*var\(--press-scale\)/)
+    expect(GLOBALS_CODE).toMatch(/scale var\(--motion-instant\)/)
+    // 旧 #673 の transform: scale(0.97) は scale 規定と二重に効くため外した
+    expect(GLOBALS_CODE).not.toContain('transform: scale(0.97)')
   })
 
   it('transition: all を使わない（#648の教訓）', () => {
@@ -109,10 +83,13 @@ describe('#673 B. 触った感触', () => {
     expect(GLOBALS_CODE).toMatch(/tbody tr:hover\s*\{[^}]*var\(--color-canvas-sunken\)/)
   })
 
-  it('メニュー・モーダルの出入りは150〜250msの ease-out', () => {
-    expect(GLOBALS_CODE).toMatch(/@keyframes lh-surface-in/)
-    expect(GLOBALS_CODE).toMatch(/\[data-design-part="action-menu"\][\s\S]*?animation:\s*lh-surface-in var\(--motion-base\)/)
-    expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\s*\{[^}]*animation:\s*lh-surface-in/)
+  it('メニュー・窓は共通部品の開閉を使い、全体の旧い動きを重ねない', () => {
+    const menu = readFileSync(join(SRC, 'components/shared/action-menu.module.css'), 'utf8')
+    const dialog = readFileSync(join(SRC, 'components/shared/dialog.module.css'), 'utf8')
+    expect(menu).toMatch(/animation:\s*action-menu-v8-enter var\(--motion-fast\) var\(--motion-ease-out\)/)
+    expect(dialog).toMatch(/:root \.panel\[data-closing\]/)
+    expect(dialog).toContain('transition-duration: var(--motion-exit)')
+    expect(GLOBALS_CODE).not.toMatch(/\[data-design-part="(?:action-menu|dialog)"\]\s*\{[^}]*animation:\s*lh-surface-in/)
   })
 
   it('動きを減らす設定で位置移動系が止まる', () => {
@@ -123,42 +100,13 @@ describe('#673 B. 触った感触', () => {
 })
 
 describe('#673 指標カードのスケルトン', () => {
-  it('読み込み中は数の場所に骨組みを出し、取れてから実数に替わる', async () => {
-    let resolveStats: ((value: { success: true; data: unknown }) => void) | undefined
-    chatStatsGet.mockImplementation(
-      () => new Promise((resolve) => { resolveStats = resolve }) as ReturnType<typeof api.chatStats.get>,
-    )
-    await act(async () => { root.render(<InboxKpis />) })
-
-    const section = host.querySelector('section[aria-label="受信箱の対応状況"]')
-    expect(section?.getAttribute('aria-busy')).toBe('true')
-    // 「要返信」＋4指標＋待ち時間の骨組み。実数の「—」は出さない。
-    expect(host.querySelectorAll('.animate-pulse').length).toBeGreaterThanOrEqual(5)
-    expect(section?.textContent).not.toContain('—')
-
-    const stats = {
-      waiting: 3,
-      oldestWaitingMinutes: 42,
-      mine: 1,
-      todayInbound: 5,
-      todayByChannel: { email: 2 },
-      waitingOverAnHour: 1,
-    }
-    await act(async () => {
-      resolveStats?.({ success: true, data: stats })
-    })
-    expect(section?.getAttribute('aria-busy')).toBeNull()
-    expect(host.querySelectorAll('.animate-pulse').length).toBe(0)
-    expect(section?.textContent).toContain('要返信 3件')
-    expect(section?.textContent).toContain('5件')
-  })
-
   it('ダッシュボードの指標カードも骨組みの口を持つ', () => {
-    const page = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-    // LiveDataCard / TodayTaskCard / SendQuotaCard が loading を受け取り、
-    // 読込中は「—」ではなく animate-pulse の骨組みを出す。
-    expect(page).toMatch(/function LiveDataCard[\s\S]*?loading = false/)
-    expect(page).toMatch(/aria-busy=\{loading \|\| undefined\}/)
-    expect(page).toContain('animate-pulse')
+    const page = readFileSync(join(SRC, 'v8/dashboard/dashboard.tsx'), 'utf8')
+    const sections = readFileSync(join(SRC, 'v8/dashboard/sections.tsx'), 'utf8')
+    const card = readFileSync(join(SRC, 'components/shared/kpi-card.tsx'), 'utf8')
+    expect(page).toContain("loading={d.pendingDetailState === 'loading'}")
+    expect(sections).toContain('DelayedSkeleton')
+    expect(sections).toContain('Skeleton')
+    expect(card).toContain('aria-busy={loading || undefined}')
   })
 })

@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import * as reminderTrigger from '../services/reminder-trigger.js';
 
 const liffAuthMocks = {
   verifyCallerLineUserId: vi.fn(),
@@ -67,9 +68,13 @@ function asD1(sqlite: Database.Database): D1Database {
   return {
     prepare,
     async batch(statements: D1PreparedStatement[]) {
-      const results = [];
-      for (const statement of statements) results.push(await statement.run());
-      return results;
+      sqlite.exec('BEGIN');
+      try {
+        const results = [];
+        for (const statement of statements) results.push(await statement.run());
+        sqlite.exec('COMMIT');
+        return results;
+      } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
     },
   } as unknown as D1Database;
 }
@@ -203,7 +208,7 @@ describe('U 状態の切替口', () => {
       to: 'paused',
     });
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: 'lifecycle_reason_required' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'lifecycle_reason_required' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('一時停止は公開フラグを落とす', async () => {
@@ -307,7 +312,7 @@ describe('U 変更確認の口', () => {
       slot_changes: [{ slot_id: 's1', capacity: 3 }],
     });
     expect(noReason.status).toBe(422);
-    await expect(noReason.json()).resolves.toEqual({ error: 'change_reason_required' });
+    await expect(noReason.json()).resolves.toMatchObject({ code: 'change_reason_required' , fields: expect.any(Object), error: expect.any(String) });
 
     const applied = await postJson(app, path, {
       expected_version: 1,
@@ -350,7 +355,7 @@ describe('U 待ちの手動操作の口', () => {
     const path = '/api/events/admin/occurrences/s1/waitlist/reorder?account_id=la1';
     const noReason = await postJson(app, path, { ordered_ids: ['w2', 'w1'] });
     expect(noReason.status).toBe(422);
-    await expect(noReason.json()).resolves.toEqual({ error: 'waitlist_reason_required' });
+    await expect(noReason.json()).resolves.toMatchObject({ code: 'waitlist_reason_required' , fields: expect.any(Object), error: expect.any(String) });
 
     const res = await postJson(app, path, {
       ordered_ids: ['w2', 'w1'],
@@ -397,7 +402,7 @@ describe('U 待ちの手動操作の口', () => {
       { expectedVersion: 1 },
     );
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: 'waitlist_reason_required' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'waitlist_reason_required' , fields: expect.any(Object), error: expect.any(String) });
   });
 });
 
@@ -420,6 +425,38 @@ describe('U-3 LIFF の開催回変更', () => {
       { 'Idempotency-Key': key, Authorization: DUMMY_AUTH },
     );
   }
+
+  test('STATIC-API-0560 旧予約の取消が失敗しても新旧が二重に残らない', async () => {
+    seedChangeBase();
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    sqlite.exec(`CREATE TRIGGER synthetic_cancel_failure BEFORE UPDATE OF status ON event_bookings
+      WHEN OLD.id = 'b1' AND NEW.status = 'cancelled'
+      BEGIN SELECT RAISE(ABORT, 'synthetic cancellation failure'); END;`);
+    const res = await changeRequest('s2', 'synthetic-change-failure');
+    expect(res.status).toBe(500);
+    expect(sqlite.prepare("SELECT id, status FROM event_bookings WHERE event_id='e1'").all())
+      .toEqual([{ id: 'b1', status: 'confirmed' }]);
+  });
+
+  test.each([false, true])('開催回変更の補償も途中失敗=%sで予約を失わない', async (restoreFails) => {
+    seedChangeBase();
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    const cancel = vi.spyOn(reminderTrigger, 'cancelByTrigger')
+      .mockRejectedValueOnce(new Error('REMINDER_SEND_IN_FLIGHT'));
+    try {
+      if (restoreFails) sqlite.exec(`CREATE TRIGGER synthetic_restore_failure BEFORE UPDATE OF status ON event_bookings
+        WHEN OLD.id = 'b1' AND NEW.status = 'confirmed'
+        BEGIN SELECT RAISE(ABORT, 'synthetic restore failure'); END;`);
+      const res = await changeRequest('s2', `synthetic-compensation-${restoreFails}`);
+      expect(res.status).toBe(restoreFails ? 500 : 409);
+      expect(sqlite.prepare("SELECT COUNT(*) AS n FROM event_bookings WHERE event_id='e1' AND status='confirmed'").get())
+        .toEqual({ n: 1 });
+      expect(sqlite.prepare("SELECT slot_id, status FROM event_bookings WHERE event_id='e1' ORDER BY slot_id").all())
+        .toEqual(restoreFails
+          ? [{ slot_id: 's1', status: 'cancelled' }, { slot_id: 's2', status: 'confirmed' }]
+          : [{ slot_id: 's1', status: 'confirmed' }]);
+    } finally { cancel.mockRestore(); }
+  });
 
   test('新しい席を確保できた時だけ元の申込を取り消す', async () => {
     seedChangeBase();

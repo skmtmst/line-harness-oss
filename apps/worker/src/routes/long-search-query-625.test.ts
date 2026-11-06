@@ -1,5 +1,5 @@
 /*
- * #625: 検索窓にとても長い文字を入れても一覧が壊れない。
+ * 検索窓にとても長い文字を入れても一覧が壊れない。
  *
  * Cloudflare D1 は LIKE / GLOB のパターンを **最大50バイト** に制限する。
  * 検索語を `%<検索語>%` で束縛していた各一覧口は、検索語が48バイトを超えると
@@ -19,7 +19,7 @@
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { computeUnansweredInbox } from '../services/unanswered-inbox.js';
 
@@ -183,7 +183,7 @@ describe('#625 シナリオ一覧 GET /api/scenarios', () => {
     const hitBody = await hit.json() as { data: { items: Array<{ id: string }> } };
     expect(hitBody.data.items.map((item) => item.id)).toEqual(['sc-1']);
 
-    // `%` は記号ではなく文字として探す（以前は ESCAPE で逃がしていたのと同じ意味）。
+    // を防ぐ。独自ヘッダーは上流の LINE API へ転送しない。
     const literal = await app.request(
       `/api/scenarios?${new URLSearchParams({ lineAccountId: 'account-a', query: '100%' })}`,
       {}, { DB: db.db },

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
- * テンプレートの置き場（`folder_id`）を書く口。台帳 #124。
+ * テンプレートの置き場（`folder_id`）を書く口。台帳。
  *
  * それまで、一覧は `folderId` を返すのに書く口が無かった——**読めるのに書けない**。
  * フォルダを作れてもテンプレートを入れられず、どのフォルダも 0 件のままだった。

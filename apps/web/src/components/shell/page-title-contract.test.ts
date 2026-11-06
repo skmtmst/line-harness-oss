@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 
 import { describe, expect, it } from 'vitest'
 
@@ -31,13 +32,12 @@ function walk(dir: string, out: string[] = []): string[] {
 /*
  * `restaurant-test/terms` はサーバー側で描くので `usePageTitle`
  * （クライアントの hook）を呼べない。ビルドが
- * 「Attempted to call usePageTitle() from the server」で落ちる。
+ * 「Attempted to call usePageTitle from the server」で落ちる。
  * サーバー側の画面は別の渡し方が要るので、ここに残してある。
  */
 const NOT_YET_MIGRATED = [
   'auto-replies/edit/page.tsx',
   'auto-replies/page.tsx',
-  'automations/page.tsx',
   'booking/bookings/detail/page.tsx',
   'booking/bookings/page.tsx',
   'booking/menus/staff/page.tsx',
@@ -54,15 +54,12 @@ const NOT_YET_MIGRATED = [
   'friends/detail/page.tsx',
   'inflow-links/detail/page.tsx',
   'inflow-links/page.tsx',
-  'nen-campaigns/edit/campaign-editor.tsx',
   'nen-campaigns/edit/page.tsx',
   'nen-campaigns/page.tsx',
   'notifications/page.tsx',
   'reminders/edit/page.tsx',
   'reminders/page.tsx',
-  'restaurant-test/restaurant-console.tsx',
   'restaurant-test/terms/page.tsx',
-  'scenarios/detail/scenario-detail-client.tsx',
   'scenarios/first-step/page.tsx',
   'scenarios/mode/page.tsx',
   'scenarios/page.tsx',
@@ -95,14 +92,14 @@ describe('画面名は上部バーだけが持つ', () => {
       'broadcasts/detail/page.tsx',
       'webinars/edit/page.tsx',
       'health/page.tsx',
-      'nen-campaigns/edit/campaign-editor.tsx',
+      // NEN配信の編集の古い campaign-editor.tsx はどこからも描かれないので 2026-10-07 に消した（入口は campaign-editor-v8.tsx。上部バーの名前は持たず、本文のパンくずで戻す）。
       'templates/detail/page.tsx',
-      'scenarios/detail/scenario-detail-client.tsx',
+      '../v8/scenario-detail/detail.tsx',
       'events/edit/page.tsx',
-      'events/new/page.tsx',
+      // events/new/page.tsx は V8（v8/events/create.tsx が usePageTitle('イベントを作る') を持つ）を出すだけになった（2026-10-09 管理画面 削除）。
       'form-submissions/edit/page.tsx',
       'pools/page.tsx',
-      'hq/settings/page.tsx',
+      // hq/settings/page.tsx は V8（v8/hq/settings.tsx が usePageTitle を持つ）を出すだけになった（2026-10-09 管理画面 削除）。
       'rich-menus/edit/page.tsx',
       'rich-menus/new/page.tsx',
       'search-console/page.tsx',
@@ -110,7 +107,7 @@ describe('画面名は上部バーだけが持つ', () => {
       'booking/staff/shifts/page.tsx',
     ]
     for (const rel of moved) {
-      const src = fs.readFileSync(path.join(APP, rel), 'utf8')
+      const src = readUiSource(path.join(APP, rel), 'utf8')
       expect(src, rel + ' が上部バーへ名前を渡していない').toContain('usePageTitle(')
     }
   })
@@ -120,12 +117,12 @@ describe('画面名は上部バーだけが持つ', () => {
     const cleaned: Array<[string, string]> = [
       ['health/page.tsx', 'BAN検知ダッシュボード'],
       ['templates/detail/page.tsx', 'テンプレートの詳細'],
-      ['nen-campaigns/edit/campaign-editor.tsx', 'NEN配信を編集する'],
-      ['scenarios/detail/scenario-detail-client.tsx', 'シナリオ詳細'],
+      ['../v8/nen-campaigns/edit.tsx', 'NEN配信を編集する'],
+      ['../v8/scenario-detail/detail.tsx', 'シナリオ詳細'],
       ['webinars/edit/page.tsx', 'ウェビナー編集'],
     ]
     for (const [rel, title] of cleaned) {
-      const src = fs.readFileSync(path.join(APP, rel), 'utf8')
+      const src = readUiSource(path.join(APP, rel), 'utf8')
       expect(src, rel + ' に単独の二重見出しが戻っている').not.toContain(
         '<Header title="' + title + '" />',
       )

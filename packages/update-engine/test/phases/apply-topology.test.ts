@@ -15,6 +15,8 @@ import { ADMIN_URL_PLACEHOLDER } from '../../src/materialize.js';
 import type { ParsedBundle } from '../../src/bundle.js';
 import type { UpdateContext, UpdateEvent } from '../../src/types.js';
 
+vi.mock('../../src/cf-api/worker-assets.js', async original => ({ ...await original<typeof import('../../src/cf-api/worker-assets.js')>(), uploadWorkerAssets: vi.fn(async () => 'completion-fixture') }));
+
 vi.mock('../../src/cf-api/d1.js', () => ({
   executeD1Query: vi.fn(async () => ({})),
 }));
@@ -33,6 +35,7 @@ vi.mock('../../src/cf-api/pages.js', () => ({
 }));
 
 import { putWorkerScript } from '../../src/cf-api/workers.js';
+import { executeD1Query } from '../../src/cf-api/d1.js';
 import { deployPagesProject } from '../../src/cf-api/pages.js';
 
 const WORKER_URL = 'https://w.acc.workers.dev';
@@ -73,6 +76,7 @@ function bundle(): ParsedBundle {
       ['logo.png', Buffer.from('binarydata')],
     ]),
     liffFiles: new Map([['index.html', Buffer.from('<html>l</html>')]]),
+    workerAssetsFiles: new Map([['index.html',Buffer.from('<html>worker client</html>')]]),
     migrations: new Map(),
   };
 }
@@ -84,6 +88,7 @@ function emitter(): { events: UpdateEvent[]; ev: ReturnType<typeof createEventEm
 }
 
 beforeEach(() => {
+  vi.mocked(executeD1Query).mockClear();
   vi.mocked(putWorkerScript).mockClear();
   vi.mocked(deployPagesProject).mockClear();
 });
@@ -114,17 +119,29 @@ describe('runApply — install topologies', () => {
     expect(files.get('chunk.js')!.toString('utf8')).toContain(ADMIN_URL_PLACEHOLDER);
   });
 
-  it('skips the LIFF Pages deploy for worker-assets installs', async () => {
+  it('uploads LIFF through Worker assets instead of the Pages deployment', async () => {
     const { events, ev } = emitter();
     const result = await runApply(ctx({ liffPagesProject: '' }), bundle(), ev);
 
     expect(result.liffDeploymentId).toBe('');
+    expect(vi.mocked(putWorkerScript).mock.calls[0][0]).toMatchObject({assetsJwt:'completion-fixture',keepAssets:false});
     expect(result.adminDeploymentId).toBe('admin-proj-dep');
     const projects = vi.mocked(deployPagesProject).mock.calls.map(([a]) => a.projectName);
     expect(projects).toEqual(['admin-proj']);
     const liffEvents = events.filter((e) => e.step === 'liff');
     expect(liffEvents).toHaveLength(1);
     expect(liffEvents[0].status).toBe('done');
+  });
+
+  it('旧bundleにWorker clientがなければSQLやdeployの前に止まる',async()=>{
+    const {ev}=emitter();
+    const input=bundle();delete input.workerAssetsFiles;
+    const c=ctx({liffPagesProject:''});c.target.migrations=['001_fixture.sql'];
+    input.migrations.set('001_fixture.sql',Buffer.from('SELECT 1;'));
+    await expect(runApply(c,input,ev)).rejects.toThrow('worker_assets_bundle_missing');
+    expect(executeD1Query).not.toHaveBeenCalled();
+    expect(putWorkerScript).not.toHaveBeenCalled();
+    expect(deployPagesProject).not.toHaveBeenCalled();
   });
 
   it('still deploys LIFF Pages for the legacy 3-artifact topology', async () => {

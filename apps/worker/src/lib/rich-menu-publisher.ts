@@ -1,3 +1,4 @@
+import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 // Rich menu publish flow — D1 ドラフトを LINE Messaging API に冪等に反映する。
 //
 // LINE API は richmenu の更新ができず、作成のみ。なので alias を経由して
@@ -11,7 +12,8 @@
 // 最後に isDefaultForAll なら 1 ページ目を全友だち default に。
 
 import { buildTapPostbackData } from './rich-menu-tap.js';
-import { RICH_MENU_DIMENSIONS, RICH_MENU_MAX_PAGES, richMenuUriError } from '@line-crm/shared';
+import { RICH_MENU_DIMENSIONS, RICH_MENU_MAX_PAGES, richMenuUriError, liffActionUrl, type LiffAction } from '@line-crm/shared';
+
 
 export type Bounds = { x: number; y: number; width: number; height: number };
 
@@ -36,6 +38,9 @@ export type AreaIntent =
   | 'tel'
   | 'text'
   | 'template'
+  | 'booking'
+  | 'booking_history'
+  | 'visit_stamp'
   | 'form'
   | 'switch'
   | 'postback'
@@ -75,6 +80,12 @@ export type GroupInput = {
   size: 'large' | 'compact';
   chatBarText: string;
   isDefaultForAll: boolean;
+  /**
+   * V8「トークを開いたとき メニューを開いておく」。LINE の rich menu payload
+   * `selected` にそのまま出る。未指定（古い呼び出し・既存行）は false、
+   * つまり従来どおり「閉じておく」。
+   */
+  defaultOpen?: boolean;
   pages: PageInput[];
   /**
    * 「回答フォームを開く」ボタンの飛び先。アカウントの LIFF URL を渡す。
@@ -132,7 +143,7 @@ export interface LineRichMenuClient {
   // bulk link: 指定 richMenuId を userIds (最大 500 件 / リクエスト) に link。
   // 500 超は呼出側で chunk して順次呼ぶ。
   linkRichMenuBulk(richMenuId: string, userIds: string[]): Promise<void>;
-  // ----- N-152: 本人LINEへのテスト適用で使う個人宛て操作（必要な経路だけが使う任意口） -----
+  // ----- : 本人LINEへのテスト適用で使う個人宛て操作（必要な経路だけが使う任意口） -----
   linkRichMenuToUser?(userId: string, richMenuId: string): Promise<void>;
   unlinkRichMenuFromUser?(userId: string): Promise<void>;
   /** その人に今出ている richMenuId。未設定なら null。 */
@@ -345,16 +356,19 @@ function validateAreaByIntent(area: AreaInput, prefix: string, group: GroupInput
       }
       return;
     }
+    case 'booking':
+    case 'booking_history':
+    case 'visit_stamp':
     case 'form': {
       const formId = area.formId ?? String(data.formId ?? '');
-      if (!requiredString(formId)) {
+      if (area.intent === 'form' && !requiredString(formId)) {
         throw new RichMenuValidationError(`${prefix}: 開く回答フォームを選んでください`);
       }
       if (!requiredString(group.formBaseUrl ?? '')) {
-        throw new RichMenuValidationError(
-          `${prefix}: このLINEアカウントにLIFFが設定されていないため、回答フォームを開くボタンは使えません`,
-        );
+        throw new RichMenuValidationError(`${prefix}: このLINEアカウントにLIFFが設定されていないため、この画面を開くボタンは使えません`);
       }
+      try { buildAreaLiffUri(area, group.formBaseUrl!); }
+      catch { throw new RichMenuValidationError(`${prefix}: LIFFまたは開くメニュー・カードの指定を確認してください`); }
       return;
     }
     case 'template': {
@@ -371,7 +385,7 @@ function validateAreaByIntent(area: AreaInput, prefix: string, group: GroupInput
       if (!limited(uri, 1000)) {
         throw new RichMenuValidationError(`${prefix}: URLは1000文字以内にしてください`);
       }
-      // R203: 計測リンクはこちらが生成したURLなので飛ばす。手入力の飛び先は
+      // 計測リンクはこちらが生成したURLなので飛ばす。手入力の飛び先は
       // URIの形と許可schemeを確かめ、LINEへ届いて初めて失敗する事故を防ぐ。
       if (!area.trackedLinkUrl) {
         const uriError = richMenuUriError(uri);
@@ -457,7 +471,7 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
       `ページは${RICH_MENU_MAX_PAGES}までです（今は${group.pages.length}ページあります）。まとめられるページを1つにしてください`,
     );
   }
-  // #827 (N-159): 「ページを切り替える」だけのボタンは、押しても別ページが
+  //  「ページを切り替える」だけのボタンは、押しても別ページが
   // 出るだけで、押すと何か起きる行き先にはならない。到達可能な行き先として数えない。
   let destinationCount = 0;
   for (const page of group.pages) {
@@ -468,7 +482,7 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
         ? `ページ「${page.name}」の「${label}」`
         : `ページ「${page.name}」のタップ領域${i + 1}`;
 
-      // #827 (N-155): ボタン名は端末の読み上げ(アクセシビリティ)にも使うため
+      //  ボタン名は端末の読み上げ(アクセシビリティ)にも使うため
       // 必須・20字以内。既存行や DB 直接更新を通った値もここで止める。
       if (!label) {
         throw new RichMenuValidationError(`${prefix}: ボタン名（読み上げラベル）を入力してください`);
@@ -496,7 +510,7 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
         if ([...uri].length > 1000) {
           throw new RichMenuValidationError(`${prefix}: URLは1000文字以内にしてください`);
         }
-        // R203: intent なしの古いボタンにも同じ検査を掛ける。
+        // intent なしの古いボタンにも同じ検査を掛ける。
         const uriError = richMenuUriError(String(uri));
         if (uriError) {
           throw new RichMenuValidationError(`${prefix}: ${uriError}`);
@@ -546,7 +560,7 @@ export function buildLineRichMenuPayload(
   const dimensions = RICH_MENU_DIMENSIONS[group.size];
   return {
     size: dimensions,
-    selected: false,
+    selected: group.defaultOpen === true,
     name: page.name,
     chatBarText: group.chatBarText,
     areas: page.areas.map((a) => ({
@@ -594,8 +608,18 @@ export function normalizeTelUri(raw: string): string {
 
 /** 「回答フォームを開く」の飛び先を組み立てる。 */
 export function buildFormUri(base: string, formId: string): string {
-  const sep = base.includes('?') ? '&' : '?';
-  return `${base}${sep}form=${encodeURIComponent(formId)}`;
+  return buildAreaLiffUri({ bounds: { x: 0, y: 0, width: 1, height: 1 }, actionType: 'uri', intent: 'form', formId, actionData: {} }, base);
+}
+
+function buildAreaLiffUri(area: AreaInput, base: string): string {
+  const url = new URL(base);
+  if (url.origin !== 'https://liff.line.me' || url.username || url.password || !/^\/[A-Za-z0-9_-]{1,128}\/?$/.test(url.pathname)) throw new Error('INVALID_LIFF');
+  const data = area.actionData;
+  const spec: LiffAction = area.intent === 'form' ? { kind: 'form', formId: area.formId ?? String(data.formId ?? '') }
+    : area.intent === 'booking' ? { kind: 'booking', ...(data.menuId ? { menuId: String(data.menuId) } : {}) }
+    : area.intent === 'visit_stamp' ? { kind: 'visit_stamp', ...(data.cardId ? { cardId: String(data.cardId) } : {}) }
+    : { kind: 'booking_history' };
+  return liffActionUrl({ liffId: url.pathname.replace(/\//g, ''), ...spec });
 }
 
 function toLineAction(area: AreaInput, group: GroupInput): Record<string, unknown> {
@@ -617,10 +641,10 @@ function toLineAction(area: AreaInput, group: GroupInput): Record<string, unknow
       return { type: 'uri', uri: normalizeTelUri(String(data.tel ?? data.uri ?? '')) };
 
     case 'form':
-      return {
-        type: 'uri',
-        uri: buildFormUri(group.formBaseUrl ?? '', area.formId ?? String(data.formId ?? '')),
-      };
+    case 'booking':
+    case 'booking_history':
+    case 'visit_stamp':
+      return { type: 'uri', uri: buildAreaLiffUri(area, group.formBaseUrl ?? '') };
 
     case 'url':
       // 計測リンクを選んでいればそちらを開く。クリック数もタグ付けも、
@@ -704,7 +728,7 @@ async function readR2Object(r2: R2Like, key: string): Promise<Uint8Array> {
 }
 
 // =============================================================================
-// 段階公開(E-08 #621 司令塔裁定・案A)。publish を create/upload → DB journal確定 →
+// 部分的な公開を防ぐため、create/upload → DB journal 確定 →
 // alias/default切替 → 旧メニュー削除へ分ける。journal確定前の失敗は、まだliveで
 // ない新メニューを消すだけで既存alias/defaultを変えない。切替途中の失敗は、
 // 保存した切替前LINE状態へ補償で戻す。予約実行が journal を挟むために使う。
@@ -862,7 +886,7 @@ export async function switchRichMenuLive(
         }
       }
     } catch (e) {
-      console.warn(`[switchRichMenuLive] default lookup/clear failed (non-fatal):`, e);
+      logger.warn("rich_menu_publisher.clear_switched_default_failed");
     }
   }
 }
@@ -888,7 +912,7 @@ export async function restorePreSwitchLive(
         await line.deleteRichMenuAlias(aliasId);
       }
     } catch (e) {
-      console.warn(`[restorePreSwitchLive] alias restore failed (non-fatal):`, e);
+      logger.warn("rich_menu_publisher.restore_live_menu_failed");
       unrestored.add(old.pageId);
     }
   }
@@ -927,7 +951,7 @@ export async function restorePreSwitchDefault(
   } catch (e) {
     // 読めない = 新メニューを指したままかもしれない。どれかも分からないので、
     // 新メニューは1つも消さない(消すと default がリンク切れになる)。
-    console.warn(`[restorePreSwitchDefault] default lookup failed (non-fatal):`, e);
+    logger.warn("rich_menu_publisher.restore_default_menu_failed");
     return { state: 'failed', retainedId: null };
   }
   if (!current || !newIds.includes(current)) return { state: 'untouched' };
@@ -939,7 +963,7 @@ export async function restorePreSwitchDefault(
     }
     return { state: 'restored' };
   } catch (e) {
-    console.warn(`[restorePreSwitchDefault] default restore failed (non-fatal):`, e);
+    logger.warn("rich_menu_publisher.restore_default_menu_failed");
     return { state: 'failed', retainedId: current };
   }
 }
@@ -1065,9 +1089,12 @@ export type UnpublishResult = {
  *   2. 各 page の richmenu を delete (404 無視)
  *   3. 現 default が own group の richmenu なら default unlink
  *
- * 削除は 404 を許容することで複数回呼ばれても安全 (idempotent)。alias / richmenu の
- * 削除そのものが失敗 (5xx 等) した場合は warnings に記録するが処理を続行する。
- * 完全失敗時は最後に throw。
+ * 削除は 404 を許容することで複数回呼ばれても安全 (idempotent)。
+ * alias / richmenu の削除が1件でも失敗 (5xx 等) したら、処理を
+ * 続けたうえで最後に throw する。失敗を warnings に退避して成功扱いに
+ * すると、DB は draft 確定なのに LINE 上にメニューが残り、画面は
+ * 「取り下げ済み」に見えてしまう。route 側は throw を受けて 500・run 失敗・
+ * lease 解放にし、group は published のまま残して再試行できるようにする。
  */
 export async function unpublishRichMenuGroup(
   group: GroupInput,
@@ -1076,6 +1103,7 @@ export async function unpublishRichMenuGroup(
 ): Promise<UnpublishResult> {
   const warnings: string[] = [];
   const pages: UnpublishResult['pages'] = [];
+  const failures: string[] = [];
 
   for (const page of group.pages) {
     // 外部呼び出しの前に担当を確かめる。失権していたら投げて止める
@@ -1086,16 +1114,18 @@ export async function unpublishRichMenuGroup(
     try {
       await line.deleteRichMenuAlias(aliasId);
     } catch (e) {
-      warnings.push(`delete alias ${aliasId} failed: ${e instanceof Error ? e.message : String(e)}`);
+      const detail = `delete alias ${aliasId} failed: ${e instanceof Error ? e.message : String(e)}`;
+      warnings.push(detail);
+      failures.push(detail);
     }
     // richmenu 削除
     if (page.lineRichMenuId) {
       try {
         await line.deleteRichMenu(page.lineRichMenuId);
       } catch (e) {
-        warnings.push(
-          `delete richmenu ${page.lineRichMenuId} failed: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        const detail = `delete richmenu ${page.lineRichMenuId} failed: ${e instanceof Error ? e.message : String(e)}`;
+        warnings.push(detail);
+        failures.push(detail);
       }
     }
     pages.push({ pageId: page.id, clearedRichMenuId: page.lineRichMenuId });
@@ -1120,5 +1150,11 @@ export async function unpublishRichMenuGroup(
     );
   }
 
+  if (failures.length > 0) {
+    throw new Error(
+      'LINE上のメニューの削除に失敗しました。メニューがLINE上に残っています。'
+      + '最新の状態を確認して、もう一度取り下げてください。',
+    );
+  }
   return { pages, warnings };
 }

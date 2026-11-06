@@ -1,11 +1,14 @@
 'use client'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import type { ReactNode } from 'react'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import { ApiError } from '@/lib/api'
+import { formatListDay, formatListTimestamp } from '@/lib/format'
 
 /**
- * 運営コンソール（★V6 37）だけで使う小さな部品と表記の決まり。
+ * 運営コンソール（★管理画面 37）だけで使う小さな部品と表記の決まり。
  *
  * 札は共通の `Chip`、数値カードは共通の `KpiCard`、表は共通の `DataTable`
  * を使う。ここには「状態をどの札で出すか」と「日付・プランの表記」だけを置く。
@@ -46,13 +49,7 @@ export const PLAN_STATUS_LABEL: Record<string, string> = {
   canceled: '請求解約',
 }
 
-export const ROLE_LABEL: Record<string, string> = { owner: 'オーナー', admin: '管理者', staff: '担当者' }
-
-const JST_DATETIME = new Intl.DateTimeFormat('ja-JP', {
-  timeZone: 'Asia/Tokyo',
-  year: 'numeric', month: '2-digit', day: '2-digit',
-  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-})
+export const ROLE_LABEL: Record<string, string> = { owner: 'オーナー', admin: '管理者', staff: 'スタッフ' }
 
 /*
  * 運営コンソールの日時はすべて日本時間で出す。端末のタイムゾーンに従うと、
@@ -61,18 +58,18 @@ const JST_DATETIME = new Intl.DateTimeFormat('ja-JP', {
  */
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  const parts = JST_DATETIME.formatToParts(d)
-  const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${pick('year')}-${pick('month')}-${pick('day')} ${pick('hour')}:${pick('minute')}`
+  return formatListTimestamp(value, { fallback: value })
 }
 
 export function formatDate(value: string | null | undefined): string {
-  return formatDateTime(value).slice(0, 10)
+  if (!value) return '—'
+  return formatListDay(value, value)
 }
 
 export const AUDIT_ACTION_LABEL: Record<string, { label: string; tone: ChipTone }> = {
+  'application.contact': { label: '申込の連絡を記録', tone: 'info' },
+  'application.approve': { label: '申込を承認', tone: 'info' },
+  'application.invite': { label: '利用開始メールを送信', tone: 'info' },
   'tenant.create': { label: '契約先を作成', tone: 'info' },
   'tenant.status.change': { label: '契約先の状態を変更', tone: 'warn' },
   'tenant.feature_packs.change': { label: '機能パックを変更', tone: 'info' },
@@ -106,7 +103,7 @@ export function tenantDetailHref(id: string): string {
  */
 /** 5xx は本文の文言が画面へ渡らない（`extractApiErrorMessage`）ので、状態コードから言い換える。 */
 export function opsErrorMessage(error: ApiError): string {
-  if (error.message && !error.message.startsWith('API error:')) return error.message
+  if (japaneseDetailOf(error)) return japaneseDetailOf(error)
   if (error.status === 503) return 'この機能はいまの環境では使えません（設定が未完了です）'
   if (error.status === 504) return '処理が時間内に終わりませんでした。手で進めるか、少し待ってからもう一度お試しください'
   if (error.status === 502) return '外部の処理に失敗しました。少し待ってからもう一度お試しください'
@@ -122,6 +119,6 @@ export async function opsCall<T>(call: Promise<T>): Promise<T | { success: false
   } catch (error) {
     if (error instanceof ApiError) return { success: false, error: opsErrorMessage(error) }
     if (error instanceof TypeError) return { success: false, error: '通信できませんでした。ネットワークを確認してもう一度お試しください' }
-    return { success: false, error: error instanceof Error && error.message ? error.message : '処理に失敗しました。通信を確かめて、もう一度お試しください。' }
+    return { success: false, error: describeApiFailure(error, '保存', { scope: 'hq' }) }
   }
 }

@@ -1,6 +1,8 @@
 import { jstNow } from './utils.js';
 
 export type RichMenuManualPublishRequest = {
+  /** Exact frozen version used by this request. Old records can be unknown. */
+  version_number?: number | null;
   id: string;
   group_id: string;
   account_id: string;
@@ -97,7 +99,7 @@ export async function getRichMenuManualPublishRequest(
   ).bind(accountId, idempotencyKey).first<RichMenuManualPublishRequest>();
 }
 
-/** N-151: 公開履歴の詳細・失敗再試行の起点。request の id で1件引く。 */
+/** 公開履歴の詳細・失敗再試行の起点。request の id で1件引く。 */
 export async function getRichMenuManualPublishRequestById(
   db: D1Database,
   requestId: string,
@@ -107,16 +109,18 @@ export async function getRichMenuManualPublishRequestById(
   ).bind(requestId).first<RichMenuManualPublishRequest>();
 }
 
-/** N-151: 公開履歴の一覧。新しい順。版（定義スナップショット）・状態・最終エラーを返す。 */
+/** 公開履歴の一覧。新しい順。版（定義スナップショット）・状態・最終エラーを返す。 */
 export async function listRichMenuManualPublishRequests(
   db: D1Database,
   groupId: string,
   limit = 50,
 ): Promise<RichMenuManualPublishRequest[]> {
   const result = await db.prepare(
-    `SELECT * FROM rich_menu_manual_publish_requests
-      WHERE group_id = ?
-      ORDER BY created_at DESC
+    `SELECT r.*, v.version_number FROM rich_menu_manual_publish_requests r
+      LEFT JOIN rich_menu_publish_runs p ON p.group_id=r.group_id AND p.idempotency_key=r.idempotency_key
+      LEFT JOIN rich_menu_versions v ON v.id=p.version_id AND v.group_id=r.group_id
+      WHERE r.group_id = ?
+      ORDER BY r.created_at DESC, r.id DESC
       LIMIT ?`,
   ).bind(groupId, limit).all<RichMenuManualPublishRequest>();
   return result.results ?? [];

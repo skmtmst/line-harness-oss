@@ -1,0 +1,108 @@
+import type { RestaurantReservationFormHealth } from './restaurant-reservation-form.js';
+import type { ReminderTestRecipientStatus } from './types/reminders.js';
+export type RestaurantFollowupTrigger = 'reservation_created' | 'reservation_24h' | 'reservation_2h' | 'post_visit' | 'review_request' | 'waitlist_invited' | 'anniversary_before';
+export const RESTAURANT_FOLLOWUP_LABELS:Record<RestaurantFollowupTrigger,string> = {
+    reservation_created:'予約したとき',reservation_24h:'前日の確認',reservation_2h:'当日の来店前',
+    post_visit:'来店後のお礼',review_request:'口コミのお願い',waitlist_invited:'キャンセル待ちの案内',anniversary_before:'記念日前のご案内',
+};
+export interface RestaurantFollowupTemplate {
+    store_id: string;
+    scenario_id: string;
+    template_version: number;
+    sending_status: 'stopped' | 'pending' | 'active';
+    approved_version_id: string | null;
+    approval_id: string | null;
+}
+export interface RestaurantFollowupBinding {
+    store_id: string;
+    trigger: RestaurantFollowupTrigger;
+    step_id: string;
+    offset_minutes: number;
+    anniversary_time?: string;
+    enabled: 0 | 1;
+    version: number;
+}
+export interface RestaurantFollowupJob {
+    id: string;
+    line_account_id: string;
+    friend_id: string;
+    scenario_version_id: string;
+    step_id: string;
+    source_kind: 'restaurant_reservation' | 'restaurant_waitlist' | 'restaurant_anniversary';
+    source_id: string;
+    source_event_id: string;
+    source_version: number;
+    scheduled_at: string;
+    status: 'pending' | 'running' | 'sent' | 'cancelled' | 'failed';
+    attempt_count: number;
+    lease_until: string | null;
+    idempotency_key: string;
+    message_log_id: string | null;
+}
+/** 本体をまだ作っていない送り方も表す。本文は作成後のシナリオが正本。 */
+export interface RestaurantFollowupRow {
+    store_id: string;
+    trigger: RestaurantFollowupTrigger;
+    initial_key: string;
+    enabled?: boolean;
+    step_id: string | null;
+    version: number;
+    default_offset_minutes: number;
+    initial_message: string;
+}
+export interface RestaurantFollowupSetup {
+    notUsing: boolean;
+    decidedAt: string | null;
+    version: number;
+}
+export type RestaurantFollowupTiming =
+    | {mode:'countdown';offsetMinutes:number}
+    | {mode:'time';offsetDays:number;sendAtTime:string}
+    | {mode:'next_day';sendAtTime:string};
+export interface RestaurantFollowupEngineDraftInput {
+    expectedRowVersion:number;
+    expectedTargetVersion:number;
+    expectedContentRevision:string|null;
+    enabled:boolean;
+    timing:RestaurantFollowupTiming;
+    messageBubbles:unknown[];
+}
+export interface RestaurantFollowupPage {
+    setup?: RestaurantFollowupSetup;
+    template: RestaurantFollowupTemplate | null;
+    rows?: RestaurantFollowupRow[];
+    bindings: RestaurantFollowupBinding[];
+    jobs: RestaurantFollowupJob[];
+    editor: 'common_scenario';
+}
+export type RestaurantConfirmationResponse = 'going' | 'change_requested' | 'cancel';
+export interface RestaurantConfirmation {
+    request_id: string;
+    reservation_id: string;
+    reservation_version: number;
+    friend_id: string;
+    response: RestaurantConfirmationResponse | null;
+    requested_at: string;
+    responded_at: string | null;
+    expires_at: string;
+    is_current: 0 | 1;
+}
+
+/** 吹き出しは実物の保存値。見本の文字で保存済み本文を上書きしない。 */
+export interface RestaurantFollowupEditorContent {
+ timing:RestaurantFollowupTiming;
+ messageParts:Array<{messageType:string;messageContent:string}>;
+}
+export interface RestaurantFollowupEngineState {
+ trigger:RestaurantFollowupTrigger;
+ engine:'scenario'|'reminder'|'automation';
+ targetId:string|null;targetVersion:number;contentRevision:string|null;
+ enabled:boolean;effectiveSendingStatus:'active'|'stopped';reason:string|null;detailPath:string|null;
+ editorContent:RestaurantFollowupEditorContent|null;
+}
+export interface RestaurantFollowupEngineBoard {
+ reservationForm?:RestaurantReservationFormHealth;
+ engines:RestaurantFollowupEngineState[];
+ legacyContents:Array<{trigger:RestaurantFollowupTrigger;content:RestaurantFollowupEditorContent|null}>;
+ testRecipient:ReminderTestRecipientStatus|null;
+}

@@ -135,6 +135,7 @@ describe('webhook 無受信の監視', () => {
     await checkAccountHealth(dbWith([{ match: 'messages_log', first: { count: 0 } }]));
     expect(createAccountHealthLog).toHaveBeenCalledWith(expect.anything(),
       expect.objectContaining({ lineAccountId: 'account-a', riskLevel: 'warning' }));
+    expect(createNotification).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ title: 'Webhook が届いていません' }));
   });
 
   it('作ったばかり（24時間未満）で受信実績が無くても warning にしない', async () => {

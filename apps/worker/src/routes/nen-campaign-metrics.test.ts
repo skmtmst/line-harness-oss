@@ -1,7 +1,8 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const accessMocks = vi.hoisted(() => ({ canAccessAllLineAccounts: vi.fn() }));
 const metricsMocks = vi.hoisted(() => ({
@@ -41,6 +42,7 @@ function app(role: Role = 'owner') {
     await next();
   });
   hono.route('/', nenCampaigns);
+  hono.onError(unhandledWorkerError);
   return hono;
 }
 
@@ -61,7 +63,7 @@ beforeEach(() => {
   metricsMocks.retryNenDelivery.mockResolvedValue({ id: 'job-1', status: 'pending', version: 2 });
 });
 
-describe('NEN campaign V6 metric routes', () => {
+describe('NEN campaign metric routes', () => {
   it('通常・空状態を成功応答で返し、期間とページ条件をserviceへ渡す', async () => {
     const flows = await app('staff').request(
       '/api/nen-campaigns/metrics/flows?lineAccountId=account-a&days=14',
@@ -84,7 +86,7 @@ describe('NEN campaign V6 metric routes', () => {
     );
   });
 
-  // ★V6 37-6: 数値カードの「今月・先月」は from/to の月の範囲で取る。
+  // ★37-6: 数値カードの「今月・先月」は from/to の月の範囲で取る。
   it('flows・columns の実績は from/to の期間指定を受け付ける', async () => {
     const flows = await app('staff').request(
       '/api/nen-campaigns/metrics/flows?lineAccountId=account-a&from=2026-08-31T15:00:00.000Z&to=2026-09-30T15:00:00.000Z',
@@ -106,7 +108,7 @@ describe('NEN campaign V6 metric routes', () => {
     expect(invalid.status).toBe(400);
   });
 
-  // #727: 「これから」チップの pending,processing を複数状態のまま service へ渡す。
+  // 「これから」チップの pending,processing を複数状態のまま service へ渡す。
   it('複数状態の絞り込みをそのままserviceへ渡す', async () => {
     const response = await app('staff').request(
       '/api/nen-campaigns/deliveries?lineAccountId=account-a&status=pending,processing',
@@ -126,7 +128,7 @@ describe('NEN campaign V6 metric routes', () => {
     );
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({
-      success: false, error: 'NEN配信の情報を取得できませんでした',
+      success: false, error: 'Internal Server Error', incidentId: expect.stringMatching(/^[0-9a-f-]{36}$/),
     });
   });
 
@@ -139,7 +141,7 @@ describe('NEN campaign V6 metric routes', () => {
     expect(metricsMocks.getNenColumnMetrics).not.toHaveBeenCalled();
   });
 
-  it('staffは閲覧できるが手動再送できない', async () => {
+  it('編集権限があるstaffは閲覧と手動再送ができる', async () => {
     const detail = await app('staff').request(
       '/api/nen-campaigns/deliveries/job-1?lineAccountId=account-a',
     );
@@ -149,8 +151,8 @@ describe('NEN campaign V6 metric routes', () => {
       '/api/nen-campaigns/deliveries/job-1/retry',
       post({ lineAccountId: 'account-a', expectedVersion: 1, reason: '確認済み' }),
     );
-    expect(retry.status).toBe(403);
-    expect(metricsMocks.retryNenDelivery).not.toHaveBeenCalled();
+    expect(retry.status).toBe(200);
+    expect(metricsMocks.retryNenDelivery).toHaveBeenCalledTimes(1);
   });
 
   it('ownerの再送を監査し、版競合409をそのまま返す', async () => {

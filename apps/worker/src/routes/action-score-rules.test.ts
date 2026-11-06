@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 
 const dbMocks = {
   getActiveImpersonation: vi.fn(async () => null),
   getPlatformAdminByStaffId: vi.fn(async () => null),
   getPlatformAdminRecord: vi.fn(async () => null),
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn().mockResolvedValue(null),
   getActionScoreBandOverview: vi.fn(),
   getActionScoreRuleConfiguration: vi.fn(),
@@ -35,6 +40,7 @@ function app() {
   const instance = new Hono<Env>();
   instance.use('*', authMiddleware);
   instance.route('/', actionScoreRules);
+  instance.onError(unhandledWorkerError);
   return instance;
 }
 
@@ -88,7 +94,7 @@ beforeEach(() => {
   });
 });
 
-describe('V6 action score rule API', () => {
+describe('action score rule API', () => {
   it('requires a selected authorized account for reads', async () => {
     expect((await call('/api/action-scores/rules')).status).toBe(400);
     expect((await call('/api/action-scores/rules?accountId=hidden')).status).toBe(404);
@@ -235,13 +241,20 @@ describe('V6 action score rule API', () => {
     const response = await call('/api/action-scores/rules?accountId=account-1');
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({
+    const body = await response.json<{ incidentId: string }>();
+    expect(body).toEqual({
       success: false,
-      error: 'スコアのルールを処理できませんでした',
+      error: 'Internal Server Error',
+      incidentId: expect.any(String),
+    });
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(JSON.stringify(body)).not.toContain('D1 internal details');
+    expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+      source: 'worker', message: 'unhandled_worker_error', path: 'GET /api/action-scores/rules', incidentId: body.incidentId,
     });
   });
 
-  // N-235: 手で直す口は、不可逆確認・冪等キー・権限・アカウント範囲を全部通す。
+  // 手で直す口は、不可逆確認・冪等キー・権限・アカウント範囲を全部通す。
   it('requires confirmation, an idempotency key and owner/admin role before adjusting', async () => {
     const body = JSON.stringify({
       accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 12, reason: '問い合わせ対応',

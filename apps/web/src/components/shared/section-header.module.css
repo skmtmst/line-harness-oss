@@ -1,0 +1,63 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/*
+ * 段の題（Pencil ★V8 `CugIm`）。
+ *
+ *   題 15/600（ink）・補足 12（ink-faint）・「？」16・右端に行き先
+ *   リンク（text-action、12/500・action）。要素間の間隔は 6、
+ *   リンクの手前は空きを広げて右へ寄せる。
+ *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない。
+ */
+
+.root {
+  display: flex;
+  align-items: center;
+}
+
+.title {
+  margin: 0;
+  /* 題は1行で「…」。全文は要素の title で読める（RESPONSIVE.md）。 */
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--color-ink);
+}
+
+.note {
+  color: var(--color-ink-faint);
+}
+
+.root[data-wrap] {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.link {
+  margin-left: auto;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+/* 右端の操作（…）と行き先リンクを両方持つ段は、2つを右端に並べる（間で空きを分けない）。 */
+.link + .link {
+  margin-left: 0;
+}
+:root .title { line-height: 23px; }
+/* 補足の円と当たりは HelpTip が持つ。包みの span に二重の円を描かない。 */
+
+}
+
+:root .root[data-size="small"] .title { font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-rt-label-lh); }
+
+:root .root { gap: var(--polish-space-row); }
+:root .root[data-separation='section'] { margin-block-start: var(--space-12); }
+
+/* ②：役割ごとの文字の段。 */
+:root .title, :root .root[data-size='small'] .title { font-size: var(--tpl-section-title-size); font-weight: var(--tpl-section-title-weight); white-space: normal; overflow: visible; text-overflow: clip; }
+:root .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); }
+
+:root .root[data-size="small"] .title { font-size: var(--tpl-section-title-size); font-weight: var(--tpl-section-title-weight); line-height: var(--tpl-rt-label-lh); }
+@layer components { .labels{min-width:0;display:flex;flex-direction:column;gap:2px;}.description{margin:0;font-size: 12px;line-height:16px;color:var(--color-ink-secondary);}}
+
+@layer components { :root .root[data-size='customer'] .title{font-size:13px;line-height:20px;} }
+
+@layer components { :root .root[data-size='customer']{gap:6px;} }

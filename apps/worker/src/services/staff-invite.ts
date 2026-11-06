@@ -1,6 +1,6 @@
-import type { Env } from '../index.js';
-import { renderMailHtml } from './mail-html.js';
+import type { Env } from '../worker-env.js';
 import { sendPlainMail as send } from './plain-mail.js';
+import { renderMailHtml } from './mail-html.js';
 
 type Invite = { name: string; email: string; verifyUrl?: string; lineUrl?: string };
 
@@ -10,18 +10,7 @@ type Invite = { name: string; email: string; verifyUrl?: string; lineUrl?: strin
  * 文字の本文は消さない。HTMLを読めない相手にも同じことが伝わるようにする。
  */
 export async function sendStaffInviteEmail(env: Env['Bindings'], input: Invite): Promise<void> {
-  await send(env, {
-    to: input.email,
-    subject: '【musubo】管理画面への招待',
-    body: `${input.name} 様\n\n管理画面へ招待されました。次のURLからメールアドレスを確認してください。\n${input.verifyUrl}\n\nこのURLの有効期限は7日間です。`,
-    html: renderMailHtml({
-      heading: '管理画面への招待',
-      lead: `${input.name} 様`,
-      paragraphs: ['管理画面へ招待されました。下のボタンからメールアドレスを確認してください。'],
-      action: { label: 'メールアドレスを確認する', url: input.verifyUrl ?? '' },
-      notes: ['このリンクの有効期限は7日間です。'],
-    }),
-  });
+  await send(env, { to: input.email, subject: '【musubo】管理画面への招待', body: `${input.name} 様\n\n管理画面へ招待されました。次のURLからメールアドレスを確認してください。\n${input.verifyUrl}\n\nこのURLの有効期限は7日間です。` });
 }
 
 export async function sendStaffLineLinkEmail(env: Env['Bindings'], input: Invite): Promise<void> {
@@ -40,7 +29,7 @@ export async function sendStaffLineLinkEmail(env: Env['Bindings'], input: Invite
 }
 
 /*
- * N-433: 本人が自分のメールアドレスを変えるときの確認便り。
+ * 本人が自分のメールアドレスを変えるときの確認便り。
  *
  * 新しい宛先へ確認リンクを送り、開かれてはじめて変更が確定する。
  * 旧アドレスへは申し込みと完了の知らせを送り、覚えのない変更に

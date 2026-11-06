@@ -13,10 +13,10 @@
 /*
  * 共通メニューの右側。縦に「トップバー」と「本文」。
  *
- * `min-height` にする。**高さを 1080px と書かない。** ★V6 の画面の高さは
+ * `min-height` にする。**高さを 1080px と書かない。** ★管理画面 の画面の高さは
  * 12種類あり（1080が180枚、1136が49枚、1840が17枚…）、絵の高さは中身の量を
  * 表しているだけで寸法の指定ではない。固定にすると、縦の短いPCで中身が
- * 無いのに縦スクロールが出る（`docs/v6-common-rules.md` §1）。
+ * 無いのに縦スクロールが出る（`docs/v8-design-rules.md` §5）。
  */
 .side {
   display: flex;
@@ -30,7 +30,7 @@
   min-width: 0;
   flex: 1;
   overflow: auto;
-  background: var(--color-shell);
+  background: var(--color-board-tint);
 }
 
 .content {
@@ -41,11 +41,23 @@
 }
 
 /*
- * 受信箱のような3カラム全画面用。ページが `useFullWidthPage()` を
+ * 受信箱のような3カラム全画面用。ページが `useFullWidthPage` を
  * 呼んだときだけ効く。**ルート名で自動判定しない**（§11-3）。
  */
 .contentFull {
   max-width: none;
+}
+
+/* Page templates cancel the content wrapper's padding with negative margins.
+   Keep the account-wide notice outside that wrapper so the page cannot cover it. */
+.securityNotice {
+  /* 下は 0。下の画面が自分の上の余白（見出しの 24px など）を持っているので、足すと 40px 空く。 */
+  margin: var(--polish-space-card) var(--polish-space-section) 0;
+}
+
+/* 受信箱は上の余白を持たずに枠から始まるので、お知らせとのあいだを空ける。 */
+.securityNotice:has(+ .content [data-page-template='inbox']) {
+  margin-bottom: var(--polish-space-card);
 }
 
 @media (min-width: 640px) {
@@ -65,7 +77,8 @@
  *   で拾う。`/accounts/new` の専用シェルにはヘッダー自体が無い。
  */
 @media (max-width: 1279.98px) {
-  .side {
+  .shell {
+    /* 警告も本文も固定ヘッダーの下に置く。本文だけを下げると警告が隠れる。 */
     padding-top: var(--mobile-header-height);
   }
 
@@ -75,14 +88,7 @@
 }
 
 @media (min-width: 1024px) {
-  /* 本文の上余白は14px。★V6 260枚すべてで例外がなかった値（§4）。 */
-  .content {
-    padding: 14px 40px 32px;
-  }
-
-  .contentFull {
-    padding: 14px 40px 32px;
-  }
+  /* 本文の上余白は14px。★管理画面 260枚すべてで例外がなかった値（§4）。 */
 }
 
 /*
@@ -102,7 +108,7 @@
 }
 
 /*
- * 本文へ移動（★V7 修正方針 §2 `sM9FE`）。焦点が来るまで画面の外に置く。
+ * 本文へ移動（★管理画面 修正方針 §2 `sM9FE`）。焦点が来るまで画面の外に置く。
  * `display:none` にすると Tab で選べなくなるので、位置だけずらす。
  */
 .skipLink {
@@ -113,9 +119,9 @@
   padding: 8px 14px;
   border-radius: var(--radius-control);
   background: var(--color-ink);
-  color: #ffffff;
+  color: var(--color-on-accent);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
   transform: translateY(-200%);
 }
 
@@ -126,4 +132,171 @@
 /* 本文へ移動で焦点を受ける。枠は出さない（焦点は本文の最初の操作へ Tab で進む）。 */
 .main:focus {
   outline: none;
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8 外側（移行③・Pencil `zUg8S` / lh-pro-ui §1）
+ *
+ * 外の地は ground の灰。左メニューと上の帯は地の上に直接置き、
+ * 中身だけを薄い灰の板（board-tint）1枚に載せる。板の中のまとまりは白いカード。
+ * PC 幅（1024px 以上）だけの見た目で、モバイルの引き出しは 管理画面 のまま。
+ * ------------------------------------------------------------------- */
+@media (min-width: 1024px) {
+  :root .main {
+    /* 左メニュー（240）が右に12の余白を持つので、板の左は0。右12・下12（zUg8S）。
+       左にも12を足すと間が二重（24）になり、板が狭くなって表がはみ出す。 */
+    margin: 0 12px 12px 0;
+    border: 1px solid var(--color-board-line);
+    border-radius: var(--radius-panel);
+    background: var(--color-board-tint);
+    box-shadow: var(--shadow-board);
+  }
+
+  /* 板の中の余白は板が持つ。内容の左右は 24px。 */
+  :root .content,
+  :root .contentFull {
+    padding: 20px 24px 24px;
+  }
+}
+
+/*
+ * ★V8：画面の高さを外枠で止め、送るのは白い板（.main）の中だけにする（動きの点検・4回目）。
+ * これまでは .shell が min-height だけで高さの上限が無く、中身が長いとページ全体が送られて、
+ * 作る・編集の画面の下の帯（sticky）が画面の外へ出ていた。.main が送る入れ物になれば、
+ * 下の帯は常に画面の下に、上の帯と左メニューは動かずに残る。
+ * PC 幅（1024px 以上）だけ。スマホは固定ヘッダーとページ全体の送りのまま。
+ */
+@media (min-width: 1024px) {
+  :root .shell {
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  /* 中の絶対配置（読み上げ用の隠し文字など）が板の外へ出てページを伸ばさないよう、板を基準にする。 */
+  :root .main {
+    position: relative;
+    min-height: 0;
+    overscroll-behavior: contain;
+  }
+
+  /* 短い板は内容の下で止める。長い内容は同じmainの中で送り、外枠は伸ばさない。 */
+  :root .main:has(> .content > [data-frame-height='content']) {
+    flex: 0 1 auto;
+  }
+}
+
+/* v8 の帯は 1280px 未満でも出す（畳んだ左メニューと組む）。モバイルの
+   固定ヘッダー分の上余白は 1024px から要らない。 */
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  :root .shell {
+    padding-top: 0;
+  }
+
+  :root .workspace > .main {
+    padding-top: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8（夕41）：設定の画面は白い板の中の左に「設定の中のメニュー」
+ * （幅208）を付ける。板の左端からメニューが始まるので、この画面では
+ * .content の余白を取り、中身の欄が従来どおりの余白を持つ。
+ * 1024px 未満では中のメニューを畳む。
+ * ------------------------------------------------------------------- */
+:root .contentSettings {
+  padding: 0;
+}
+
+/* ★V8：統括の「統括の情報」も板の左端から中のメニューが
+   始まる形。ただし左メニューの中身が統括用（`HqSettingsNav`）で共通の
+   `SettingsInnerNav` ではないため、上の `contentSettings`（道で決まる）は
+   使えない。画面側が付ける `data-board-bleed` を目印にして、板の余白だけ
+   取る。余白は画面側（頭と中身）が持つ。 */
+:root .content:has(> [data-board-bleed]) {
+  padding: 0;
+}
+
+/* 設定の住所で外のメニューを出さないときの包み。並びには影響させない（本文を作り直さないためだけの箱）。 */
+.settingsPass {
+  display: contents;
+}
+
+:root .settingsBody {
+  min-width: 0;
+  padding: 24px 16px;
+}
+
+@media (min-width: 640px) {
+  :root .settingsBody {
+    padding-inline: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root .settingsBody {
+    padding: 20px 24px 24px; /* .content の v8 の余白と同じ */
+  }
+}
+
+@media (min-width: 1024px) {
+  :root .settingsSplit {
+    display: flex;
+    align-items: stretch;
+    /* 上の帯 60 + 板の下余白 12 + 板の枠 2。中身が短い画面でも
+       左の線が板の下端まで届くようにする。 */
+    min-height: calc(100dvh - 74px);
+  }
+
+  :root .settingsBody {
+    flex: 1;
+  }
+}
+
+/* 運営の板も固定絵の外側24を共通の外枠が持つ。 */
+:root .content[data-content-layout='ops'] { padding: var(--polish-space-section); }
+
+/* 固定絵が内容の下で終わる板。送りは main 内に保つ。 */
+:root .main:has([data-height-mode='content']) { flex: 0 1 auto; }
+
+/*
+ * 板の右の送るバー。普段は見せず、板に乗せて送る時だけ濃くする。
+ * 触れない端末では常に見せる（送る口が無いと気づけないため）。
+ */
+@media (hover: hover) {
+  :root .main {
+    scrollbar-color: transparent transparent;
+  }
+
+  :root .main:hover {
+    scrollbar-color: var(--color-scroll-thumb-hover) transparent;
+  }
+
+  :root .main::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+
+  :root .main:hover::-webkit-scrollbar-thumb {
+    background-color: var(--color-scroll-thumb-hover);
+  }
+}
+
+/* 明示した画面の高さだけ、外枠とお知らせを除いた残りを親から受け取る。
+   対象条件は templates/page-templates.module.css の親収容・保存帯の規則と対で保つ。 */
+@media (min-width: 1024px) {
+  :root .main[id='main-content']:has(> .content[data-design-shell] > :global([data-page-template][data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']))) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  :root .main[id='main-content']:has(> .content[data-design-shell] > :global([data-page-template][data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']))) > .securityNotice {
+    flex-shrink: 0;
+  }
+
+  :root .main[id='main-content'] > .content[data-design-shell]:has(> :global([data-page-template][data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']))) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
 }

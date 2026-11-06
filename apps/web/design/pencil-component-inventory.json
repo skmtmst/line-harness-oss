@@ -7,7 +7,7 @@
   ],
   "$pencilFile": "4b332ccf-fe84-4df8-9e23-6554f2bef197/pencil-new.pen",
   "$snapshot": {
-    "reusableComponents": 86,
+    "reusableComponents": 87,
     "componentDefinitionsInspected": 86,
     "globalReferenceCount": "unverified",
     "globalReferenceCountReason": "Pencil全体のref visitorは規模上限で中断したため、既存契約で実測済みの部品以外は参照回数を合格証拠にしない。",
@@ -2378,7 +2378,27 @@
         "action": "reuse",
         "target": "Notice/Toast"
       },
-      "lastCheckedAt": "2026-09-26"
+      "lastCheckedAt": "2026-09-30"
+    },
+    "z97zZN": {
+      "name": "★V7 仕上げ（並び・状態・待ち時間・表）",
+      "family": "bulk-actions",
+      "classification": "global",
+      "designState": "bulk-bar",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "variant"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "BulkBar"
+      },
+      "lastCheckedAt": "2026-09-30"
     }
   }
 }

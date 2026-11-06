@@ -1,11 +1,11 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import { countActivePlatformAdmins, getPlatformAdminByStaffId } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { dbFor } from '../services/db-router.js';
 
 /**
- * 運営マスター（★V6 37）の門番。
+ * 運営マスター（★37）の門番。
  *
  * 判定は platform_admins に登録され、かつ有効であること。役割（owner/admin）や
  * 所属する統括とは別の軸で見る。
@@ -40,7 +40,7 @@ export async function legacyDefaultTenantOwner(c: Context<Env>): Promise<boolean
 /**
  * ログイン処理の途中など、まだ c.get('staff') が無い場面向け。staff_members の
  * 行（または同じ形）から同じ判定をする。LINE ログインの運営コンソール分岐
- * （★V6 37-1）と /api/auth/session が使う。判定の中身は isPlatformAdmin と同じ。
+ * （★37-1）と /api/auth/session が使う。判定の中身は isPlatformAdmin と同じ。
  */
 export type PlatformAdminCandidate = {
   id: string;
@@ -69,17 +69,8 @@ async function legacyDefaultTenantOwnerRow(db: D1Database, candidate: PlatformAd
   if (candidate.role !== 'owner' || candidate.readOnly) return false;
   if ((candidate.tenantId ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID) return false;
   /*
-   * 「登録が完了して有効な運営マスター」の数え方は countActivePlatformAdmins に
-   * そろえる（is_active=1 かつ activation_state='active'）。
-   *
-   * 以前はここだけ is_active=1 のみで数えていた。招待の行は
-   * is_active=1 / activation_state='invited' で作られる（upsertPlatformAdminInvite）
-   * ため、誰も自己登録しないまま他人を招待すると、
-   *   - この互換判定は「登録済みが居る」と読んで無効になる
-   *   - 一方 getPlatformAdminByStaffId は 'invited' を運営マスターと認めない
-   * となり、運営マスターが 0 人のまま誰も /ops に入れなくなっていた。
-   * 招待メールが失効すると再送も requirePlatformAdminWrite を要求するため、
-   * 画面からは復旧できない。
+   * 有効な運営マスターの判定は countActivePlatformAdmins と同じ is_active=1 かつ activation_state='active' にする。
+   * 未登録の招待行まで有効と数えると、誰も /ops へ入れず、招待が失効した際に画面から復旧できなくなる。
    */
   return (await countActivePlatformAdmins(db)) === 0;
 }

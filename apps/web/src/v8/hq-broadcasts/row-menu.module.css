@@ -1,0 +1,2 @@
+/* 行末の「…」の箱。メニューはこの箱に付ける。 */
+.rowMenu { display: inline-flex; position: relative; }

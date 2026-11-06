@@ -2,9 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 
 /**
- * 点検 #500 の「中」掲載一覧N+1の再発防止。
- * 掲載先の取得が写真の件数によらず1回であること、掲載ごとの振り分けが
- * 従来の形のままであることを見る。
+ * 掲載先の取得が写真件数にかかわらず1回で済み、写真ごとの掲載状態が正しく振り分けられることを確かめる。
  */
 
 const accessMocks = vi.hoisted(() => ({
@@ -29,7 +27,7 @@ function fakeDb(options: { publications: Row[]; placements: Row[]; inactive?: Ro
             if (sql.includes('nen_photo_publication_placements')) {
               return { results: options.placements }
             }
-            // Issue #1040: 公開中ではない掲載（撤回済み・同意撤回で整理待ち）は
+            // 公開中ではない掲載（撤回済み・同意撤回で整理待ち）は
             // `pub.withdrawn_at` を持つ2本目の問い合わせで取る。
             if (sql.includes('pub.withdrawn_at')) {
               return { results: options.inactive ?? [] }

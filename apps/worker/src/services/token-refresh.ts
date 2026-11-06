@@ -1,30 +1,22 @@
-/**
- * Token auto-refresh — proactively renew LINE channel access tokens before expiry.
- *
- * LINE's stateless token API uses client_credentials grant:
- * POST channel_id + channel_secret → new access_token (30 days).
- * No refresh_token needed.
- *
- * Runs every cron cycle (5 min). Only refreshes when:
- * - token_expires_at is within 7 days, OR
- * - token_expires_at is NULL (legacy, unknown expiry — refresh once to start tracking)
- */
+import { lineObservationTime, jstCalendar as japanCalendar, type LineTokenRefreshFailureReason } from '@line-crm/shared';
+import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
+/** LINE の client_credentials で有効期限30日のトークンを発行する。5分の cron ごとに、期限まで7日以内か期限不明のアカウントだけを更新し、失効前に交換する。 */
 
 import { getLineAccounts, updateLineAccount, updateLineAccountFields } from '@line-crm/db';
 import type { LineAccount } from '@line-crm/db';
 import { fetchBotProfile } from '../lib/bot-profile.js';
+import { LINE_TOKEN_REFRESH_WINDOW_MS, recordLineTokenRefreshFailure } from './line-token-notices.js';
 
-const REFRESH_THRESHOLD_MS = 7 * 24 * 60 * 60_000; // 7 days
-const JST_OFFSET_MS = 9 * 60 * 60_000;
+const REFRESH_THRESHOLD_MS = LINE_TOKEN_REFRESH_WINDOW_MS; // 7 days
 
 function jstNow(): string {
-  const jst = new Date(Date.now() + JST_OFFSET_MS);
+  const jst = japanCalendar();
   return jst.toISOString().slice(0, -1) + '+09:00';
 }
 
 function shouldRefresh(account: LineAccount): boolean {
-  if (!account.token_expires_at) return true; // unknown expiry
-  const expiresAt = new Date(account.token_expires_at).getTime();
+  if (!account.token_expires_at) return true; // 期限が分からない場合も、一度更新して以後の期限を追えるようにする。
+  const expiresAt = lineObservationTime(account.token_expires_at);
   return expiresAt - Date.now() < REFRESH_THRESHOLD_MS;
 }
 
@@ -36,7 +28,7 @@ function shouldSyncProfile(account: LineAccount): boolean {
 
 export interface TokenResponse {
   access_token: string;
-  expires_in: number; // seconds
+  expires_in: number; // 単位は秒。
   token_type: string;
 }
 
@@ -57,11 +49,7 @@ export class LineTokenIssueError extends Error {
   }
 }
 
-/**
- * Issue a channel access token through the existing LINE OAuth endpoint.
- * Response bodies are intentionally never copied into exceptions because they
- * may contain operational details that must not reach logs or browser errors.
- */
+/** LINE の既存 OAuth でトークンを発行する。応答本文に運用上の情報が含まれ得るため、例外へ写してログや画面へ出さない。 */
 export async function issueLineAccessToken(
   channelId: string,
   channelSecret: string,
@@ -115,7 +103,7 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
     if (shouldRefresh(account)) {
       try {
         const token = await issueLineAccessToken(account.channel_id, account.channel_secret);
-        const expiresAt = new Date(Date.now() + token.expires_in * 1000 + JST_OFFSET_MS);
+        const expiresAt = japanCalendar(new Date(Date.now() + token.expires_in * 1000));
         const expiresAtJst = expiresAt.toISOString().slice(0, -1) + '+09:00';
 
         await updateLineAccount(db, account.id, {
@@ -124,9 +112,21 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
         });
         accessToken = token.access_token;
 
-        console.log(`🔄 Token refreshed: ${account.name} (expires ${expiresAtJst})`);
+        logger.log("services_token_refresh_log");
       } catch (err) {
-        console.error(`❌ Token refresh failed for ${account.name}:`, err);
+        const reason: LineTokenRefreshFailureReason = err instanceof LineTokenIssueError ? err.reason : 'unexpected';
+        // ログは固定のイベント名と状態番号だけ。理由は知らせの記録に残す。
+        logger.error(reason === 'credentials'
+          ? 'token_refresh.refresh_failed.credentials'
+          : 'token_refresh.refresh_failed', {
+          status: err instanceof LineTokenIssueError ? err.status ?? undefined : undefined,
+        });
+        // 自動で直らない失敗だけを知らせに残す。書けなくても取り替えとプロフィールの同期は続ける。
+        try {
+          await recordLineTokenRefreshFailure(db, account, reason);
+        } catch {
+          logger.error("token_refresh.failure_notice_failed");
+        }
       }
     }
 
@@ -142,7 +142,7 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
           });
         }
       } catch (err) {
-        console.error(`❌ LINE profile sync failed for ${account.name}:`, err);
+        logger.error("token_refresh.refresh_line_access_tokens_failed");
       }
     }
   }

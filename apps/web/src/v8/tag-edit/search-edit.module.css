@@ -1,0 +1,52 @@
+/*
+ * ★V8 保存した検索の編集。
+ * 頭・左右の列・下の帯は型（CreatePage）。頭の行の間6・説明13/19 だけこの画面で上書きする。
+ */
+.page { display: contents; }
+.loading { margin: 0; padding: var(--tpl-eds-loading-pad); color: var(--color-ink-faint); font-size: var(--text-label); }
+.backLink { display: inline-flex; align-items: center; gap: var(--tpl-eds-back-gap); color: var(--color-action); font-size: var(--text-label); font-weight: 600; text-decoration: none; }
+.backLink:hover { text-decoration: underline; }
+
+.hint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-eds-hint-lh); }
+
+/* カード：枠1本・角12・余白20・間14。 */
+.field { display: flex; flex-direction: column; gap: var(--tpl-eds-field-gap); min-width: 0; }
+.labelRow { display: inline-flex; align-items: center; gap: var(--tpl-eds-field-gap); }
+.labelStrong { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-eds-label-lh); }
+.label { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-eds-label2-lh); }
+.input { width: 100%; }
+
+/* 共有：灰の地に選んだ所だけ白（切り替え）。 */
+/* 条件の行：つなぎ37・種類140・比べ方120・値・×28。間8。 */
+.conditionRow { display: flex; align-items: center; gap: var(--tpl-eds-cond-gap); min-width: 0; }
+.opFirst,
+.opAnd,
+.opOr { flex: 0 0 auto; min-width: var(--tpl-eds-op-w); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-eds-note-lh); white-space: nowrap; }
+.opFirst { color: var(--color-action); }
+.opAnd { color: var(--color-accent-deep); }
+.opOr { color: var(--color-warning); }
+.grow { flex: 1 1 0; min-width: 0; }
+.grow :global(*) { max-width: 100%; }
+.growNote { flex: 1 1 0; min-width: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
+.dateRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--tpl-eds-cond-gap); min-width: 0; }
+.dateLabel { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-back-gap); min-width: var(--tpl-eds-date-min); color: var(--color-ink-faint); font-size: var(--text-caption); font-weight: 600; }
+.dateDash { color: var(--color-ink-faint); }
+.addButtons { display: flex; gap: var(--tpl-eds-cond-gap); }
+.listRow { display: flex; gap: var(--tpl-eds-list-gap); }
+
+/* 右の列：当てはまる人（数 32/700＋人 14）・使っている所（行 余白8/0・名110）・案内の帯。 */
+.side { display: flex; flex-direction: column; gap: var(--tpl-eds-aside-gap); width: 100%; }
+.sideHead { display: flex; align-items: center; gap: var(--tpl-eds-field-gap); }
+.sideTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 600; line-height: var(--tpl-eds-side-title-lh); }
+.count { display: flex; align-items: flex-end; gap: var(--tpl-eds-count-gap); margin: 0; }
+.countNum { color: var(--color-ink); font-size: var(--tpl-eds-count-size); font-weight: 700; line-height: var(--tpl-eds-count-lh); }
+.countUnit { color: var(--color-ink-secondary); font-size: var(--text-body); line-height: normal; }
+.countNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-eds-hint-lh); }
+.staleTitle { margin: 0; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; }
+.staleLine { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.sideButtons { display: flex; flex-wrap: wrap; gap: var(--tpl-eds-cond-gap); }
+.useList { display: flex; flex-direction: column; margin: 0; }
+.useRow { display: flex; align-items: center; min-width: 0; padding: var(--tpl-eds-use-pad); box-shadow: var(--shadow-row-line); }
+.useRow > dt { flex: 0 0 var(--tpl-eds-use-label-w); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }
+.useRow > dd { min-width: 0; margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
+.infoIcon { flex-shrink: 0; color: var(--color-action); }

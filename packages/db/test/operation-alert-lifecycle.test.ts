@@ -47,13 +47,13 @@ async function observe(status: OperationHealthStatus, runId: string, now: string
  * 実運用と同じ形で1回分の確認を記録する。確認の履歴（operation_health_results）も
  * 残すので、「前回も正常だったか」を見る解消の判定を試験できる。
  */
-async function observeRecorded(status: OperationHealthStatus, runId: string, now: string): Promise<void> {
+async function observeRecorded(status: OperationHealthStatus, runId: string, now: string, checkKey: OperationHealthResult['checkKey'] = 'webhook'): Promise<void> {
   sqlite.prepare(
     `INSERT OR IGNORE INTO operation_health_runs
        (id, scope_key, line_account_id, window_started_at, source, status, overall_status, started_at, completed_at)
      VALUES (?, 'account-1', 'account-1', ?, 'scheduled', 'completed', ?, ?, ?)`,
   ).run(runId, now, status, now, now);
-  const result = { ...healthResult(status), runId, observedAt: now };
+  const result = { ...healthResult(status), checkKey, runId, observedAt: now };
   sqlite.prepare(
     `INSERT INTO operation_health_results (id, run_id, check_key, status, summary, source, observed_at)
      VALUES (?, ?, ?, ?, ?, 'test', ?)`,
@@ -79,6 +79,46 @@ beforeEach(() => {
 });
 
 describe('運用異常alertのライフサイクル', () => {
+  it('配信枠の未確認を挟んでも受領済み注意を再通知しない', async () => {
+    const inspect = async (status: OperationHealthStatus, runId: string) => {
+      await reconcileOperationHealthAlerts(db, { lineAccountId: 'account-1', runId,
+        results: [{ ...healthResult(status), checkKey: 'message_quota', runId }], now: '2026-09-16T00:00:00.000Z' });
+    };
+    for (const id of ['one', 'two', 'three']) sqlite.prepare(
+      `INSERT INTO operation_health_runs (id, scope_key, line_account_id, window_started_at, source, status, overall_status, started_at)
+       VALUES (?, 'account-1', 'account-1', ?, 'scheduled', 'completed', 'warning', ?)`
+    ).run(id, id, '2026-09-16T00:00:00.000Z');
+    await inspect('warning', 'one');
+    let [alert] = await listOperationAlerts(db, { lineAccountId: 'account-1' });
+    await acknowledgeOperationAlert(db, { id: alert.id, lineAccountId: 'account-1', actorId: 'owner-1', expectedVersion: alert.version, note: '確認中' });
+    await inspect('unknown', 'two');
+    await inspect('warning', 'three');
+    [alert] = await listOperationAlerts(db, { lineAccountId: 'account-1' });
+    expect(alert).toMatchObject({ status: 'acknowledged', severity: 'warning', acknowledgedById: 'owner-1' });
+    expect(alert.events.map(({ action }) => action)).not.toContain('escalated');
+  });
+  it.each([
+    { key: 'message_quota', first: 'warning', last: 'danger', result: 'open', severity: 'danger', escalated: true },
+    { key: 'message_quota', first: 'danger', last: 'danger', result: 'acknowledged', severity: 'danger', escalated: false },
+    { key: 'webhook', first: 'warning', last: 'warning', result: 'open', severity: 'warning', escalated: true },
+  ] as const)('$key の $first は未確認後の $last を正しく処理する', async ({ key, first, last, result, severity, escalated }) => {
+    await observeRecorded(first, 'run-a', '2026-09-16T00:00:00Z', key);
+    let [alert] = await listOperationAlerts(db, { lineAccountId: 'account-1' });
+    await acknowledgeOperationAlert(db, { id: alert.id, lineAccountId: 'account-1', actorId: 'owner-1', expectedVersion: alert.version, note: '確認中' });
+    await observeRecorded('unknown', 'run-b', '2026-09-16T00:05:00Z', key);
+    await observeRecorded(last, 'run-c', '2026-09-16T00:10:00Z', key);
+    [alert] = await listOperationAlerts(db, { lineAccountId: 'account-1' });
+    expect(alert).toMatchObject({ status: result, severity });
+    expect(alert.events.some(({ action }) => action === 'escalated')).toBe(escalated);
+  });
+  it('配信枠は未確認後も正常を2回確認して解消する', async () => {
+    await observeRecorded('warning', 'run-a', '2026-09-16T00:00:00Z', 'message_quota');
+    await observeRecorded('unknown', 'run-b', '2026-09-16T00:05:00Z', 'message_quota');
+    await observeRecorded('normal', 'run-c', '2026-09-16T00:10:00Z', 'message_quota');
+    expect(await listOperationAlerts(db, { lineAccountId: 'account-1' })).toHaveLength(1);
+    await observeRecorded('normal', 'run-d', '2026-09-16T00:15:00Z', 'message_quota');
+    expect(await listOperationAlerts(db, { lineAccountId: 'account-1' })).toHaveLength(0);
+  });
   it('同じ異常をまとめ、悪化・受領・解消・再発を版付き履歴に残す', async () => {
     await observe('warning', 'run-open', '2026-09-16T00:00:00.000Z');
     await observe('warning', 'run-same', '2026-09-16T00:05:00.000Z');

@@ -1,0 +1,136 @@
+/*
+ * ★V8 統括のメンバー（Pencil ）。左の設定メニュー、一覧、本人の認証設定を並べる。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
+ */
+.buttonIcon {
+  width: var(--tpl-hq-button-icon);
+  height: var(--tpl-hq-button-icon);
+}
+.layout { display: grid; grid-template-columns: minmax(0, var(--tpl-settings-nav-width)) minmax(0, 1fr) var(--tpl-htn-aside-w); min-height: 100%; }
+.settingsNav { min-width: 0; padding: var(--polish-space-section) var(--polish-space-card); border-right: 1px solid var(--color-divider); }
+.main { display: flex; flex-direction: column; gap: var(--polish-space-card); min-width: 0; padding: var(--polish-space-section) var(--polish-space-card); }
+.main > :global([data-list-toolbar]) { flex: 0 0 auto; }
+.securityAside { min-width: 0; padding: var(--polish-space-section) var(--polish-space-card); border-left: 1px solid var(--color-divider); }
+.listCard { min-width: 0; padding: var(--polish-space-card); border: 1px solid var(--card-edge); border-radius: var(--radius-card); background: var(--color-canvas); box-shadow: var(--card-shadow); }
+.listTitle { margin: 0; font-size: var(--polish-text-section); color: var(--color-ink); font-weight: 700; }
+.listCount { margin: var(--polish-space-row) 0 var(--polish-space-card); color: var(--color-ink-faint); font-size: var(--text-caption); }
+.identity { display: flex; flex-direction: column; min-width: 0; gap: var(--tpl-sa-passkey-meta-gap); }
+.identity strong, .identity small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.identity strong { color: var(--color-ink); font-size: var(--text-caption); }
+.identity small { color: var(--color-ink-faint); font-size: var(--text-micro); }
+.warning { color: var(--color-warning); font-size: var(--text-caption); font-weight: 600; }
+.listFoot { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-card); color: var(--color-ink-faint); font-size: var(--text-micro); }
+@media (max-width: 1339.98px) { .layout { grid-template-columns: minmax(0, var(--tpl-settings-nav-width)) minmax(0, 1fr); } .securityAside { grid-column: 2; border-left: 0; border-top: 1px solid var(--color-divider); } }
+@media (max-width: 899.98px) { .layout { display: flex; flex-direction: column; } .settingsNav { display: none; } }
+.shortText { white-space: nowrap; }
+
+.viewerBand { margin: 0; }
+
+.notice { margin: 0; color: var(--color-accent-deep); font-size: var(--text-label); }
+
+
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-card-gap);
+  min-width: 0;
+  padding: var(--tpl-hq-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+
+.cardValueRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-hq-card-gap);
+}
+
+/* 権限者の表（枠は outline・角丸12・見出しは薄い灰） */
+.table {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: var(--card-shadow);
+}
+
+.head,
+.row {
+  display: grid;
+  /* 名前は 160 で守り、メールアドレスだけ伸び縮み（はみ出しは …＋title）。絵 （2026-10-08） */
+  grid-template-columns: var(--tpl-hq-col-name) minmax(0, 1fr) var(--tpl-hq-col-role) var(--tpl-hq-col-scope) var(--tpl-hq-col-state) var(--tpl-hq-col-login) var(--tpl-hq-col-action);
+  align-items: center;
+  column-gap: var(--tpl-hq-col-gap);
+}
+
+.head {
+  padding: var(--tpl-hq-head-pad);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-hq-small-lh);
+  white-space: nowrap;
+}
+
+.row {
+  height: var(--tpl-hq-row-h);
+  padding: var(--tpl-hq-row-pad);
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-cell-lh);
+}
+
+.cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-hq-card-gap);
+  padding-right: var(--tpl-hq-action-pad);
+}
+
+.textButton {
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.textButton:disabled { opacity: var(--polish-disabled-opacity); }
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.confirmList { display: grid; gap: var(--tpl-hq-confirm-gap); }
+.confirmRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-col-gap);
+  padding-bottom: var(--tpl-hq-confirm-gap);
+  border-bottom: 1px solid var(--color-hairline);
+}
+.confirmLabel { width: var(--tpl-hq-confirm-label); flex-shrink: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
+.confirmValue { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-caption); }

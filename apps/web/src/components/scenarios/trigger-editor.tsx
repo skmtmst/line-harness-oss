@@ -17,15 +17,18 @@
  * 反映する。キャンセル・Esc・背景を押すと下書きは捨てられる。
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type ScenarioTriggerItem } from '@/lib/api'
 import { pruneCondition, type SegmentCondition } from '@/lib/segment-condition'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { describeCondition } from './scenario-dialogs'
 import { scenarioReferenceData } from './scenario-reference-data'
+import { formatNumber } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 interface TagOption {
   id: string
@@ -84,7 +87,15 @@ export default function TriggerEditor({
   activeNow = null,
   lineAccountId = null,
 }: TriggerEditorProps) {
+  const saveErrors = useSaveFormErrors()
+
   /** 最後にサーバーへ保存されている（されていると分かっている）一覧。 */
+  const subject = `${scenarioId}:${lineAccountId}`
+  const subjectRef = useRef({ key: subject, generation: 0 })
+  if (subjectRef.current.key !== subject) {
+    subjectRef.current = { key: subject, generation: subjectRef.current.generation + 1 }
+  }
+  const loadGeneration = useRef(0)
   const [saved, setSaved] = useState<ScenarioTriggerItem[] | null>(null)
   /** 編集中の下書き。ここを見せて、保存のときだけサーバーへ送る。 */
   const [draft, setDraft] = useState<ScenarioTriggerItem[]>([])
@@ -127,40 +138,57 @@ export default function TriggerEditor({
             }
           : { kind: 'error' },
       )
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       setMatch({ kind: 'error' })
     }
     // 条件の中身が変わったときだけ作り直す。参照の同一性では判断しない。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conditionKey, lineAccountId, scenarioId])
+  }, [conditionKey, lineAccountId, scenarioId, saveErrors])
 
   useEffect(() => {
     void recount()
   }, [recount])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (preserveDraft = false) => {
+    const at = subjectRef.current
+    const generation = ++loadGeneration.current
+    const isCurrent = () => at === subjectRef.current && generation === loadGeneration.current
     setLoading(true)
-    const res = await api.scenarios.triggers.list(scenarioId)
-    if (res.success) {
+    try {
+      const res = await api.scenarios.triggers.list(scenarioId)
+      if (!isCurrent()) return false
+      if (!res.success) throw new Error(res.error)
       setSaved(res.data)
-      setDraft(res.data)
+      if (!preserveDraft) setDraft(res.data)
       onChanged?.(res.data.length)
-    } else {
-      setError(res.error)
+      return true
+    } catch (saveFailure) {
+      if (!isCurrent()) return false
+      const fieldFailure = saveErrors.capture(saveFailure)
+      setSaved(null)
+      { if (!fieldFailure) setError('開始条件を読み込めませんでした。もう一度お試しください。') }
+      return false
+    } finally {
+      if (isCurrent()) setLoading(false)
     }
-    setLoading(false)
-    // onChanged は毎描画で作り直される可能性があるので依存に入れない。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenarioId])
+  }, [scenarioId, lineAccountId, saveErrors])
 
   useEffect(() => {
+    setSaved(null); setDraft([]); setError(''); setSaving(false)
     void load()
+    return () => { loadGeneration.current += 1 }
   }, [load])
 
   useEffect(() => {
+    let cancelled = false
+    setTags([])
     void scenarioReferenceData.tags(lineAccountId).then((res) => {
-      if (res.success) setTags(res.data.map((t) => ({ id: t.id, name: t.name })))
-    })
+      if (!cancelled && res.success) setTags(res.data.map((t) => ({ id: t.id, name: t.name })))
+    }).catch(() => { if (!cancelled) setError('タグを読み込めませんでした。') })
+    return () => { cancelled = true }
   }, [lineAccountId])
 
   /*
@@ -185,48 +213,38 @@ export default function TriggerEditor({
   }
 
   /** 下書きと保存済みが違うか。違っていれば「未保存」を面に出す。 */
-  const dirty =
-    saved !== null &&
-    (draft.length !== saved.length ||
-      draft.some((item) => !saved.some((s) => s.id === item.id)))
+  const sameTrigger = (a: (typeof draft)[number], b: (typeof draft)[number]) => a.kind === b.kind && a.tagId === b.tagId
+  const dirty = saved !== null &&
+    (draft.length !== saved.length || draft.some((item) => !saved.some((s) => sameTrigger(s, item))))
 
-  /*
-   * 下書きをまとめて反映する。
-   *
-   * 途中で失敗したときは一覧を読み直して実態に合わせる。半分だけ
-   * 反映された状態を「保存できた」と見せない。
-   */
   const save = async () => {
-    if (saving || saved === null) return
+    if (saved === null) return
+    const at = subjectRef.current
     setError('')
     setSaving(true)
-    const removed = saved.filter((s) => !draft.some((d) => d.id === s.id))
-    const added = draft.filter((d) => !saved.some((s) => s.id === d.id))
-    for (const trigger of removed) {
-      const res = await api.scenarios.triggers.remove(scenarioId, trigger.id)
-      if (!res.success) {
-        setError(res.error)
-        await load()
-        setSaving(false)
-        return
+    try {
+      const removed = saved.filter((s) => !draft.some((d) => sameTrigger(d, s)))
+      const added = draft.filter((d) => !saved.some((s) => sameTrigger(s, d)))
+      for (const trigger of removed) {
+        const res = await api.scenarios.triggers.remove(scenarioId, trigger.id)
+        if (!res.success) throw new Error(res.error)
       }
-    }
-    for (const trigger of added) {
-      const res = await api.scenarios.triggers.add(
-        scenarioId,
-        trigger.kind === 'tag_added' ? 'tag_added' : 'friend_add',
-        trigger.tagId,
-      )
-      if (!res.success) {
-        setError(res.error)
-        await load()
-        setSaving(false)
-        return
+      for (const trigger of added) {
+        const res = await api.scenarios.triggers.add(scenarioId,
+          trigger.kind === 'tag_added' ? 'tag_added' : 'friend_add', trigger.tagId)
+        if (!res.success) throw new Error(res.error)
       }
+      if (at === subjectRef.current && await load()) onClose()
+    } catch (error) {
+
+
+      if (at !== subjectRef.current) return
+      const fieldFailure = saveErrors.capture(error)
+      await load(true)
+      { if (!fieldFailure) setError(`${describeApiFailure(error, '保存')}変更は残しています。`) }
+    } finally {
+      if (at === subjectRef.current) { setSaving(false) }
     }
-    await load()
-    setSaving(false)
-    onClose()
   }
 
   const hasFriendAdd = draft.some((t) => t.kind === 'friend_add')
@@ -235,13 +253,13 @@ export default function TriggerEditor({
   const tagName = (id: string | null) => tags.find((t) => t.id === id)?.name ?? '（消されたタグ）'
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open
       title="シナリオの開始条件"
       description="どの出来事をきっかけに、どの友だちへ開始するかを設定します。変更は「開始条件を保存」を押すまで反映されません。"
       onCancel={onClose}
-      onConfirm={() => void save()}
-      confirmLabel="開始条件を保存"
+      onConfirm={() => save()}
+      confirmLabel="開始条件を保存する"
       cancelLabel="キャンセル"
       busy={saving}
       error={error || undefined}
@@ -252,6 +270,7 @@ export default function TriggerEditor({
         保存は常に見える位置へ置く。
       */}
       <div className="overflow-y-auto" style={{ maxHeight: 'calc(100dvh - 15rem)' }}>
+        {saved === null && error && <Button onClick={() => void load(true)}>もう一度読み込む</Button>}
         {dirty && (
           <Notice tone="warn" className="mb-4">
             未保存の変更があります。キャンセル・Esc・背景を押すと元に戻ります。
@@ -283,7 +302,7 @@ export default function TriggerEditor({
                   }`}
                 >
                   <span className="block">{kind.label}</span>
-                  <span className="text-ink-faint mt-0.5 block text-xs font-normal">
+                  <span className="text-ink-faint mt-0.5 block text-xs font-medium">
                     {kind.ready ? (configured ? '設定済み' : '足せます') : 'まだ使えません'}
                   </span>
                 </span>
@@ -345,18 +364,14 @@ export default function TriggerEditor({
               ＋ 友だち追加時
             </Button>
             <div className="min-w-0 flex-1">
-              <Select
-                aria-label="きっかけにするタグ"
-                size="full"
+              <SaveErrorField names={["addingTagId"]}><EntityKindField
+                kind="tag"
+                label="きっかけにするタグ"
                 value={addingTagId}
+                clearable
                 onChange={(value) => setAddingTagId(value)}
-                options={[
-                  { value: '', label: 'タグを選ぶ' },
-                  ...tags
-                    .filter((tag) => !usedTagIds.has(tag.id))
-                    .map((tag) => ({ value: tag.id, label: tag.name })),
-                ]}
-              />
+                options={tags.filter((tag) => !usedTagIds.has(tag.id))}
+              /></SaveErrorField>
             </div>
             <Button
               size="field"
@@ -374,18 +389,18 @@ export default function TriggerEditor({
           条件そのものの編集は詳細画面の「対象」から開くので、ここでは
           読むだけにして場所を案内する。
         */}
-        <section className="border-hairline rounded-card border px-4 py-3">
+        <section className="content-card rounded-card border px-4 py-3">
           <p className="text-ink text-sm font-bold">開始する友だちの条件</p>
           <p className="text-ink-secondary mt-2 text-sm">
             {usableCondition
               ? `対象の絞り込み：${describeCondition(usableCondition)}`
               : '対象の絞り込みは未設定です。フォロー中の友だち全員が対象です。'}
             {match.kind === 'ready'
-              ? ` いま一致するのは ${match.matched.toLocaleString('ja-JP')} 人です。`
+              ? ` いま一致するのは ${formatNumber(match.matched)} 人です。`
               : ''}
           </p>
           <p className="text-ink-faint mt-1 text-xs">
-            条件そのものは、シナリオ詳細の「開始のきっかけ」札にある「対象」から編集します。
+            条件そのものは、シナリオ詳細の「開始のきっかけ」のカードにある「対象」から編集します。
           </p>
         </section>
 
@@ -395,7 +410,7 @@ export default function TriggerEditor({
           稼働中・停止中は重ねて登録せず、読み終えた人は条件を満たすと
           もう一度始まる。選べないものを選択肢に見せないため、仕様の説明にする。
         */}
-        <div className="border-hairline rounded-card mt-4 border p-4">
+        <div className="content-card rounded-card mt-4 border p-4">
           <p className="text-ink text-sm font-bold">同じ友だちの開始回数</p>
           <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
             同じシナリオへ同時に入れるのは1人1つまでです。稼働中・停止中の人には重ねて開始しません。
@@ -415,7 +430,7 @@ export default function TriggerEditor({
               onClick={() => void recount()}
               disabled={!lineAccountId || match.kind === 'loading'}
               title={lineAccountId ? undefined : 'LINE公式アカウントを選んでください'}
-              className="text-action text-xs hover:underline disabled:opacity-40 disabled:no-underline"
+              className="text-action text-xs hover:underline disabled:no-underline"
             >
               対象を再計算
             </button>
@@ -426,11 +441,11 @@ export default function TriggerEditor({
               <dt className="text-ink-faint text-xs">一致</dt>
               <dd className="text-ink mt-0.5 text-xl font-bold tabular-nums">
                 {match.kind === 'ready' ? (
-                  `${match.matched.toLocaleString('ja-JP')}人`
+                  `${formatNumber(match.matched)}人`
                 ) : match.kind === 'loading' ? (
-                  <span className="text-ink-faint text-sm font-normal">読み込んでいます</span>
+                  <span className="text-ink-faint text-sm font-medium">読み込んでいます</span>
                 ) : match.kind === 'error' ? (
-                  <span className="text-danger text-sm font-normal">読み込めませんでした</span>
+                  <span className="text-danger text-sm font-medium">読み込めませんでした</span>
                 ) : (
                   <span className="text-ink-faint">—</span>
                 )}
@@ -440,9 +455,9 @@ export default function TriggerEditor({
               <dt className="text-ink-faint text-xs">すでに購読中</dt>
               <dd className="text-warning mt-0.5 text-xl font-bold tabular-nums">
                 {match.kind === 'ready'
-                  ? `${match.alreadySubscribed.toLocaleString('ja-JP')}人`
+                  ? `${formatNumber(match.alreadySubscribed)}人`
                   : typeof activeNow === 'number'
-                    ? `${activeNow.toLocaleString('ja-JP')}人`
+                    ? `${formatNumber(activeNow)}人`
                     : <span className="text-ink-faint">—</span>}
               </dd>
             </div>
@@ -450,7 +465,7 @@ export default function TriggerEditor({
               <dt className="text-ink-faint text-xs">予約中</dt>
               <dd className="text-success mt-0.5 text-xl font-bold tabular-nums">
                 {match.kind === 'ready'
-                  ? `${match.newStartPlanned.toLocaleString('ja-JP')}人`
+                  ? `${formatNumber(match.newStartPlanned)}人`
                   : <span className="text-ink-faint">—</span>}
               </dd>
             </div>
@@ -471,12 +486,12 @@ export default function TriggerEditor({
               ? '一致は「対象の絞り込み」に当てはまる友だちの数です。'
               : '絞り込みが空なので、フォロー中の友だち全員を数えています。'}
             {match.kind === 'ready'
-              ? ` 対象外は${match.excluded.toLocaleString('ja-JP')}人です。試算では配信も購読も始まりません。`
+              ? ` 対象外は${formatNumber(match.excluded)}人です。試算では配信も購読も始まりません。`
               : ' 試算では配信も購読も始まりません。'}
           </p>
         </div>
         <Notice tone="warn" className="mt-4">保存後も配信は始まりません。テスト送信と開始確認を完了してから稼働させます。</Notice>
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

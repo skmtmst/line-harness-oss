@@ -42,14 +42,15 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: fixture.routerReplace }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/line-notifications',
 }))
 
 /*
  * account切替を「実物のReact再レンダー」として起こすための、購読可能な口。
- * `commitAccountSwitch` は React のイベント・act() を経由しない生の
- * setState呼び出しで、レンダー（layout境界）と受動effect（load()の発火）を
+ * `commitAccountSwitch` は React のイベント・act を経由しない生の
+ * setState呼び出しで、レンダー（layout境界）と受動effect（loadの発火）を
  * 別のタスクへ切り離す——本番のブラウザで account切替の描画コミットと
- * load() の useEffect 発火が別々に起きるのと同じ非同期境界を保つ。
+ * load の useEffect 発火が別々に起きるのと同じ非同期境界を保つ。
  */
 const accountSetters = new Set<(id: string | null) => void>()
 function useControllableAccount(): string | null {
@@ -79,11 +80,11 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   useMergedTab: () => fixture.activeTab,
 }))
 
-vi.mock('@/components/line-notifications/notification-run-list', () => ({
+vi.mock('@/v8/settings/line-notifications/runs-tab', () => ({
   default: () => <section>送信記録</section>,
 }))
 
-vi.mock('./operator-notification-rules', () => ({
+vi.mock('@/v8/settings/line-notifications/operator-tab', () => ({
   default: () => <section>運用者へのお知らせ設定</section>,
 }))
 
@@ -125,6 +126,8 @@ vi.mock('@/lib/api', () => {
 })
 
 import { ApiError, type EcNotificationSetting, type LineNotificationDefinition } from '@/lib/api'
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffIdentity: () => null, useStaffRole: () => 'owner', canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
+
 import LineNotificationsPage from './page'
 
 const {
@@ -149,7 +152,7 @@ type MutationGuard = Parameters<typeof saveCustomerNotification>[0]['guard']
 
 /**
  * 画面が持つ「いまのアカウント世代」「いま向いているアカウント」「いまの文面の
- * 指紋」を、試験から動かせる形にする。保存を投げたあとに `type()` すれば、
+ * 指紋」を、試験から動かせる形にする。保存を投げたあとに `type` すれば、
  * 保存中の追加入力をそのまま再現できる。
  */
 function editorState(initial: EcNotificationSetting, accountId = 'account-a') {
@@ -526,14 +529,14 @@ describe('#678 保存中の追加入力を、古い応答で消さない', () =>
 /*
  * 司令塔の独立再審査REJECT（2026-09-09）。
  *
- * loadGeneration は load() の useEffect の中でしか進まない。Aの保存中に
+ * loadGeneration は load の useEffect の中でしか進まない。Aの保存中に
  * Bを選ぶと、選択中accountを映す描画そのものは同期的に済むが、Bの
- * load()（useEffect）が実際に発火して loadGeneration を進めるのは、
+ * load（useEffect）が実際に発火して loadGeneration を進めるのは、
  * それより後になる——その隙間で古いAの応答が返ると、旧来の実装は
  * isStale=false のまま A の localStorage の下書きを消し、dirty も
  * 解除してしまっていた。
  *
- * ここでは、Bの load() がまだ一度も発火していない（世代は据え置き）状態を
+ * ここでは、Bの load がまだ一度も発火していない（世代は据え置き）状態を
  * `moveRenderToAccountBeforeReload` で明示的に作り、そこへ旧Aの応答を
  * 返して固定する。
  */
@@ -598,14 +601,14 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
    *
    * ここでは実物の LineNotificationsPage をmountし、account context を
    * 実物のReact再レンダーとしてA→Bへ動かす。`commitAccountSwitch` は
-   * act()・React由来イベントを経由しない生のsetState呼び出しで、
-   * レンダー（layout境界）と load() の受動effect（useEffect）の発火を
+   * act・React由来イベントを経由しない生のsetState呼び出しで、
+   * レンダー（layout境界）と load の受動effect（useEffect）の発火を
    * 別のタスクへ切り離す。同じ木に置いた層効果（useLayoutEffect）の探針が
-   * 「Bへコミットした」瞬間を検出し、そこ——load()のuseEffectがまだ
+   * 「Bへコミットした」瞬間を検出し、そこ——loadのuseEffectがまだ
    * 一度も発火していない・loadGenerationが据え置きのままの
    * layout境界——で旧Aの保存応答を解放する。
    */
-  it('実物のLineNotificationsPageをmountし、layout境界（Bへコミット直後・load()のuseEffect発火前）で旧Aの応答を返しても、Aの控え・dirtyは保持されBへ漏れない', async () => {
+  it("実物のLineNotificationsPageをmountし、layout境界（Bへコミット直後・loadのuseEffect発火前）で旧Aの応答を返しても、Aの控え・dirtyは保持されBへ漏れない", async () => {
     fixture.settings.mockImplementation((accountId: string) => Promise.resolve({
       success: true,
       data: [setting({
@@ -635,7 +638,7 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
         if (seen.current === account || account !== 'account-b') return
         seen.current = account
         committedToB = true
-        // ここが本題。layout effect は「同じコミット内の受動effect（load()の
+        // ここが本題。layout effect は「同じコミット内の受動effect（loadの
         // useEffect）より必ず先に」実行される——React が保証する順序であり、
         // タイミングの偶然に頼っていない。
         releaseA({ success: true })
@@ -648,30 +651,30 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
       <LayoutBoundaryProbe />
       <LineNotificationsPage />
     </>)
-    await waitFor(() => expect(screen.getByText('A店の注文受付')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'A店の注文受付の内容を編集' })).toBeTruthy())
 
-    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    fireEvent.click(screen.getByRole('button', { name: /の内容を編集$/ }))
     const introBox = await screen.findByLabelText('ご案内文') as HTMLTextAreaElement
     fireEvent.change(introBox, { target: { value: 'Aで保存を押した時点の本文' } })
     await waitFor(() => expect(screen.getByText('未保存の変更があります')).toBeTruthy())
 
-    fireEvent.click(screen.getByRole('button', { name: 'お知らせを保存' }))
+    fireEvent.click(screen.getByRole('button', { name: 'お知らせを保存する' }))
     expect(committedToB).toBe(false)
 
-    // act() を経由しない生の setState。レンダーと load() の受動effectが
+    // act を経由しない生の setState。レンダーと load の受動effectが
     // 別タスクへ分かれることを、この境界試験そのものが要求している。
     commitAccountSwitch('account-b')
 
     await layoutCommitted
     expect(committedToB).toBe(true)
 
-    // load()（受動effect）はこの時点でまだ一度も発火していない。
+    // load（受動effect）はこの時点でまだ一度も発火していない。
     // レイアウトeffectは同じコミット内の受動effectより必ず先に走るという
     // Reactの保証により、ここでは待ち合わせではなく確定した事実として言える。
     expect(fixture.operatorList).not.toHaveBeenCalledWith('account-b')
     expect(fixture.settings).not.toHaveBeenCalledWith('account-b')
 
-    // まさにこの窓――load()のuseEffectがまだ発火していない――のうちに
+    // まさにこの窓――loadのuseEffectがまだ発火していない――のうちに
     // 解放された旧Aの応答では、Aの控えは消えていない。
     const stored = window.localStorage.getItem(customerDraftKey('account-a', 'order.confirmed'))
     expect(stored).not.toBeNull()
@@ -705,18 +708,18 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
    * （isStale＝世代とアカウントの両方）を通すよう直した。
    *
    * 【この試験がどう空振りしていたか（Issue #695 T1）】
-   * 前の版は「Bへ描画コミット済み・Bのload()未発火」の隙間で旧Aの応答を
+   * 前の版は「Bへ描画コミット済み・Bのload未発火」の隙間で旧Aの応答を
    * 解放し、`テスト受信者 3名へ送信しました` が出ないことを見ていた。
    * これは保護を全部外しても緑のままだった。理由は2つ:
-   *   1. `flushSync(() => {})` は空コールバックなので、default lane の
+   *   1. `flushSync( => {})` は空コールバックなので、default lane の
    *      setNotice を流しきれず DOM に出ない
-   *   2. 次に load() が走ると冒頭で setNotice(null) を呼ぶので、
+   *   2. 次に load が走ると冒頭で setNotice(null) を呼ぶので、
    *      仮に入っていたお知らせも消える
    * つまり判定は保護の有無にかかわらず必ず null だった。
    *
    * 【直し方】
-   * 隙間を狙うのをやめ、B の load() を最後まで終わらせてから旧Aの応答を
-   * 解放する。これなら後から notice を消す load() が無いので、漏れたお知らせは
+   * 隙間を狙うのをやめ、B の load を最後まで終わらせてから旧Aの応答を
+   * 解放する。これなら後から notice を消す load が無いので、漏れたお知らせは
    * 画面に残り続ける——競合のタイミングに頼らず決定的に観測できる。
    *
    * 観測は文字列ではなく「お知らせ枠が出ているか」で行う。保護
@@ -742,14 +745,14 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
     fixture.testSend.mockReturnValue(heldTestSend.promise)
 
     render(<LineNotificationsPage />)
-    await waitFor(() => expect(screen.getByText('A店の注文受付')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'A店の注文受付の内容を編集' })).toBeTruthy())
 
     // A で編集を開き、テスト送信の確認を開いて送信する（応答はまだ返さない）。
     // #988 NEXT-05: ボタン名は「テスト受信者に送信」。確認を開いただけでは
     // 送らず、宛先の読み込みが済んでから確認の中の送信ボタンを押す。
-    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    fireEvent.click(screen.getByRole('button', { name: /の内容を編集$/ }))
     await screen.findByLabelText('ご案内文')
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
     expect(fixture.testSend).not.toHaveBeenCalled()
     const confirmSend = await screen.findByRole('button', { name: 'テスト受信者 2名へ送信' })
     fireEvent.click(confirmSend)
@@ -757,7 +760,7 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
     expect(fixture.testSend.mock.calls[0][0]).toMatchObject({ accountId: 'account-a' })
 
     // B へ切り替え、B の読み直しを最後まで終わらせる。
-    // ここまで来ると、あとから notice を消す load() はもう走らない。
+    // ここまで来ると、あとから notice を消す load はもう走らない。
     commitAccountSwitch('account-b')
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
     await waitFor(() => {
@@ -786,7 +789,7 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
 
   /*
    * 逆変異で赤になる証拠はここ。isStale から account 照合だけを外すと、
-   * 世代が動いていない（Bのload()未発火）この状況で `applied` が返り、
+   * 世代が動いていない（Bのload未発火）この状況で `applied` が返り、
    * 旧Aのテスト送信結果が画面へ入る側に回る。
    */
   it('テスト送信: アカウントが替わっていれば、世代が据え置き（Bのload未発火）でも結果を画面へ入れない', async () => {
@@ -799,7 +802,7 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
       setting: sent,
       accountId: 'account-a',
       guard: {
-        // Bのload()はまだ発火していない。世代は据え置きのまま。
+        // Bのloadはまだ発火していない。世代は据え置きのまま。
         generation: 1,
         currentGeneration: () => 1,
         forAccountId: 'account-a',
@@ -1002,7 +1005,7 @@ describe('#678 「保存済み」にしてよい条件', () => {
 
   /*
    * 司令塔の再審査（独立審査REJECT）で指摘された、まさにその隙間。
-   * loadGeneration は load() の useEffect の中でしか進まない。Bを選んだ
+   * loadGeneration は load の useEffect の中でしか進まない。Bを選んだ
    * 直後・Bの useEffect がまだ発火していない（＝世代はまだ古いまま）状態でも、
    * 選択中accountはもう新しいアカウントを指している。世代だけを見る guard
    * では、この状態は「stale ではない」と誤判定する。account を独立して
@@ -1062,27 +1065,29 @@ describe('#678 実Reactで描いた編集画面', () => {
     hasUnsaved: false,
   }
 
-  /*
-   * 実寸は line-notifications-browser-behavior.mjs が実物のChromeで測る。
-   *   pnpm --filter web build
-   *   node apps/web/src/app/line-notifications/line-notifications-browser-behavior.mjs
-   * そこで測った値（折り返しなしだと 375px で右端 550px = 175px が画面の外、
-   * 折り返しありで 359px）を踏まえ、ここでは折り返しを外す変更を止める。
-   */
-  it('375px級でも固定フッターの主要操作を折り返し、横へはみ出す一列にしない', () => {
-    const html = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} />)
-    const actions = /<div data-design="editor-footer-actions" class="([^"]+)"/.exec(html)
-    expect(actions).not.toBeNull()
-    // ボタンの文字は共通部品側で nowrap。列が折り返さないと 375px で横に出る。
-    expect(actions![1]).toContain('flex-wrap')
-    expect(actions![1]).toContain('min-w-0')
-    const footer = /<div data-design="editor-footer" class="([^"]+)"/.exec(html)
-    expect(footer![1]).toContain('px-4')
-    expect(footer![1]).toContain('sm:px-6')
-    // 折り返した分だけ本文の下余白を広げ、最後の入力欄が隠れないようにする。
-    expect(html).toContain('pb-48 sm:pb-24')
-    expect(html).toContain('顧客へのお知らせを公開')
-    expect(html).toContain('下書きを保存')
+  it('変更がある時だけ共通の保存帯を出し、公開とテスト送信は変更前でも使える', () => {
+    const clean = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} />)
+    expect(clean).not.toContain('data-template-region="footer"')
+    expect(clean).not.toContain('下書きを保存する')
+    expect(clean).toContain('顧客へのお知らせを公開')
+    expect(clean).toContain('テスト受信者に送る')
+    const dirty = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} hasUnsaved />)
+    expect(dirty).toContain('data-template-region="footer"')
+    expect(dirty).toContain('data-sticky-layout="center"')
+    expect(dirty).toContain('下書きを保存する')
+  })
+
+  it('下書きの変更を戻すと保存口が消え、閉じる操作と公開は残る', () => {
+    const onClose = vi.fn()
+    const onPublish = vi.fn()
+    const view = render(<CustomerNotificationEditor {...editorProps} onClose={onClose} onPublish={onPublish} hasUnsaved />)
+    expect(screen.getByRole('button', { name: '下書きを保存する' })).toBeTruthy()
+    view.rerender(<CustomerNotificationEditor {...editorProps} onClose={onClose} onPublish={onPublish} />)
+    expect(screen.queryByRole('button', { name: '下書きを保存する' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '顧客へのお知らせを公開' }))
+    expect(onPublish).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'LINE通知', exact: true }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('未保存の編集があることを画面に出す', () => {
@@ -1092,23 +1097,26 @@ describe('#678 実Reactで描いた編集画面', () => {
       .not.toContain('未保存の変更があります')
   })
 
-  it('長文を入れても入力欄と見本が最小幅で潰れず、内容をそのまま描く', () => {
+  it('長文を入れても入力欄と見本が最小幅で潰れず、内容をそのまま描く', async () => {
     const longIntro = 'ご注文ありがとうございます。'.repeat(50)
     const html = renderToStaticMarkup(
       <CustomerNotificationEditor {...editorProps} setting={setting({ introText: longIntro })} />,
     )
     expect(html).toContain(longIntro)
-    expect(html).toContain('grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_390px]')
+    expect(html).toMatch(/class="[^"]*editorGrid[^"]*"/)
+    const css = (await import('node:fs')).readFileSync((await import('node:path')).join(__dirname, '../../v8/settings/line-notifications/screen.module.css'), 'utf8')
+    expect(css).toMatch(/\.editorGrid\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/)
+    expect(css).toMatch(/@media \(min-width: 1024px\)[\s\S]*?grid-template-columns: minmax\(0, 1fr\) var\(--tpl-sb-ln-preview-w\)/)
   })
 
   it('定義がないお知らせには公開ボタンを出さない', () => {
-    const html = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} definition={null} />)
+    const html = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} definition={null} hasUnsaved />)
     expect(html).not.toContain('顧客へのお知らせを公開')
-    expect(html).toContain('お知らせを保存')
+    expect(html).toContain('お知らせを保存する')
   })
 
   it('保存中は主要操作を押せなくする', () => {
-    const html = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} busy />)
+    const html = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} busy hasUnsaved />)
     expect(html.match(/disabled=""/g)?.length ?? 0).toBeGreaterThanOrEqual(3)
   })
 })
@@ -1120,12 +1128,13 @@ describe('#678 実Reactで描いた画面全体', () => {
     expect(html).toContain('顧客へのお知らせ —')
   })
 
-  it('運用者件数は0件・読み込み中・取得失敗を書き分ける', () => {
+  it('運用者件数は0件・読み込み中・取得失敗・権限なしを書き分ける', () => {
     expect(operatorTabCountLabel('ready', 0)).toBe('0')
     expect(operatorTabCountLabel('ready', 7)).toBe('7')
     expect(operatorTabCountLabel('loading', null)).toBe('—')
     expect(operatorTabCountLabel('error', null)).toBe('取得失敗')
-    expect(operatorTabCountLabel('forbidden', null)).toBe('取得失敗')
+    // M031: 403は取れなかったのではなく権限が無い。「取得失敗」と混ぜない。
+    expect(operatorTabCountLabel('forbidden', null)).toBe('権限なし')
   })
 })
 
@@ -1163,7 +1172,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
 
     render(<LineNotificationsPage />)
 
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
     expect(screen.getByText('運用者へのお知らせ 0')).toBeTruthy()
   })
 
@@ -1199,17 +1208,29 @@ describe('#678 実DOMへマウントした画面全体', () => {
 
     render(<LineNotificationsPage />)
 
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
-    // 行の「今日」「この30日」は送信履歴の2通・7通。
-    expect(screen.getByText('2通')).toBeTruthy()
-    expect(screen.getByText('7通')).toBeTruthy()
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
+    // 板 ：行は「この30日」だけ（送信履歴の7通）。「今日」の列は置かない。
+    // 数カード「この30日」も同じ7通。
+    // V8は数字と単位を別要素へ出す。表と数カードの両方の実データを守る。
+    expect(screen.getByRole('table', { name: '顧客へのお知らせ' }).textContent).toContain('7')
+    const number = document.querySelector('[data-kpi-number]')
+    const numbers = [...document.querySelectorAll('[data-kpi-number]')].map((node) => node.textContent)
+    expect(number).toBeTruthy()
+    expect(numbers).toContain('7')
+    expect(numbers).toContain('2')
+    for (const value of ['2', '7']) {
+      const number = [...document.querySelectorAll('[data-kpi-number]')].find(node => node.textContent === value)!
+      expect(number.closest('[data-design-version="v8"]')?.querySelector('[data-kpi-unit]')?.textContent).toBe('通')
+    }
+    expect(numbers).not.toContain('5')
+    expect(numbers).not.toContain('9')
     expect(screen.queryByText('5通')).toBeNull()
     expect(screen.queryByText('9通')).toBeNull()
-    // KPIの「今日 送った」も送信履歴の合計。
+    // KPIの「今日送った」も送信履歴の合計。
     expect(screen.getByText('今日 送った')).toBeTruthy()
   })
 
-  it('403: 顧客のお知らせは「表示する権限がありません」を出し、読み直す口は出さない', async () => {
+  it('403: 顧客のお知らせは「表示する権限がありません」を出し、権限変更後に読み直せる', async () => {
     fixture.settings.mockRejectedValue(new ApiError(403))
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
@@ -1217,7 +1238,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     render(<LineNotificationsPage />)
 
     await waitFor(() => expect(screen.getByText('表示する権限がありません')).toBeTruthy())
-    expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
   })
 
   it('500: 「表示できませんでした」を出し、実物の読み直すボタンを押すと実物のfetchをやり直して復旧する', async () => {
@@ -1227,33 +1248,41 @@ describe('#678 実DOMへマウントした画面全体', () => {
 
     render(<LineNotificationsPage />)
 
-    await waitFor(() => expect(screen.getByText('顧客へのお知らせを表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('顧客へのお知らせを読み込めませんでした')).toBeTruthy())
     expect(fixture.settings).toHaveBeenCalledTimes(1)
 
     // 2回目からは成功する応答へ差し替えてから、実物のボタンを押す。
-    // ★V7 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
+    // ★管理画面 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
     fixture.settings.mockResolvedValueOnce({ success: true, data: [setting()] })
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
     expect(fixture.settings).toHaveBeenCalledTimes(2)
-    expect(screen.queryByText('顧客へのお知らせを表示できませんでした')).toBeNull()
+    expect(screen.queryByText('顧客へのお知らせを読み込めませんでした')).toBeNull()
   })
 
-  it('運用者だけ403/500になっても、顧客のお知らせは表示を続け、タブの数字だけ「取得失敗」にする', async () => {
+  it('運用者だけ403になっても顧客のお知らせは表示を続け、タブは「権限なし」にする', async () => {
     fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockRejectedValueOnce(new ApiError(403))
 
     const { unmount } = render(<LineNotificationsPage />)
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
-    expect(screen.getByText('運用者へのお知らせ 取得失敗')).toBeTruthy()
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
+    // M031: 403は「取得失敗」と混ぜない。権限が変わった後も読み直せるようにする。
+    expect(screen.getByText('運用者へのお知らせ 権限なし')).toBeTruthy()
+    expect(screen.queryByText('運用者へのお知らせ 取得失敗')).toBeNull()
+    expect(screen.getByText(/見る権限がありません/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     unmount()
+  })
 
+  it('運用者だけ500になっても、顧客のお知らせは表示を続け、タブの数字だけ「取得失敗」にする', async () => {
+    fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
+    fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockRejectedValueOnce(new Error('internal error'))
     render(<LineNotificationsPage />)
     await waitFor(() => expect(screen.getByText('運用者へのお知らせ 取得失敗')).toBeTruthy())
-    expect(screen.getByText('注文を受け付けました')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy()
   })
 
   it('長文入力: 実物のtextareaへ実物のonChangeで打ち込み、未保存表示・端末控え・保存APIへ渡す中身まで実物のまま追う', async () => {
@@ -1265,9 +1294,9 @@ describe('#678 実DOMへマウントした画面全体', () => {
     fixture.publishDefinition.mockResolvedValue({ success: true, data: definition({ status: 'published', version: 5 }) })
 
     render(<LineNotificationsPage />)
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
 
-    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    fireEvent.click(screen.getByRole('button', { name: /の内容を編集$/ }))
     const introBox = await screen.findByLabelText('ご案内文') as HTMLTextAreaElement
 
     fireEvent.change(introBox, { target: { value: longIntro } })
@@ -1281,7 +1310,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     expect(stored).not.toBeNull()
     expect(JSON.parse(stored!).introText).toBe(longIntro)
 
-    fireEvent.click(screen.getByRole('button', { name: 'お知らせを保存' }))
+    fireEvent.click(screen.getByRole('button', { name: 'お知らせを保存する' }))
     await waitFor(() => expect(fixture.createDefinition).toHaveBeenCalledTimes(1))
     // 保存APIへ渡した中身も、打ち込んだ長文のまま欠けたり切れたりしない。
     // N-330: 旧設定APIではなく、正本の定義を作る口へ送る。
@@ -1326,19 +1355,20 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
     render(<LineNotificationsPage />)
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
-    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /の内容を編集$/ }))
     await screen.findByLabelText('ご案内文')
   }
 
   it('確認にはアカウント・お知らせ・宛先・人数を出し、送信ボタンを押すまで送らない', async () => {
     await openEditor()
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
 
     // 開いただけでは送らない。宛先は実API口から読む。
     expect(fixture.testSend).not.toHaveBeenCalled()
     await waitFor(() => expect(fixture.getTestRecipients).toHaveBeenCalledWith('account-a'))
     expect(await screen.findByText('account-aのLINEアカウント')).toBeTruthy()
+    expect(within(screen.getByRole('dialog')).getByText('環境')).toBeTruthy()
     expect(screen.getByText('「注文を受け付けました」')).toBeTruthy()
     expect(await screen.findByText('テスト 一郎・テスト 二郎（2名）')).toBeTruthy()
 
@@ -1350,7 +1380,7 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
   it('テスト受信者が0人なら送信ボタンを出さず、登録画面への道筋を出す', async () => {
     fixture.getTestRecipients.mockResolvedValue({ success: true, data: [] })
     await openEditor()
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
 
     expect(await screen.findByText(/テスト受信者が登録されていません/)).toBeTruthy()
     // 宛先が数えられていないのに送らせない（ConfirmDialog は onConfirm 無しで実行ボタンを出さない）。
@@ -1362,16 +1392,17 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
   it('宛先の読み込みに失敗したら送信ボタンを出さない', async () => {
     fixture.getTestRecipients.mockRejectedValue(new Error('network down'))
     await openEditor()
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
 
-    expect(await screen.findByText(/テスト受信者を読み込めませんでした/)).toBeTruthy()
+    const dialog = await screen.findByRole('dialog')
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/テスト受信者を読み込めませんでした/)
     expect(screen.queryByRole('button', { name: /名へ送信/ })).toBeNull()
     expect(fixture.testSend).not.toHaveBeenCalled()
   })
 
   it('確認をキャンセルしたら送らない', async () => {
     await openEditor()
-    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByRole('button', { name: 'テスト受信者 2名へ送信' })
 
@@ -1398,8 +1429,8 @@ describe('#988 条件説明と表示例は実際の意味に合わせる', () =>
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
     render(<LineNotificationsPage />)
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
-    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /の内容を編集$/ }))
     await screen.findByLabelText('ご案内文')
   }
 
@@ -1452,4 +1483,13 @@ describe('#988 条件説明と表示例は実際の意味に合わせる', () =>
       expect(link.getAttribute('href')).toBe(href)
     }
   })
+})
+
+it("通知の共通保存関数は422の欄の理由を呼び出した画面へ残す", async () => {
+  const { saveCustomerNotification: saveV8 } = await import('@/v8/settings/line-notifications/screen')
+  const sent = setting()
+  fixture.updateDraft.mockRejectedValueOnce({ status: 422, fields: { introText: 'ご案内文を短くしてください' } })
+  const outcome = await saveV8({ api: mutationApi(), accountId: 'account-a', setting: sent,
+    definition: definition(), enabled: sent.isEnabled, guard: steadyGuard(sent) })
+  expect(outcome).toMatchObject({ kind: 'failed', fields: { introText: 'ご案内文を短くしてください' }, contentSaved: false, settleDraft: false })
 })

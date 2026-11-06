@@ -1,13 +1,12 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
-import {
-  cancelMeetConsultation,
-  registerMeetConsultation,
-  type RegisterMeetConsultationInput,
-} from '../services/meet-consultation-reminders.js';
+import { cancelMeetConsultation, registerMeetConsultation } from '../services/meet-consultation-reminders.js';
+import { type RegisterMeetConsultationInput } from '../services/meet-reminder-types.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-
+import { fail } from '../lib/fail.js';
 const meetConsultations = new Hono<Env>();
 
 meetConsultations.get('/api/meet-consultations', requireRole('owner', 'admin', 'staff'), async (c) => {
@@ -17,7 +16,7 @@ meetConsultations.get('/api/meet-consultations', requireRole('owner', 'admin', '
   }
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const accountWhere = scope.allowedAccountIds.length
-    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+    ? `AND (f.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
     : scope.canSeeUnassigned
       ? 'AND f.line_account_id IS NULL'
       : 'AND 1 = 0';
@@ -31,22 +30,22 @@ meetConsultations.get('/api/meet-consultations', requireRole('owner', 'admin', '
               SUM(CASE WHEN r.status='failed' THEN 1 ELSE 0 END) AS failed_reminders
          FROM meet_consultations c
          INNER JOIN friends f ON f.id = c.friend_id
-         LEFT JOIN meet_consultation_reminders r ON r.consultation_id = c.id
+         LEFT JOIN meet_consultation_notification_runs r ON r.consultation_id = c.id
         WHERE (? = 'all' OR c.status = ?)
           ${accountWhere}
         GROUP BY c.id
         ORDER BY c.starts_at ASC`,
     )
-    .bind(status, status, ...scope.allowedAccountIds)
+    .bind(status, status, ...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []))
     .all();
   return c.json({ success: true, data: result.results ?? [] });
 });
 
-meetConsultations.post('/api/meet-consultations', requireRole('owner', 'admin', 'staff'), async (c) => {
+meetConsultations.post('/api/meet-consultations', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"externalEventId":["string"],"friendId":["string"],"title":["string"],"startsAt":["string"],"endsAt":["string"],"meetUrl":["string"],"bookingId":["null","string"],"bookingVersion":["null","number"]}), async (c) => {
   try {
     const body = await c.req.json<RegisterMeetConsultationInput>();
     if (typeof body.friendId !== 'string' || !body.friendId.trim()) {
-      return c.json({ success: false, error: 'friendId is required' }, 400);
+      return inputError(c, { success: false, error: 'friendId is required' }, 400, ["friendId"]);
     }
     const [friend, existing] = await Promise.all([
       c.env.DB.prepare('SELECT line_account_id FROM friends WHERE id = ?')
@@ -61,14 +60,14 @@ meetConsultations.post('/api/meet-consultations', requireRole('owner', 'admin', 
     if (!friend || !await canAccessAllLineAccounts(
       c.env.DB, c.get('staff'), [friend.line_account_id, existing?.line_account_id],
     )) {
-      return c.json({ success: false, error: 'friend not found or not following' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND_OR_NOT_FOLLOWING');
     }
     const registered = await registerMeetConsultation(c.env.DB, body);
     return c.json({ success: true, data: registered }, 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = message === 'friend not found or not following' ? 404 : 400;
-    return c.json({ success: false, error: message }, status);
+    return inputError(c, { success: false, error: message }, status, ["externalEventId","friendId","startsAt","meetUrl"]);
   }
 });
 
@@ -83,13 +82,13 @@ meetConsultations.delete('/api/meet-consultations/:externalEventId', requireRole
   if (!consultation || !await canAccessAllLineAccounts(
     c.env.DB, c.get('staff'), [consultation.line_account_id],
   )) {
-    return c.json({ success: false, error: 'consultation not found' }, 404);
+    return fail(c, 404, 'CONSULTATION_NOT_FOUND');
   }
   try {
     const cancelled = await cancelMeetConsultation(c.env.DB, externalEventId, new Date(), {
       failOnSendInFlight: true,
     });
-    if (!cancelled) return c.json({ success: false, error: 'consultation not found' }, 404);
+    if (!cancelled) return fail(c, 404, 'CONSULTATION_NOT_FOUND');
   } catch (error) {
     // 送信権の貸出中は確定させず 409 で再試行させる (取消確定後の送信を起こさない)。
     if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {

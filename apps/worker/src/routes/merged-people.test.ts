@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const personMocks = vi.hoisted(() => {
   class TestMergedPersonError extends Error {
@@ -35,7 +35,7 @@ const profileMocks = vi.hoisted(() => ({
 
 vi.mock('../services/merged-people.js', () => personMocks);
 vi.mock('../services/account-access.js', () => accessMocks);
-vi.mock('../services/friend-profile-candidates.js', () => profileMocks);
+vi.mock('../features/friends/friend-profile-candidates.js', () => profileMocks);
 
 const { mergedPeople } = await import('./merged-people.js');
 
@@ -93,6 +93,15 @@ beforeEach(() => {
 });
 
 describe('merged person HTTP contract', () => {
+  it.each(['limit=0', 'limit=101', 'limit=abc', 'limit=1.5', 'offset=-1', 'offset=100001', 'offset=abc'])(
+    'ページ指定%sを400で断り、一覧を取得しない', async (query) => {
+      const response = await harness().request(`/api/friends/people?${query}`);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: 'INVALID_PAGINATION' });
+      expect(personMocks.listMergedPeople).not.toHaveBeenCalled();
+    },
+  );
+
   it('returns the normal detail shape only after every linked account is authorized', async () => {
     const response = await harness({ role: 'staff' }).request('/api/friends/people/user-a');
     expect(response.status).toBe(200);
@@ -134,11 +143,11 @@ describe('merged person HTTP contract', () => {
     );
   });
 
-  it('returns 422 for malformed JSON and 409 for a stale revision', async () => {
+  it('returns 400 for malformed JSON and 409 for a stale revision', async () => {
     const malformed = await harness().request('/api/friends/people/user-a', {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, body: '{',
     });
-    expect(malformed.status).toBe(422);
+    expect(malformed.status).toBe(400);
     expect(await malformed.json()).toMatchObject({ success: false, code: 'INVALID_JSON' });
 
     personMocks.updateMergedPerson.mockRejectedValue(
@@ -252,7 +261,8 @@ describe('merged person HTTP contract', () => {
     const response = await harness({ role: 'staff' }).request('/api/friends/people');
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      success: true, data: { items: [], total: 0, limit: 20, offset: 0 },
+      success: true, data: { items: [], total: 0, limit: 20, offset: 0,
+        sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] },
     });
     expect(personMocks.listMergedPeople).toHaveBeenCalledWith(
       expect.anything(), 'tenant-a', ['account-a'], 20, 0,

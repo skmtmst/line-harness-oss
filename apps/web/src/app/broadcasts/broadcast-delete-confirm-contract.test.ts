@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('../../v8/broadcasts/list.tsx', import.meta.url), 'utf8')
 
 /** 名前で見つけた関数の本体だけを切り出す。ファイル全体を見ると素通しになる。 */
 function fnBody(src: string, decl: string): string {
@@ -23,7 +23,7 @@ function fnBody(src: string, decl: string): string {
 }
 
 function dialog(src: string): string {
-  const open = src.indexOf('open={deleteTarget !== null}')
+  const open = src.indexOf('open={deleteTarget !== null && renderedDeleteScope?.generation === accountScope.current.generation}')
   const from = src.lastIndexOf('<ConfirmDialog', open)
   if (from < 0) throw new Error('<ConfirmDialog が見つかりません')
   const pairedTo = src.indexOf('</ConfirmDialog>', from)
@@ -42,7 +42,7 @@ describe('一斉配信一覧の削除確認', () => {
 
   it('削除の処理が二度押しを受け付けない', () => {
     const body = fnBody(PAGE, 'const handleDelete = async ()')
-    expect(body, '押している間の二度押しを止めていない').toContain('if (!deleteTarget || deleting) return')
+    expect(body, '押している間の二度押しを止めていない').toContain('if (!deleteTarget || deleting || !renderedDeleteScope || renderedDeleteScope !== deleteScope.current || renderedDeleteScope.generation !== accountScope.current.generation) return')
     expect(body).toContain('setDeleting(true)')
     expect(body, '処理中の印を必ず戻していない').toMatch(/finally\s*\{[\s\S]*setDeleting\(false\)/)
   })
@@ -78,12 +78,12 @@ describe('一斉配信一覧の削除確認', () => {
 
   it('送信済みの配信に、下書きの言い方を出さない', () => {
     /*
-     * 窓の本文は「予約済みかどうか」で分岐する。**送信済みにも削除を出すと、
+     * 窓の本文は「予約中かどうか」で分岐する。**送信済みにも削除を出すと、
      * else の枝が「まだ送っていないので、友だちには何も届きません。」という
      * 嘘の文を出す。** 削除の口（…メニューの中の危ない操作）は下書きと
-     * 予約済みだけに置く（★V7 Xn1Mz：行にゴミ箱ボタンは置かない）。
+     * 予約中だけに置く（★管理画面 Xn1Mz：行にゴミ箱ボタンは置かない）。
      */
-    expect(PAGE).toContain("destructiveItem={(broadcast.status === 'draft' || broadcast.status === 'scheduled')")
+    expect(PAGE).toContain("broadcast.status === 'draft' || broadcast.status === 'scheduled'")
   })
 
   it('何を消すのかを、配信名と影響で読み合わせる', () => {
@@ -95,8 +95,8 @@ describe('一斉配信一覧の削除確認', () => {
   it('確認窓が取り消せない操作として出て、処理中は閉じられない', () => {
     const jsx = dialog(PAGE)
     expect(jsx).toContain('destructive')
-    expect(jsx).toContain('designNode="EGMb1"')
-    expect(jsx).toContain('titleIcon={<Trash2')
+    expect(jsx).toContain("busy={deleting}")
+    expect(jsx).toContain("destructive")
     expect(jsx).toContain('confirmLabel="削除する"')
     expect(jsx, '処理中でも押せてしまう').toContain('busy={deleting}')
     expect(jsx, '失敗が窓の中に出ない').toContain('error={deleteError}')
@@ -104,8 +104,11 @@ describe('一斉配信一覧の削除確認', () => {
   })
 
   it('削除ボタンは窓を開くだけで、押した時点では消さない', () => {
-    // m13f：行を押すと詳細へ行くため、行の中の操作は行へ伝えない。開くだけの動きは同じ。
-    expect(PAGE).toContain('onClick={(event) => event.stopPropagation()}')
-    expect(PAGE).toContain("onSelect: () => { setDeleteError(''); setDeleteTarget(broadcast) }")
+    // 行内操作の独立は共通Trの動きの試験で守る。削除の入口は確認だけ。
+    expect(PAGE).toContain("onSelect: () => requestDelete(broadcast)")
+    const body = fnBody(PAGE, 'const requestDelete = (broadcast: ApiBroadcast) =>')
+    expect(body).toContain('deleteScope.current = { generation: accountScope.current.generation }')
+    expect(body).toContain('setDeleteTarget({ ...broadcast })')
+    expect(body).not.toContain('api.broadcasts.delete')
   })
 })

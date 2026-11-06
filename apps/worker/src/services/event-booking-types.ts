@@ -1,6 +1,5 @@
-// Event booking shared types & constants.
-// IDs are TEXT (UUID/nanoid) to follow line-harness schema.sql conventions.
-// See: docs/superpowers/specs/2026-05-09-event-booking-design.md
+// DB の保存形式に合わせ、ID は UUID/nanoid の TEXT とする。
+
 
 export type EventBookingStatus =
   | 'requested'

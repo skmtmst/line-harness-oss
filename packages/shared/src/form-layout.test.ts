@@ -1,28 +1,6 @@
 import { describe, expect, test } from "vitest";
-import {
-  collectInputs,
-  emptyLayout,
-  fieldsToLayout,
-  formChoiceIsSelected,
-  formThemeButtonText,
-  FORM_THEME_DEFAULT,
-  formThemeContrastError,
-  isCalendarDateString,
-  isFormAnswerEmpty,
-  layoutToFields,
-  newBlockId,
-  nextSectionIndex,
-  normalizeLayout,
-  normalizeFormTheme,
-  parseLayout,
-  validateAnswer,
-  validateAnswers,
-  validateFormDefinition,
-  validateFormForPublish,
-  type FormBlock,
-  type FormInputBlock,
-  type FormLayout,
-} from "./form-layout";
+import { collectInputs, emptyLayout, fieldsToLayout, formChoiceIsSelected, formThemeButtonText, FORM_THEME_DEFAULT, formThemeContrastError, isCalendarDateString, isFormAnswerEmpty, layoutToFields, newBlockId, nextSectionIndex, normalizeLayout, normalizeFormTheme, parseLayout, validateAnswer, validateAnswers, validateFormDefinition, validateFormForPublish } from './form-layout';
+import { type FormBlock, type FormInputBlock, type FormLayout } from './types/form-layout';
 
 /** 入力ブロックを1つ作る。テストの見通しのため、必要な分だけ埋める。 */
 function input(partial: Partial<FormInputBlock> & { name: string }): FormInputBlock {
@@ -134,11 +112,11 @@ describe("壊れた入力を受け止める", () => {
     expect(layout?.sections).toHaveLength(1);
   });
 
-  test("知らない種類のブロックは落とす", () => {
+  test("知らない種類のブロックは正規化前に拒否する", () => {
     const layout = normalizeLayout({
       sections: [{ id: "s1", name: "1", blocks: [{ id: "x", kind: "iframe", src: "..." }] }],
     });
-    expect(layout?.sections[0].blocks).toHaveLength(0);
+    expect(layout).toBeNull();
   });
 });
 
@@ -706,7 +684,7 @@ describe("初期値の公開前検証（R196）", () => {
 
 /**
  * P（回答フォームの読みにくい色）：文字（text）と背景（sub）の差が
- * 4.5:1 未満なら保存できない。比は WCAG の式で測り、独立に python で
+ * 4.5:1 未満なら注意を返す。保存・公開は妨げない。比は WCAG の式で測り、独立に python で
  * 検算した値（既定 15.3・#999/白 2.8・#777/白 4.4・同色 1.0）と突き合わせる。
  */
 describe("文字と背景のコントラスト（P）", () => {
@@ -714,18 +692,18 @@ describe("文字と背景のコントラスト（P）", () => {
     expect(formThemeContrastError(FORM_THEME_DEFAULT)).toBeNull();
   });
 
-  test("4.5未満は測った比を文に入れて止める", () => {
+  test("4.5未満は測った比を注意の文に入れる", () => {
     const error = formThemeContrastError({
       ...FORM_THEME_DEFAULT,
       text: "#999999",
       sub: "#ffffff",
     });
-    expect(error).toContain("保存できません");
+    expect(error).toContain("読みづらい可能性");
     expect(error).toContain("いま 2.8:1");
     expect(error).toContain("4.5:1以上");
   });
 
-  test("同じ色は 1:1 で止める", () => {
+  test("同じ色は 1:1 の注意を返す", () => {
     const error = formThemeContrastError({
       ...FORM_THEME_DEFAULT,
       text: "#ffffff",
@@ -734,17 +712,17 @@ describe("文字と背景のコントラスト（P）", () => {
     expect(error).toContain("いま 1:1");
   });
 
-  test("4.5ぎりぎり（#777/白 = 4.47）は通さない", () => {
+  test("4.5未満（#777/白 = 4.47）は注意を返す", () => {
     expect(
       formThemeContrastError({
         ...FORM_THEME_DEFAULT,
         text: "#777777",
         sub: "#ffffff",
       }),
-    ).toContain("保存できません");
+    ).toContain("読みづらい可能性");
   });
 
-  test("公開前の検査で読みにくい色を止める", () => {
+  test("公開前の検査は読みにくい色で止めない", () => {
     const layout = layoutWith([
       input({ name: "name", label: "お名前", type: "text" }),
     ]);
@@ -753,8 +731,32 @@ describe("文字と背景のコントラスト（P）", () => {
       text: "#999999",
       sub: "#ffffff",
     };
-    expect(validateFormForPublish(layout)).toContain("保存できません");
+    expect(validateFormForPublish(layout)).toBeNull();
     layout.options.theme = { ...FORM_THEME_DEFAULT };
     expect(validateFormForPublish(layout)).toBeNull();
   });
+});
+
+test('チェックボックスの上限0は制限なしとして公開・回答の両方で扱う', () => {
+  const question = input({ name: 'selected', label: '選択', type: 'checkbox', required: true,
+    choices: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], selectionLimit: { min: 1, max: 0 } });
+  const layout = emptyLayout();
+  layout.sections[0]!.blocks = [question];
+  expect(validateFormForPublish(layout)).toBeNull();
+  expect(validateAnswers(layout, { selected: ['A', 'B'] })).toBeNull();
+});
+
+test('分岐で通らなかったセクションの必須欄は要求しない', () => {
+  const layout = emptyLayout();
+  layout.header = [input({ name: 'header', required: true })];
+  layout.sections = [
+    { id: 'first', name: 'First', blocks: [input({ name: 'branch', type: 'radio', required: true,
+      choices: [{ id: 'skip', label: 'skip', jumpToSectionId: 'last' }, { id: 'all', label: 'all' }] })] },
+    { id: 'middle', name: 'Middle', blocks: [input({ name: 'skipped', required: true })] },
+    { id: 'last', name: 'Last', blocks: [input({ name: 'final', required: true })] },
+  ];
+  expect(validateAnswers(layout, { header: 'header', branch: 'skip', final: 'done' })).toBeNull();
+  expect(validateAnswers(layout, { header: 'header', branch: 'all', final: 'done' })).toContain('skipped');
+  expect(validateAnswers(layout, { branch: 'skip', final: 'done' })).toContain('header');
+  expect(validateAnswers(layout, { header: 'header', branch: 'skip' })).toContain('final');
 });

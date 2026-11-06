@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ApiError } from '@/lib/api'
 
-import { errorMessage } from './google-format'
+import { errorMessage } from '@/v8/restaurant/google/format'
 
 /**
  * 本番のGoogleアカウント接続で、画面に `API error: 503` だけが出て

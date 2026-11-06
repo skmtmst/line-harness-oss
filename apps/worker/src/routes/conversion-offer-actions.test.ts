@@ -1,5 +1,5 @@
 /*
- * 成果承認の確定で案件の動作（タグ付与・シナリオ開始）を実行する(N-212)。
+ * 成果承認の確定で案件の動作（タグ付与・シナリオ開始）を実行する。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物の conversions ルートを当てる。
  * モックは LINE 通知と staff の注入だけ。付与・登録・台帳の経路は本物のまま通す。
@@ -12,8 +12,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const notifyAffiliateApproval = vi.fn().mockResolvedValue(undefined);
 vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateApproval }));

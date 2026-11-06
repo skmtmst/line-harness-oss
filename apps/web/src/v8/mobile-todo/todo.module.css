@@ -1,0 +1,53 @@
+/* 電話の画面の「対応」。値は外枠の型（mobile-frame.module.css）の --phone-* と共通の値だけを読む。 */
+.stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-row);
+  min-width: 0;
+}
+
+.noticeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--polish-space-row);
+}
+
+.time {
+  flex: none;
+  color: var(--color-ink-faint);
+  font-size: var(--phone-note-text);
+  font-variant-numeric: var(--font-numeric);
+  font-weight: var(--font-weight-ui);
+}
+
+.noticeTitle {
+  overflow: hidden;
+  font-size: var(--phone-body-text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.noticeBody {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--phone-support-text);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--phone-support-lh);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.pcLink {
+  color: var(--color-accent-deep);
+  font-size: var(--phone-support-text);
+  font-weight: 600;
+}

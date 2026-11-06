@@ -1,15 +1,15 @@
 'use client'
 
-import type { KeyboardEvent, ReactNode } from 'react'
-import { GripVertical } from 'lucide-react'
+import type { ReactNode } from 'react'
+import ReorderHandle from '@/components/shared/reorder-handle'
 
 /**
- * 並び替えのつまみ（N-049）。
+ * 並び替えのつまみ（N-049）。既存の呼び出しを保つための別名。
  *
- * ドラッグだけの操作はキーボードでは動かせないため、つまみを
- * フォーカス可能なボタンにして ↑/↓ で1つずつ移動できるようにする。
- * ドラッグ用の draggable/onDrop は外側のセル側に残し、マウス操作の
- * 見た目と動きは変えない。
+ * 中身は共通の並び替え部品（components/shared/reorder-handle）。
+ * V8 の画面はこれを使わず、ReorderHandle と useReorder を直接使う
+ * （動かせない時はつまみを出さず、理由を title と読み上げで言う）。
+ * 動かせない時は現役の共通部品と同じく隠す。
  */
 export default function ReorderGrip({
   label,
@@ -28,35 +28,16 @@ export default function ReorderGrip({
   /** 既定は lucide の grip-vertical。設計の別絵がある画面だけ差し替える */
   children?: ReactNode
 }) {
-  if (disabled) {
-    return (
-      <span
-        className="inline-flex cursor-not-allowed items-center justify-center text-ink-faint"
-        title={disabledReason}
-        aria-label={disabledReason}
-      >
-        {children ?? <GripVertical size={16} aria-hidden="true" />}
-      </span>
-    )
-  }
-  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      void onMove(-1)
-    } else if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      void onMove(1)
-    }
-  }
   return (
-    <button
-      type="button"
-      onKeyDown={handleKeyDown}
-      aria-label={`${label}を並び替え。上下キーで移動`}
-      title="ドラッグまたは上下キーで並び替え"
-      className="inline-flex cursor-grab items-center justify-center rounded-control p-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+    <ReorderHandle
+      label={label}
+      look="inline"
+      disabledLook="hide"
+      locked={disabled}
+      disabledReason={disabled ? disabledReason : null}
+      onMove={onMove}
     >
-      {children ?? <GripVertical size={16} aria-hidden="true" />}
-    </button>
+      {children}
+    </ReorderHandle>
   )
 }

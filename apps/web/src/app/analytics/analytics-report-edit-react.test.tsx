@@ -30,13 +30,13 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => ({ get: (key: string) => (key === 'id' ? fixture.editId : null) }),
   usePathname: () => '/analytics/reports/new',
   useRouter: () => ({ push: () => undefined, replace: () => undefined, back: () => undefined }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
   usePageChrome: () => ({ title: null, fullWidth: false }),
 }))
@@ -145,7 +145,7 @@ describe('定期レポートの編集画面(?id=)', () => {
     const nameInput = Array.from(host.querySelectorAll('input[type="text"], input:not([type])'))
       .find((item) => (item as HTMLInputElement).value === '週次まとめ')
     expect(nameInput).toBeTruthy()
-    expect(host.textContent).toContain('「週次まとめ」を直しています')
+    expect((host.querySelector('input[placeholder="例：週次まとめ"]') as HTMLInputElement).value).toBe('週次まとめ')
     expect(host.textContent).toContain('変更を保存する')
     expect(host.textContent).not.toContain('今すぐ1回だけ送る')
 
@@ -183,13 +183,13 @@ describe('定期レポートの編集画面(?id=)', () => {
       return Promise.reject(new Error('接続できませんでした'))
     }
     await render()
-    expect(host.textContent).toContain('定期レポートを表示できませんでした')
+    expect(host.textContent).toContain('定期レポートを読み込めませんでした')
     expect(host.textContent).not.toContain('定期レポートが見つかりませんでした')
     // やり直しで読み直しが走る
-    // ★V7 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
+    // ★管理画面 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
     net.handler = defaultHandler
     await act(async () => { button('もう一度読み込む').click() })
     expect(net.calls.filter((call) => call.path.startsWith('/api/analytics/report-schedules') && call.method === 'GET').length).toBeGreaterThanOrEqual(2)
-    expect(host.textContent).toContain('「週次まとめ」を直しています')
+    expect((host.querySelector('input[placeholder="例：週次まとめ"]') as HTMLInputElement).value).toBe('週次まとめ')
   })
 })

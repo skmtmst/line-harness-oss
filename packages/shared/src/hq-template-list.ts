@@ -1,0 +1,31 @@
+export type HqTemplateArchiveStatus = 'active' | 'archived' | 'all';
+export interface HqTemplateArchiveCounts { active: number; archived: number }
+
+/** 統括のひな形一覧にだけ付く表示用の材料。本文や画像URLは含めない。 */
+export interface HqTemplateListDisplay {
+  archived_at?: string | null;
+  kind?: import('./template-definition').TemplateKind | null;
+  /** 保存したメッセージの形だけ。本文・URLは返さない。旧応答では未取得。 */
+  message_type?: import('./template-definition').MessageTemplateDefinition['template']['messageType'] | null;
+  /** 最新の保存版に含まれるLINEメッセージ数。カルーセルは1通。未取得はnull。 */
+  message_count?: number | null;
+  /** 本文・カード・質問・素材の差し込み。名前やファイル名は含めない。 */
+  has_interpolations?: boolean | null;
+  /** 配布に成功したアカウントの現在の表示名。名前順、最大3件。同じアカウントは1件。 */
+  distributed_account_names: string[];
+  /** 表示した3件を除いたアカウント数。 */
+  distributed_account_more: number;
+  distributed_account_count: number;
+  /** 種類と件数の短い要約。最新の内容を確認できない場合はnull。 */
+  content_summary: string | null;
+  this_month_sent_count?: number | null;
+  outdated_account_count?: number;
+  current_version?: number | null;
+  friend_count?: number | null;
+  manual_assignment_allowed?: boolean | null;
+  assignment_method?: string | null;
+  display_order?: number | null;
+  display_audience?: string | null;
+  display_locations?: import('./support-mark-display.js').SupportMarkLocation[] | null;
+  tap_count?: number | null;
+}

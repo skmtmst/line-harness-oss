@@ -1,4 +1,5 @@
-import fs from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
+const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -50,7 +51,7 @@ describe('ログインユーザーの確認窓', () => {
   })
 
   it('二段階認証の解除が二度押しを止め、返事を確かめ、finally で戻す', () => {
-    const body = slice(PAGE, 'const runDisableTwoFactor = async', '\n  return <div data-design-node="e3jz3"')
+    const body = slice(PAGE, 'const runDisableTwoFactor = async', '\n  const runRemove = async')
     expect(body, '処理中でも受け付けてしまう').toContain('if (!disablingTarget || disablingTwoFactor) return')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body, '失敗を握りつぶしている').toContain(
@@ -78,6 +79,6 @@ describe('ログインユーザーの確認窓', () => {
     expect(unlink).toContain('招待メールからLINE認証をやり直せば、また繋がります。')
     const twoFactor = dialogWith(PAGE, 'open={disablingTarget !== null}')
     expect(twoFactor).toContain('LINEログインだけでログインできるようになります。')
-    expect(twoFactor).toContain('あとから「未設定」を押せば、設定し直せます。')
+    // 戻し方の文は staff-two-factor-disable-dialog-react.test.tsx が開いた確認窓で読む。
   })
 })

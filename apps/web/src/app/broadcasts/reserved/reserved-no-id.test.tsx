@@ -25,7 +25,7 @@ vi.mock('next/link', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'visual-qa-account', loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/lib/api', () => ({
   api: {
     broadcasts: {
@@ -38,10 +38,12 @@ vi.mock('@/lib/api', () => ({
     },
     tags: { list: async () => ({ success: true, data: [] }) },
     scenarios: { list: async () => ({ success: true, data: [] }) },
+    staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
   },
 }))
 
 import Page from './page'
+import DetailPage from '../detail/page'
 
 const flush = () => act(async () => { await Promise.resolve() })
 
@@ -72,11 +74,26 @@ const broadcast = {
 
 describe('broadcasts/reserved の対象未指定', () => {
   it('id なしでは取らず予定への戻りを出す', async () => {
-    render(<Page />)
+    const { container } = render(<Page />)
     await flush()
+    expect(container.querySelector('[data-target-missing="unspecified"]')).toBeTruthy()
+    expect(container.querySelector('[data-line-preview-part]')).toBeNull()
+    expect(container.querySelector('[data-template-region="preview"]')).toBeNull()
     expect(apiMocks.get).not.toHaveBeenCalled()
-    expect(await screen.findByText('予約した配信が指定されていません')).toBeTruthy()
+    expect(await screen.findByText('予約中の配信が指定されていません')).toBeTruthy()
     expect(screen.getByRole('link', { name: '配信予定へ戻る' }).getAttribute('href')).toBe('/broadcasts')
+    expect(screen.queryByText('8月キャンペーンのお知らせ')).toBeNull()
+  })
+
+  it('詳細も対象なしなら右の下見や配信結果を表示しない', async () => {
+    const { container } = render(<DetailPage />)
+    await flush()
+    expect(await screen.findByText('見る配信が指定されていません')).toBeTruthy()
+    expect(container.querySelector('[data-target-missing="unspecified"]')).toBeTruthy()
+    expect(container.querySelector('[data-line-preview-part]')).toBeNull()
+    expect(container.querySelector('[data-template-region="preview"]')).toBeNull()
+    expect(screen.queryByText('配信結果')).toBeNull()
+    expect(apiMocks.get).not.toHaveBeenCalled()
   })
 
   it('id ありでは予約内容が出る', async () => {
@@ -84,6 +101,6 @@ describe('broadcasts/reserved の対象未指定', () => {
     apiMocks.get.mockResolvedValue({ success: true, data: broadcast })
     render(<Page />)
     await flush()
-    expect(await screen.findByText('8月キャンペーンのお知らせ')).toBeTruthy()
+    expect(await screen.findAllByText('8月キャンペーンのお知らせ')).toBeTruthy()
   })
 })

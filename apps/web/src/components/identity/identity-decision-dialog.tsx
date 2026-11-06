@@ -1,17 +1,19 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useId, useState } from 'react'
 import type {
   IdentityCandidateDecision,
   IdentityCandidateDetail,
   DecideIdentityCandidateRequest,
   IdentityReprocessMode,
 } from '@line-crm/shared'
+import DifferencesFilter, { comparisonSourceLabels, sameKnownValues } from '@/components/shared/differences-filter'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import {
   canSubmitDecision,
@@ -23,6 +25,8 @@ import {
 } from './identity-view'
 import styles from './identity-review.module.css'
 import type { IdentityCandidateWithProfiles } from '@/lib/api'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 const DECISIONS: IdentityCandidateDecision[] = ['linked', 'different', 'deferred']
 
@@ -41,12 +45,18 @@ export default function IdentityDecisionDialog({
   candidate,
   busy,
   error,
+  initialDecision = 'linked',
   onCancel,
   onSubmit,
 }: {
   open: boolean
   candidate: IdentityCandidateDetail | IdentityCandidateWithProfiles
   busy: boolean
+  /**
+   * ★V8 ：追従帯の「別の人だった」「あとで決める」「結び付ける」が
+   * この窓を開くときの初期選択。省略時は「同じ人として結び付ける」。
+   */
+  initialDecision?: IdentityCandidateDecision
   /** 版競合や権限不足の言い換え。候補の中身は入れない。 */
   error?: string
   onCancel: () => void
@@ -57,6 +67,8 @@ export default function IdentityDecisionDialog({
     profileSelections?: DecideIdentityCandidateRequest['profileSelections']
   }) => void
 }) {
+  const disabledReasonId = useId()
+  const [differencesOnly, setDifferencesOnly] = useState(true)
   const [decision, setDecision] = useState<IdentityCandidateDecision>('linked')
   const [reason, setReason] = useState('')
   const [mode, setMode] = useState<IdentityReprocessMode>('future_only')
@@ -66,14 +78,17 @@ export default function IdentityDecisionDialog({
   // 別の候補を開いたら、前の候補の入力を持ち越さない。
   useEffect(() => {
     if (!open) return
-    setDecision('linked')
+    setDifferencesOnly(true)
+    setDecision(initialDecision)
     setReason('')
     setMode('future_only')
     const profiles = 'profileCandidates' in candidate ? candidate.profileCandidates : []
     setProfileSelections(Object.fromEntries(profiles.flatMap((field) => field.options[0] ? [[field.fieldKey, field.options[0].sourceFriendId]] : [])))
     setConsents([false, false, false])
-  }, [open, candidate])
+  }, [open, candidate, initialDecision])
 
+  useEffect(() => { if (error) setDifferencesOnly(false) }, [error])
+  const sourceLabels = comparisonSourceLabels([candidate.left, candidate.right].map((subject) => ({ id: subject.id, name: subject.label, source: subject.lineAccountName })))
   const ec = candidate.kind === 'ec_member'
   const canReprocess = ec && decision === 'linked'
   const profileCandidates = 'profileCandidates' in candidate ? candidate.profileCandidates : []
@@ -97,31 +112,38 @@ export default function IdentityDecisionDialog({
       } : {}),
     })
 
+  const actions = (
+    <>
+      <Button type="button" onClick={onCancel} disabled={busy}>
+        キャンセル
+      </Button>
+      {/* 理由が空のまま押せると、履歴に「なぜそう決めたか」が残らない。 */}
+      <Button type="button" variant="primary" onClick={submit} disabled={!ready} aria-describedby={!ready ? disabledReasonId : undefined} busy={busy} busyLabel="処理中…">
+        {decisionText(decision)}
+      </Button>
+    </>
+  )
+
   return (
     <Dialog
       open={open}
-      title="この2件を判定する"
-      description="判定すると履歴に残ります。元の友だち・注文は消えません。"
+      designWidth={ec ? 480 : undefined}
+      designTop={ec ? 220 : undefined}
+      title={ec ? '決める' : 'この2件を判定する'}
+      /* EC の「決める」は、何と何を結ぶかを題の下に出す。履歴の決まりは下の注記が持つ。 */
+      description={ec && candidate.right.label ? `${candidate.left.label} と ${candidate.right.label}` : '判定すると履歴に残ります。元の友だち・注文は消えません。'}
       busy={busy}
       error={error}
       onCancel={onCancel}
       designNode={candidate.kind === 'friend_duplicate' ? 'InCDe' : 'ELayY'}
-      footer={
-        <div className={styles.actions}>
-          <Button type="button" onClick={onCancel} disabled={busy}>
-            やめる
-          </Button>
-          {/* 理由が空のまま押せると、履歴に「なぜそう決めたか」が残らない。 */}
-          <Button type="button" variant="primary" onClick={submit} disabled={!ready}>
-            {busy ? '処理中…' : decisionText(decision)}
-          </Button>
-        </div>
-      }
+      footer={<DialogActions>{actions}</DialogActions>}
+      footerAlign={ec ? 'center' : undefined}
     >
       <div className={styles.dialogBody}>
-        <RadioCardGroup legend="判定" className={styles.choices}>
+        <SaveErrorField names={["identity-decision","item","decision"]}><RadioCardGroup legend="判定" className={styles.choices}>
           {DECISIONS.map((item) => (
             <RadioCard
+              variant="row"
               key={item}
               name="identity-decision"
               value={item}
@@ -131,40 +153,44 @@ export default function IdentityDecisionDialog({
               note={decisionNote(item)}
             />
           ))}
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
 
         {canReprocess ? (
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="identity-reprocess">
               過去の扱い
             </label>
-            <Select
+            <SaveErrorField names={["mode"]}><Select
               aria-label="過去の扱い"
               id="identity-reprocess"
               value={mode}
               onChange={(value) => setMode(value as IdentityReprocessMode)}
               options={REPROCESS_MODES.map((item) => ({ value: item, label: reprocessText(item) }))}
               size="full"
-            />
+            /></SaveErrorField>
           </div>
         ) : null}
 
         {!ec && decision === 'linked' && profileCandidates.length > 0 ? (
           <div className={styles.field}>
             <p className={styles.fieldLabel}>統合プロフィールに採用する値</p>
-            {profileCandidates.map((field) => (
+            <DifferencesFilter checked={differencesOnly} onChange={setDifferencesOnly} />
+            {profileCandidates.filter((field) => !differencesOnly || !sameKnownValues([
+              field.options.find((option) => option.sourceFriendId === candidate.left.id)?.valuePreview,
+              field.options.find((option) => option.sourceFriendId === candidate.right.id)?.valuePreview,
+            ])).map((field) => (
               <label key={field.fieldKey} className={styles.fieldLabel}>
                 {field.fieldLabel}
-                <Select
+                <SaveErrorField names={["profileSelections","profile_selections"]}><Select
                   aria-label={field.fieldLabel}
                   value={profileSelections[field.fieldKey] ?? ''}
                   onChange={(value) => setProfileSelections((current) => ({ ...current, [field.fieldKey]: value }))}
                   options={field.options.map((option) => ({
                     value: option.sourceFriendId,
-                    label: `${option.sourceLabel}：${option.valuePreview ?? '未登録'}${option.verified ? '（確認済み）' : ''}`,
+                    label: `${sourceLabels[option.sourceFriendId] || option.sourceLabel}：${option.valuePreview ?? '未登録'}${option.verified ? '（確認済み）' : ''}`,
                   }))}
                   size="full"
-                />
+                /></SaveErrorField>
               </label>
             ))}
           </div>
@@ -173,17 +199,17 @@ export default function IdentityDecisionDialog({
         {!ec && decision === 'linked' ? (
           <div className={styles.field}>
             <p className={styles.fieldLabel}>利用目的と同意・規約の確認</p>
-            {[
+            <DataTable><thead><TableHeadRow><Th>確かめること</Th></TableHeadRow></thead><tbody>{[
               'この統合の利用目的が、友だちが同意した範囲におさまっている',
               'プライバシーポリシーと利用規約に、この使い方が書いてある',
               'LINEの規約と、プロバイダーの決めごとに反していない',
             ].map((label, index) => (
-              <Checkbox
+              <Tr key={label}><Td><SaveErrorField names={["consents"]}><Checkbox
                 key={label}
                 checked={consents[index]}
                 onCheckedChange={(checked) => setConsents((current) => current.map((value, itemIndex) => itemIndex === index ? checked : value))}
-              >{label}</Checkbox>
-            ))}
+              >{label}</Checkbox></SaveErrorField></Td></Tr>
+            ))}</tbody></DataTable>
           </div>
         ) : null}
 
@@ -191,19 +217,19 @@ export default function IdentityDecisionDialog({
           <label className={styles.fieldLabel} htmlFor="identity-reason">
             判定の理由<RequiredBadge />
           </label>
-          <textarea
+          <SaveErrorField names={["reason"]}><SharedTextArea
             id="identity-reason"
             className={styles.reason}
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             placeholder="何を見てそう判断したかを書いてください。"
-          />
+          /></SaveErrorField>
         </div>
 
         <p className={styles.confirmNote}>{UNDO_NOTE}</p>
 
         {ready ? null : (
-          <p className={styles.confirmNote} role="status">
+          <p id={disabledReasonId} className={styles.confirmNote} role="status">
             {candidate.canDecide
               ? decision === 'linked' && !linkedReady
                 ? '理由を書くと判定できます。統合する場合は、採用する値と3つの確認もそろえてください。'

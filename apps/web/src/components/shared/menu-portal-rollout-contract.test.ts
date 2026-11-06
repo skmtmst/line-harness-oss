@@ -1,9 +1,7 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8')
-const consolePage = read('../../app/hq/templates/template-console.tsx')
-const consoleCss = read('../../app/hq/templates/template-console.module.css')
 const mileage = read('../../app/mileage/page.tsx')
 
 /*
@@ -13,19 +11,8 @@ const mileage = read('../../app/mileage/page.tsx')
  * （details＋absolute に戻す）と赤くなる。
  */
 describe('m17j 表の中のメニューは最上層に出す', () => {
-  it('ひな形一覧の「…」は details ではなく MenuPortal に出す', () => {
-    expect(consolePage).toContain('<MenuPortal')
-    expect(consolePage).toContain("import MenuPortal from '@/components/shared/menu-portal'")
-    expect(consolePage).toContain('role="menu"')
-    // できること（編集・配布・削除）は変えない。
-    expect(consolePage).toContain('を編集')
-    expect(consolePage).toContain('を配布')
-    expect(consolePage).toContain('を削除')
-    // 自前の absolute メニューを戻したら赤くなる。
-    expect(consolePage).not.toContain('styles.menuItems')
-    expect(consolePage).not.toContain('<details')
-    expect(consoleCss).not.toContain('position: absolute')
-  })
+  // ひな形一覧（app/hq/templates/template-console.tsx）は 2026-10-09 の 管理画面 削除で V8（v8/hq-templates/console.tsx）を出すだけになった。
+  // V8 の行の「…」は共通の RowMenu（最上層に出す器を持つ）を使うので、管理画面 の MenuPortal の見張りは外した。
 
   it('マイルの「公開版の中身を見る」は表の枠に切られない開き方にする', () => {
     expect(mileage).toContain('公開版の中身を見る')

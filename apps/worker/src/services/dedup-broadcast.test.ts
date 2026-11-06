@@ -8,12 +8,7 @@ interface CannedData {
   accountMeta: Array<{ id: string; name: string; country: string | null }>;
 }
 
-/**
- * Fake D1 that routes by SQL fingerprint (mirrors duplicates-stats.test.ts).
- * Bind parameters are intentionally ignored — the production DB is the source
- * of truth for "given this SQL + binds, what rows come back". Tests provide
- * canned results that reflect what production would return.
- */
+/** SQL の特徴で応答を選ぶ D1 の試験実装。引数の意味は実 DB 側で検証し、ここでは各 SQL に対応する決めた結果を返す。 */
 function withIdentKey<T extends { friend_id: string; ident_key?: string }>(rows: T[]): T[] {
   // テスト fixture は ident_key を省略して書ける。production の SQL は必ず
   // ident_key 列を返すので、未指定なら friend_id を入れて互換性を保つ。
@@ -44,7 +39,7 @@ function fakeDb(canned: CannedData): D1Database {
 
 describe('computeDedupBroadcastPreview', () => {
   it('targetTagId optional: when provided, SQL includes friend_tags EXISTS clause', async () => {
-    // Capture prepared SQL strings to verify the tag filter is wired in.
+    // タグ条件が接続されていることを、発行 SQL から確かめる。
     const preparedSqls: string[] = [];
     const capturingDb = {
       prepare(sql: string) {
@@ -70,7 +65,7 @@ describe('computeDedupBroadcastPreview', () => {
     expect(selectedCountSql).toMatch(/EXISTS \(SELECT 1 FROM friend_tags/);
     expect(rankedSql).toMatch(/EXISTS \(SELECT 1 FROM friend_tags/);
 
-    // Without tag, the EXISTS clause should NOT appear.
+    // タグ指定がなければ、その EXISTS 条件も付けない。
     const preparedSqls2: string[] = [];
     const capturingDb2 = {
       prepare(sql: string) {
@@ -108,7 +103,7 @@ describe('computeDedupBroadcastPreview', () => {
           { line_account_id: 'acc1', cnt: 1 },
           { line_account_id: 'acc2', cnt: 2 },
         ],
-        // f2 lost to acc1 priority; only f1 (acc1) and f3 (acc2, distinct ident) remain
+        // 同じ本人の f2 は優先度で除き、acc1 の f1 と別本人の acc2 の f3 を残す。
         rankedRows: [
           { friend_id: 'f1', line_user_id: 'u1', line_account_id: 'acc1' },
           { friend_id: 'f3', line_user_id: 'u3', line_account_id: 'acc2' },
@@ -138,7 +133,7 @@ describe('computeDedupBroadcastPreview', () => {
           { line_account_id: 'acc2', cnt: 1 },
           { line_account_id: 'acc3', cnt: 1 },
         ],
-        // All 3 share ident; only acc1 wins
+        // 3行が同じ本人なら、優先度の高い acc1 だけを残す。
         rankedRows: [{ friend_id: 'f1', line_user_id: 'u1', line_account_id: 'acc1' }],
         accountMeta: [
           { id: 'acc1', name: 'Account 1', country: '日本' },
@@ -162,7 +157,7 @@ describe('computeDedupBroadcastPreview', () => {
           { line_account_id: 'acc1', cnt: 1 },
           { line_account_id: 'acc2', cnt: 1 },
         ],
-        // Distinct idents → both rows survive
+        // 本人識別が違えば、両方の行を残す。
         rankedRows: [
           { friend_id: 'f1', line_user_id: 'u1', line_account_id: 'acc1' },
           { friend_id: 'f2', line_user_id: 'u2', line_account_id: 'acc2' },
@@ -178,8 +173,7 @@ describe('computeDedupBroadcastPreview', () => {
   });
 
   it('priority entry not in accountIds: ignored (priority is filtered to accountIds subset)', async () => {
-    // Production filters dedupPriority to entries in accountIds before SQL.
-    // The fake DB doesn't care; production behavior is acc1 wins given accountIds=[acc1,acc2] priority=[acc3,acc1,acc2].
+    // 対象にない優先先は SQL 前に除かれ、対象内の優先順だけで選ぶことを確かめる。
     const result = await computeDedupBroadcastPreview(
       fakeDb({
         selectedCounts: [
@@ -199,7 +193,7 @@ describe('computeDedupBroadcastPreview', () => {
   });
 
   it('account in accountIds but not in dedupPriority: tail-ranked (production behavior canned)', async () => {
-    // accountIds=[acc1,acc2] priority=[acc1] → acc2 in CASE ELSE 999, loses to acc1 even though created earlier
+    // 優先指定にある acc1 を、作成が古くても指定なしの acc2 より先に選ぶ。
     const result = await computeDedupBroadcastPreview(
       fakeDb({
         selectedCounts: [
@@ -225,8 +219,7 @@ describe('computeDedupBroadcastPreview', () => {
           { line_account_id: 'acc1', cnt: 1 },
           { line_account_id: 'acc2', cnt: 1 },
         ],
-        // Production: empty priority → caseExpr is '999', tie-break by created_at ASC.
-        // Test seeds acc2 with earlier created_at, so acc2 wins.
+        // 優先指定が空なら同順位となり、作成日時の古い acc2 を選ぶ。
         rankedRows: [{ friend_id: 'f2', line_user_id: 'u2', line_account_id: 'acc2' }],
         accountMeta: [
           { id: 'acc1', name: 'Account 1', country: '日本' },
@@ -246,7 +239,7 @@ describe('computeDedupBroadcastPreview', () => {
           { line_account_id: 'acc1', cnt: 3 },
           { line_account_id: 'acc2', cnt: 2 },
         ],
-        // 5 friends, all same ident → only 1 winner
+        // 同じ本人の5行は1行へ収束させる。
         rankedRows: [{ friend_id: 'f0', line_user_id: 'u0', line_account_id: 'acc1' }],
         accountMeta: [
           { id: 'acc1', name: 'Account 1', country: '日本' },
@@ -297,9 +290,7 @@ describe('computeDedupBroadcastPreview', () => {
   });
 });
 
-// =============================================================================
-// processMultiAccountDedupBroadcast — send executor tests
-// =============================================================================
+
 
 vi.mock('@line-crm/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@line-crm/db')>();
@@ -316,11 +307,12 @@ vi.mock('./stealth.js', () => ({
   addMessageVariation: (text: string) => text,
 }));
 
-// Import the mocked module's symbols AFTER vi.mock declarations
+// モック登録後に読み込み、差替済みの関数を使う。
 import { getLineAccountById } from '@line-crm/db';
 import * as dbModule from '@line-crm/db';
 import { processMultiAccountDedupBroadcast } from './dedup-broadcast.js';
 import type { LineClient, Message } from '@line-crm/line-sdk';
+
 
 class MockLineClient {
   calls: Array<{ method: string; args: unknown[] }> = [];
@@ -342,11 +334,7 @@ class MockLineClient {
   }
 }
 
-// fakeDb for send-side: handles `db.prepare(...).bind(...).run()` for the
-// failed_account_ids UPDATE and `db.batch(...)` for messages_log INSERTs.
-// Also handles the SQL fingerprints from computeDedupBroadcastPreview (which
-// runs inside the executor — we provide canned results matching what the
-// caller seeded).
+// 失敗アカウントの更新、履歴 batch、プレビュー取得の SQL に対応し、渡した対象に合う結果を返す試験 DB を使う。
 function makeSendDb(opts: {
   selectedCounts?: Array<{ line_account_id: string; cnt: number }>;
   rankedRows?: Array<{
@@ -360,8 +348,8 @@ function makeSendDb(opts: {
 }) {
   const updates: Record<string, unknown> = {};
   // Per-batch progress UPDATE 履歴。resume テスト用に full snapshot を取る。
-  // bind() タイミングで capture することで、run()/batch() どちらの実行経路でも
-  // 拾えるようにする (現在の実装は db.batch() 経由のため、run() フックだと取れない)。
+  // bind タイミングで capture することで、run/batch どちらの実行経路でも
+  // 拾えるようにする (現在の実装は db.batch 経由のため、run フックだと取れない)。
   const progressUpdates: Array<{ progress: unknown; successCount: unknown }> = [];
   const batches: unknown[][] = [];
   const db = {
@@ -379,7 +367,7 @@ function makeSendDb(opts: {
             progressUpdates.push({ progress: params[0], successCount: params[1] });
           }
           return {
-            // batch() に載った文を後から見分けるための印。どの文が
+            // batch に載った文を後から見分けるための印。どの文が
             // どの batch に入ったか（= 何と何が同時に確定するか）を
             // 試験が読めるようにする。
             __sql: sql,
@@ -495,7 +483,7 @@ describe('processMultiAccountDedupBroadcast', () => {
     );
     expect(result).toMatchObject({ totalCount: 1, successCount: 1 });
     expect((clients[0].calls[0].args[1] as unknown[])).toHaveLength(2);
-    // 2通の送信記録 + 受信者単位の進捗更新 + 送達台帳の決着（#662）。
+    // 2通の送信記録 + 受信者単位の進捗更新 + 送達台帳の決着。
     // **同じ batch に載っていること**が要点。分けて流すと、記録だけ残って
     // 台帳が押さえたままの窓ができ、その相手が「届いたのに送達不明」になる。
     const deliveryBatch = batches.find((stmts) =>
@@ -550,7 +538,7 @@ describe('processMultiAccountDedupBroadcast', () => {
     );
 
     expect(result.failedAccountIds).toEqual(['acc1']);
-    expect(result.successCount).toBe(1); // only acc2 succeeded
+    expect(result.successCount).toBe(1); // acc2 だけが成功した状態。
     expect(updates.failed_account_ids).toBe(JSON.stringify(['acc1']));
   });
 
@@ -571,7 +559,7 @@ describe('processMultiAccountDedupBroadcast', () => {
     });
 
     vi.mocked(getLineAccountById).mockImplementation(async (_db: D1Database, id: string) => {
-      if (id === 'acc1') return { id, channel_access_token: 'tok1', is_active: 0 } as never; // inactive
+      if (id === 'acc1') return { id, channel_access_token: 'tok1', is_active: 0 } as never;
       if (id === 'acc2') return { id, channel_access_token: 'tok2', is_active: 1 } as never;
       return null;
     });
@@ -591,15 +579,15 @@ describe('processMultiAccountDedupBroadcast', () => {
     );
 
     expect(result.failedAccountIds).toEqual([]);
-    expect(result.successCount).toBe(1); // only acc2 sent (1 friend)
+    expect(result.successCount).toBe(1); // acc2 の友だち1人だけへ送信した状態。
     expect(result.totalCount).toBe(1);
     // 失敗ゼロでも明示的に NULL 上書きする (resume 時の stale 失敗マーク消去用)
     expect(updates.failed_account_ids).toBeNull();
   });
 
-  it('persists progress per batch and clears dedup_progress at end', async () => {
+  it('persists the audience and progress per batch', async () => {
     // 1 アカ × 1 batch (1 recipient) — 各 multicast 後に progress UPDATE が走り
-    // 完走後に dedup_progress=NULL の clear が走ることを確認する。
+    // 再送にも使う宛先と既送IDが残ることを確認する。
     const { db, progressUpdates } = makeSendDb({
       selectedCounts: [{ line_account_id: 'acc1', cnt: 1 }],
       rankedRows: [{ friend_id: 'f1', line_user_id: 'u1', line_account_id: 'acc1' }],
@@ -633,9 +621,7 @@ describe('processMultiAccountDedupBroadcast', () => {
     // ident_key は test fixture で friend_id をデフォルトに使っている (withIdentKey 参照)
     expect(lastProgress.sentIdentKeys).toEqual(['f1']);
     expect(progressUpdates[progressUpdates.length - 1].successCount).toBe(1);
-    // 最終的に dedup_progress=NULL に戻されている
-    // dedup_progress の clear は updateBroadcastStatus 側で行われる設計に変更したため
-    // ここでは検証しない。caller の send パスに対する別テストでカバー。
+    expect(lastProgress.audience.perAccount[0].recipients).toHaveLength(1);
   });
 
   it('resumes from saved dedup_progress: skips already-sent batches', async () => {
@@ -681,6 +667,7 @@ describe('processMultiAccountDedupBroadcast', () => {
         // 前回の partial run state: ident_key 'f1' 送信済み (acc1 の u1 配信済), 'f2' 未送信
         dedup_progress: JSON.stringify({
           sentIdentKeys: ['f1'],
+          audience: await computeDedupBroadcastPreview(db,['acc1','acc2'],['acc1','acc2']),
         }),
       },
       factory,
@@ -742,6 +729,7 @@ describe('processMultiAccountDedupBroadcast', () => {
         // 前回 batch1 (f0..f499 = ident_key) だけ完了して死んだ想定。f500 は未送信。
         dedup_progress: JSON.stringify({
           sentIdentKeys: Array.from({ length: 500 }, (_, i) => `f${i}`),
+          audience: await computeDedupBroadcastPreview(db,['acc1'],['acc1']),
         }),
       },
       factory,
@@ -879,7 +867,7 @@ describe('processMultiAccountDedupBroadcast', () => {
 });
 
 // =============================================================================
-// N-184: 共通情報 ({{var.*}}) を配信元アカウントごとに解決する (実D1 + LINE mock)
+// 共通情報 ({{var.*}}) を配信元アカウントごとに解決する (実D1 + LINE mock)
 // =============================================================================
 
 type SeedDb = ReturnType<typeof createTestD1>;
@@ -1114,4 +1102,14 @@ describe('processMultiAccountDedupBroadcast per-account common vars (N-184)', ()
       spy.mockRestore();
     }
   });
+});
+
+it('SCALE-02 仲間: 201店舗と201件の優先順でも変数上限を超えない', async () => {
+  const seed = createTestD1();
+  try {
+    const ids = Array.from({ length: 201 }, (_, i) => `synthetic-${i}`);
+    const result = await computeDedupBroadcastPreview(seed.db, ids, [...ids].reverse());
+    expect(result.totalSelected).toBe(0);
+    expect(result.perAccount).toHaveLength(201);
+  } finally { seed.raw.close(); }
 });

@@ -1,5 +1,5 @@
 /*
- * R429: 公開受信の頻度制限は、不正な認証ヘッダーを付けても緩まない。
+ * 公開受信の頻度制限は、不正な認証ヘッダーを付けても緩まない。
  *
  * 落ち方（直前）: 同一IPが上限（100/分）に達した後、存在しない Bearer 値を
  *   付けるだけで認証済み枠（1000/分）へ切り替わり、429 が 401 に戻る。
@@ -9,7 +9,7 @@
 import { describe, expect, test } from 'vitest';
 import { Hono } from 'hono';
 import { rateLimitMiddleware } from './rate-limit.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 function app() {
   const a = new Hono<Env>();

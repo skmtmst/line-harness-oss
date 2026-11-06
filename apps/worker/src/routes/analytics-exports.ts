@@ -1,3 +1,6 @@
+import { logger } from '@line-crm/shared/server';
+import { csvRecordCount } from '../middleware/output-audit.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   ANALYTICS_EXPORT_MAX_BYTES,
@@ -28,7 +31,8 @@ import {
   type AnalyticsExportParams,
   type AnalyticsExportTarget,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -61,7 +65,7 @@ async function resolveExportAccount(
 ): Promise<{ ok: true; accountId: string } | { ok: false; response: Response }> {
   const trimmed = accountId?.trim();
   if (!trimmed) {
-    return { ok: false, response: c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400) };
+    return { ok: false, response: inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]) };
   }
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!scope.allowedAccountIds.includes(trimmed)) {
@@ -111,7 +115,7 @@ export async function runAnalyticsExportJob(db: D1Database, jobId: string): Prom
       finishedAt: finishedAt(),
     });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'analytics_export_failed', jobId, error: String(error) }));
+    logger.error("analytics.export_failed");
     const message = error instanceof Error && error.message === 'analytics_export_not_ready'
       ? '集計がまだ終わっていません。集計が終わってから書き出してください'
       : error instanceof Error && error.message === 'analytics_export_not_found'
@@ -173,24 +177,24 @@ async function buildExportRows(
 analyticsExports.post(
   '/api/analytics/exports',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const body = await c.req.json<Record<string, unknown>>().catch(() => null);
       const account = await resolveExportAccount(c, body?.accountId as string | undefined);
       if (!account.ok) return account.response;
       const target = parseAnalyticsExportTarget(body?.target);
       if (!target) {
-        return c.json({ success: false, error: '書き出す内容を選んでください' }, 400);
+        return inputError(c, { success: false, error: '書き出す内容を選んでください' }, 400, ["target"]);
       }
       const params = parseAnalyticsExportParams(body?.params);
       if (target === 'cross' && !params.resultId) {
-        return c.json({ success: false, error: 'クロス分析の結果を選んでください' }, 422);
+        return inputError(c, { success: false, error: 'クロス分析の結果を選んでください' }, 422, ["target","params"]);
       }
       if (target === 'funnel' && !params.funnelId) {
-        return c.json({ success: false, error: 'ファネルを選んでください' }, 422);
+        return inputError(c, { success: false, error: 'ファネルを選んでください' }, 422, ["target","params"]);
       }
       if ((target === 'cross' || target === 'funnel') && (params.from || params.to)) {
-        return c.json({ success: false, error: '期間の指定はこの書き出しには使えません' }, 400);
+        return inputError(c, { success: false, error: '期間の指定はこの書き出しには使えません' }, 400, ["target","params"]);
       }
       // 存在しない集計の待ち行列を作らない。IDの打ち間違いはここで落とす。
       if (target === 'cross') {
@@ -207,7 +211,7 @@ analyticsExports.post(
           (key) => (key === 'from' ? params.from : key === 'to' ? params.to : undefined),
           selected?.timezone || 'Asia/Tokyo',
         );
-        if (!range.ok) return c.json({ success: false, error: range.error }, 400);
+        if (!range.ok) return inputError(c, { success: false, error: range.error }, 400, ["params","accountId"]);
       }
       const staff = c.get('staff');
       const now = new Date();
@@ -229,10 +233,10 @@ analyticsExports.post(
       }
       auditLog(c, 'analytics.export', { kind: 'analytics_export', id: job.id });
       const fresh = await getAnalyticsExportJob(c.env.DB, job.id, account.accountId);
-      return c.json({ success: true, data: exportJobJson(fresh ?? job) }, 202);
+      c.set('outputAudit', { count: (fresh ?? job).row_count, accountId: account.accountId, targetId: job.id, phase: 'requested' });
+    return c.json({ success: true, data: exportJobJson(fresh ?? job) }, 202);
     } catch (error) {
-      console.error(JSON.stringify({ event: 'analytics_export_create_failed', error: String(error) }));
-      return c.json({ success: false, error: '書き出しを始められませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -253,8 +257,7 @@ analyticsExports.get(
       }
       return c.json({ success: true, data: exportJobJson(job) });
     } catch (error) {
-      console.error(JSON.stringify({ event: 'analytics_export_status_failed', error: String(error) }));
-      return c.json({ success: false, error: '書き出しの状態を確認できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -284,6 +287,7 @@ analyticsExports.get(
         return c.json({ success: false, error: 'この書き出しはまだダウンロードできません' }, 409);
       }
       auditLog(c, 'analytics.export', { kind: 'analytics_export', id: job.id });
+      c.set('outputAudit', { count: csvRecordCount(fresh.csv_text), accountId: account.accountId, targetId: job.id });
       return new Response(`﻿${fresh.csv_text}`, {
         headers: {
           'content-type': 'text/csv; charset=utf-8',
@@ -292,8 +296,7 @@ analyticsExports.get(
         },
       });
     } catch (error) {
-      console.error(JSON.stringify({ event: 'analytics_export_download_failed', error: String(error) }));
-      return c.json({ success: false, error: 'ダウンロードできませんでした' }, 500);
+      throw error;
     }
   },
 );

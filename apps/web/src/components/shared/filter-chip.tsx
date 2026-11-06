@@ -1,12 +1,12 @@
-import { Check } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { Check, ChevronDown } from 'lucide-react'
+import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from 'react'
 import './filter-chip.css'
 
 /**
- * 一覧の絞り込み札（★V7・全画面で1つだけ使う形）。
+ * 一覧の絞り込み札（★管理画面・全画面で1つだけ使う形）。
  *
- * 丸い札・高さ32・選んだら濃い緑の地に白文字＋✓（#669: 選んだ状態は
- * 「有効状態」なのでアクセントを使う）。件数は文字の後ろに小さく出す。
+ * 丸い札・高さは操作の段と同じ 36。押していない＝白、押した＝薄い緑の地・緑の文字・左に ✓（印は ✓ に替わる）。
+ * 件数は文字の後ろに小さく出す。
  * 選んでいないときは印を出さない（○や星などの飾りを付けない）。
  *
  * 状態を表示するだけの Chip と違い、これは押して条件を切り替える操作に使う。
@@ -18,8 +18,20 @@ export default function FilterChip({
   count,
   disabled,
   title,
+  icon,
+  selectedIcon = true,
+  size,
+  showCheck = true,
+  'aria-expanded': expanded,
+  'aria-haspopup': popup,
   children,
-}: {
+}: Pick<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-expanded' | 'aria-haspopup'> & {
+  icon?: ReactNode
+  /** 印のない絞り込み札（設定・ログインユーザーの板）。省略時は従来の ✓。 */
+  selectedIcon?: boolean
+  size?: 'compact' | 'inbox'
+  /** 選んだときの ✓ を出すか（メッセージ作成の札）。selectedIcon と同じ意味で、どちらかが false なら出さない。 */
+  showCheck?: boolean
   selected: boolean
   onChange: (selected: boolean) => void
   /** 文字の後ろに小さく出す件数。取れていないときは出さない（「—」は置かない）。 */
@@ -33,19 +45,26 @@ export default function FilterChip({
     <button
       type="button"
       aria-pressed={selected}
+      aria-expanded={expanded}
+      aria-haspopup={popup}
       disabled={disabled}
       title={title}
       onClick={() => onChange(!selected)}
-      className="v6-filter-chip"
+      className="v6-filter-chip" data-part="filter-chip" data-size={size}
     >
-      {selected ? <Check aria-hidden="true" className="v6-filter-chip__icon" /> : null}
+      {selected && selectedIcon && showCheck ? <Check aria-hidden="true" className="v6-filter-chip__icon" /> : icon ? <span className="v6-filter-chip__icon">{icon}</span> : null}
       {children}
+      {popup ? <ChevronDown aria-hidden="true" className="v6-filter-chip__chevron" /> : null}
       {count === undefined || count === '' ? null : (
-        <>
-          {' '}
-          <span className="v6-filter-chip__count">{count}</span>
+        <>{' '}
+          <span className="v6-filter-chip__count" data-filter-count={popup ? '' : undefined}>{count}</span>
         </>
       )}
     </button>
   )
+}
+
+/** 保管済み一覧への切り替え。全画面で同じ動詞を使う。 */
+export function ArchiveFilterChip(props: Omit<ComponentProps<typeof FilterChip>, 'children'>) {
+  return <FilterChip {...props}>保管したものを見る</FilterChip>
 }

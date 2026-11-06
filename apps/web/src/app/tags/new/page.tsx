@@ -1,12 +1,11 @@
 'use client'
 
+import PagePending from '@/components/templates/page-pending'
+import { routePendingForPath } from '@/lib/route-pending'
 import { Suspense } from 'react'
-import NewTagPageV4 from '@/components/friend-fields/new-tag-page-v4'
+import Screen from '@/v8/tags/create'
 
+/** V8 の入口。URL・読み書き・権限は画面側で保つ。 */
 export default function NewTagPage() {
-  return (
-    <Suspense fallback={<p className="p-6 text-sm text-ink-faint">読み込み中…</p>}>
-      <NewTagPageV4 />
-    </Suspense>
-  )
+  return <Suspense fallback={<PagePending stage="route" {...routePendingForPath("/tags/new")} />}><Screen /></Suspense>
 }

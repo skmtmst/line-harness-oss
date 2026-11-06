@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { Hono } from 'hono';
 import {
   billingRevenueTotals,
@@ -9,20 +10,24 @@ import {
   dashboardLineRegistration,
   dashboardTickets,
   dashboardUsage,
+  getActiveImpersonation,
   getPlatformSetting,
   latestPaidBillingInvoices,
   listContractTenants,
   knowledgeMetrics,
   type TenantPlanRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { adminSessionTokenHashFromRequest } from '../middleware/auth/credentials/auth.js';
 import { requirePlatformAdmin } from '../middleware/platform-admin.js';
 import { BILLING_PLANS, findPlan, type PlanKey } from '../services/billing-plans.js';
 import { dbFor } from '../services/db-router.js';
+import { firstRunFunnel } from '../services/first-run-funnel.js';
 
 /**
- * 運営ダッシュボード（★V6 37-2 `Xvofy`）。
+ * 運営ダッシュボード（★37-2 `Xvofy`）。
  *
  * 売上は Stripe の入金済み請求書から数え、返金を差し引く。
  * Stripe 未設定または請求書がまだ無い環境だけ、契約中プランの定価へ戻す。
@@ -34,10 +39,8 @@ opsDashboard.use('/api/ops/dashboard', requirePlatformAdmin());
 
 export type DashboardPeriod = 'month' | 'prev_month' | 'year';
 
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
-
 function jstParts(at = Date.now()): { y: number; m: number; d: number } {
-  const t = new Date(at + JST_OFFSET_MS);
+  const t = japanCalendar(new Date(at));
   return { y: t.getUTCFullYear(), m: t.getUTCMonth(), d: t.getUTCDate() };
 }
 
@@ -49,7 +52,7 @@ export function jstMonthStart(y: number, m: number): string {
 }
 
 export function jstIso(at: number): string {
-  const t = new Date(at + JST_OFFSET_MS);
+  const t = japanCalendar(new Date(at));
   const pad = (n: number, w = 2) => String(n).padStart(w, '0');
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}T${pad(t.getUTCHours())}:${pad(t.getUTCMinutes())}:${pad(t.getUTCSeconds())}.${pad(t.getUTCMilliseconds(), 3)}+09:00`;
 }
@@ -98,7 +101,6 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
       excludeTenantId: DEFAULT_TENANT_ID,
       now: nowIso,
       trialDeadline: jstIso(now + 3 * 24 * 60 * 60 * 1000),
-      tokenDeadline: jstIso(now + 14 * 24 * 60 * 60 * 1000),
     }),
     dashboardTickets(db, { from: range.from, to: range.to }),
     dashboardLineRegistration(db, DEFAULT_TENANT_ID),
@@ -110,7 +112,7 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
   ]);
 
   // 「契約中」＝請求契約が生きているもの（active ＋決済失敗の past_due）。
-  // 一覧（/api/ops/tenants の集計）と同じ定義にそろえる（監査 R153）。
+  // 一覧（/api/ops/tenants の集計）と同じ定義にそろえる。
   const active = tenants.filter((t) => t.plan_status === 'active' || t.plan_status === 'past_due');
   const trialing = tenants.filter((t) => t.plan_status === 'trialing');
   const byPlan: Record<PlanKey, number> = { light: 0, standard: 0, pro: 0 };
@@ -249,7 +251,7 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
   });
 });
 
-/** 「未登録の N 人へ案内」の一覧（★V6 37-2）。名前と契約先だけ返す。メールアドレスは返さない。 */
+/** 「未登録の N 人へ案内」の一覧（★37-2）。名前と契約先だけ返す。メールアドレスは返さない。 */
 opsDashboard.get('/api/ops/dashboard/line-unregistered', async (c) => {
   const db = dbFor(c.env);
   const line = await dashboardLineRegistration(db, DEFAULT_TENANT_ID);
@@ -261,4 +263,25 @@ opsDashboard.get('/api/ops/dashboard/line-unregistered', async (c) => {
       people: line.unregistered.map((p) => ({ staffId: p.staffId, name: p.name, tenantName: p.tenantName, hasEmail: p.email !== null })),
     },
   });
+});
+
+/**
+ * 最初の 10 分の全アカウントのまとめ。期間（アカウントを作った日）ごとの数と割合だけを返す。
+ * 運営マスターの中でも、閲覧のみの人と代理ログイン中は読めない。
+ */
+opsDashboard.get('/api/ops/dashboard/first-run', async (c) => {
+  const db = dbFor(c.env);
+  const staff = c.get('staff');
+  if (!staff || staff.readOnly) {
+    return c.json({ success: false, error: '閲覧のみの権限では、このまとめは見られません' }, 403);
+  }
+  const tokenHash = await adminSessionTokenHashFromRequest(c);
+  if (tokenHash && await getActiveImpersonation(db, staff.id, tokenHash)) {
+    return c.json({ success: false, error: '代理ログイン中は、このまとめは見られません' }, 403);
+  }
+  const periodRaw = c.req.query('period');
+  const period: DashboardPeriod = periodRaw === 'prev_month' || periodRaw === 'year' ? periodRaw : 'month';
+  const range = resolvePeriod(period);
+  const funnel = await firstRunFunnel(db, { from: range.from, to: range.to, excludeTenantId: DEFAULT_TENANT_ID });
+  return c.json({ success: true, data: { period, periodLabel: range.label, ...funnel } });
 });

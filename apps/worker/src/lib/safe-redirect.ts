@@ -1,55 +1,23 @@
-/**
- * URL schemes that can execute script / load attacker content when handed to
- * `c.redirect()` (Location) or `window.location.href`. These are the only
- * schemes this guard blocks.
- */
+/** 保存済みまたは署名済みの移動先では、既存のスクリプト以外のスキームを保つ。 */
 const DANGEROUS_SCHEMES = new Set(['javascript:', 'data:', 'vbscript:', 'file:']);
-
-/**
- * Validate a user-supplied post-OAuth redirect target.
- *
- * The `?redirect=` param on /auth/line (and the /api/links/wrap proxy) is an
- * intentional feature: businesses send users to their own marketing/LP
- * destinations — and app/deep-link schemes like `line://`, `tel:`, `mailto:` —
- * after the friend-add funnel. To avoid breaking those funnels this guard is a
- * *denylist*, not an allowlist: it accepts http(s), root-relative paths, and
- * any non-dangerous scheme, and only rejects the things that are never a
- * legitimate redirect target:
- *   - script/content schemes (javascript:, data:, vbscript:, file:) — XSS,
- *   - protocol-relative `//host` (incl. the `/\host` / `\\host` backslash
- *     variants browsers normalize to `//`) — scheme confusion,
- *   - control characters — header-splitting / bypass tricks,
- *   - and anything that is neither an absolute URL nor a root-relative path.
- *
- * Used on both redirect sinks: the server-side /auth/callback redirect and the
- * client-side LIFF navigation (apps/worker/src/client/main.ts).
- *
- * @returns the trimmed redirect string when safe, or null when the caller
- *          should fall back to the default completion screen.
- */
-export function safeRedirectTarget(raw: string | null | undefined): string | null {
+export function storedRedirectTarget(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const value = raw.trim();
   if (!value) return null;
 
-  // Control characters (incl. CR/LF/TAB, code point < 0x20 or DEL 0x7f) enable
-  // header-splitting / bypass tricks — never legitimate in a redirect target.
+  // 制御文字はヘッダ分割や検査回避に使えるため、CR/LF/TAB・0x20未満・DELを拒む。
   for (let i = 0; i < value.length; i++) {
     const code = value.charCodeAt(i);
     if (code < 0x20 || code === 0x7f) return null;
   }
 
-  // Protocol-relative forms (`//host`, and the `/\`, `\\`, `\/` backslash
-  // variants browsers normalize to `//`) — reject before the relative-path
-  // branch below.
+  // ブラウザが別ホストと解釈する // やバックスラッシュの変形は、同一 origin の相対パスと判定する前に拒む。
   if (/^[/\\][/\\]/.test(value)) return null;
 
-  // Root-relative path (single leading slash) — same-origin, always safe.
+  // 先頭が単一スラッシュの絶対パスは同一 origin 内へ移動する。
   if (value.startsWith('/')) return value;
 
-  // Absolute URL: accept any scheme except the dangerous ones. A value that is
-  // neither root-relative nor a parseable absolute URL (e.g. "not a url",
-  // bare "evil.com") is rejected rather than guessed.
+  // 危険なスキーム以外の絶対 URL を許可する。相対パスでも解析可能な絶対 URL でもない値は、推測で補わず拒む。
   let url: URL;
   try {
     url = new URL(value);
@@ -57,4 +25,31 @@ export function safeRedirectTarget(raw: string | null | undefined): string | nul
     return null;
   }
   return DANGEROUS_SCHEMES.has(url.protocol.toLowerCase()) ? null : value;
+}
+
+/** 信頼できないクエリの移動先は、現在の origin 内に限る。 */
+export function safeRedirectTarget(raw: string | null | undefined, origin?: string): string | null {
+  const value = storedRedirectTarget(raw);
+  if (!value || /[\\\u0000-\u0020\u007f]/.test(value)) return null;
+  try {
+    const decodedPath = decodeURIComponent(value.split(/[?#]/)[0]);
+    if (/[\\\u0000-\u0020\u007f]/.test(decodedPath) || decodedPath.startsWith('//')) return null;
+  } catch { return null; }
+  try {
+    const base = origin || 'https://same-origin.invalid';
+    const parsed = new URL(value, base);
+    if (parsed.origin !== new URL(base).origin || !/^https?:$/.test(parsed.protocol)) return null;
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch { return null; }
+}
+
+/** 顧客の識別情報は、この Worker の計測経路だけへ渡す。 */
+export function attributedRedirectTarget(target: string, origin: string, identityToken: string): string {
+  const parsed = new URL(target, origin);
+  if (parsed.origin !== new URL(origin).origin || !parsed.pathname.startsWith('/t/')) return target;
+  parsed.searchParams.delete('lu');
+  parsed.searchParams.delete('f');
+  parsed.searchParams.delete('identity');
+  parsed.searchParams.set('identity', identityToken);
+  return parsed.toString();
 }

@@ -1,9 +1,9 @@
 import { ChevronDown } from 'lucide-react'
-import type { ReactNode } from 'react'
+import type { FocusEventHandler, ReactNode, Ref } from 'react'
 import styles from './disclosure.module.css'
 
 /**
- * 開閉する欄。Pencil ★V7「開閉する欄」（V7 文書 `v9M8P8`）。
+ * 開閉する欄。Pencil ★V8（V8.pen）「開け閉めする段」。
  *
  * 中身はネイティブの `<details>`/`<summary>`。キーボード（Enter・Space）と読み上げ
  * （開いている／閉じている）は最初から効く。見た目と動きだけをそろえる。
@@ -16,8 +16,13 @@ export default function Disclosure({
   hint,
   defaultOpen = false,
   size = 'standard',
+  appearance = 'card',
+  selected = false,
   className,
   id,
+  onToggle,
+  detailsRef,
+  onBlur,
   children,
 }: {
   title: ReactNode
@@ -25,17 +30,29 @@ export default function Disclosure({
   hint?: ReactNode
   defaultOpen?: boolean
   size?: 'standard' | 'compact'
+  appearance?: 'card' | 'inset'
+  /** 選択中の欄を見出し左の緑印で示す。 */
+  selected?: boolean
   className?: string
   id?: string
+  /** 開いたときにだけ必要な詳細を読み込むための口。 */
+  onToggle?: (open: boolean) => void
+  /** 保存の誤りで欄を開いて移るとき（呼ぶ側が open を立てる）。 */
+  detailsRef?: Ref<HTMLDetailsElement>
+  onBlur?: FocusEventHandler<HTMLDetailsElement>
   children: ReactNode
 }) {
   return (
     <details
+      ref={detailsRef}
+      onBlur={onBlur}
       id={id}
+      data-appearance={appearance}
+      onToggle={onToggle ? (event) => onToggle(event.currentTarget.open) : undefined}
       open={defaultOpen || undefined}
       className={[styles.root, size === 'compact' ? styles.compact : '', className].filter(Boolean).join(' ')}
     >
-      <summary className={styles.summary}>
+      <summary className={styles.summary} data-selected={selected || undefined}>
         <span className={styles.title}>{title}</span>
         {hint ? <span className={styles.hint}>{hint}</span> : null}
         <ChevronDown aria-hidden="true" className={styles.chevron} />

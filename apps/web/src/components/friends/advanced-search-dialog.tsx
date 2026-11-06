@@ -1,28 +1,29 @@
 'use client'
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { X } from 'lucide-react'
-import type { SavedSearchCondition, Scenario, Tag } from '@line-crm/shared'
-import { api, type FriendListParams } from '@/lib/api'
-import {
-  conditionsToEditorState,
-  describeSavedCondition,
-  describeSavedVisibility,
-  editorStateToConditions,
-  hasSavedSearchFilter,
-  type FriendSearchBlock,
-  type FriendSearchEditorState,
-  type FriendVisibilityChoice,
-  type SavedSearchConditionLabels,
-} from './saved-search-utils'
-import { TextInput } from '@/components/shared/form-controls'
-import DateField from '@/components/shared/date-field'
-import Button from '@/components/shared/button'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Combobox from '@/components/shared/combobox'
-import Select from '@/components/shared/select'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
-
+import CloseButton from '@/components/shared/close-button'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { memberRanksApi } from '@/lib/api/helpers/gap3';
+import { useOverlayLayer } from '@/components/shared/overlay-utils';
+import TagOverflow from '@/components/shared/tag-overflow';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { X } from 'lucide-react';
+import TagPill from '@/components/shared/tag-pill';
+import type { SavedSearchCondition, Scenario, Tag } from '@line-crm/shared';
+import { api } from '@/lib/api';
+import { conditionsToEditorState, describeSavedCondition, describeSavedVisibility, editorStateToConditions, hasSavedSearchFilter, type FriendSearchBlock, type FriendSearchEditorState, type FriendVisibilityChoice, type SavedSearchConditionLabels } from './saved-search-utils';
+import { TextInput } from '@/components/shared/form-controls';
+import DateField from '@/components/shared/date-field';
+import Button from '@/components/shared/button';
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
+import Select from '@/components/shared/select';
+import HelpTip from '@/components/shared/help-tip';
+import { useOverlayFocus } from '@/components/shared/overlay-utils';
+import { formatNumber } from '@/lib/format';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import { BLOCK_HELP, type AdvancedSearchResult } from './advanced-search-dialog-gap-parts'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
+export type { AdvancedSearchResult } from './advanced-search-dialog-gap-parts'
 /**
  * V4の詳細検索。既存APIが受け取れる条件だけを実行対象にする。
  *
@@ -36,6 +37,7 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 /** 絞り込みの1ブロック。設計の「条件」1つぶん。 */
 type Block = FriendSearchBlock
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 
 const BLOCK_LABEL: Record<Block['kind'], string> = {
   name: '名前',
@@ -44,18 +46,15 @@ const BLOCK_LABEL: Record<Block['kind'], string> = {
   status_message: 'ステータスメッセージ',
   created_at: '友だち登録日',
   chat_status: '対応状況',
+  visit_count: '来店の回数',
+  purchase_amount: '購入の合計金額',
+  last_activity_at: '最後の来店・購入の日',
+  member_tier: '会員ランク',
 }
 
-const BLOCK_HELP: Record<Block['kind'], string> = {
-  name: 'LINE登録名・本名・システム表示名',
-  tag: '含む／含まない',
-  field: '項目と値',
-  status_message: 'ひとことに含む文字',
-  created_at: '期間を指定',
-  chat_status: '固定の4状態',
-}
 
-const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
+
+
 
 const VISIBILITY_OPTIONS: Array<{ value: FriendVisibilityChoice; label: string }> = [
   { value: 'visible', label: '表示中' },
@@ -64,59 +63,7 @@ const VISIBILITY_OPTIONS: Array<{ value: FriendVisibilityChoice; label: string }
   { value: 'all', label: 'すべて' },
 ]
 
-/*
- * FRIEND-03: ORの軸は「項目→比較方法→値」を自分で選ぶ。
- * 先頭の候補や固定の日付を勝手に使うと、選んだ覚えのない条件で
- * 絞り込まれる。値が要る軸は入力が揃うまで「追加」を押せない。
- */
-type OrAxisInput = 'mark' | 'scenario' | 'date' | 'text' | null
-const OR_AXES: Array<{
-  label: string
-  feature?: 'support_marks'
-  input: OrAxisInput
-  placeholder?: string
-  make: (value: string) => SavedSearchCondition | null
-}> = [
-  { label: '対応マーク', feature: 'support_marks', input: 'mark', make: (value) => value ? { kind: 'mark', op: 'eq', value } : null },
-  { label: 'シナリオ', input: 'scenario', make: (value) => value ? { kind: 'scenario', op: 'eq', value } : null },
-  { label: 'イベント予約', input: null, make: () => ({ kind: 'event_booking', op: 'exists' }) },
-  { label: 'カレンダー予約', input: null, make: () => ({ kind: 'calendar_booking', op: 'exists' }) },
-  { label: '回答フォーム', input: null, make: () => ({ kind: 'form', op: 'exists' }) },
-  { label: '最終反応日', input: 'date', make: (value) => value ? { kind: 'last_activity', op: 'after', value } : null },
-  { label: 'リマインダ', input: null, make: () => ({ kind: 'reminder', op: 'exists' }) },
-  { label: '個別メモ', input: null, make: () => ({ kind: 'memo', op: 'exists' }) },
-  { label: 'ステータスメッセージ', input: 'text', placeholder: '含む文字', make: (value) => value.trim() ? { kind: 'status_message', op: 'contains', value: value.trim() } : null },
-  { label: '友だち登録日', input: 'date', make: (value) => value ? { kind: 'created_at', op: 'after', value } : null },
-  { label: 'その他', input: 'text', placeholder: 'イベント種別（例：conversion）', make: (value) => value.trim() ? { kind: 'common_event', op: 'exists', value: value.trim() } : null },
-]
 
-export interface AdvancedSearchResult {
-  params: Pick<
-    FriendListParams,
-    | 'search'
-    | 'tagIds'
-    | 'excludeTagIds'
-    | 'metadata'
-    | 'metadataNot'
-    | 'statusMessage'
-    | 'createdFrom'
-    | 'createdTo'
-    | 'chatStatus'
-    | 'visibility'
-    | 'sort'
-    | 'limit'
-    | 'savedSearchId'
-    | 'conditions'
-  >
-  /** 画面に「絞り込み中」を出すための、人が読める形 */
-  summary: string[]
-  /**
-   * 詳細条件をもう一度開いたとき、この編集状態から再開する（FRIEND-32）。
-   * URL直指定の保存検索など実条件が手元に無い適用では未設定のままにし、
-   * 開いたときに保存済み一覧から引き直す。
-   */
-  editorState?: FriendSearchEditorState
-}
 
 function defaultBlocks(fieldsEnabled: boolean): Block[] {
   const blocks: Block[] = [
@@ -163,10 +110,22 @@ export default function AdvancedSearchDialog({
   initialSort: 'recent' | 'oldest'
   initialLimit: number
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const savedSearchEnabled = features?.savedSearch !== false
   const marksFeatureEnabled = features?.marks !== false
   const fieldsFeatureEnabled = features?.fields !== false
   const [blocks, setBlocks] = useState<Block[]>(() => defaultBlocks(fieldsFeatureEnabled))
+  /* ★V8 ：会員ランクの段の候補。ランクを動かしていない店では空。 */
+  const [rankTiers, setRankTiers] = useState<Array<{ id: string; name: string }>>([])
+  useEffect(() => {
+    if (!open || !accountId) return
+    let alive = true
+    memberRanksApi.program(accountId).then((r) => { if (alive && r.success) setRankTiers(r.data.tiers.map((t) => ({ id: t.id, name: t.name }))) }).catch(() => undefined)
+    return () => { alive = false }
+  }, [open, accountId])
+  /* 共通の重なり番号：この窓の上に開く窓（準備中など）が後ろに回らない。 */
+  const layer = useOverlayLayer(open)
   const [visibility, setVisibility] = useState<FriendVisibilityChoice>('visible')
   const [any, setAny] = useState<SavedSearchCondition[]>([])
   const [extraAll, setExtraAll] = useState<SavedSearchCondition[]>([])
@@ -333,6 +292,9 @@ export default function AdvancedSearchDialog({
       if (b.kind === 'created_at' && (b.from || b.to)) {
         out.push(`登録日 ${b.from || '…'} 〜 ${b.to || '…'}`)
       }
+      if ((b.kind === 'visit_count' || b.kind === 'purchase_amount') && (b.min || b.max)) out.push(`${BLOCK_LABEL[b.kind]} ${b.min || '…'} 〜 ${b.max || '…'}`)
+      if (b.kind === 'last_activity_at' && (b.from || b.to)) out.push(`最後の来店・購入 ${b.from || '…'} 〜 ${b.to || '…'}`)
+      if (b.kind === 'member_tier' && b.tierId) out.push(`会員ランク ${rankTiers.find((t) => t.id === b.tierId)?.name ?? '選択済み'}`)
       if (b.kind === 'chat_status') {
         out.push(
           `対応状況 ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済み' }[b.value]}`,
@@ -360,14 +322,15 @@ export default function AdvancedSearchDialog({
       if (requestId !== countRequestRef.current) return
       setCount(res.success ? res.data.total : null)
       setCountFailed(!res.success)
-    } catch {
+    } catch (saveFailure) {
       if (requestId !== countRequestRef.current) return
+      saveErrors.capture(saveFailure)
       setCount(null)
       setCountFailed(true)
     } finally {
       if (requestId === countRequestRef.current) setCounting(false)
     }
-  }, [accountId, params])
+  }, [accountId, params, saveErrors])
 
   useEffect(() => {
     if (!open) return
@@ -393,7 +356,13 @@ export default function AdvancedSearchDialog({
               ? { kind: 'status_message', keyword: '' }
               : kind === 'created_at'
                 ? { kind: 'created_at', from: '', to: '' }
-                : { kind: 'chat_status', value: 'unread' },
+                : kind === 'visit_count' || kind === 'purchase_amount'
+                  ? { kind, min: '', max: '' }
+                  : kind === 'last_activity_at'
+                    ? { kind: 'last_activity_at', from: '', to: '' }
+                    : kind === 'member_tier'
+                      ? { kind: 'member_tier', tierId: '' }
+                      : { kind: 'chat_status', value: 'unread' },
     ])
 
   const resetConditions = () => {
@@ -434,15 +403,19 @@ export default function AdvancedSearchDialog({
       setSaveOpen(false)
       setSavedNotice('条件を保存しました')
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : '条件を保存できませんでした')
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure) setSaveError(describeApiFailure(error, '保存')) }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-scrim p-4"
+    <SaveErrorScope errors={saveErrors}><div
+      className="fixed inset-0 flex items-center justify-center bg-scrim p-4"
+      style={{ zIndex: layer }}
+      data-design-node="CYJ0L"
       onClick={onClose}
     >
       <div
@@ -456,37 +429,37 @@ export default function AdvancedSearchDialog({
          * 組み換え（項目・比較方法・値の縦3段化）は、画面の幅ではなく
          * このパネルの幅で切り替える（#984 U011再）。
          */
-        className="@container flex max-h-[calc(100vh-32px)] w-full max-w-3xl flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-2xl"
+        className="@container flex max-h-[calc(100vh-32px)] w-full max-w-200 flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-overlay"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-divider-soft px-6 py-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-divider-soft px-6 py-5">
           <div>
             <h2 id={dialogTitleId} className="text-ink text-lg font-bold">絞り込み条件を設定</h2>
             <p className="text-ink-secondary mt-0.5 text-xs">
-              条件を組み合わせて、対象の友だちだけを表示します。
+              条件を足すたびに人数を数え直します
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="閉じる"
-            className="flex h-8 w-8 items-center justify-center rounded-control text-xl leading-none text-ink-faint hover:bg-canvas-sunken"
-          >
-            ×
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {onLoadSaved && savedSearchEnabled ? (
+              <Button type="button" onClick={onLoadSaved}>
+                保存した検索から読み込む
+              </Button>
+            ) : null}
+            <CloseButton onClick={onClose} />
+          </div>
         </div>
 
-        <div className="space-y-3 overflow-y-auto px-6 py-4">
+        <div className="min-h-0 space-y-3 overflow-y-auto px-6 py-4">
           <section className="rounded-panel border border-accent-border bg-accent-soft px-4 py-3">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-micro font-medium text-ink-faint">現在の条件に一致</p>
                 <p className="mt-0.5 text-xl font-bold tabular-nums text-ink">
-                  {counting ? '…' : count === null ? '—' : `${count.toLocaleString('ja-JP')}人`}
+                  {counting ? '…' : count === null ? '—' : `${formatNumber(count)}人`}
                 </p>
               </div>
               {countFailed ? (
-                <span className="flex items-center gap-2 text-micro text-danger">
+                <span className="flex items-center gap-2 text-micro text-ink-secondary">
                   件数を確認できません
                   <button
                     type="button"
@@ -502,10 +475,10 @@ export default function AdvancedSearchDialog({
             </div>
           </section>
 
-          <section className="rounded-card border border-hairline bg-canvas p-3">
+          <section className="rounded-card border content-card bg-canvas p-3">
           <div className="flex items-center gap-2 px-1 pb-2">
-            <span className="bg-accent-deep text-on-accent rounded-pill px-2 py-0.5 text-xs font-bold">
-              AND
+            <span className="bg-surface-pearl text-ink-secondary rounded-pill px-2 py-0.5 text-xs font-medium">
+              すべて
             </span>
             <span className="text-ink text-sm font-bold">すべて満たす条件</span>
           </div>
@@ -517,18 +490,17 @@ export default function AdvancedSearchDialog({
               className="mb-2 grid items-center gap-3 rounded-card bg-canvas-sunken p-3 last:mb-0 sm:grid-cols-12"
             >
               <div className="sm:col-span-3">
-                <h3 className="text-ink text-sm font-bold">{BLOCK_LABEL[b.kind]}</h3>
-                <p className="text-ink-faint mt-0.5 text-nano">{BLOCK_HELP[b.kind]}</p>
+                <h3 className="flex items-center text-sm font-semibold text-ink">{BLOCK_LABEL[b.kind]}<HelpTip label={`${BLOCK_LABEL[b.kind]}の説明`}>{BLOCK_HELP[b.kind]}</HelpTip></h3>
               </div>
 
               <div className="min-w-0 sm:col-span-8">
                 {b.kind === 'name' && (
-                  <TextInput
+                  <SaveErrorField names={[`blocks.${i}.keyword`,"keyword","b.keyword"]}><TextInput
                     value={b.keyword}
                     onChange={(e) => patch(i, { ...b, keyword: e.target.value })}
                     placeholder="キーワードを入力"
                     aria-label="名前のキーワード"
-                  />
+                  /></SaveErrorField>
                 )}
 
                 {b.kind === 'tag' && (
@@ -553,12 +525,12 @@ export default function AdvancedSearchDialog({
                   <div className="flex flex-col items-stretch gap-2 @3xl:flex-row @3xl:items-end">
                     <label className="min-w-0 @3xl:flex-1">
                       <span className="text-caption mb-1 block font-semibold text-ink-secondary">項目</span>
-                      <TextInput
+                      <SaveErrorField names={[`blocks.${i}.key`,"key","b.key"]}><TextInput
                         list="friend-field-names"
                         value={b.key}
                         onChange={(e) => patch(i, { ...b, key: e.target.value })}
                         placeholder="例：誕生日"
-                      />
+                      /></SaveErrorField>
                     </label>
                     <datalist id="friend-field-names">
                       {fieldNames.map((n) => (
@@ -567,7 +539,7 @@ export default function AdvancedSearchDialog({
                     </datalist>
                     <label className="@3xl:shrink-0">
                       <span className="text-caption mb-1 block font-semibold text-ink-secondary">比較方法</span>
-                      <Select
+                      <SaveErrorField names={[`blocks.${i}.op`,"op","b.op"]}><Select
                         aria-label="比較方法"
                         value={b.op}
                         onChange={(value) => patch(i, { ...b, op: value as 'eq' | 'ne' })}
@@ -575,42 +547,42 @@ export default function AdvancedSearchDialog({
                           { value: 'eq', label: '等しい' },
                           { value: 'ne', label: '等しくない' },
                         ]}
-                      />
+                      /></SaveErrorField>
                     </label>
                     <label className="min-w-0 @3xl:flex-1">
                       <span className="text-caption mb-1 block font-semibold text-ink-secondary">値</span>
-                      <TextInput
+                      <SaveErrorField names={[`blocks.${i}.value`,"value","b.value"]}><TextInput
                         value={b.value}
                         onChange={(e) => patch(i, { ...b, value: e.target.value })}
                         placeholder="例：1990-01-01"
-                      />
+                      /></SaveErrorField>
                     </label>
                   </div>
                 )}
 
                 {b.kind === 'status_message' && (
-                  <TextInput
+                  <SaveErrorField names={[`blocks.${i}.keyword`,"keyword","b.keyword"]}><TextInput
                     value={b.keyword}
                     onChange={(e) => patch(i, { ...b, keyword: e.target.value })}
                     placeholder="ひとことに含む文字"
                     aria-label="ひとことに含む文字"
-                  />
+                  /></SaveErrorField>
                 )}
 
                 {b.kind === 'created_at' && (
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <DateField
+                      <SaveErrorField names={[`blocks.${i}.from`,"from","b.from"]}><DateField
                         value={b.from}
                         onChange={(v) => patch(i, { ...b, from: v })}
                         aria-label="友だち登録日の開始"
-                      />
+                      /></SaveErrorField>
                       <span className="text-ink-secondary text-sm">〜</span>
-                      <DateField
+                      <SaveErrorField names={[`blocks.${i}.to`,"to","b.to"]}><DateField
                         value={b.to}
                         onChange={(v) => patch(i, { ...b, to: v })}
                         aria-label="友だち登録日の終了"
-                      />
+                      /></SaveErrorField>
                     </div>
                     {/* R183: 逆転期間は保存・実行のどちらも断られる。欄で先に知らせる。 */}
                     {b.from && b.to && b.from > b.to ? (
@@ -619,10 +591,28 @@ export default function AdvancedSearchDialog({
                   </div>
                 )}
 
+                {(b.kind === 'visit_count' || b.kind === 'purchase_amount') && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <TextInput className="w-36" type="number" min={0} value={b.min} onChange={(e) => patch(i, { ...b, min: e.target.value })} placeholder="下限なし" aria-label={`${BLOCK_LABEL[b.kind]}の下限`} />
+                    <span className="text-ink-faint text-sm">{b.kind === 'visit_count' ? '回以上〜' : '円以上〜'}</span>
+                    <TextInput className="w-36" type="number" min={0} value={b.max} onChange={(e) => patch(i, { ...b, max: e.target.value })} placeholder="上限なし" aria-label={`${BLOCK_LABEL[b.kind]}の上限`} />
+                    <span className="text-ink-faint text-sm">{b.kind === 'visit_count' ? '回以下' : '円以下'}</span>
+                  </div>
+                )}
+                {b.kind === 'last_activity_at' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <DateField value={b.from} onChange={(next) => patch(i, { ...b, from: next })} aria-label="最後の来店・購入の日の開始" className="w-48" />
+                    <span className="text-ink-faint text-sm">〜</span>
+                    <DateField value={b.to} onChange={(next) => patch(i, { ...b, to: next })} aria-label="最後の来店・購入の日の終了" className="w-48" />
+                  </div>
+                )}
+                {b.kind === 'member_tier' && (
+                  <EntitySelect aria-label="会員ランク" value={b.tierId} onChange={(value) => patch(i, { ...b, tierId: value })} options={[{ value: '', label: 'ランクを選ぶ' }, ...rankTiers.map((t) => ({ value: t.id, label: `${t.name}の人` }))]} />
+                )}
                 {b.kind === 'chat_status' && (
                   <>
                     {/* FRIEND-05: 説明どおり固定4状態。保留も検索できる。 */}
-                    <Select
+                    <SaveErrorField names={[`blocks.${i}.value`,"value","b.value"]}><Select
                       aria-label="対応状況"
                       value={b.value}
                       onChange={(value) =>
@@ -634,7 +624,7 @@ export default function AdvancedSearchDialog({
                         { value: 'on_hold', label: '保留' },
                         { value: 'resolved', label: '対応済み' },
                       ]}
-                    />
+                    /></SaveErrorField>
                   </>
                 )}
               </div>
@@ -684,7 +674,7 @@ export default function AdvancedSearchDialog({
 
           <section className="rounded-panel border border-hairline bg-canvas p-3">
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-action px-2 py-0.5 text-xs font-bold text-on-action">OR</span>
+              <span className="rounded-pill bg-surface-pearl px-2 py-0.5 text-xs font-medium text-ink-secondary">どれか</span>
               <span className="text-sm font-bold text-ink">いずれか1つ以上満たす条件</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-3">
@@ -721,7 +711,7 @@ export default function AdvancedSearchDialog({
               「対象」プルダウンの2か所が同じ変数へ別の意味で書き込み、
               「すべて」が非表示だけを検索していた。
             */}
-            <RadioCardGroup legend="表示する友だち" className="mt-2 flex flex-wrap gap-4">
+            <SaveErrorField names={["friend-search-visibility","value","item.value","visibility"]}><RadioCardGroup legend="表示する友だち" className="mt-2 flex flex-wrap gap-4">
               {VISIBILITY_OPTIONS.map((item) => (
                 <RadioCard
                   key={item.value}
@@ -732,7 +722,7 @@ export default function AdvancedSearchDialog({
                   title={item.label}
                 />
               ))}
-            </RadioCardGroup>
+            </RadioCardGroup></SaveErrorField>
             <label className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-ink-secondary">
               友だちの状態
               {/* 共通Selectはvalue/onChange必須のため、操作なしの固定表示として値と空の変更受けを付ける。disabledの見た目・文言は変えない。 */}
@@ -743,14 +733,14 @@ export default function AdvancedSearchDialog({
                 options={[{ value: '', label: 'このアカウントをブロックしていない' }]}
                 disabled
               />
-              <span className="text-nano font-normal text-ink-faint">相手側のブロック状態を絞る口の接続後に選べます</span>
+              <span className="text-nano font-medium text-ink-faint">相手側のブロック状態を絞る口の接続後に選べます</span>
             </label>
           </section>
 
           <div className="grid gap-2 sm:grid-cols-2">
-            <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
+            <label className="rounded-card border content-card bg-canvas px-3 py-2">
               <span className="text-nano text-ink-faint">並び順</span>
-                <Select
+                <SaveErrorField names={["sort"]}><Select
                   aria-label="並び順"
                   value={sort}
                   onChange={(value) => setSort(value as 'recent' | 'oldest')}
@@ -760,19 +750,19 @@ export default function AdvancedSearchDialog({
                   ]}
                   size="full"
                   className="mt-0.5"
-                />
+                /></SaveErrorField>
             </label>
             {/* FRIEND-04: 表示件数も条件の一部として適用する。 */}
-            <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
+            <label className="rounded-card border content-card bg-canvas px-3 py-2">
               <span className="text-nano text-ink-faint">表示件数</span>
-              <Select
+              <SaveErrorField names={["limit"]}><Select
                 aria-label="表示件数"
                 value={String(limit)}
                 onChange={(value) => setLimit(Number(value))}
                 options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size}件` }))}
                 size="page-size"
                 className="mt-0.5"
-              />
+              /></SaveErrorField>
             </label>
           </div>
         </div>
@@ -785,11 +775,6 @@ export default function AdvancedSearchDialog({
         */}
         <div className="border-t border-divider-soft px-6 py-4">
           <div className="flex flex-wrap items-center gap-3">
-            {onLoadSaved && savedSearchEnabled ? (
-              <Button type="button" onClick={onLoadSaved}>
-                保存した検索から読み込む
-              </Button>
-            ) : null}
             <button
               type="button"
               onClick={resetConditions}
@@ -799,7 +784,7 @@ export default function AdvancedSearchDialog({
             </button>
             {savedNotice ? <span className="text-xs font-semibold text-accent-deep">{savedNotice}</span> : null}
             {savedSearchEnabled ? (
-              <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存</Button>
+              <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存する</Button>
             ) : null}
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
@@ -811,9 +796,8 @@ export default function AdvancedSearchDialog({
               type="button"
               variant="primary"
               className="px-5"
-              onClick={() => onApply({ params, summary, editorState })}
-            >
-              {counting ? '再計算中…' : count === null ? 'この条件で表示' : `${count.toLocaleString('ja-JP')}人を表示`}
+              onClick={() => onApply({ params, summary, editorState })} busy={counting} busyLabel="再計算中…">
+              {count === null ? 'この条件で表示' : `${formatNumber(count)}人を表示`}
             </Button>
           </div>
         </div>
@@ -832,26 +816,125 @@ export default function AdvancedSearchDialog({
           >
             <div className="flex items-start justify-between gap-3">
               <h3 id={saveTitleId} className="text-lg font-bold text-ink">この条件を保存</h3>
-              <button type="button" onClick={() => setSaveOpen(false)} disabled={saving} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
+              <button type="button" onClick={() => setSaveOpen(false)} disabled={saving} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
                 <X aria-hidden="true" className="h-5 w-5" />
               </button>
             </div>
             <p className="mt-1 text-xs leading-5 text-ink-faint">保存後は「保存した検索」から何度でも呼び出せます。</p>
             <label className="mt-4 block text-sm font-semibold text-ink-secondary">
               条件名
-              <TextInput autoFocus value={saveName} onChange={(event) => setSaveName(event.target.value)} maxLength={80} placeholder="例：VIPかつ未契約" className="mt-2" />
+              <SaveErrorField names={["saveName","name","save_name"]}><TextInput autoFocus value={saveName} onChange={(event) => setSaveName(event.target.value)} maxLength={80} placeholder="例：VIPかつ未契約" className="mt-2" /></SaveErrorField>
             </label>
             {saveError ? <p className="mt-3 text-sm text-danger">{saveError}</p> : null}
             <div className="mt-5 flex justify-end gap-2">
               <Button type="button" onClick={() => setSaveOpen(false)}>キャンセル</Button>
-              <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : '保存する'}</Button>
+              <Button type="button" variant="primary" disabled={saving} onClick={() => void save()} busy={saving}>保存する</Button>
             </div>
           </section>
         </div>
       ) : null}
+    </div></SaveErrorScope>
+  )
+}
+
+function TagPicker({
+  tags,
+  include,
+  exclude,
+  onChange,
+}: {
+  tags: Tag[]
+  include: string[]
+  exclude: string[]
+  onChange: (include: string[], exclude: string[]) => void
+}) {
+
+  const [pick, setPick] = useState('')
+  const [mode, setMode] = useState<'include' | 'exclude'>('include')
+  const label = (id: string) => tags.find((t) => t.id === id)?.name ?? id
+
+  return (
+    <div>
+      {/*
+        U012: タグ名の選択は全幅の1行目、含む/含まないは別行へ。
+        同じ行に並べると狭いパネルでタグ名が数文字に切れて読めなかった。
+        選んだタグの札は下で複数行に広がり、全文を確認できる。
+      */}
+      <SaveErrorField names={["pick"]}><EntitySelect clearable size="full" kind="tag"
+        aria-label="タグ名を選ぶ"
+        placeholder="タグ名を選ぶ"
+        value={pick}
+        onChange={(id) => {
+          if (!id) return
+          if (mode === 'include') {
+            if (!include.includes(id)) onChange([...include, id], exclude)
+          } else if (!exclude.includes(id)) {
+            onChange(include, [...exclude, id])
+          }
+          setPick('')
+        }}
+        options={tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))}
+        className="w-full"
+      /></SaveErrorField>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <SaveErrorField names={["mode"]}><Select
+          aria-label="タグの含め方"
+          value={mode}
+          onChange={(value) => setMode(value as 'include' | 'exclude')}
+          options={[
+            { value: 'include', label: '付いている' },
+            { value: 'exclude', label: '付いていない' },
+          ]}
+        /></SaveErrorField>
+        {/* 設計の「タグフォルダで指定」。フォルダからタグを引く口が無い。 */}
+        <button
+          type="button"
+          disabled
+          title="タグフォルダからまとめて指定する口がまだありません"
+          className="text-ink-faint text-xs opacity-50"
+        >
+          タグフォルダで指定
+        </button>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <TagOverflow>{include.map((id) => (
+          <TagPill key={id} name={label(id)} color={tags.find((tag) => tag.id === id)?.color}
+            onRemove={() => onChange(include.filter((value) => value !== id), exclude)} />
+        ))}</TagOverflow>
+        <TagOverflow>{exclude.map((id) => (
+          <span key={id} className="inline-flex items-center gap-1.5">
+            <TagPill name={label(id)} color={tags.find((tag) => tag.id === id)?.color}
+              onRemove={() => onChange(include, exclude.filter((value) => value !== id))} />
+            <span>以外</span>
+          </span>
+        ))}</TagOverflow>
+      </div>
     </div>
   )
 }
+
+type OrAxisInput = 'mark' | 'scenario' | 'date' | 'text' | null
+
+const OR_AXES: Array<{
+  label: string
+  feature?: 'support_marks'
+  input: OrAxisInput
+  placeholder?: string
+  make: (value: string) => SavedSearchCondition | null
+}> = [
+  { label: '対応マーク', feature: 'support_marks', input: 'mark', make: (value) => value ? { kind: 'mark', op: 'eq', value } : null },
+  { label: 'シナリオ', input: 'scenario', make: (value) => value ? { kind: 'scenario', op: 'eq', value } : null },
+  { label: 'イベント予約', input: null, make: () => ({ kind: 'event_booking', op: 'exists' }) },
+  { label: 'カレンダー予約', input: null, make: () => ({ kind: 'calendar_booking', op: 'exists' }) },
+  { label: '回答フォーム', input: null, make: () => ({ kind: 'form', op: 'exists' }) },
+  { label: '最終反応日', input: 'date', make: (value) => value ? { kind: 'last_activity', op: 'after', value } : null },
+  { label: 'リマインダ', input: null, make: () => ({ kind: 'reminder', op: 'exists' }) },
+  { label: 'メモ', input: null, make: () => ({ kind: 'memo', op: 'exists' }) },
+  { label: 'ステータスメッセージ', input: 'text', placeholder: '含む文字', make: (value) => value.trim() ? { kind: 'status_message', op: 'contains', value: value.trim() } : null },
+  { label: '友だち登録日', input: 'date', make: (value) => value ? { kind: 'created_at', op: 'after', value } : null },
+  { label: 'その他', input: 'text', placeholder: 'イベント種別（例：conversion）', make: (value) => value.trim() ? { kind: 'common_event', op: 'exists', value: value.trim() } : null },
+]
+
 
 /**
  * ORの軸1つぶん。値が要る軸は入力が揃うまで追加できない（FRIEND-03）。
@@ -879,31 +962,31 @@ function OrAxisPicker({
       <span className="text-xs font-semibold text-ink-secondary">{axis.label}</span>
       <div className="flex items-center gap-1.5">
         {axis.input === 'mark' || axis.input === 'scenario' ? (
-          <Combobox
+          <SaveErrorField names={["draft"]}><EntitySelect clearable size="full"
             aria-label={`${axis.label}を選ぶ`}
             placeholder="選ぶ"
             value={draft}
             onChange={setDraft}
             disabled={waitingForOptions}
-            options={options.map((option) => ({ value: option.id, label: option.name }))}
+            options={options.map((option) => ({ ...entityOptionMetadata(option), value: option.id, label: option.name }))}
             className="min-w-0 flex-1"
-          />
+          /></SaveErrorField>
         ) : axis.input === 'date' ? (
-          <DateField
+          <SaveErrorField names={["draft"]}><DateField
             value={draft}
             onChange={setDraft}
             aria-label={`${axis.label}の日付（この日以降）`}
             className="min-w-0 flex-1"
-          />
+          /></SaveErrorField>
         ) : axis.input === 'text' ? (
-          <input
+          <SaveErrorField names={["draft"]}><SharedTextField
             type="text"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder={axis.placeholder}
             aria-label={`${axis.label}の値`}
             className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-2 py-1.5 text-xs"
-          />
+          /></SaveErrorField>
         ) : null}
         <button
           type="button"
@@ -913,107 +996,13 @@ function OrAxisPicker({
             onAdd(condition)
             setDraft('')
           }}
-          className="shrink-0 rounded-full border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
+          className="shrink-0 rounded-pill border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary"
         >
-          ＋ 追加
+          ＋ 追加する
         </button>
       </div>
       {waitingForOptions ? <span className="text-ink-faint text-nano leading-tight">選択肢を読み込むと使えます</span> : null}
       {axis.input === 'date' ? <span className="text-ink-faint text-nano leading-tight">指定した日以降</span> : null}
-    </div>
-  )
-}
-
-function TagPicker({
-  tags,
-  include,
-  exclude,
-  onChange,
-}: {
-  tags: Tag[]
-  include: string[]
-  exclude: string[]
-  onChange: (include: string[], exclude: string[]) => void
-}) {
-  const [pick, setPick] = useState('')
-  const [mode, setMode] = useState<'include' | 'exclude'>('include')
-  const label = (id: string) => tags.find((t) => t.id === id)?.name ?? id
-
-  return (
-    <div>
-      {/*
-        U012: タグ名の選択は全幅の1行目、含む/含まないは別行へ。
-        同じ行に並べると狭いパネルでタグ名が数文字に切れて読めなかった。
-        選んだタグの札は下で複数行に広がり、全文を確認できる。
-      */}
-      <Combobox
-        aria-label="タグ名を選ぶ"
-        placeholder="タグ名を選ぶ"
-        value={pick}
-        onChange={(id) => {
-          if (!id) return
-          if (mode === 'include') {
-            if (!include.includes(id)) onChange([...include, id], exclude)
-          } else if (!exclude.includes(id)) {
-            onChange(include, [...exclude, id])
-          }
-          setPick('')
-        }}
-        options={tags.map((t) => ({ value: t.id, label: t.name }))}
-        className="w-full"
-      />
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <Select
-          aria-label="タグの含め方"
-          value={mode}
-          onChange={(value) => setMode(value as 'include' | 'exclude')}
-          options={[
-            { value: 'include', label: '付いている' },
-            { value: 'exclude', label: '付いていない' },
-          ]}
-        />
-        {/* 設計の「タグフォルダで指定」。フォルダからタグを引く口が無い。 */}
-        <button
-          type="button"
-          disabled
-          title="タグフォルダからまとめて指定する口がまだありません"
-          className="text-ink-faint text-xs opacity-50"
-        >
-          タグフォルダで指定
-        </button>
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {include.map((id) => (
-          <span
-            key={id}
-            className="bg-accent-soft text-accent-deep rounded-pill inline-flex items-center gap-1.5 px-2.5 py-1 text-xs"
-          >
-            {label(id)}
-            <button
-              type="button"
-              onClick={() => onChange(include.filter((v) => v !== id), exclude)}
-              aria-label={`${label(id)} を外す`}
-            >
-              ✕
-            </button>
-          </span>
-        ))}
-        {exclude.map((id) => (
-          <span
-            key={id}
-            className="bg-warning-bg text-warning rounded-pill inline-flex items-center gap-1.5 px-2.5 py-1 text-xs"
-          >
-            {label(id)} 以外
-            <button
-              type="button"
-              onClick={() => onChange(include, exclude.filter((v) => v !== id))}
-              aria-label={`${label(id)} 以外 を外す`}
-            >
-              ✕
-            </button>
-          </span>
-        ))}
-      </div>
     </div>
   )
 }

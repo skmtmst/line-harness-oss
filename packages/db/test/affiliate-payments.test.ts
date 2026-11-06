@@ -46,7 +46,7 @@ describe('getAffiliatePaymentSummaries', () => {
       CREATE TABLE affiliates (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, code TEXT NOT NULL UNIQUE,
         commission_rate REAL NOT NULL, friend_id TEXT, hold_days INTEGER, payout_cycle TEXT,
-        line_account_id TEXT, tenant_id TEXT
+        line_account_id TEXT, tenant_id TEXT, reward_mode TEXT
       );
       CREATE TABLE conversion_points (id TEXT PRIMARY KEY, name TEXT, value INTEGER, line_account_id TEXT);
       CREATE TABLE affiliate_offers (
@@ -84,7 +84,7 @@ describe('getAffiliatePaymentSummaries', () => {
 
   test('割合方式と定額方式を選択中アカウントの承認済み成果だけから集計する', async () => {
     sqlite.exec(`
-      INSERT INTO affiliates VALUES
+      INSERT INTO affiliates (id, name, code, commission_rate, friend_id, hold_days, payout_cycle, line_account_id, tenant_id) VALUES
         ('rate', '割合さん', 'rate-code', 10, NULL, 0, '月末締め', 'account-1', 'tenant-1'),
         ('fixed', '定額さん', 'fixed-code', 0, NULL, 0, NULL, 'account-1', 'tenant-1');
       INSERT INTO affiliate_offers VALUES ('offer-fixed', '定期便', 3000, 'account-1');
@@ -111,7 +111,7 @@ describe('getAffiliatePaymentSummaries', () => {
 
   test('別アカウントの紹介者名と成果金額を返さない', async () => {
     sqlite.exec(`
-      INSERT INTO affiliates VALUES
+      INSERT INTO affiliates (id, name, code, commission_rate, friend_id, hold_days, payout_cycle, line_account_id, tenant_id) VALUES
         ('mine', '自店', 'mine-code', 10, 'friend-1', 0, NULL, 'account-1', 'tenant-1'),
         ('other', '他店', 'other-code', 10, 'friend-2', 0, NULL, 'account-2', 'tenant-1');
       INSERT INTO conversion_events VALUES
@@ -127,7 +127,7 @@ describe('getAffiliatePaymentSummaries', () => {
 
   test('承認後の設定編集で承認/保留/未確定の表示が変わらない', async () => {
     sqlite.exec(`
-      INSERT INTO affiliates VALUES
+      INSERT INTO affiliates (id, name, code, commission_rate, friend_id, hold_days, payout_cycle, line_account_id, tenant_id) VALUES
         ('rate', '割合さん', 'rate-code', 10, NULL, 0, '月末締め', 'account-1', 'tenant-1'),
         ('fixed', '定額さん', 'fixed-code', 0, NULL, 0, NULL, 'account-1', 'tenant-1');
       INSERT INTO affiliate_offers VALUES ('offer-fixed', '定期便', 3000, 'account-1');
@@ -153,7 +153,7 @@ describe('getAffiliatePaymentSummaries', () => {
 
   test('保留期間内と承認日時が無い成果を区別し、成果なしは実値0を返す', async () => {
     sqlite.exec(`
-      INSERT INTO affiliates VALUES
+      INSERT INTO affiliates (id, name, code, commission_rate, friend_id, hold_days, payout_cycle, line_account_id, tenant_id) VALUES
         ('held', '保留あり', 'held-code', 10, 'friend-1', 7, '毎月末締め', 'account-1', 'tenant-1'),
         ('empty', '成果なし', 'empty-code', 0, 'friend-1', NULL, NULL, 'account-1', 'tenant-1');
       INSERT INTO conversion_events VALUES
@@ -199,7 +199,7 @@ describe('紹介停止と支払い確定の追記台帳', () => {
       CREATE TABLE affiliates (
         id TEXT PRIMARY KEY, tenant_id TEXT, line_account_id TEXT, name TEXT NOT NULL,
         code TEXT NOT NULL UNIQUE, commission_rate REAL NOT NULL, is_active INTEGER NOT NULL,
-        friend_id TEXT, hold_days INTEGER, payout_cycle TEXT, created_at TEXT
+        friend_id TEXT, hold_days INTEGER, payout_cycle TEXT, created_at TEXT, reward_mode TEXT
       );
       CREATE TABLE conversion_points (
         id TEXT PRIMARY KEY, name TEXT, value INTEGER, line_account_id TEXT

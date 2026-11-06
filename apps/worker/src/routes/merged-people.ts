@@ -1,3 +1,7 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { fail } from '../lib/fail.js';
+import { logger } from '@line-crm/shared/server';
+import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type {
@@ -7,14 +11,14 @@ import type {
   UpdateMergedPersonDeliveryPrioritiesRequest,
   UpdateMergedPersonRequest,
 } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   getFriendProfileCandidates,
   resolveProfileCandidateSelections,
   type ProfileCandidateSelectionReference,
-} from '../services/friend-profile-candidates.js';
+} from '../features/friends/friend-profile-candidates/index.js';
 import {
   getMergedPerson,
   hasMergedPersonHistory,
@@ -142,18 +146,26 @@ async function safeBody(c: { req: { json<T>(): Promise<T> } }): Promise<unknown>
   }
 }
 
+function mergedPersonErrorFields(c: Context<Env>, code: string): string[] {
+  const map: Record<string, string[]> = {
+    EXPECTED_REVISION_REQUIRED: ['expectedRevision'], INVALID_PERSON_STATUS: ['status'],
+    INVALID_DISPLAY_NAME: ['primaryDisplayName'], INVALID_TEXT: ['primaryDisplayName'],
+    PROFILE_CANDIDATE_REQUIRED: ['profileSelections'], INVALID_PROFILE_CANDIDATE: ['selections'],
+    PROFILE_SELECTION_DUPLICATE: ['selections'], PROFILE_SELECTIONS_REQUIRED: ['selections'],
+    INVALID_PROFILE_FIELD: ['selections'], INVALID_PROFILE_SOURCE: ['selections'],
+    INVALID_PROFILE_VALUE: ['selections'], PROFILE_SOURCE_NOT_LINKED: ['selections'],
+    INVALID_DELIVERY_PRIORITY: ['priorities'], DUPLICATE_DELIVERY_PRIORITY: ['priorities'],
+    DELIVERY_FRIEND_NOT_LINKED: ['priorities'],
+    INVALID_BODY: ['expectedRevision', c.req.path.endsWith('/profile-values') ? 'selections' : 'priorities'],
+  };
+  return map[code] ?? [];
+}
+
 function errorResponse(c: Context<Env>, error: unknown): Response {
   if (error instanceof MergedPersonError) {
-    return c.json({ success: false, error: error.message, code: error.code }, error.status);
+    return fail(c, error.status, error.code, { error: error.message }, mergedPersonErrorFields(c, error.code));
   }
-  console.error(JSON.stringify({
-    message: 'merged person request failed',
-    error: error instanceof Error ? error.message : String(error),
-  }));
-  return c.json(
-    { success: false, error: '統合ユーザーを処理できませんでした', code: 'INTERNAL_ERROR' },
-    500,
-  );
+  throw error;
 }
 
 async function canAccessPerson(c: Context<Env>, id: string): Promise<boolean> {
@@ -162,7 +174,7 @@ async function canAccessPerson(c: Context<Env>, id: string): Promise<boolean> {
     return canAccessAllLineAccounts(c.env.DB, getStaff(c), accountIds);
   }
   /*
-   * R391: 結び付き0件の保管状態は、アカウントの壁では測れない。統括全体を
+   * 結び付き0件の保管状態は、アカウントの壁では測れない。統括全体を
    * 見られる担当だけに開き、履歴の残っている本人に限る。担当店だけの
    * スタッフには開示しない。
    */
@@ -171,22 +183,16 @@ async function canAccessPerson(c: Context<Env>, id: string): Promise<boolean> {
     && hasMergedPersonHistory(c.env.DB, tenantId(c), id);
 }
 
-function positiveInt(value: string | undefined, fallback: number, max: number): number | null {
-  if (value === undefined || value === '') return fallback;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 0 && parsed <= max ? parsed : null;
-}
-
 mergedPeople.get('/api/friends/people', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const limit = positiveInt(c.req.query('limit'), 20, 100);
-    const offset = positiveInt(c.req.query('offset'), 0, 100_000);
-    if (limit === null || limit < 1 || offset === null) {
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 20, limitPolicy: {}, offsetPolicy: {} });
+    const invalidPaging = !Number.isInteger(limit) || limit < 0 || limit > 100 || !Number.isInteger(offset) || offset < 0 || offset > 100_000;
+    if (invalidPaging || limit < 1) {
       return c.json({ success: false, error: 'ページ位置が正しくありません', code: 'INVALID_PAGINATION' }, 400);
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, getStaff(c));
     const data = await listMergedPeople(c.env.DB, tenantId(c), scope.allowedAccountIds, limit, offset);
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit, offset }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
   } catch (error) {
     return errorResponse(c, error);
   }
@@ -208,7 +214,7 @@ mergedPeople.get('/api/friends/people/:id', requireRole('owner', 'admin', 'staff
   }
 });
 
-mergedPeople.patch('/api/friends/people/:id', requireRole('owner', 'admin'), async (c) => {
+mergedPeople.patch('/api/friends/people/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     if (!await canAccessPerson(c, c.req.param('id'))) {
       return c.json({ success: false, error: 'この統合ユーザーを変更する権限がありません', code: 'FORBIDDEN' }, 403);
@@ -226,7 +232,7 @@ mergedPeople.patch('/api/friends/people/:id', requireRole('owner', 'admin'), asy
   }
 });
 
-mergedPeople.patch('/api/friends/people/:id/profile-values', requireRole('owner', 'admin'), async (c) => {
+mergedPeople.patch('/api/friends/people/:id/profile-values', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     if (!await canAccessPerson(c, id)) {
@@ -272,7 +278,7 @@ mergedPeople.patch('/api/friends/people/:id/profile-values', requireRole('owner'
 mergedPeople.patch(
   '/api/friends/people/:id/delivery-priorities',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       if (!await canAccessPerson(c, c.req.param('id'))) {
         return c.json({ success: false, error: 'この統合ユーザーを変更する権限がありません', code: 'FORBIDDEN' }, 403);

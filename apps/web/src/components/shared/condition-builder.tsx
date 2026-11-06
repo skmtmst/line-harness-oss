@@ -1,5 +1,20 @@
 'use client'
 
+import Checkbox from './checkbox'
+import { useEffect, useRef, useState } from 'react';
+import { api } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { useFeatureVisibility } from '@/lib/use-feature-visibility';
+import DateField from './date-field';
+import { TextField } from './text-field';
+import Card, { CardHeader } from './card';
+import Select from './select';
+import { findInvalidRangeIssue, isStructurallyEmpty, pruneCondition, type FieldOperator, type SegmentCondition, type SegmentRule } from '@/lib/segment-condition';
+import { formatNumber } from '@/lib/format';
+import Button from '@/components/shared/button';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import EntityRemoteField from './entity-remote-field';
+import { type RuleKind, type Option, KindPicker, TagPicker, MemberTierRule } from "./condition-builder-gap-parts"
 /*
  * 友だちの絞り込み条件を作る部品。
  *
@@ -16,53 +31,16 @@
  * 運用で実際に要る形に絞ったほうが間違えにくい。
  */
 
-import { useEffect, useState } from 'react'
-import { api } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { useFeatureVisibility } from '@/lib/use-feature-visibility'
-import DateField from './date-field'
-import { TextField } from './text-field'
-import Combobox from './combobox'
-import Select from './select'
-import {
-  findInvalidRangeIssue,
-  isEmptyCondition,
-  pruneCondition,
-  type FieldOperator,
-  type SegmentCondition,
-  type SegmentRule,
-} from '@/lib/segment-condition'
-
 // これまでどおりこのファイルからも取れるようにしておく。呼び出し側が多い。
 export {
   isRuleComplete,
   isEmptyCondition,
+  isStructurallyEmpty,
   pruneCondition,
+  findConditionDraftIssue,
   findInvalidRangeIssue,
 } from '@/lib/segment-condition'
 export type { FieldOperator, SegmentCondition, SegmentRule } from '@/lib/segment-condition'
-
-/**
- * 追加できる絞り込みの種類。並びは Lステップの並びに合わせてある。
- * `group` は候補の右端に出すまとまり名（友だちの情報・タグ・行動など）。
- */
-const RULE_KINDS: { type: string; label: string; group: string; feature?: 'support_marks' | 'friend_fields'; make: () => SegmentRule }[] = [
-  { type: 'name', label: '名前', group: '友だちの情報', make: () => ({ type: 'name', value: { text: '', targets: ['display', 'real', 'system'] } }) },
-  { type: 'private_memo', label: '個別メモ', group: '友だちの情報', make: () => ({ type: 'private_memo', value: '' }) },
-  { type: 'status_message', label: 'ステータスメッセージ', group: '友だちの情報', make: () => ({ type: 'status_message', value: '' }) },
-  { type: 'registered_at', label: '友だち登録日', group: '友だちの情報', make: () => ({ type: 'registered_at', value: { from: '', to: '' } }) },
-  { type: 'support_mark', label: '対応マーク', group: 'タグ・記入欄', feature: 'support_marks' as const, make: () => ({ type: 'support_mark', value: { markIds: [], exclude: false } }) },
-  { type: 'tag_exists', label: 'タグ', group: 'タグ・記入欄', make: () => ({ type: 'tag_exists', value: '' }) },
-  { type: 'friend_field', label: '友だち情報', group: 'タグ・記入欄', feature: 'friend_fields' as const, make: () => ({ type: 'friend_field', value: { fieldId: '', op: 'contains', text: '' } }) },
-  { type: 'scenario_subscribed', label: 'シナリオ購読', group: '参加', make: () => ({ type: 'scenario_subscribed', value: '' }) },
-  { type: 'scenario_state', label: 'シナリオ', group: '参加', make: () => ({ type: 'scenario_state', value: { scenarioId: '', state: 'subscribed' } }) },
-  { type: 'form_answered', label: '回答フォーム', group: '行動', make: () => ({ type: 'form_answered', value: '' }) },
-  { type: 'last_reaction_at', label: '最終反応日', group: '行動', make: () => ({ type: 'last_reaction_at', value: { from: '', to: '' } }) },
-  { type: 'reaction_state', label: '反応状態', group: '行動', make: () => ({ type: 'reaction_state', value: 'reply_or_postback' }) },
-  { type: 'score_range', label: '行動スコア', group: '行動', make: () => ({ type: 'score_range', value: { min: 30, max: 69 } }) },
-  { type: 'is_following', label: 'ブロック状態', group: '友だちの情報', make: () => ({ type: 'is_following', value: true }) },
-  { type: 'is_hidden', label: '表示状態', group: '友だちの情報', make: () => ({ type: 'is_hidden', value: false }) },
-]
 
 const TAG_OPS: { value: string; label: string }[] = [
   { value: 'tag_exists', label: '選択したタグのいずれか1つ以上を含む人' },
@@ -78,10 +56,10 @@ const FIELD_OPS: { value: FieldOperator; label: string }[] = [
   { value: 'not_exists', label: '登録なし' },
   { value: 'not_equals', label: '完全一致除外' },
   { value: 'not_contains', label: '部分一致除外' },
-  { value: 'gte', label: '以上(≧)' },
-  { value: 'gt', label: 'より大きい(＞)' },
-  { value: 'lte', label: '以下(≦)' },
-  { value: 'lt', label: 'より小さい(＜)' },
+  { value: 'gte', label: '以上（≧）' },
+  { value: 'gt', label: 'より大きい（＞）' },
+  { value: 'lte', label: '以下（≦）' },
+  { value: 'lt', label: 'より小さい（＜）' },
 ]
 
 const REACTION_STATES: { value: string; label: string }[] = [
@@ -98,12 +76,9 @@ const SCENARIO_STATES: { value: string; label: string }[] = [
   { value: 'ever', label: 'を1度でも購読した人' },
 ]
 
-interface Option {
-  id: string
-  name: string
-}
-
 export interface ConditionBuilderProps {
+  disabled?: boolean
+  lockedReason?: string
   value: SegmentCondition | null
   onChange: (next: SegmentCondition | null) => void
   /** 見出しに出す言葉。「この通の配信対象」など。 */
@@ -117,9 +92,17 @@ export interface ConditionBuilderProps {
    * 分からなくなる。
    */
   showCount?: boolean
+  /**
+   * 候補を呼ぶ側から渡す（統括の一括配信：複数のアカウントのタグ・シナリオを名前でまとめたもの）。
+   * 渡したときは今のアカウントの候補を読まず、kinds の種類だけを足せる。友だち情報・対応マークの候補は空。
+   */
+  options?: { tags: Option[]; scenarios: Option[]; kinds?: readonly string[] }
 }
 
-export default function ConditionBuilder({ value, onChange, label, showCount = true }: ConditionBuilderProps) {
+export default function ConditionBuilder({ value, onChange, label, showCount = true, options, disabled = false, lockedReason }: ConditionBuilderProps) {
+  const blocked = disabled || Boolean(lockedReason)
+  const blockedRef = useRef(blocked)
+  blockedRef.current = blocked
   const { selectedAccountId } = useAccount()
   // 対応マーク・友だち情報は任意機能。オフのaccountでは条件の選択肢ごと出さない。
   const featureVisibility = useFeatureVisibility(selectedAccountId)
@@ -131,13 +114,31 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
   const [scenarios, setScenarios] = useState<Option[]>([])
   const [count, setCount] = useState<number | null>(null)
   const [counting, setCounting] = useState(false)
+  /* WEB067：候補（タグ・シナリオ・友だち情報・対応マーク）が読めなかったこと。読み直せる。 */
+  const [optionsFailed, setOptionsFailed] = useState(false)
+  const [optionsAttempt, setOptionsAttempt] = useState(0)
 
   const condition: SegmentCondition = value ?? { operator: 'AND', rules: [], groups: [] }
 
   useEffect(() => {
     let cancelled = false
-    if (!selectedAccountId) {
+    if (options) {
+      setTags(options.tags)
+      setScenarios(options.scenarios)
+      setFields([])
       setMarks([])
+      return () => { cancelled = true }
+    }
+    /*
+     * WEB067：アカウントが変わったら、前のアカウントの候補を消してから読む。
+     * B の読み込みが失敗したときに、A のタグ・シナリオを選べるまま残さない。
+     */
+    setTags([])
+    setFields([])
+    setMarks([])
+    setScenarios([])
+    setOptionsFailed(false)
+    if (!selectedAccountId) {
       return () => { cancelled = true }
     }
     void (async () => {
@@ -154,11 +155,13 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
           api.scenarios.list({ accountId: selectedAccountId }),
         ])
         if (cancelled) return
-        if (tagRes.success && Array.isArray(tagRes.data)) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
+        if (tagRes.success && Array.isArray(tagRes.data)) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name, color: t.color, groupId: t.groupId })))
         if (fieldRes.success && Array.isArray(fieldRes.data)) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
         if (markRes.success && Array.isArray(markRes.data)) setMarks(markRes.data.map((m) => ({ id: m.id, name: m.name })))
-        if (scenarioRes.success && Array.isArray(scenarioRes.data)) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
+        if (scenarioRes.success && Array.isArray(scenarioRes.data)) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name, folderId: s.folderId })))
+        if (!tagRes.success || !fieldRes.success || !markRes.success || !scenarioRes.success) setOptionsFailed(true)
       } catch {
+        if (!cancelled) setOptionsFailed(true)
         /*
          * 選択肢の読み込みが丸ごと失敗しても、条件の入力行自体は残す。
          * 名前・日付・スコアのような選択肢を使わない条件は組めるままにする。
@@ -168,7 +171,9 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId, fieldsEnabled, marksEnabled])
+    // 渡された候補は中身が変わったときだけ入れ直す。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccountId, fieldsEnabled, marksEnabled, options ? JSON.stringify(options) : '', optionsAttempt])
 
   /*
    * 該当件数。条件を書きながら人数が見えないと、絞りすぎ・絞り足りないに
@@ -178,29 +183,45 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
     // 出さないなら数えない。打つたびに使われない問い合わせが飛ぶ。
     if (!showCount) return
     const usable = pruneCondition(condition)
+    /* WEB065：数え直す間は前の数を出さない（別のアカウント・条件の数を残さない）。 */
+    setCount(null)
     if (!usable) {
-      setCount(null)
+      setCounting(false)
       return
     }
+    /* WEB066：条件・アカウントが変わったら、飛んでいる数え上げの結果は捨てる。 */
+    let cancelled = false
     const timer = setTimeout(() => {
       void (async () => {
         setCounting(true)
         try {
-          const res = await api.segments.count(usable as never)
+          // WEB065：選んでいるアカウントの友だちで数える（統括の候補を渡す画面はアカウントを付けない）。
+          const res = await api.segments.count(usable as never, options ? undefined : (selectedAccountId ?? undefined))
+          if (cancelled) return
           setCount(res.success ? (res.count ?? 0) : null)
         } catch {
-          setCount(null)
+          if (!cancelled) setCount(null)
         } finally {
-          setCounting(false)
+          if (!cancelled) setCounting(false)
         }
       })()
     }, 400)
-    return () => clearTimeout(timer)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(condition), showCount])
+  }, [JSON.stringify(condition), showCount, selectedAccountId])
 
+  /*
+   * S4-OR: 足したばかりの空のかたまりは下書きとして残す。
+   * isEmptyCondition（実質空）は保存・数え上げの「絞り込みなし」の
+   * 意味であって、編集中の表示を消す理由にしない。何も足して
+   * いない素の空のときだけ null へ戻す。
+   */
   const update = (next: SegmentCondition) => {
-    onChange(isEmptyCondition(next) ? null : next)
+    if (blockedRef.current) return
+    onChange(isStructurallyEmpty(next) ? null : next)
   }
 
   const addRule = (kind: (typeof RULE_KINDS)[number], groupIndex: number | null) => {
@@ -247,23 +268,20 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
           key={`${groupIndex ?? 'root'}-${i}`}
           className="border-hairline bg-canvas rounded-card flex flex-wrap items-start gap-2 border p-3"
         >
-          <button
-            type="button"
-            onClick={() => removeRule(i, groupIndex)}
-            className="text-ink-faint hover:text-danger rounded-control border-hairline h-9 shrink-0 border px-2 text-xs"
-            aria-label="この条件を外す"
-          >
+          <Button variant="secondary" disabled={disabled} lockedReason={lockedReason} className="text-ink-faint hover:text-danger h-9 shrink-0 px-2 text-xs whitespace-normal" type="button" onClick={() => removeRule(i, groupIndex)} aria-label="この条件を外す">
             外す
-          </button>
+          </Button>
           <div className="min-w-0 flex-1 space-y-2">
+            <fieldset disabled={blocked} className="contents" aria-label="条件の入力">
             <RuleEditor
+              key={blocked ? 'locked' : 'editable'}
               rule={rule}
               onChange={(next) => setRule(i, next, groupIndex)}
               tags={tags}
               fields={fields}
               marks={marks}
               scenarios={scenarios}
-            />
+            /></fieldset>
           </div>
         </div>
       ))}
@@ -272,14 +290,14 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
 
   /*
    * 条件の足し口。15個の札を並べっぱなしにすると1440pxでも3行に
-   * 折れて、どれがどれだか探せない。共通の候補つき入力（Combobox）で
-   * 打って絞り、右端のまとまり名（友だちの情報・タグ・行動など）で
-   * 確かめてから足す。札は1つも並べないので折り返しは起きない。
+   * 折れて、どれがどれだか探せない。共通の選ぶ窓で検索し、
+   * まとまり名（友だちの情報・タグ・行動など）を確かめてから足す。
    */
   const kindButtons = (groupIndex: number | null) => (
     <div className="mt-2 max-w-md">
       <KindPicker
-        kinds={RULE_KINDS.filter((kind) => !kind.feature || featureVisibility.enabled(kind.feature))}
+        disabled={disabled} lockedReason={lockedReason}
+        kinds={RULE_KINDS.filter((kind) => (options?.kinds ? options.kinds.includes(kind.type) : !kind.feature || featureVisibility.enabled(kind.feature)))}
         onPick={(kind) => addRule(kind, groupIndex)}
       />
     </div>
@@ -287,58 +305,48 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
 
   return (
     <div className="space-y-4">
-      <div className="border-hairline rounded-card border p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="text-ink text-sm font-bold">
-            「すべて満たす」必要がある条件<span className="text-ink-faint ml-1 font-normal">(and条件)</span>
-          </p>
-          {label && <span className="text-ink-faint text-xs">{label}</span>}
-        </div>
+      {optionsFailed ? (
+        <p className="text-ink-secondary text-xs" role="status">
+          タグ・シナリオなどの候補を読み込めませんでした。{' '}
+          <button type="button" className="font-semibold underline" onClick={() => setOptionsAttempt((n) => n + 1)}>読み直す</button>
+        </p>
+      ) : null}
+      <Card surface="muted" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
+        <CardHeader size="stacked" headingLevel={3} title="すべて満たす条件" meta={label} />
         <div className="mt-3">{renderRules(condition.rules, null)}</div>
         <p className="text-ink-faint mt-3 text-center text-xs">絞り込む項目を更に追加できます</p>
         {kindButtons(null)}
-      </div>
+      </Card>
 
       {(condition.groups ?? []).map((group, gi) => (
-        <div key={gi} className="border-hairline rounded-card border p-4">
+        <Card key={gi} surface="muted" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-ink text-sm font-bold">
-              「いずれか1つ以上を満たす」必要がある条件
-              <span className="text-ink-faint ml-1 font-normal">(or条件)</span>
-            </p>
-            <button
-              type="button"
-              onClick={() =>
+            <CardHeader headingLevel={3} size="stacked" title="いずれか1つ以上を満たす条件" />
+            <Button variant="secondary" disabled={disabled} lockedReason={lockedReason} className="text-ink-faint hover:text-danger h-9 px-3 text-xs whitespace-normal" type="button" onClick={() =>
                 update({ ...condition, groups: (condition.groups ?? []).filter((_, i) => i !== gi) })
-              }
-              className="text-ink-faint hover:text-danger rounded-control border-hairline h-9 border px-3 text-xs"
-            >
+              }>
               このかたまりを外す
-            </button>
+            </Button>
           </div>
           <div className="mt-3">{renderRules(group.rules, gi)}</div>
           {kindButtons(gi)}
-        </div>
+        </Card>
       ))}
 
-      <button
-        type="button"
-        onClick={() =>
+      <Button variant="secondary" disabled={disabled} lockedReason={lockedReason} aria-label="いずれか条件のかたまりを足す" className="text-ink-secondary rounded-card w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
           update({
             ...condition,
             groups: [...(condition.groups ?? []), { operator: 'OR', rules: [] }],
           })
-        }
-        className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-card h-10 w-full border border-dashed text-sm"
-      >
-        ＋「いずれか1つ以上を満たす」必要がある条件(or条件)を追加
-      </button>
+        }>
+        ＋いずれか1つ以上を満たす条件を足す
+      </Button>
 
       {showCount && (
         <div className="bg-canvas-sunken rounded-card flex items-baseline justify-between px-4 py-3">
           <span className="text-ink-secondary text-xs">該当件数</span>
           <span className="text-ink text-lg font-bold tabular-nums">
-            {isEmptyCondition(condition)
+            {isStructurallyEmpty(condition)
               ? '絞り込みなし'
               : !pruneCondition(condition)
                 ? '入力するとここに出ます'
@@ -346,120 +354,9 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
                   ? '…'
                   : count === null
                     ? '—'
-                    : `${count.toLocaleString('ja-JP')} 人`}
+                    : `${formatNumber(count)} 人`}
           </span>
         </div>
-      )}
-    </div>
-  )
-}
-
-/**
- * 条件の足し口（1つ選ぶ）。共通の候補つき入力（★V7 `WUVcz`）を使う。
- *
- * 選んだ直後は欄を空に戻す（続けてもう1つ足せる）。Combobox は value と
- * 一致する選択肢の名前を欄に出すため、どの選択肢とも一致しない値を渡して
- * 空に戻す。焦点は欄に残る。
- */
-function KindPicker({
-  kinds,
-  onPick,
-}: {
-  kinds: typeof RULE_KINDS
-  onPick: (kind: (typeof RULE_KINDS)[number]) => void
-}) {
-  const [added, setAdded] = useState(0)
-  return (
-    <Combobox
-      aria-label="追加する条件を選ぶ"
-      placeholder="条件を追加（文字で検索）"
-      value={added === 0 ? '' : `added-${added}`}
-      onChange={(next) => {
-        const kind = kinds.find((item) => item.type === next)
-        if (!kind) return
-        onPick(kind)
-        setAdded((current) => current + 1)
-      }}
-      options={kinds.map((kind) => ({ value: kind.type, label: kind.label, hint: kind.group }))}
-    />
-  )
-}
-
-/**
- * タグを選ぶ。
- *
- * 全部を並べるだけだと、タグが増えたときに画面が埋まる。実際の運用アカウントで
- * 101個あり、条件を1つ足すだけで縦20行のタグの壁ができて、その下にある
- * 「送る内容」まで届かなかった。Lステップも入力して絞る形にしている。
- *
- * 選んだものは常に先頭に出す。絞り込んだ状態で選ぶと、消したいときに
- * もう一度同じ言葉を打ち直さないと見つからない。
- */
-function TagPicker({
-  tags,
-  selected,
-  onToggle,
-}: {
-  tags: Option[]
-  selected: string[]
-  onToggle: (id: string) => void
-}) {
-  const [query, setQuery] = useState('')
-  const [showAll, setShowAll] = useState(false)
-
-  if (tags.length === 0) {
-    return <span className="text-ink-faint text-xs">タグがまだありません</span>
-  }
-
-  const chosen = tags.filter((t) => selected.includes(t.id))
-  const rest = tags.filter(
-    (t) => !selected.includes(t.id) && (query === '' || t.name.includes(query)),
-  )
-  // 打っていないときだけ畳む。絞り込んだ結果を隠すと、探しているものが出ない。
-  const LIMIT = 24
-  const collapsed = query === '' && !showAll && rest.length > LIMIT
-  const shown = collapsed ? rest.slice(0, LIMIT) : rest
-
-  const chip = (tag: Option, on: boolean) => (
-    <button
-      key={tag.id}
-      type="button"
-      onClick={() => onToggle(tag.id)}
-      className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-        on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
-      }`}
-    >
-      {tag.name}
-    </button>
-  )
-
-  return (
-    <div className="space-y-2">
-      {tags.length > LIMIT && (
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={`タグ名で絞り込む（${tags.length}件）`}
-          aria-label="タグ名で絞り込む"
-          className="border-hairline rounded-control h-9 w-full border px-3 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action sm:max-w-xs"
-        />
-      )}
-      <div className="flex flex-wrap gap-1.5">
-        {chosen.map((tag) => chip(tag, true))}
-        {shown.map((tag) => chip(tag, false))}
-      </div>
-      {collapsed && (
-        <button
-          type="button"
-          onClick={() => setShowAll(true)}
-          className="text-ink-secondary hover:bg-canvas-sunken border-hairline rounded-control h-8 border px-3 text-xs"
-        >
-          残り {rest.length - LIMIT} 件を表示
-        </button>
-      )}
-      {query !== '' && rest.length === 0 && chosen.length === 0 && (
-        <p className="text-ink-faint text-xs">「{query}」に当てはまるタグがありません</p>
       )}
     </div>
   )
@@ -497,7 +394,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     return (
       <>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">タグ</span>
+          <span className="text-ink text-sm font-semibold">タグ</span>
           <Select
             aria-label="タグの条件"
             value={rule.type}
@@ -515,10 +412,9 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
         <TagPicker
           tags={tags}
           selected={selected}
-          onToggle={(id) => {
-            const next = selected.includes(id) ? selected.filter((t) => t !== id) : [...selected, id]
-            onChange({ type: rule.type, value: isMulti ? next : (next[next.length - 1] ?? '') })
-          }}
+          multiple={isMulti}
+          onChange={(next) =>
+            onChange({ type: rule.type, value: isMulti ? next : (next[0] ?? '') })}
         />
       </>
     )
@@ -535,7 +431,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-sm font-medium">名前</span>
+            <span className="text-ink text-sm font-semibold">名前</span>
             <input
               value={nameText}
               onChange={(e) => changeName({ ...v, text: e.target.value })}
@@ -551,27 +447,26 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
               { key: 'system', label: 'システム表示名' },
             ].map((t) => {
               return (
-                <label key={t.key} className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={nameTargets.includes(t.key)}
-                    onChange={(e) => {
-                      // 最後の1つは外さない。外したまま保存されると
-                      // 判定側が全欄へ広げてしまう（R258）。
-                      if (!e.target.checked && nameTargets.length === 1 && nameTargets.includes(t.key)) {
-                        setNameTargetsNotice(true)
-                        return
-                      }
-                      changeName({
-                        ...v,
-                        targets: e.target.checked
-                          ? [...nameTargets, t.key]
-                          : nameTargets.filter((x) => x !== t.key),
-                      })
-                    }}
-                  />
+                <Checkbox
+                  key={t.key}
+                  checked={nameTargets.includes(t.key)}
+                  onCheckedChange={(checked) => {
+                    // 最後の1つは外さない。外したまま保存されると
+                    // 判定側が全欄へ広げてしまう（R258）。
+                    if (!checked && nameTargets.length === 1 && nameTargets.includes(t.key)) {
+                      setNameTargetsNotice(true)
+                      return
+                    }
+                    changeName({
+                      ...v,
+                      targets: checked
+                        ? [...nameTargets, t.key]
+                        : nameTargets.filter((x) => x !== t.key),
+                    })
+                  }}
+                >
                   {t.label}
-                </label>
+                </Checkbox>
               )
             })}
             <span className="text-ink-faint text-xs">から検索</span>
@@ -589,23 +484,55 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'status_message':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">
-            {rule.type === 'private_memo' ? '個別メモ' : 'ステータスメッセージ'}
+          <span className="text-ink text-sm font-semibold">
+            {rule.type === 'private_memo' ? 'メモ' : 'ステータスメッセージ'}
           </span>
           <input
             value={String(rule.value ?? '')}
             onChange={(e) => onChange({ type: rule.type, value: e.target.value })}
-            aria-label={rule.type === 'private_memo' ? '個別メモに含む文字' : 'ステータスメッセージに含む文字'}
+            aria-label={rule.type === 'private_memo' ? 'メモに含む文字' : 'ステータスメッセージに含む文字'}
             className={inputClass}
           />
         </div>
       )
 
+    case 'visit_count':
+    case 'purchase_amount': {
+      const visit = rule.type === 'visit_count'
+      const name = visit ? '来店の回数' : '購入の合計金額'
+      const num = (x: unknown) => (typeof x === 'number' ? x : '')
+      const put = (key: 'min' | 'max', text: string) => {
+        const next: Record<string, unknown> = { ...v }
+        if (text === '') delete next[key]
+        else next[key] = Number(text)
+        onChange({ type: rule.type, value: next })
+      }
+      return (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-ink text-sm font-semibold">{name}</span>
+          <TextField type="number" min={0} step={1} value={num(v.min)} onChange={(e) => put('min', e.target.value)} placeholder="下限なし" aria-label={`${name}の下限`} />
+          <span className="text-ink-faint text-sm">{visit ? '回以上〜' : '円以上〜'}</span>
+          <TextField type="number" min={0} step={1} value={num(v.max)} onChange={(e) => put('max', e.target.value)} placeholder="上限なし" aria-label={`${name}の上限`} />
+          <span className="text-ink-faint text-sm">{visit ? '回以下' : '円以下'}</span>
+        </div>
+      )
+    }
+    case 'member_tier':
+      return <MemberTierRule value={typeof rule.value === 'string' ? rule.value : ''} onChange={(next) => onChange({ type: 'member_tier', value: next })} />
+    case 'last_activity_at':
+      return (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-ink text-sm font-semibold">最後の来店・購入の日</span>
+          <DateField value={String(v.from ?? '')} onChange={(next) => onChange({ type: rule.type, value: { ...v, from: next } })} aria-label="最後の来店・購入の日の開始" className="w-48" />
+          <span className="text-ink-faint text-sm">〜</span>
+          <DateField value={String(v.to ?? '')} onChange={(next) => onChange({ type: rule.type, value: { ...v, to: next } })} aria-label="最後の来店・購入の日の終了" className="w-48" />
+        </div>
+      )
     case 'registered_at':
     case 'last_reaction_at':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">
+          <span className="text-ink text-sm font-semibold">
             {rule.type === 'registered_at' ? '友だち登録日' : '最終反応日'}
           </span>
           <DateField
@@ -629,7 +556,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-sm font-medium">対応マーク</span>
+            <span className="text-ink text-sm font-semibold">対応マーク</span>
             <Select
               aria-label="マークの含め方"
               value={v.exclude ? 'exclude' : 'include'}
@@ -642,31 +569,18 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
               ]}
             />
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {marks.map((mark) => {
-              const on = selected.includes(mark.id)
-              return (
-                <button
-                  key={mark.id}
-                  type="button"
-                  onClick={() =>
+          <EntitySelect aria-label="条件の対応マーク" size="full" values={selected}
+            options=
+            {marks.map((mark) =>({ ...entityOptionMetadata(mark), value:mark.id, label: mark.name }))}
+            onChange={(markIds) =>
                     onChange({
                       type: rule.type,
                       value: {
                         ...v,
-                        markIds: on ? selected.filter((id) => id !== mark.id) : [...selected, mark.id],
-                      },
+                        markIds
+                      }
                     })
-                  }
-                  className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
-                  }`}
-                >
-                  {mark.name}
-                </button>
-              )
-            })}
-          </div>
+                  }/>
         </>
       )
     }
@@ -676,12 +590,12 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       const needsText = op !== 'exists' && op !== 'not_exists'
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">友だち情報</span>
-          <Select
+          <span className="text-ink text-sm font-semibold">友だち情報</span>
+          <EntitySelect
             aria-label="友だち情報の項目"
             value={String(v.fieldId ?? '')}
             onChange={(value) => onChange({ type: rule.type, value: { ...v, fieldId: value } })}
-            options={[{ value: '', label: '項目を選ぶ' }, ...fields.map((f) => ({ value: f.id, label: f.name }))]}
+            options={[{ value: '', label: '項目を選ぶ' }, ...fields.map((f) => ({ ...entityOptionMetadata(f), value: f.id, label: f.name }))]}
           />
           <Select
             aria-label="項目の比べ方"
@@ -704,12 +618,12 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'scenario_subscribed':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">シナリオ購読</span>
-          <Select
+          <span className="text-ink text-sm font-semibold">シナリオ購読</span>
+          <EntitySelect kind="scenario"
             aria-label="購読中のシナリオ"
             value={String(rule.value ?? '')}
             onChange={(value) => onChange({ type: rule.type, value: value })}
-            options={[{ value: '', label: 'シナリオを選ぶ' }, ...scenarios.map((sc) => ({ value: sc.id, label: sc.name }))]}
+            options={[{ value: '', label: 'シナリオを選ぶ' }, ...scenarios.map((sc) => ({ ...entityOptionMetadata(sc), value: sc.id, label: sc.name }))]}
           />
         </div>
       )
@@ -717,12 +631,12 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'scenario_state':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">シナリオ</span>
-          <Select
+          <span className="text-ink text-sm font-semibold">シナリオ</span>
+          <EntitySelect kind="scenario"
             aria-label="シナリオ"
             value={String(v.scenarioId ?? '')}
             onChange={(value) => onChange({ type: rule.type, value: { ...v, scenarioId: value } })}
-            options={[{ value: '', label: 'シナリオを選ぶ' }, ...scenarios.map((sc) => ({ value: sc.id, label: sc.name }))]}
+            options={[{ value: '', label: 'シナリオを選ぶ' }, ...scenarios.map((sc) => ({ ...entityOptionMetadata(sc), value: sc.id, label: sc.name }))]}
           />
           <Select
             aria-label="シナリオの状態"
@@ -736,13 +650,11 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'form_answered':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">回答フォーム</span>
-          <input
+          <span className="text-ink text-sm font-semibold">回答フォーム</span>
+          <EntityRemoteField kind="form" label="回答フォーム"
             value={String(rule.value ?? '')}
-            onChange={(e) => onChange({ type: rule.type, value: e.target.value })}
-            placeholder="フォームID（空ならどれかに回答した人）"
-            aria-label="回答フォームのID"
-            className={inputClass}
+            emptyLabel="いずれかのフォームに回答した人"
+            onChange={(value) => onChange({ type: rule.type, value })}
           />
         </div>
       )
@@ -750,7 +662,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'reaction_state':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">反応状態</span>
+          <span className="text-ink text-sm font-semibold">反応状態</span>
           <Select
             aria-label="反応の種類"
             value={String(rule.value ?? 'reply_or_postback')}
@@ -769,7 +681,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-sm font-medium">行動スコア</span>
+            <span className="text-ink text-sm font-semibold">行動スコア</span>
             <TextField
               type="number"
               step={1}
@@ -804,7 +716,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'is_hidden':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">
+          <span className="text-ink text-sm font-semibold">
             {rule.type === 'is_following' ? 'ブロック状態' : '表示状態'}
           </span>
           <Select
@@ -840,6 +752,28 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     }
 
     default:
-      return <span className="text-ink-faint text-xs">この条件はこの画面では編集できません（{rule.type}）</span>
+      return <span className="text-ink-faint text-xs">この条件はこの画面では編集できません。条件を作った画面で直してください。</span>
   }
 }
+
+const RULE_KINDS: RuleKind[] = [
+  { type: 'name', label: '名前', group: '友だちの情報', make: () => ({ type: 'name', value: { text: '', targets: ['display', 'real', 'system'] } }) },
+  { type: 'private_memo', label: 'メモ', group: '友だちの情報', make: () => ({ type: 'private_memo', value: '' }) },
+  { type: 'status_message', label: 'ステータスメッセージ', group: '友だちの情報', make: () => ({ type: 'status_message', value: '' }) },
+  { type: 'registered_at', label: '友だち登録日', group: '友だちの情報', make: () => ({ type: 'registered_at', value: { from: '', to: '' } }) },
+  { type: 'support_mark', label: '対応マーク', group: 'タグ・記入欄', feature: 'support_marks' as const, make: () => ({ type: 'support_mark', value: { markIds: [], exclude: false } }) },
+  { type: 'tag_exists', label: 'タグ', group: 'タグ・記入欄', make: () => ({ type: 'tag_exists', value: '' }) },
+  { type: 'friend_field', label: '友だち情報', group: 'タグ・記入欄', feature: 'friend_fields' as const, make: () => ({ type: 'friend_field', value: { fieldId: '', op: 'contains', text: '' } }) },
+  { type: 'scenario_subscribed', label: 'シナリオ購読', group: '参加', make: () => ({ type: 'scenario_subscribed', value: '' }) },
+  { type: 'scenario_state', label: 'シナリオ', group: '参加', make: () => ({ type: 'scenario_state', value: { scenarioId: '', state: 'subscribed' } }) },
+  { type: 'form_answered', label: '回答フォーム', group: '行動', make: () => ({ type: 'form_answered', value: '' }) },
+  { type: 'last_reaction_at', label: '最終反応日', group: '行動', make: () => ({ type: 'last_reaction_at', value: { from: '', to: '' } }) },
+  { type: 'reaction_state', label: '反応状態', group: '行動', make: () => ({ type: 'reaction_state', value: 'reply_or_postback' }) },
+  { type: 'score_range', label: '行動スコア', group: '行動', make: () => ({ type: 'score_range', value: { min: 30, max: 69 } }) },
+  { type: 'visit_count', label: '来店の回数', group: '来店・購入', make: () => ({ type: 'visit_count', value: { min: 1 } }) },
+  { type: 'purchase_amount', label: '購入の合計金額', group: '来店・購入', make: () => ({ type: 'purchase_amount', value: { min: 1 } }) },
+  { type: 'last_activity_at', label: '最後の来店・購入の日', group: '来店・購入', make: () => ({ type: 'last_activity_at', value: { from: '', to: '' } }) },
+  { type: 'member_tier', label: '会員ランク', group: '来店・購入', make: () => ({ type: 'member_tier', value: '' }) },
+  { type: 'is_following', label: 'ブロック状態', group: '友だちの情報', make: () => ({ type: 'is_following', value: true }) },
+  { type: 'is_hidden', label: '表示状態', group: '友だちの情報', make: () => ({ type: 'is_hidden', value: false }) },
+]

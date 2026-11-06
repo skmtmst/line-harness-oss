@@ -9,7 +9,7 @@ import ChatsPage from './page'
  *
  * `inbox-673-account-switch-react.test.tsx` と同じく本物のReactで
  * `ChatsPage` を mount し、通信(fetch)だけを差し替える。会話の切替は
- * `useSearchParams()` が返す `?friend=` を試験の途中で書き換えることで
+ * `useSearchParams` が返す `?friend=` を試験の途中で書き換えることで
  * 実際の効果再実行を通す。
  *
  * 見るもの:
@@ -307,7 +307,7 @@ async function typeMessage(text: string) {
 }
 
 async function typeDatetime(text: string) {
-  // 日時の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm（日本時間）。
+  // 日時の選択（★管理画面）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm（日本時間）。
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(text)
   if (!match) throw new Error('日時が読めない')
   const year = Number(match[1])
@@ -339,13 +339,17 @@ async function typeDatetime(text: string) {
       (b.getAttribute('aria-label') ?? '').startsWith(`${year}年${month}月${day}日（${week}）`),
     ) ?? null,
   )
-  for (const [label, v] of [['時', match[4]], ['分', match[5]]] as const) {
-    const select = dialog()?.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)
-    if (!select) throw new Error('時刻の選択が見つからない')
-    await act(async () => {
-      select.value = v
-      select.dispatchEvent(new Event('change', { bubbles: true }))
-    })
+  await click(Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
+  await setTimeControl(dialog()?.querySelector('input[role="combobox"]') ?? null, `${match[4]}:${match[5]}`)
+}
+import { setTimeControl } from '@/test-utils/time-control'
+
+async function eventually(check: () => void) {
+  for (let attempt = 0; ; attempt++) {
+    try { check(); return } catch (error) {
+      if (attempt >= 100) throw error
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
+    }
   }
 }
 
@@ -375,6 +379,48 @@ async function openSchedulePanel() {
 }
 
 describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(#965)', () => {
+  it('会話切替直後から前の本文を隠し、遅い取得だけ骨組みを出す', async () => {
+    const slow = deferred<unknown>()
+    const normal = baseHandler({})
+    net.handler = (path, init) => /^\/api\/chats\/friend-b(\?|$)/.test(path) ? slow.promise : normal(path, init)
+    fixture.params = new URLSearchParams('friend=friend-a')
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() => expect(talkPaneText()).toContain('friend-aの会話'))
+    fixture.params = new URLSearchParams('friend=friend-b')
+    await act(async () => root.render(<ChatsPage />))
+    expect(talkPaneText()).not.toContain('friend-aの会話')
+    const loading = host.querySelector('[aria-label="会話を読み込んでいます"]')
+    expect(loading).not.toBeNull()
+    expect(loading?.closest('[data-skeleton-reserve]')).not.toBeNull()
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 330)) })
+    expect(host.querySelector('[aria-label="会話を読み込んでいます"]')?.closest('[data-skeleton-reserve]')).toBeNull()
+    expect(loading?.querySelector('[data-skeleton]')).not.toBeNull()
+    await act(async () => { slow.resolve({ success: true, data: chatDetail('friend-b', 'Bさん', '新しい会話') }) })
+    await eventually(() => expect(talkPaneText()).toContain('新しい会話'))
+    expect(talkPaneText()).not.toContain('friend-aの会話')
+  })
+
+  it('送信待ちの吹き出しは送信中、成功後は送信済みになり連打で増えない', async () => {
+    const slow = deferred<unknown>()
+    net.handler = baseHandler({ send: () => slow.promise })
+    fixture.params = new URLSearchParams('friend=friend-a')
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() => expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+    await typeMessage('確認の返信')
+    const send = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '送信する')!
+    await act(async () => { send.click(); send.click() })
+    expect(talkPaneText()).toContain('送信中…')
+    expect(talkPaneText()).toContain('確認の返信')
+    const pending = [...host.querySelectorAll('[role="article"]')].find((article) => article.textContent?.includes('確認の返信'))
+    expect(pending?.querySelector('[data-inbox-v6="quote-reply"]')).toBeNull()
+    expect(pending?.querySelector('[data-inbox-v6="correct-message"]')).toBeNull()
+    expect(net.posts.filter((post) => post.path.endsWith('/send'))).toHaveLength(1)
+    await act(async () => { slow.resolve({ success: true, data: { sent: true, sentByStaffName: '担当者', revision: 2 } }) })
+    await eventually(() => expect(talkPaneText()).toContain('送信済み'))
+    expect(talkPaneText()).not.toContain('送信中…')
+    expect([...host.querySelectorAll('[role="article"]')].filter((article) => article.textContent?.includes('確認の返信'))).toHaveLength(1)
+  })
+
   it('F07: Aの予約一覧応答が遅れてBへ切替後に届いても、Bの予約パネルに混ざらない', async () => {
     const schedA = deferred<unknown>()
     net.handler = baseHandler({
@@ -413,7 +459,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
 
     // Bの予約パネルにはBの分だけが出る。Aの「予約文面」も件数も混ざらない。
     await openSchedulePanel()
-    expect(scheduleToggleText()).toBe('予約(1)')
+    expect(scheduleToggleText()).toBe('送信予約(1)')
     expect(scheduledRowsText()).toContain('Bの予約文面')
     expect(scheduledRowsText()).not.toContain('Aの予約文面')
   })
@@ -431,9 +477,9 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     await flush()
 
     // 0件として黙るのではなく、読み込めなかったことと再読み込み口が出る。
-    expect(host.textContent).toContain('予約の一覧を読み込めませんでした。')
+    expect(document.body.textContent).toContain('予約の一覧を読み込めませんでした。')
     expect(document.querySelector('[data-inbox-v6="scheduled-retry"]')).not.toBeNull()
-    expect(scheduleToggleText()).toBe('予約')
+    expect(scheduleToggleText()).toBe('送信予約')
   })
 
   it('F03: Aの「前のメッセージ」応答が遅れてBへ切替後に届いても、Bの履歴に混ざらない', async () => {
@@ -494,7 +540,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     // Aへ送信を開始し、応答は保留のまま。(ダイレクト送信パネルにも
     // 「送信」ボタンがあるので、トーク画面の中に限定する)
     const pane = document.querySelector('[data-inbox-v4="talk-pane"]')
-    const sendButton = [...(pane?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '送信')
+    const sendButton = [...(pane?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '送信する')
     await click(sendButton ?? null)
     await flush()
     expect(net.posts.some((p) => p.path === '/api/chats/friend-a/send')).toBe(true)
@@ -558,7 +604,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     await typeDatetime('2026-09-25T10:30')
 
     const scheduleButton = () =>
-      [...document.querySelectorAll('button')].find((b) => b.textContent === 'この日時で予約する' || b.textContent === '予約中...')
+      [...document.querySelectorAll('button')].find((b) => /に予約$/.test(b.textContent ?? '') || b.textContent === '予約中...' )
 
     // 1回目: 通信中に保留 → 失敗させる。
     await click(scheduleButton() ?? null)

@@ -63,7 +63,7 @@ describe('NEN column create contract', () => {
   });
 
   it('validates targeting, schedule and completion settings', () => {
-    // #935 N-304 で過去日時は拒否するようになったため、固定の未来日時を使う
+    //   で過去日時は拒否するようになったため、固定の未来日時を使う
     const futureIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     expect(validateNenColumnCreateBody({
       title: '秋の食事', articleUrl: 'https://example.com/columns/autumn',

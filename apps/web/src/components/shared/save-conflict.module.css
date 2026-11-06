@@ -1,0 +1,76 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/*
+ * 保存がぶつかったとき（409）の帯と、比べる窓の中身（共通）。
+ * 見た目は回答フォームの編集の帯をそのまま共通にしたもの。
+ * リマインダの編集も同じ絵。値は globals.css の --save-conflict-*。
+ */
+.buttonIcon {
+  flex: none;
+  width: var(--save-conflict-button-icon);
+  height: var(--save-conflict-button-icon);
+}
+
+/* 比べる窓の中身。違いの行を薄い地にまとめる。 */
+.changes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--save-conflict-change-gap);
+  padding: var(--save-conflict-changes-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+}
+
+.changeLine {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--save-conflict-change-size);
+  line-height: var(--save-conflict-change-lh);
+}
+
+.changeLine[data-kind='add'] {
+  color: var(--color-ink);
+}
+
+.changeLine[data-kind='remove'] {
+  color: var(--color-danger);
+}
+
+/* 「違いを比べる」の表。行は下の線で区切り、見出しの行だけ太くする。 */
+.compareTable {
+  width: 100%;
+  margin-top: var(--tpl-cn-compare-gap);
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+.compareTable th,
+.compareTable td {
+  padding: var(--tpl-cn-compare-cell-pad);
+  padding-left: 0;
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  font-weight: var(--font-weight-ui);
+  text-align: left;
+  vertical-align: top;
+}
+.compareTable th {
+  white-space: nowrap;
+}
+.compareTable thead th {
+  padding: var(--tpl-cn-compare-head-pad);
+  padding-left: 0;
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+.compareTable .compareLabelCol {
+  width: var(--tpl-cn-compare-label-w);
+  padding-left: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+.compareTable .compareSaved {
+  color: var(--color-status-warn-deep);
+}
+}

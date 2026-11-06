@@ -1,5 +1,5 @@
 /*
- * IDEA-23: 注文1件の処理状況ビュー（getEcOrderDetail）の固定。
+ * 注文1件の処理状況ビュー（getEcOrderDetail）の固定。
  *
  * 見る点:
  *  - 注文に届いた出来事・個別処理・購読配送・共通送信台帳・発送後の案内・
@@ -142,7 +142,7 @@ describe('getEcOrderDetail', () => {
       eventId: 'ev-1', lineAccountId: 'account-1', status: 'succeeded',
     });
 
-    // 購読先別配送（通知・V6連携とも完了）。
+    // 購読先別配送（通知・連携とも完了）。
     sqlite.prepare(
       `INSERT INTO ec_v6_dispatches (event_id, subscriber, status, attempt_count, idempotency_key, updated_at)
        VALUES ('ev-1', 'notification', 'sent', 1, 'k1', '2026-09-16T00:01:00.000Z'),
@@ -286,7 +286,7 @@ describe('getEcOrderDetail', () => {
   });
 
   /*
-   * IDEA-16: 注文から成果・報酬・支払い状態まで同じ行で辿れることの固定。
+   * 注文から成果・報酬・支払い状態まで同じ行で辿れることの固定。
    * 確定後の取消（反対仕訳）と、同じ注文・同じ成果地点の重複候補も見せる。
    */
   it('成果から紹介者・確定報酬・締め・支払いCSV・支払い結果まで辿れる', async () => {
@@ -403,5 +403,20 @@ describe('getEcOrderDetail', () => {
 
     const detail = await getEcOrderDetail(db, { lineAccountId: 'account-1', orderId });
     expect(detail!.outcomes.conversions.map((row) => row.id)).toEqual([]);
+  });
+});
+
+
+describe('注文の出来事が増えた場合', () => {
+  it('150件の出来事と処理履歴をD1の変数上限以内で全件返す', async () => {
+    for (let i = 0; i < 150; i++) insertEvent({ id: `bulk-${i}`, externalId: `external-${i}` });
+    const order = await seedOrder({ eventId: 'bulk-0', externalId: 'external-0' });
+    for (let i = 0; i < 150; i++) {
+      sqlite.prepare(`INSERT INTO ec_action_executions
+        (id, line_account_id, event_id, action_type, rule_version, idempotency_key, status, created_at, updated_at)
+        VALUES (?, 'account-1', ?, 'notification', 'ec-action-v1', ?, 'succeeded', '2026-09-16', '2026-09-16')`).run(`action-${i}`, `bulk-${i}`, `key-${i}`);
+    }
+    const detail = await getEcOrderDetail(db, { lineAccountId: 'account-1', orderId: order.id });
+    expect(detail?.events).toHaveLength(150);
   });
 });

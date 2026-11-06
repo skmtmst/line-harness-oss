@@ -1,17 +1,21 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
-import { hasFirstDeliveredMessage, resolveLineCredential } from '@line-crm/db';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import { hasFirstDeliveredMessage, hasSavedFeatureConfiguration } from '@line-crm/db';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-import { expectedWebhookUrl, fetchWebhookEndpoint } from '../lib/webhook-endpoint.js';
+import { starterApplication } from '../services/style-starter-ensure.js';
+import { firstRunTimes } from '../services/getting-started-first-run.js';
+import { scenarioIdsStartedBy } from '../services/first-run-funnel.js';
 
 /**
- * はじめの設定の順路。設計 ★V6 34-1（`RAW35`）。台帳 #134。
+ * はじめの設定の順路。設計 ★34-1（`RAW35`）。台帳。
  *
  * **画面を開いたかではなく、実際に作られたもので判定する。**
  * 訪問の記録は持たない。毎回いまの中身を数え、キャッシュもしない
- * （要件 v6-34 §6-1）。
+ * （要件 -34 §6-1）。
  */
 const gettingStarted = new Hono<Env>();
 
@@ -19,6 +23,7 @@ export type StepState = 'done' | 'stalled' | 'todo' | 'forbidden' | 'unknown';
 
 const STEP_HREFS = {
   accounts: '/accounts',
+  featureSet: '/settings?tab=features',
   attributes: '/tags?tab=tags',
   friendAdd: '/friend-add-settings',
   scenario: '/scenarios',
@@ -27,6 +32,7 @@ const STEP_HREFS = {
 
 const STEP_PERMISSIONS: Record<keyof typeof STEP_HREFS, string[]> = {
   accounts: ['/accounts', 'account.definition.edit'],
+  featureSet: ['feature_settings.edit'],
   attributes: ['/tags', 'tag.definition.edit'],
   friendAdd: ['/friend-add-settings', 'friend_add.definition.edit'],
   scenario: ['/scenarios', 'scenario.definition.edit'],
@@ -56,11 +62,6 @@ function withAccess(
 
 interface AccountRow {
   id: string;
-  is_active: number;
-  channel_access_token: string | null;
-  channel_access_token_encrypted: string | null;
-  channel_secret: string | null;
-  channel_secret_encrypted: string | null;
 }
 
 gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'), async (c) => {
@@ -74,46 +75,10 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
 
     const accountIds = accountId ? [accountId] : visibleScope.allowedAccountIds;
     const accounts = accountIds.length > 0 ? await c.env.DB.prepare(
-      `SELECT id, is_active, channel_access_token, channel_access_token_encrypted,
-              channel_secret, channel_secret_encrypted
-         FROM line_accounts
-        WHERE archived_at IS NULL AND id IN (${accountIds.map(() => '?').join(', ')})`,
-    ).bind(...accountIds).all<AccountRow>() : { results: [] as AccountRow[] };
+      `SELECT id FROM line_accounts
+        WHERE archived_at IS NULL AND id IN (${sqlIdSet(accountIds).sql})`,
+    ).bind(...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<AccountRow>() : { results: [] as AccountRow[] };
     const rows = accounts.results;
-
-    /*
-      段1。**3つとも揃って初めて「終わり」。**
-      稼働中で、Webhook が合っていて、シークレットが確かめられている。
-      Webhook は LINE に問い合わせて確かめる。**読めなかったものを
-      「合っている」とも「登録されていない」とも言わない。**
-    */
-    const expected = expectedWebhookUrl(c.env.WORKER_URL ?? new URL(c.req.url).origin);
-    const webhookChecks = await Promise.all(
-      rows.map(async (row) => {
-        if (row.is_active !== 1) return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
-        const hasSecret = Boolean(row.channel_secret || row.channel_secret_encrypted);
-        if (!hasSecret) return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
-        try {
-          const token = await resolveLineCredential(
-            row.channel_access_token_encrypted,
-            row.channel_access_token,
-            { lineAccountId: row.id, field: 'channel_access_token' },
-          );
-          if (!token) return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
-          const check = await fetchWebhookEndpoint(token, expected);
-          return { id: row.id, status: check.status, active: check.active };
-        } catch {
-          return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
-        }
-      }),
-    );
-    /*
-      R74。URLが一致していても、LINE側でWebhookの利用がオフなら
-      受信は届かない。「終わり」に数えない。`active: null`（読めなかった）
-      は従来どおり「合っている側」に寄せず `unknown` のまま——
-      ここでは利用オフ（false）だけを除外する。
-    */
-    const usable = webhookChecks.filter((w) => w.status === 'matched' && w.active !== false).length;
 
     const tagCount = accountId ? await c.env.DB.prepare(
       `SELECT COUNT(*) AS c FROM tags
@@ -150,22 +115,8 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
           .first<{ hit: number }>()
       : null;
 
-    let startedScenarioIds: string[] = [];
-    for (const rule of ruleRows.results) {
-      try {
-        const definition = JSON.parse(rule.definition_snapshot) as {
-          scenarioId?: string | null;
-          actions?: Array<{ type?: string; scenarioId?: string; targetId?: string }>;
-        };
-        const actionIds = (definition.actions ?? [])
-          .filter((action) => action.type === 'start_scenario')
-          .map((action) => action.scenarioId ?? action.targetId);
-        startedScenarioIds.push(definition.scenarioId ?? '', ...actionIds.filter(Boolean) as string[]);
-      } catch {
-        // 壊れた公開版を「設定済み」にしない。ほかの正常なルールは判定を続ける。
-      }
-    }
-    startedScenarioIds = [...new Set(startedScenarioIds.filter(Boolean))];
+    // 壊れた公開版を「設定済み」にしない。ほかの正常なルールは判定を続ける。
+    const startedScenarioIds = [...new Set(ruleRows.results.flatMap((rule) => scenarioIdsStartedBy(rule.definition_snapshot)))];
 
     const scenarioTotal = await c.env.DB.prepare(
       `SELECT COUNT(*) AS c FROM scenarios${accountId ? ' WHERE line_account_id = ?' : ' WHERE 1 = 0'}`,
@@ -175,12 +126,12 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
 
     let scenarioFromFriendAdd = false;
     if (startedScenarioIds.length > 0) {
-      const placeholders = startedScenarioIds.map(() => '?').join(', ');
+      const placeholders = sqlIdSet(startedScenarioIds).sql;
       const hit = await c.env.DB.prepare(
         `SELECT 1 AS hit FROM scenarios
           WHERE line_account_id = ? AND is_active = 1 AND id IN (${placeholders}) LIMIT 1`,
       )
-        .bind(accountId, ...startedScenarioIds)
+        .bind(accountId, ...(startedScenarioIds.length ? sqlIdSet(startedScenarioIds).binds : []))
         .first<{ hit: number }>();
       scenarioFromFriendAdd = hit !== null;
     }
@@ -191,13 +142,8 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
     const hasFallbackRule = ruleRows.results.some((row) => row.is_unknown_route_fallback === 1);
     const steps = [
       {
-        ...withAccess(staff, 'accounts', usable > 0 ? 'done' : rows.length > 0 ? 'stalled' : 'todo',
-          rows.length > 0 && usable === 0 ? 'LINE側のWebhook利用設定またはシークレットを確認してください' : null),
-        /*
-          **Webhook を確かめられなかったことを隠さない。** ここが空だと、
-          段1が終わらない理由が運用者に分からない。
-        */
-        webhook: webhookChecks,
+        // 登録済みアカウントがあれば段1は完了。接続状態は運用画面で別に確認する。
+        ...withAccess(staff, 'accounts', rows.length > 0 ? 'done' : 'todo'),
       },
       withAccess(staff, 'attributes',
         (tagCount?.c ?? 0) > 0 || (fieldCount?.c ?? 0) > 0 ? 'done' : 'todo'),
@@ -212,6 +158,11 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
       withAccess(staff, 'firstMessage', firstMessage ? 'done' : 'todo'),
     ];
 
+    if (c.req.query('version') === 'v8') {
+      const configured = accountId ? await hasSavedFeatureConfiguration(c.env.DB, accountId) : false;
+      steps.splice(1, 0, withAccess(staff, 'featureSet', configured ? 'done' : 'todo'));
+    }
+
     /*
       「閉じた」は本人単位の記憶。**完了判定には使わない**（要件 §15）。
       帯を出すかは `dismissed` と `allDone` を画面が見て決める。
@@ -222,11 +173,20 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
         ).bind(staff.id).first<{ dismissed_at: string | null }>()
       : null;
 
+    /*
+      初期セットが入っているかと、最初の10分の時刻。どちらも読むだけで行を作らない
+      （作成の口以外で設定を書かない決まり）。アカウントを1つ選んでいる時だけ返す。
+    */
+    const starter = accountId ? await starterApplication(c.env.DB, accountId, staff?.tenantId ?? null) : null;
+    const firstRun = accountId ? await firstRunTimes(c.env.DB, accountId) : null;
+
     return c.json({
       success: true,
       data: {
         steps,
         accountId,
+        starter,
+        firstRun,
         doneCount: steps.filter((s) => s.state === 'done').length,
         total: steps.length,
         /** 全部終わったら、ダッシュボードの帯を出さない。 */
@@ -235,8 +195,7 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
       },
     });
   } catch (err) {
-    console.error('GET /api/getting-started error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -246,7 +205,7 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
  * **完了ではない。** 閉じた日時は帯を出さないためだけの記憶で、
  * 段の判定には一切入れない（§15）。
  */
-gettingStarted.post('/api/getting-started/dismiss', requireRole('owner', 'admin', 'staff'), async (c) => {
+gettingStarted.post('/api/getting-started/dismiss', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const staff = c.get('staff');
     if (!staff?.id) {
@@ -259,8 +218,7 @@ gettingStarted.post('/api/getting-started/dismiss', requireRole('owner', 'admin'
     ).bind(staff.id).run();
     return c.json({ success: true, data: { dismissed: true } });
   } catch (err) {
-    console.error('POST /api/getting-started/dismiss error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

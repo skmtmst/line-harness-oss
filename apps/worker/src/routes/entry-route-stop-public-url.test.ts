@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// N-244: 停止した流入経路の公開URL受付と計測を止める回帰テスト。
+// 停止した流入経路の公開URL受付と計測を止める回帰テスト。
 // active だけが通常受付し、停止は転送先・内部状態を漏らさない同一の
 // 終了応答(410)で止まる。存在しない ref は従来の汎用受付のまま
 // (affiliate 契約テスト (c) の鎖を保つ)で、経路に結びつく計測を増やさない。
 const dbMocks = {
-  // eager module-load deps (mirror affiliate-links-redirect.test.ts)
+
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
@@ -23,11 +23,10 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
-// Import after the mock so index.ts binds the mocked helpers.
+// 差替済みのヘルパを入口へ接続するため、モック登録後に読み込む。
 const worker = (await import('../index.js')).default;
 
-// A stub DB is enough: every query goes through the mocked @line-crm/db
-// helpers, so the binding itself is never touched by the /r/:ref handler.
+// 問い合わせは差替済みの DB ヘルパを通るため、D1 本体は使わない。
 const DB = {} as D1Database;
 
 const MOBILE_UA =
@@ -52,6 +51,29 @@ beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.getLineAccounts.mockResolvedValue([]);
   dbMocks.getEntryRouteByRefCodeAny.mockResolvedValue(null);
+});
+
+describe('/r/:ref — クーポンQRの所属', () => {
+  it('既定プール・転送先に流れず、クーポンの店のLIFFとrefへ送る', async () => {
+    dbMocks.getEntryRouteByRefCode.mockResolvedValue({ id: 'r', ref_code: 'coupon', is_active: 1,
+      coupon_enabled: 1, coupon_asset_id: 'c', line_account_id: 'a', pool_id: 'other-pool', redirect_url: 'https://other.example' });
+    dbMocks.getLineAccountById.mockResolvedValue({ id: 'a', liff_id: '2000000000-CouponAA' });
+    const response = await get('/r/coupon');
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('2000000000-CouponAA');
+    expect(html).toContain('couponRef=coupon');
+    expect(html).not.toContain('1000000000-DefaultAA');
+    expect(dbMocks.getTrafficPoolBySlug).not.toHaveBeenCalled();
+    expect(dbMocks.getTrafficPoolById).not.toHaveBeenCalled();
+  });
+  it('所属のLIFFが無ければ、別の店へ落とさず利用不可にする', async () => {
+    dbMocks.getEntryRouteByRefCode.mockResolvedValue({ id: 'r', is_active: 1,
+      coupon_enabled: 1, coupon_asset_id: 'c', line_account_id: 'a' });
+    dbMocks.getLineAccountById.mockResolvedValue({ id: 'a', liff_id: null });
+    expect((await get('/r/coupon')).status).toBe(503);
+    expect(dbMocks.getTrafficPoolBySlug).not.toHaveBeenCalled();
+  });
 });
 
 describe('/r/:ref — N-244 stopped entry routes', () => {

@@ -1,4 +1,5 @@
-import type { Env } from '../index.js';
+import { logger } from '@line-crm/shared/server';
+import type { Env } from '../worker-env.js';
 import { accountFeatureOffExclusionSql } from '@line-crm/db';
 import { dbFor } from './db-router.js';
 import {
@@ -179,10 +180,7 @@ async function storeRawEmail(
   objectKey: string,
   customMetadata?: Record<string, string>,
 ): Promise<void> {
-  // Cloudflare Email Routing rejects messages over 25 MiB before this handler runs.
-  // Workers share a 128 MB isolate limit, so never turn the raw MIME stream into an
-  // ArrayBuffer/string here. EmailMessage.raw does not carry a content length that
-  // R2 can rely on, so preserve streaming while attaching the authoritative rawSize.
+  // Email Routing は25MiB超を先に拒むが、Worker の128MB内で複製を増やさないよう MIME を文字列や ArrayBuffer にしない。stream を保ち、R2 へ正規の rawSize を渡す。
   const fixedLength = new FixedLengthStream(message.rawSize);
   const pipeAbort = new AbortController();
   const pipePromise = message.raw.pipeTo(fixedLength.writable, { signal: pipeAbort.signal });
@@ -194,8 +192,7 @@ async function storeRawEmail(
     });
     await pipePromise;
   } catch (error) {
-    // If R2 rejects before consuming the body, release the single-use source stream
-    // instead of leaving the pipe blocked on backpressure.
+    // R2 が本文を読む前に拒んだ場合、背圧で止まらないよう一度限りの元 stream を解放する。
     pipeAbort.abort(error);
     await fixedLength.readable.cancel(error).catch(() => undefined);
     await pipePromise.catch(() => undefined);
@@ -245,12 +242,7 @@ async function markRawStorageFailure(
     await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails
       SET status = 'storage_failed', r2_key = '' WHERE id = ?`).bind(inboundId).run();
   } catch (recordError) {
-    console.error(JSON.stringify({
-      event: 'restaurant_email_storage_failure_record_failed',
-      inboundId,
-      error: String(recordError),
-      originalError: String(error),
-    }));
+    logger.error("restaurant_email.record_storage_failure_failed");
   }
 }
 
@@ -291,13 +283,7 @@ async function quarantineRestaurantEmail(
   }
   await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails
     SET r2_key = ?, status = 'quarantined' WHERE id = ?`).bind(objectKey, claim.id).run();
-  console.warn(JSON.stringify({
-    event: 'restaurant_email_quarantined',
-    reason,
-    objectKey,
-    domain: parts?.domain ?? null,
-    rawSize: message.rawSize,
-  }));
+  logger.warn("restaurant_email_quarantined");
   return { quarantined: true, duplicate: false, objectKey };
 }
 
@@ -329,7 +315,7 @@ async function storeRestaurantReservationEmail(
   }
 
   await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails
-    SET r2_key = ?, status = 'stored' WHERE id = ?`).bind(objectKey, claim.id).run();
+    SET r2_key = ?, status = 'stored', media_id = ? WHERE id = ?`).bind(objectKey, media.id, claim.id).run();
 
   const eventId = crypto.randomUUID();
   const inserted = await dbFor(env, storeId).prepare(`INSERT INTO rt_sync_events
@@ -456,11 +442,7 @@ export async function deleteExpiredRestaurantRawEmails(
       deleted += results.length;
     } catch (error) {
       failed += results.length;
-      console.error(JSON.stringify({
-        event: 'restaurant_raw_mail_retention_failed',
-        count: results.length,
-        error: String(error),
-      }));
+      logger.error("restaurant_email.delete_expired_raw_mail_failed");
       break;
     }
   }

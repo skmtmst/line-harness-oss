@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -17,12 +17,14 @@ import { describe, expect, it } from 'vitest'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 const staffSource = readFileSync(join(directory, 'page.tsx'), 'utf8')
+const CSS = readFileSync(join(directory, '../../v8/settings/staff/staff.module.css'), 'utf8')
 
 describe('LAY-07: 権限詳細の設定欄が狭い幅で潰れない', () => {
   it('設定と説明の2列は全幅固定ではなく、十分な幅の時だけにする', () => {
     expect(staffSource).not.toContain("gridTemplateColumns: 'minmax(0, 1fr) 390px'")
     expect(staffSource).toContain('grid-cols-1')
-    expect(staffSource).toContain('lg:grid-cols-[minmax(0,1fr)_390px]')
+    expect(staffSource).toContain('styles.scopeGrid')
+    expect(CSS).toMatch(/@media \(min-width: 1024px\)\s*{\s*\.scopeGrid\s*{[^}]*grid-template-columns: minmax\(0, 1fr\) var\(--tpl-sa-scope-side-w\)/s)
   })
 
   it('選択列の `repeat(3, 140px)` 固定をやめ、機能ごとのカードにする', () => {
@@ -34,15 +36,14 @@ describe('LAY-07: 権限詳細の設定欄が狭い幅で潰れない', () => {
 })
 
 describe('LAY-08: 保存バーが画面外へ逃げない', () => {
-  it('バーの左端は var(--sidebar-width) 固定ではなくビュー幅に追従する', () => {
+  it('画面ごとの固定座標を置かず、共通の追従帯へ配置を委ねる', () => {
     expect(staffSource).not.toContain('var(--sidebar-width')
-    expect(staffSource).toContain('inset-x-0')
-    expect(staffSource).toContain('xl:left-64')
+    expect(staffSource).not.toContain('fixed inset-x-0 bottom-0')
   })
 
   it('バーの高さを固定せず、下部はキャンセルと保存に絞る', () => {
     expect(staffSource).not.toContain('height: 72')
-    expect(staffSource).toContain('見せる範囲を保存')
+    expect(staffSource).toContain('見せる範囲を保存する')
     expect(staffSource).toContain('キャンセル')
   })
 })

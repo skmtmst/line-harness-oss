@@ -1,0 +1,2 @@
+@layer properties, theme, base, components, utilities;
+/* 代理ログインの知らせの面と操作は共通の Notice と Button が持つ。 */

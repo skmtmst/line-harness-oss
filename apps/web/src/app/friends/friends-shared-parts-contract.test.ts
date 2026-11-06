@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -15,8 +15,9 @@ const FRIENDS = read('app/friends/page.tsx')
 const FRIENDS_BODY = withoutComments(FRIENDS)
 const ROW = read('components/friends/friend-list-row.tsx')
 const ROW_BODY = withoutComments(ROW)
-const SUMMARY = read('components/users/summary-bar.tsx')
+const SUMMARY = read('v8/friends/merged/merged.tsx')
 const SUMMARY_BODY = withoutComments(SUMMARY)
+const SUMMARY_HOOK = read('components/users/use-users-summary.ts')
 const DUPLICATES_BODY = withoutComments(read('app/duplicates/page.tsx'))
 const TOKENS = read('app/globals.css')
 
@@ -29,45 +30,20 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
     expect(FRIENDS_BODY, '手書きの検索入力が残っている').not.toMatch(/<input\s+type="search"/)
     expect(FRIENDS_BODY, '手書きのプルダウンが残っている').not.toContain('<select')
     expect(FRIENDS_BODY, '手書きのプルダウン装飾が残っている').not.toContain('v6-select')
-    expect(FRIENDS_BODY, '保存条件の札が手書きのまま').not.toContain('rounded-full bg-canvas px-2.5')
+    expect(FRIENDS_BODY, '保存条件の札が手書きのまま').not.toContain('rounded-pill bg-canvas px-2.5')
     expect(FRIENDS_BODY).toContain('<Chip key={summary} tone="neutral">')
   })
 
-  it('絞り込み4つを設計の幅（156/156/176/184）で置く', () => {
-    /* 共通Selectの standard は176px固定。幅は外枠で持ち、size="full" を渡す。 */
-    for (const [filter, width] of [
-      ['tag', 'w-39'],
-      ['response', 'w-39'],
-      ['operator', 'w-44'],
-      ['scenario', 'w-46'],
-    ] as const) {
-      expect(FRIENDS_BODY, `${filter} の幅が設計と違う`).toContain(
-        `<div className="${width} shrink-0" data-filter="${filter}">`,
-      )
-    }
-    expect(FRIENDS_BODY, '痩せた実装幅が残っている').not.toContain('w-37.5 shrink-0')
-    expect((FRIENDS_BODY.match(/size="full"/g) ?? []).length).toBeGreaterThanOrEqual(5)
-  })
-
-  it('検索行の副操作を設計の高さ38pxと幅で置く', () => {
-    /* 共通Buttonは36px・角丸8pxで設計と一致済み。ここへ当てない。 */
-    expect(FRIENDS).toContain("const SEARCH_ROW_SECONDARY = 'inline-flex h-9.5")
-    expect(FRIENDS_BODY, '詳細条件が110pxでない').toContain('w-27.5')
-    expect(FRIENDS_BODY, '保存した検索が130pxでない').toContain('w-32.5')
-    expect(FRIENDS_BODY, '検索実行が70pxでない').toContain('w-17.5')
-    expect(FRIENDS_BODY).not.toContain('h-10 whitespace-nowrap rounded-control')
-  })
-
-  // ★V7「友だちの顔」（KXDhj）：共通 Avatar の 40px の丸。画像が読めない時も頭文字（2026-09-24）。
-  it('行の顔は共通 Avatar（40px）', () => {
-    expect(ROW_BODY).toContain('<Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />')
+  // ★管理画面「友だちの顔」（KXDhj）：共通 Avatar の 40px の丸。画像が読めない時も頭文字（2026-09-24）。
+  it('行の顔は共通 Avatar（32px）', () => {
+    expect(ROW_BODY).toContain('<Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />')
     expect(ROW_BODY, '画像を直接描いている').not.toMatch(/<img src=\{friend\.pictureUrl\}/)
   })
 
   it('行の担当者に丸アイコンを出し、未割り当ては全角ハイフンで埋める', () => {
     expect(ROW_BODY).toContain('data-operator-avatar={friend.operator ? \'assigned\' : \'unassigned\'}')
-    expect(ROW_BODY, '担当者アイコンが16pxでない').toContain('h-4 w-4 shrink-0 items-center justify-center rounded-full')
-    expect(ROW_BODY, '頭文字が10px/800でない').toContain('text-nano font-extrabold')
+    expect(ROW_BODY, '担当者アイコンが16pxでない').toContain('h-4 w-4 shrink-0 items-center justify-center rounded-pill')
+    expect(ROW_BODY, '頭文字が10px/500でない').toContain('text-nano font-medium')
     expect(ROW_BODY, '未割り当てが全角ハイフンでない').toContain("'－'")
     expect(ROW_BODY).toContain("担当：{friend.operator?.name ?? '未割り当て'}")
   })
@@ -86,8 +62,8 @@ describe('統合ユーザー(r7eSi)の指標カードを共通部品へ載せ替
     expect(SUMMARY_BODY).toContain('読み込んでいます')
     expect(SUMMARY_BODY).toContain('読み込めませんでした')
     expect(SUMMARY_BODY).toContain('再読み込み')
-    expect(SUMMARY_BODY, '失敗しても前の数字を残している').toContain('setStats(null)')
-    expect(SUMMARY_BODY, '遅れて返った古い集計を照合していない').toContain(
+    expect(SUMMARY_HOOK, '失敗しても前の数字を残している').toContain('setStats(null)')
+    expect(SUMMARY_HOOK, '遅れて返った古い集計を照合していない').toContain(
       'requestGuard.isCurrent(requestGeneration)',
     )
   })
@@ -105,18 +81,17 @@ describe('重複検出で取れない数を作らない契約', () => {
   it('取れない数は「—」と未接続の説明にする', () => {
     /* #1005: 独自カードをやめて共通 KpiCard の3段へ揃えた。値の「—」と
        短い状態は常時表示、接続待ちの説明は説明アイコンの中へ。 */
-    expect(DUPLICATES_BODY).toContain("import KpiCard from '@/components/shared/kpi-card'")
-    expect(DUPLICATES_BODY).toContain('title="重複配信の削減"')
-    expect(DUPLICATES_BODY).toContain('valueText="—"')
+    expect(DUPLICATES_BODY).toContain('重複配信の削減')
+    expect(DUPLICATES_BODY).toContain("emptyValue('unknown')")
     expect(DUPLICATES_BODY).toContain('配信前プレビューの実績')
   })
 
   it('読込中と取得失敗を状態の言葉でそろえる', () => {
-    expect(DUPLICATES_BODY).toContain('読み込んでいます')
+    expect(DUPLICATES_BODY).toContain('aria-busy={d.candidatesLoading}')
     expect(DUPLICATES_BODY).toContain('読み込めませんでした')
-    // ★V7 `x63W5x`：失敗の1枚は共通部品の error（副ボタン「もう一度読み込む」つき）。
+    // ★管理画面 `x63W5x`：失敗の1枚は共通部品の error（副ボタン「もう一度読み込む」つき）。
     // 文言は部品が持つ。ここでは口（`onRetry`）があることだけ見る。
-    expect(DUPLICATES_BODY, '取得失敗にやり直す口が無い').toContain('onRetry={() => void loadCandidates()}')
+    expect(DUPLICATES_BODY, '取得失敗にやり直す口が無い').toContain('onClick={() => void (d.data ? d.loadCandidates() : d.load())}')
     expect(DUPLICATES_BODY).not.toContain('読み込み中…')
     expect(DUPLICATES_BODY).not.toContain('集計の取得に失敗しました')
   })

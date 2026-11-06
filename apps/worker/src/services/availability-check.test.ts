@@ -1,8 +1,12 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+
+const circuitFixtures = new Set<SqliteD1>();
+afterEach(() => { for (const fixture of circuitFixtures) fixture.raw.close(); circuitFixtures.clear(); });
 import { explainBookingSlot, getAvailability, type SlotBlockReason } from './availability.js';
 
 // ----------------------------------------------------------------
-// explainBookingSlot (IDEA-28 予約設定の「この日時はなぜ取れないか」)
+// explainBookingSlot ( 予約設定の「この日時はなぜ取れないか」)
 // 理由が実際の判定と一致することを、同じ stubDB で getAvailability と
 // 突き合わせて確認する。
 // ----------------------------------------------------------------
@@ -61,8 +65,12 @@ interface StubData {
 }
 
 function stubDB(data: StubData): D1Database {
+  // 空き判定の fixture を保ち、停止状態の永続 SQL は実際に実行する。
+  const circuit = data.calendarConnection ? createTestD1() : undefined;
+  if (circuit) circuitFixtures.add(circuit);
   return {
     prepare(sql: string) {
+      if (circuit && sql.includes('workflow_steps')) return circuit.db.prepare(sql);
       return {
         bind() {
           return this;
@@ -72,6 +80,7 @@ function stubDB(data: StubData): D1Database {
             return data.timezone === undefined ? null : { timezone: data.timezone };
           }
           if (sql.includes('FROM menus')) return data.menu ?? null;
+          if (sql.includes('FROM booking_calendar_switches')) return data.calendarConnection ? { read_enabled: 1, write_enabled: 0, version: 1 } : null;
           if (sql.includes('FROM google_calendar_connections')) return data.calendarConnection ?? null;
           return null;
         },
@@ -79,7 +88,7 @@ function stubDB(data: StubData): D1Database {
           if (sql.includes('booking_availability_exceptions')) {
             return { results: data.exceptions ?? [] };
           }
-          if (sql.includes('booking_resource_consumptions')) {
+          if (sql.includes('booking_slot_resources')) {
             return { results: data.resourceBookings ?? [] };
           }
           if (sql.includes('booking_menu_resources')) {
@@ -106,7 +115,7 @@ function stubDB(data: StubData): D1Database {
           if (sql.includes('FROM staff_breaks')) {
             return { results: data.breaks ?? [] };
           }
-          if (sql.includes('FROM bookings')) {
+          if (sql.includes('FROM booking_slot_allocations')) {
             return { results: data.bookings ?? [] };
           }
           return { results: [] };
@@ -290,7 +299,7 @@ describe('explainBookingSlot', () => {
 
   test('外部カレンダーの予定が重なる → google_busy（詳細は返さない）', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      calendars: { 'cal@example.com': { busy: [{ start: '2026-05-09T01:00:00Z', end: '2026-05-09T02:00:00Z' }] } },
+      items: [{ start: '2026-05-09T01:00:00Z', end: '2026-05-09T02:00:00Z' }].map((entry,index)=>({id:'external-'+index,start:{dateTime:entry.start},end:{dateTime:entry.end}})),
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
     try {
       const data: StubData = {
@@ -397,7 +406,7 @@ describe('explainBookingSlot', () => {
         starts_at: '2026-05-09T01:00:00Z', block_ends_at: '2026-05-09T02:00:00Z',
       }],
     };
-    // 店舗営業時間は businessHours 行が要る。stub では all() が空を返すため
+    // 店舗営業時間は businessHours 行が要る。stub では all が空を返すため
     // 店舗定員は無制限 → store_full にはならず other_booking になる。
     // （店舗定員の単体条件は availability.test.ts 側で担保済み）
     const result = await check(data, '10:00');
@@ -477,4 +486,18 @@ describe('explainBookingSlot', () => {
     expect(result.bookable).toBe(false);
     expect(new Set(result.reasons)).toEqual(new Set<SlotBlockReason>(['other_booking', 'outside_working']));
   });
+});
+
+test('GoogleがHTTP200でも予定一覧が欠けていたら予約不可を保つ', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ calendars: {
+    'cal@example.com': { errors: [{ domain: 'global', reason: 'internalError' }] },
+  } }), { status: 200 })));
+  try {
+    const data: StubData = { menu: MENU_BASIC, staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: DAY, start_time: '10:00', end_time: '13:00' }],
+      calendarConnection: { id: 'GC1', calendar_id: 'cal@example.com', auth_type: 'oauth', access_token: 'token' } };
+    expect(await actuallyBookable(data, '10:00')).toBe(false);
+    const availability = await getAvailability(stubDB(data), { lineAccountId: 'A1', menuId: 'M1', staffId: 'S1', from: DAY, to: DAY, now: NOW, minLeadTimeMinutes: 0 });
+    expect(availability).toMatchObject({calendar_sync: [expect.objectContaining({ configured: true, ok: false, error: 'unavailable' })]});
+  } finally { vi.unstubAllGlobals(); }
 });

@@ -22,13 +22,15 @@ describe('R117 個別操作の選択欄・入力欄に読み上げ名がある',
     for (const tag of shared) {
       expect(tag).toMatch(/aria-label="[^"]+"|aria-labelledby="[^"]+"/)
     }
-    for (const name of ['対応状況', 'テンプレート', 'シナリオ', 'タグ', 'リマインダ']) {
-      expect(SRC).toContain(`aria-label="${name}"`)
+    expect(SRC).toContain('aria-label="対応状況"')
+    // 作ってあるものは共通の選ぶ窓（EntityKindField）。label が欄の読み上げ名になる。
+    for (const name of ['テンプレート', 'シナリオ', 'タグ', 'リマインダ']) {
+      expect(SRC).toContain(`label="${name}"`)
     }
   })
 
   it('すべての input に読み上げ名がある', () => {
-    const inputs = SRC.match(/<input[^>]*>/g) ?? []
+    const inputs = SRC.match(/<(?:input|SharedTextField)\b[^>]*>/g) ?? []
     expect(inputs.length).toBeGreaterThan(0)
     for (const tag of inputs) {
       expect(tag).toMatch(/aria-label="[^"]+"|aria-labelledby="[^"]+"/)

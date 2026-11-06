@@ -1,6 +1,6 @@
-// GET /api/booking/admin/bookings.csv（台帳CSV #933 N-397）と
-// GET /api/booking/admin/requests の担当者・種別絞り込み（#933 N-398）、
-// /o の view=history 通過（#933 N-396）の route 試験。
+// GET /api/booking/admin/bookings.csv（台帳CSV）と
+// GET /api/booking/admin/requests の担当者・種別絞り込み、
+// /o の view=history 通過の route 試験。
 //
 // 実SQLite (bootstrap.sql) で動かし、絞り込み・CSV・権限の実挙動を見る。
 
@@ -11,7 +11,7 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const availabilityMocks = vi.hoisted(() => ({
   getAvailability: vi.fn(async () => ({ by_staff: [] })),
@@ -25,8 +25,8 @@ const notifierMocks = vi.hoisted(() => ({
   sendBookingNotification: vi.fn(async () => undefined),
 }));
 // 送る側だけ差し替える。文面の組み立て（時刻・残り時間）は本物を使う。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   ...notifierMocks,
 }));
 
@@ -246,6 +246,16 @@ describe('GET /api/booking/admin/bookings.csv (N-397)', () => {
 
   afterEach(() => sqlite.close());
 
+  test('日本時間の朝も台帳の書出し名は今日の日付', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-09-30T15:09:00Z'));
+    try {
+      const { app, env } = makeApp(db);
+      const res = await app.request('/api/booking/admin/bookings.csv?account_id=acc1&status=all', {}, env);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-disposition')).toBe('attachment; filename="booking-ledger-20261001-by-owner-1-20260930T150900000Z.csv"');
+    } finally { vi.useRealTimers(); }
+  });
+
   test('BOM付きCSV・注記行に絞り込みと上限を書く', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1', status: 'confirmed', source: 'liff' });
     insertBooking(sqlite, { id: 'B2', customer: 'customer-1', staff: 's2', menu: 'm2', status: 'completed', source: 'phone' });
@@ -256,7 +266,7 @@ describe('GET /api/booking/admin/bookings.csv (N-397)', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/csv');
     expect(res.headers.get('content-disposition')).toContain('attachment');
-    // BOM は text() が剥がすので、生バイトで確かめる（Excelが文字化けしない印）。
+    // BOM は text が剥がすので、生バイトで確かめる（Excelが文字化けしない印）。
     const bytes = new Uint8Array(await res.arrayBuffer());
     expect([bytes[0], bytes[1], bytes[2]]).toEqual([0xef, 0xbb, 0xbf]);
     const text = new TextDecoder().decode(bytes);
@@ -390,6 +400,20 @@ describe('GET /api/booking/admin/bookings.csv (N-397)', () => {
 });
 
 describe('GET /o の予約履歴URL通過 (N-396)', () => {
+  test.each([
+    ['page=visit-stamps&card=card-1', 'visit-stamps', 'card', 'card-1'],
+    ['page=visit-stamps', 'visit-stamps', 'card', null],
+    ['page=salon-book&menu_id=menu-1', 'salon-book', 'menu_id', 'menu-1'],
+    ['page=salon-book&menu_id=x%26admin%3D1', 'salon-book', 'menu_id', null],
+    ['page=event&card=card-1&menu_id=menu-1', 'event', 'card', null],
+  ])('選んだメニュー・カードを対象ページにだけ通す: %s', async (query, page, key, expected) => {
+    const res = await rootApp.request(`/o?liffId=1234-abcdef&${query}`, { headers: { 'user-agent': 'Mozilla/5.0 (Macintosh)' } }, { DB: {} } as never, execCtx);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    const target = new URL(decodeURIComponent(html.match(/\/api\/qr\?size=240x240&data=([^"&]+)/)![1]));
+    expect(target.searchParams.get('page')).toBe(page);
+    expect(target.searchParams.get(key)).toBe(expected);
+  });
   test('salon-book の view=history だけを LIFF 宛URLへ通す', async () => {
     // desktop UA でQRページを返す。QRの data パラメータに転送先が丸ごと入る。
     const res = await rootApp.request(

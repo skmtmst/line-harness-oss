@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useEffect, useId, useRef } from 'react'
 import styles from './pagination.module.css'
 
 export type PaginationItem = number | 'ellipsis'
+export type PaginationRange = { total: number | null | undefined; first: number; last: number; unit?: string }
 
 export type PaginationProps = {
   page: number
@@ -10,9 +11,27 @@ export type PaginationProps = {
   ariaLabel?: string
   disabled?: boolean
   className?: string
+  /**
+   * ★V8（jX2Uw）：帯の左端に出す件数の文。互換経路では帯の外に従来の件数
+   * 表示があるので、この中身は v8 のときだけ出る。
+   */
+  summary?: React.ReactNode
+  /** 件数の書き方は共通部品が持つ。画面からは数値と単位だけ渡す。 */
+  range?: PaginationRange
+  /** 予約台帳の枠内で、絵の広めの件数帯を描く。 */
+  spacing?: 'roomy' | 'restaurant'
+  /** カーソル式は前・現在・次だけ。任意の番号へは移動しない。 */
+  mode?: 'numbered' | 'cursor'
+  /**
+   * 渡された page が範囲の外（pageCount より大きい）なら、最後のページへ
+   * 戻す知らせ（onPageChange）を出す。絞り込み・削除で全体が縮んだ一覧用。
+   * 印のない呼び出しの動きは変えない。読み込み中（disabled）は出さない。
+   * 呼ぶ側は取得の成功後・確定したページ数のときだけ描くこと。
+   */
+  correctOutOfRange?: boolean
 }
 
-/** Pencil の5枠に収め、先頭・現在地・末尾を常に辿れる並びを返す。 */
+/** 7ページまでは全て表示し、多い場合も先頭・現在地・末尾を辿れる並びを返す。 */
 /**
  * ページ番号として使える数に直す。
  *
@@ -33,7 +52,7 @@ export function paginationItems(page: number, pageCount: number): PaginationItem
   const total = safePage(pageCount, 1)
   const current = Math.min(total, safePage(page, 1))
 
-  if (total <= 5) return Array.from({ length: total }, (_, index) => index + 1)
+  if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1)
   if (current <= 3) return [1, 2, 3, 'ellipsis', total]
   if (current >= total - 2) return [1, 'ellipsis', total - 2, total - 1, total]
   return [1, 'ellipsis', current, 'ellipsis', total]
@@ -47,19 +66,7 @@ function Ellipsis() {
   )
 }
 
-/**
- * Pencil V5/V6 の `Blot6` を正本にした共通ページネーション。
- * 見た目と省略規則は部品側に置き、呼び出し側は現在ページと変更処理だけを渡す。
- *
- * ## 送る先が無いときは描かない
- *
- * **1ページしか無い一覧に「前へ 1 次へ」を出さない。** 読み込み中や、
- * 1件も無いときにも出ていた。押せない口が並ぶと、運用者は
- * 「まだ何かあるのに出ていない」と読む。
- *
- * 画面ごとに `{pageCount > 1 && <Pagination …>}` と書くと、書き忘れた画面
- * だけ出たままになる（実際そうなっていた）。**部品の側で決める。**
- */
+/** 2ページ以上のときに移動操作を出し、1ページのときは件数だけ残す。 */
 export default function Pagination({
   page,
   pageCount,
@@ -67,26 +74,57 @@ export default function Pagination({
   ariaLabel = 'ページ送り',
   disabled = false,
   className,
+  summary,
+  range,
+  spacing,
+  mode = 'numbered',
+  correctOutOfRange = false,
 }: PaginationProps) {
+  const reasonId = useId()
   const total = safePage(pageCount, 1)
   const current = Math.min(total, safePage(page, 1))
-  const classes = [styles.pagination, className].filter(Boolean).join(' ')
 
-  // 送る先が1ページだけなら、そもそも出さない。
-  if (total <= 1) return null
+  const notifiedRef = useRef<number | null>(null)
+  useEffect(() => {
+    // 同じ行き先への知らせは1回だけ（StrictMode の二重実行でも重ねない）。
+    if (!correctOutOfRange || disabled || page <= total) {
+      notifiedRef.current = null
+      return
+    }
+    if (notifiedRef.current === total) return
+    notifiedRef.current = total
+    onPageChange(total)
+  }, [correctOutOfRange, disabled, page, total, onPageChange])
+  const classes = [styles.pagination, className].filter(Boolean).join(' ')
+  const pausedReason = disabled ? '現在、ページを移動できません。' : undefined
+  const previousReason = pausedReason ?? (current <= 1 ? '最初のページです。' : undefined)
+  const nextReason = pausedReason ?? (current >= total ? '最後のページです。' : undefined)
+
+  const summaryNode = range ? <span className={styles.summary} data-pagination-summary>{paginationSummary(range.total, range.first, range.last, range.unit)}</span>
+    : summary ? <span className={styles.summary}>{summary}</span> : null
+
+  if (!Number.isFinite(pageCount) || total <= 1) {
+    return summaryNode ? <div data-pagination className={classes} data-spacing={spacing}>{summaryNode}</div> : null
+  }
 
   return (
-    <nav aria-label={ariaLabel} className={classes}>
+    <nav aria-label={ariaLabel} data-pagination className={classes} data-spacing={spacing}>
+      {summaryNode}
       <button
         type="button"
         className={[styles.item, styles.control].join(' ')}
         onClick={() => onPageChange(current - 1)}
         disabled={disabled || current <= 1}
         aria-label="前のページ"
+        title={previousReason}
+        aria-describedby={previousReason ? `${reasonId}-previous` : undefined}
       >
-        前へ
+        <span className={styles.controlLabel}>前へ</span>
+        <span className={styles.controlGlyph} aria-hidden="true">
+          ‹
+        </span>
       </button>
-      {paginationItems(current, total).map((item, index) =>
+      {mode === 'cursor' ? <span className={[styles.item, styles.page, styles.current].join(' ')} aria-current="page" aria-label={`${current}ページ目`}>{current}</span> : paginationItems(current, total).map((item, index) =>
         item === 'ellipsis' ? (
           <Ellipsis key={`ellipsis-${index}`} />
         ) : (
@@ -98,6 +136,8 @@ export default function Pagination({
               .join(' ')}
             onClick={() => onPageChange(item)}
             disabled={disabled}
+            title={pausedReason}
+            aria-describedby={pausedReason ? `${reasonId}-paused` : undefined}
             aria-label={`${item}ページ目へ`}
             aria-current={item === current ? 'page' : undefined}
           >
@@ -111,9 +151,40 @@ export default function Pagination({
         onClick={() => onPageChange(current + 1)}
         disabled={disabled || current >= total}
         aria-label="次のページ"
+        title={nextReason}
+        aria-describedby={nextReason ? `${reasonId}-next` : undefined}
       >
-        次へ
+        <span className={styles.controlLabel}>次へ</span>
+        <span className={styles.controlGlyph} aria-hidden="true">
+          ›
+        </span>
       </button>
+      {previousReason ? <span id={`${reasonId}-previous`} hidden>{previousReason}</span> : null}
+      {nextReason ? <span id={`${reasonId}-next`} hidden>{nextReason}</span> : null}
+      {pausedReason ? <span id={`${reasonId}-paused`} hidden>{pausedReason}</span> : null}
     </nav>
   )
+}
+
+/** 固定版jX2Uwの件数。人数の一覧も同じ配置で単位だけ渡す。 */
+export function paginationSummary(total: number | null | undefined, from: number, to: number, unit = '件'): string {
+  if (total === 0) return `0${unit}`
+  const count = total != null && Number.isFinite(total) ? total.toLocaleString('ja-JP') : '—'
+  const first = to > 0 ? from : 0
+  return `${count}${unit}中 ${first.toLocaleString('ja-JP')}〜${to.toLocaleString('ja-JP')}${unit}`
+}
+
+/** APIのカーソル移動を保ち、共通のページ送りと同じ件数・形を出す。 */
+export function CursorPagination({ page, pageSize, shown, total, hasNext, onPrevious, onNext, disabled = false, ariaLabel = 'ページ送り' }: {
+  page: number; pageSize: number; shown: number; total: number | null | undefined; hasNext: boolean
+  onPrevious: () => void; onNext: () => void; disabled?: boolean; ariaLabel?: string
+}) {
+  const current = safePage(page, 1)
+  const start = shown > 0 ? (current - 1) * pageSize + 1 : 0
+  const end = shown > 0 ? start + shown - 1 : 0
+  const pages = total != null && Number.isFinite(total) && total >= 0 && Number.isFinite(pageSize) && pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : null
+  const summary = <>{paginationSummary(total, start, end)}{pages !== null && pages > 1 ? `（全${pages.toLocaleString('ja-JP')}ページ）` : ''}</>
+  return <Pagination mode="cursor" page={current} pageCount={current + (hasNext ? 1 : 0)} disabled={disabled} ariaLabel={ariaLabel}
+    summary={summary}
+    onPageChange={(next) => { if (next < current) onPrevious(); else if (next > current) onNext() }} />
 }

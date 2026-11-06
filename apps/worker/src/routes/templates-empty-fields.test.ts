@@ -1,5 +1,5 @@
 /*
- * N-146: 口を直接叩かれても、空の名前・空の本文・空の種別で
+ * 口を直接叩かれても、空の名前・空の本文・空の種別で
  * テンプレートを作ったり書き換えたりさせない。
  *
  * 画面側は保存前に止めているが、PUT /api/templates/:id は部分更新を
@@ -9,7 +9,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const mocks = {
   getTemplatesWithUsageCount: vi.fn(),

@@ -1,3 +1,4 @@
+import { formatDay } from '@/lib/format'
 type TimeInterval = { start: string; end: string }
 type BusinessHoursDay = { weekday: number; intervals: TimeInterval[] }
 
@@ -50,11 +51,7 @@ export function bookingWindowEnd(days: number, now = new Date()): string {
   // (a): 受付期間の終わりの日は判定（空き計算の最終日＝今日＋日数）と同じにする。
   // 1を引くと表示だけ1日短くなり、判定で取れる最終日と食い違う。
   date.setDate(date.getDate() + Math.max(0, days))
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    timeZone: 'Asia/Tokyo',
-  }).format(date)
+  return formatDay(date)
 }
 
 /**

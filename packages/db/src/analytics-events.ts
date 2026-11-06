@@ -32,6 +32,7 @@ const DIMENSION_KEYS: Partial<Record<AnalyticsEventType, readonly string[]>> = {
   'ec.subscription.card_updated': ['status'],
   'ec.subscription.cancelled': ['status'],
   'ec.customer.profile_updated': ['status'],
+  'ec.site.publication_viewed': ['status'],
 };
 
 export interface AnalyticsEvent {

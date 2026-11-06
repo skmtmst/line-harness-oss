@@ -1,4 +1,4 @@
-/* N-175 直接試験: 実route＋実SQLite。folderId条件をサーバーで絞ること。 */
+/*  直接試験: 実route＋実SQLite。folderId条件をサーバーで絞ること。 */
 import { Hono } from 'hono';
 import { expect, test } from 'vitest';
 
@@ -10,7 +10,7 @@ const { DEFAULT_TENANT_ID } = await import('@line-crm/shared');
 const TENANT_B = 'tenant-B';
 
 function setup() {
-  const t = createTestD1();
+  const t = createTestD1({ loginPolicy: 'off' });
   const raw = t.raw;
   raw.prepare('INSERT OR IGNORE INTO tenants (id, name) VALUES (?, ?), (?, ?)')
     .run(DEFAULT_TENANT_ID, '既定', TENANT_B, '支社');

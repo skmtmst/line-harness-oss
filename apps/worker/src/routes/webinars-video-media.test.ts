@@ -1,18 +1,7 @@
-/*
- * N-115: ウェビナー動画の指定を R2 prefix 自由入力からメディア選択へ変える。
- *
- * 実SQLite（bootstrap.sql を流した better-sqlite3）に実物の webinars
- * ルートを当て、認証も実物（Bearer APIキー → staff_members → 役割・
- * account境界）で通す。R2 へは触れない（参照はキー文字列だけ）。
- *
- * 直す前: PUT/POST は videoPrefix の文字列をそのまま保存し、実在しない
- * prefix や別アカウントの領域も通った。直す後: videoMediaId で
- * メディアを選ぶと同じアカウントの kind='video' だけが受理され、
- * 保存値 video_prefix はそのメディアの r2_key から生成される。
- */
+/** 動画指定は自由な R2 prefix を受け付けず、同じアカウントの kind=video の登録メディアからキーを解決する。実 route・認証・SQLite で検証し、R2 自体へは触れない。 */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
@@ -91,7 +80,7 @@ function put(webinarId: string, apiKey: string | null, body: Record<string, unkn
       'Content-Type': 'application/json',
       ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ expectedVersion: (sqlite.raw.prepare('SELECT version FROM webinar_editor_settings WHERE webinar_id = ?').get(webinarId) as {version:number} | undefined)?.version ?? 0, ...body }),
   }, env());
 }
 
@@ -117,7 +106,7 @@ function savedPrefix(webinarId: string): string | null {
 }
 
 beforeEach(async () => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed(sqlite.raw);
   ({ webinarRoutes } = await import('./webinars.js'));
 });
@@ -139,21 +128,21 @@ describe('ウェビナー動画のメディア選択 (N-115)', () => {
   test('動画でないメディアは拒否する', async () => {
     const res = await put(WEBINAR_A, KEY_OWNER, { videoMediaId: MEDIA_IMAGE_A });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toBe('video_media_not_video');
+    expect((await res.json() as { error: string; code: string }).code).toBe('video_media_not_video');
     expect(savedPrefix(WEBINAR_A)).toBeNull();
   });
 
   test('別アカウントのメディアは選べない', async () => {
     const res = await put(WEBINAR_A, KEY_OWNER, { videoMediaId: MEDIA_VIDEO_B });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toBe('video_media_not_found');
+    expect((await res.json() as { error: string; code: string }).code).toBe('video_media_not_found');
     expect(savedPrefix(WEBINAR_A)).toBeNull();
   });
 
   test('存在しないメディアIDは拒否する', async () => {
     const res = await put(WEBINAR_A, KEY_OWNER, { videoMediaId: 'missing-media' });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toBe('video_media_not_found');
+    expect((await res.json() as { error: string; code: string }).code).toBe('video_media_not_found');
   });
 
   test('videoMediaIdとvideoPrefixの同時指定は拒否する', async () => {
@@ -162,7 +151,7 @@ describe('ウェビナー動画のメディア選択 (N-115)', () => {
       videoPrefix: 'hand-written/prefix',
     });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toBe('ambiguous_video_source');
+    expect((await res.json() as { error: string; code: string }).code).toBe('ambiguous_video_source');
     expect(savedPrefix(WEBINAR_A)).toBeNull();
   });
 

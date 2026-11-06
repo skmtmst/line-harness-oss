@@ -4,7 +4,7 @@
  *
  * 見るのは3点:
  *   - 押すと表示文字列ではなく渡された全文がクリップボードへ入る
- *   - 成功するとボタンが「コピー済み」へ変わり、一定時間で元に戻る
+ *   - 成功するとボタンが「コピーしました」へ変わり、一定時間で元に戻る
  *   - clipboard API が失敗する環境では、全文を選んでコピーできる
  *     読み取り専用の欄と一言を出す（省略表示のままでは取り出せないため）
  */
@@ -29,28 +29,28 @@ afterEach(() => {
   cleanup()
 })
 
-describe('CopyTextButton', () => {
-  it('押すと全文をクリップボードへ書き、「コピー済み」へ変わる', async () => {
+describe.each(['text', 'primary', 'secondary', 'inline'] as const)('CopyTextButton (%s)', (variant) => {
+  it('押すと全文をクリップボードへ書き、「コピーしました」へ変わる', async () => {
     const writeText = stubClipboard(async () => undefined)
-    render(<CopyTextButton value="{{var.open_hours}}" aria-label="営業時間の差し込みキーをコピー" />)
+    render(<CopyTextButton variant={variant === 'inline' ? 'text' : variant} size={variant === 'inline' ? 'inline' : undefined} value="{{var.open_hours}}" aria-label="営業時間の差し込みキーをコピー" />)
 
     const button = screen.getByRole('button', { name: '営業時間の差し込みキーをコピー' })
     await act(async () => { fireEvent.click(button) })
 
     expect(writeText).toHaveBeenCalledWith('{{var.open_hours}}')
-    expect(button.textContent).toBe('コピー済み')
+    expect(button.textContent).toBe('コピーしました')
     expect(button.title).toBe('コピーしました')
   })
 
-  it('「コピー済み」は一定時間で「コピー」へ戻る', async () => {
+  it('「コピーしました」は一定時間で「コピー」へ戻る', async () => {
     vi.useFakeTimers()
     try {
       stubClipboard(async () => undefined)
-      render(<CopyTextButton value="abc" aria-label="値をコピー" />)
+      render(<CopyTextButton variant={variant === 'inline' ? 'text' : variant} size={variant === 'inline' ? 'inline' : undefined} value="abc" aria-label="値をコピー" />)
 
       const button = screen.getByRole('button', { name: '値をコピー' })
       await act(async () => { fireEvent.click(button) })
-      expect(button.textContent).toBe('コピー済み')
+      expect(button.textContent).toBe('コピーしました')
 
       await act(async () => { vi.advanceTimersByTime(1600) })
       expect(button.textContent).toBe('コピー')
@@ -61,7 +61,7 @@ describe('CopyTextButton', () => {
 
   it('コピーできない環境では全文を選べる欄と一言を出す', async () => {
     stubClipboard(async () => { throw new Error('denied') })
-    render(<CopyTextButton value="{{var.very_long_key_name}}" aria-label="キーをコピー" />)
+    render(<CopyTextButton variant={variant === 'inline' ? 'text' : variant} size={variant === 'inline' ? 'inline' : undefined} value="{{var.very_long_key_name}}" aria-label="キーをコピー" />)
 
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'キーをコピー' })) })
 

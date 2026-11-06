@@ -10,6 +10,7 @@
  *     「そのまま見せる／伏せて見せる／見せない」の例外表記になる
  *   - 選んだ段階は aria-pressed と permissionScope の保存値に一致する
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -20,17 +21,18 @@ const fixture = vi.hoisted(() => ({
   updateStaff: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams('tab=members'),
 }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => <nav aria-label="ログインユーザーのタブ" />,
   useMergedTab: () => 'members',
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -64,11 +66,13 @@ const state = {
   ],
 }
 
-vi.mock('@/lib/api', () => {
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
   class ApiError extends Error {}
   return {
+    ...actual,
     ApiError,
-    fetchApi: vi.fn(),
+    fetchApi: vi.fn().mockResolvedValue({ success: true, data: [] }),
     api: {
       staff: {
         list: async () => ({ success: true, data: state.members }),
@@ -102,17 +106,17 @@ const { default: StaffPage } = await import('./page')
 
 /* [機能名, edit の説明, view の説明, none の説明] の期待表。SCOPE_ROWS の正本と同じ順。 */
 const EXPECTED_ROWS = [
-  ['友だち', '追加・変更できる', '見るだけ', '見せない'],
+  ['友だち', '追加・変更できる', '閲覧のみ', '見せない'],
   ['個人情報', 'すべて表示', '一部を伏せて表示', '見せない'],
-  ['配信', '作成・配信できる', '見るだけ', '見せない'],
-  ['受信箱', '返信できる', '見るだけ', '見せない'],
-  ['予約', '受付・変更できる', '見るだけ', '見せない'],
-  ['予約メニュー', '変更できる', '見るだけ', '見せない'],
-  ['予約設定', '変更できる', '見るだけ', '見せない'],
-  ['本人の勤務', '変更できる', '見るだけ', '見せない'],
-  ['分析', '承認・変更できる', '見るだけ', '見せない'],
-  ['設定', '変更できる', '見るだけ', '見せない'],
-  ['運用状態', '操作できる', '見るだけ', '見せない'],
+  ['配信', '作成・配信できる', '閲覧のみ', '見せない'],
+  ['受信箱', '返信できる', '閲覧のみ', '見せない'],
+  ['予約', '受付・変更できる', '閲覧のみ', '見せない'],
+  ['予約メニュー', '変更できる', '閲覧のみ', '見せない'],
+  ['予約設定', '変更できる', '閲覧のみ', '見せない'],
+  ['本人の勤務', '変更できる', '閲覧のみ', '見せない'],
+  ['分析', '承認・変更できる', '閲覧のみ', '見せない'],
+  ['設定', '変更できる', '閲覧のみ', '見せない'],
+  ['運用状態', '操作できる', '閲覧のみ', '見せない'],
 ] as const
 
 const STANDARD_LEVEL_LABELS = ['変えられる', '見えるだけ', '出さない'] as const
@@ -129,8 +133,8 @@ function scopeGroup(label: string): HTMLElement {
 
 async function openPermissionView() {
   await act(async () => { render(<StaffPage />) })
-  await waitFor(() => expect(screen.getByText('対象者')).toBeTruthy())
-  fireEvent.click(within(screen.getByText('対象者').closest('tr') as HTMLTableRowElement).getByRole('button', { name: '中身を見る' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '対象者の中身を見る' })).toBeTruthy())
+  fireEvent.click(within(screen.getByRole('button', { name: '対象者の中身を見る' }).closest('[role="row"]') as HTMLElement).getByRole('button', { name: /の中身を見る$/ }))
   await waitFor(() => expect(screen.getByText('項目ごとに決める')).toBeTruthy())
 }
 
@@ -167,10 +171,10 @@ describe('「項目ごとに決める」の説明文と読み上げ名 (STAFF-01
 
     // 監査で指摘された組み合わせ: 配信の閲覧に「作成・配信」、受信箱に「返信できる」、
     // 予約に「変更できる」、分析・運用状態の非表示に「見られる」と出していた。
-    expect(within(scopeGroup('配信')).getByRole('button', { name: '配信：見えるだけ（見るだけ）' })).toBeTruthy()
+    expect(within(scopeGroup('配信')).getByRole('button', { name: '配信：見えるだけ（閲覧のみ）' })).toBeTruthy()
     expect(within(scopeGroup('配信')).queryByRole('button', { name: /配信.*見えるだけ.*作成/ })).toBeNull()
-    expect(within(scopeGroup('受信箱')).getByRole('button', { name: '受信箱：見えるだけ（見るだけ）' })).toBeTruthy()
-    expect(within(scopeGroup('予約')).getByRole('button', { name: '予約：見えるだけ（見るだけ）' })).toBeTruthy()
+    expect(within(scopeGroup('受信箱')).getByRole('button', { name: '受信箱：見えるだけ（閲覧のみ）' })).toBeTruthy()
+    expect(within(scopeGroup('予約')).getByRole('button', { name: '予約：見えるだけ（閲覧のみ）' })).toBeTruthy()
     expect(within(scopeGroup('分析')).getByRole('button', { name: '分析：出さない（見せない）' })).toBeTruthy()
     expect(within(scopeGroup('運用状態')).getByRole('button', { name: '運用状態：出さない（見せない）' })).toBeTruthy()
   })
@@ -192,7 +196,7 @@ describe('「項目ごとに決める」の説明文と読み上げ名 (STAFF-01
     await openPermissionView()
 
     // 「運用」プリセットで配信は edit。閲覧へ変えると view として保存される。
-    fireEvent.click(screen.getByRole('button', { name: '配信：見えるだけ（見るだけ）' }))
+    fireEvent.click(screen.getByRole('button', { name: '配信：見えるだけ（閲覧のみ）' }))
     fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledTimes(1))
@@ -200,3 +204,6 @@ describe('「項目ごとに決める」の説明文と読み上げ名 (STAFF-01
     expect(payload.permissionScope?.delivery).toBe('view')
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

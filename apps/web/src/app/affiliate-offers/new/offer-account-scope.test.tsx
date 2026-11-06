@@ -1,9 +1,12 @@
+import { screen } from '@testing-library/react'
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * N-211: 案件作成で選ぶタグ・シナリオが選択accountで絞られることを、
  * 本物のReactで動かして見る。一覧取得のURLに選択accountが付くこと。
  */
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -29,6 +32,7 @@ function stubFetch() {
   vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
     fetchUrls.push(String(url).split('?')[0] + '?' + String(url).split('?').slice(1).join('?'))
     const text = String(url)
+      if (text.includes('/api/tag-groups') || text.includes('/api/folders')) return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
     if (text.includes('/api/tags')) {
       return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
     }
@@ -47,6 +51,7 @@ async function settle(milliseconds: number) {
 
 describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
   beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
     stubFetch()
     host = document.createElement('div')
     document.body.appendChild(host)
@@ -76,16 +81,17 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
   })
 
   /*
-   * R193: 保管済みタグ・停止中シナリオは成果承認時に実行できない。
+   * R193: アーカイブタグ・停止中シナリオは成果承認時に実行できない。
    * 作成画面の候補から外す（案件編集モーダルの #798 と同じ決まり）。
    */
-  it('保管済みタグと停止中シナリオは候補に出さない', async () => {
+  it('アーカイブタグと停止中シナリオは候補に出さない', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
       const text = String(url)
+      if (text.includes('/api/tag-groups') || text.includes('/api/folders')) return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
       if (text.includes('/api/tags')) {
         return { ok: true, status: 200, json: async () => ({ success: true, data: [
           { id: 't1', name: '有効タグ', lineAccountId: 'acc-1', status: 'active' },
-          { id: 't2', name: '保管済みタグ', lineAccountId: 'acc-1', status: 'archived' },
+          { id: 't2', name: 'アーカイブタグ', lineAccountId: 'acc-1', status: 'archived' },
         ] }) }
       }
       if (text.includes('/api/scenarios')) {
@@ -102,24 +108,27 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
     await settle(100)
 
     const optionLabels = async (buttonId: string) => {
-      const button = host.querySelector<HTMLButtonElement>(`#${buttonId}`)
-      expect(button).toBeTruthy()
-      await act(async () => { button!.click() })
-      // 選択肢は最上層（portal）に出るので document 側を見る。
-      const labels = [...document.querySelectorAll('[role="option"]')]
-        .map((el) => el.textContent ?? '')
+      const switchName = buttonId === 'of-tag' ? 'タグを付ける' : 'シナリオ配信を始める'
+  await act(async () => { screen.getByRole('button', { name: '行うことを足す' }).click() })
+  await act(async () => { screen.getByRole('menuitem', { name: switchName }).click() })
+      const labels = [...document.querySelectorAll('[role="dialog"] input[type="radio"], [role="dialog"] input[type="checkbox"]')]
+        .map((el) => el.getAttribute('aria-label') ?? '')
       return labels
     }
 
     const tagLabels = await optionLabels('of-tag')
     expect(tagLabels.some((text) => text.includes('有効タグ'))).toBe(true)
-    expect(tagLabels.some((text) => text.includes('保管済みタグ'))).toBe(false)
+    expect(tagLabels.some((text) => text.includes('アーカイブタグ'))).toBe(false)
 
     // 開いているメニューを閉じてからシナリオ側を開く。
     await act(async () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     })
-    const scenarioLabels = await optionLabels('of-scenario')
+    // シナリオは選ぶ窓。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
+    await act(async () => { screen.getByRole('button', { name: '行うことを足す' }).click() })
+    await act(async () => { screen.getByRole('menuitem', { name: 'シナリオ配信を始める' }).click() })
+    const scenarioLabels = [...document.querySelectorAll('[role="dialog"] input[type="radio"], [role="dialog"] input[type="checkbox"]')]
+      .map((el) => el.getAttribute('aria-label') ?? '')
     expect(scenarioLabels.some((text) => text.includes('有効シナリオ'))).toBe(true)
     expect(scenarioLabels.some((text) => text.includes('停止シナリオ'))).toBe(false)
   })

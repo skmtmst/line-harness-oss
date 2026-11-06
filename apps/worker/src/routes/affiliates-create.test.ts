@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Route-level test for POST /api/affiliates (admin-side create). The db layer is
-// mocked — the real collision-retry / UNIQUE behaviour is covered against SQLite
-// in packages/db/test. Here we assert the route wires body → db calls, defaults,
-// link issuance, and error mapping (404 / 409 / 400).
+// 実 SQL の一意制約と再試行は DB 側で試す。ここでは入力・既定値・リンク発行・404/409/400の変換を確かめる。
 const dbMocks = {
-  // eager module-load deps (mirror other route tests)
+
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
   getAccountSetting: vi.fn().mockResolvedValue(null),
@@ -13,10 +10,11 @@ const dbMocks = {
     version: 1,
     data: { features: { affiliates: true } },
   }),
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
-  // affiliates route deps
+
   getAffiliates: vi.fn(),
   getAffiliateById: vi.fn(),
   getAffiliateByCode: vi.fn(),
@@ -113,7 +111,7 @@ beforeEach(() => {
   dbMocks.getLineAccounts.mockResolvedValue([
     { id: ACCOUNT_ID, tenant_id: TENANT_ID },
   ]);
-  dbMocks.getLinkBaseUrl.mockResolvedValue(null); // fall back to WORKER_URL/r
+  dbMocks.getLinkBaseUrl.mockResolvedValue(null); // 設定がなければ WORKER_URL/r を使う。
 });
 
 describe('POST /api/affiliates — random-code create', () => {
@@ -137,7 +135,7 @@ describe('POST /api/affiliates — random-code create', () => {
     };
     expect(body.success).toBe(true);
     expect(body.data.code).toBe('Ab3xYz');
-    // No friendId + no explicit issueInitialLink → no link issued by default.
+    // 友だち指定も明示的な初期リンク発行もなければ、既定では発行しない。
     expect(body.link).toBeNull();
     expect(dbMocks.createAffiliateWithRandomCode).toHaveBeenCalledWith(env.DB, {
       tenantId: TENANT_ID,
@@ -146,7 +144,7 @@ describe('POST /api/affiliates — random-code create', () => {
       commissionRate: 10,
       friendId: null,
     });
-    // createAffiliate (legacy explicit path) must not be touched.
+    // 旧形式の明示的な作成関数は呼ばない。
     expect(dbMocks.createAffiliate).not.toHaveBeenCalled();
   });
 });
@@ -184,9 +182,9 @@ describe('POST /api/affiliates — friend binding', () => {
       link: { refCode: string; url: string };
     };
     expect(body.success).toBe(true);
-    expect(body.data.name).toBe('Bob'); // from friend.display_name
+    expect(body.data.name).toBe('Bob');
     expect(body.data.friendId).toBe('friend-1');
-    // Link issued by default when friendId is present.
+    // 友だち指定があれば初期リンクを既定で発行する。
     expect(body.link.refCode).toBe('Ef5tSr');
     expect(body.link.url).toBe('https://worker.example.com/r/Ef5tSr');
     expect(dbMocks.createAffiliateWithRandomCode).toHaveBeenCalledWith(env.DB, {
@@ -222,9 +220,9 @@ describe('POST /api/affiliates — friend binding', () => {
 
     const res = await post('/api/affiliates', { friendId: 'friend-1' });
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { success: boolean; error: string };
+    const body = (await res.json()) as { success: boolean; error: { code: string; message: string } };
     expect(body.success).toBe(false);
-    expect(body.error).toBe('この友だちは既にアフィリエイターです');
+    expect(body.error.message).toBe('この友だちは既にアフィリエイターです');
   });
 });
 
@@ -262,8 +260,8 @@ describe('POST /api/affiliates — legacy explicit code (back-compat)', () => {
     dbMocks.createAffiliate.mockRejectedValue(UNIQUE_CODE_ERR);
     const res = await post('/api/affiliates', { name: 'Dup', code: 'takenCode' });
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe('このコードは既に使われています');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toBe('このコードは既に使われています');
   });
 });
 
@@ -339,14 +337,21 @@ describe('GET /api/affiliates/:id/links — offer_name enrichment', () => {
 });
 
 describe('紹介者APIの所属境界', () => {
-  it('一覧取得へテナントとLINEアカウントの範囲を渡す', async () => {
+  it('複数の店を見られても選んだ店だけを取得し、未割当も含めない', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([{ id: ACCOUNT_ID, tenant_id: TENANT_ID }, { id: 'account-2', tenant_id: TENANT_ID }]);
     dbMocks.getAffiliates.mockResolvedValue([]);
     expect((await get('/api/affiliates')).status).toBe(200);
     expect(dbMocks.getAffiliates).toHaveBeenCalledWith(env.DB, {
       tenantId: TENANT_ID,
       allowedLineAccountIds: [ACCOUNT_ID],
-      includeUnassigned: true,
+      includeUnassigned: false,
     });
+  });
+
+  it('選択なしでは一覧を読み出さない', async () => {
+    const response = await worker.fetch(new Request('https://worker.example.com/api/affiliates', { headers: { Authorization: `Bearer ${API_KEY}` } }), env, { waitUntil() {} } as unknown as ExecutionContext);
+    expect(response.status).toBe(400);
+    expect(dbMocks.getAffiliates).not.toHaveBeenCalled();
   });
 
   it('所属外IDは詳細・更新・停止・関連情報の全てで404にする', async () => {
@@ -368,6 +373,7 @@ describe('紹介者APIの所属境界', () => {
         tenantId: TENANT_ID,
         allowedLineAccountIds: [ACCOUNT_ID],
       }),
+      undefined,
     );
     expect(dbMocks.getAffiliateReportV2).not.toHaveBeenCalled();
     expect(dbMocks.getAffiliateJourneys).not.toHaveBeenCalled();
@@ -386,6 +392,49 @@ describe('紹介者APIの所属境界', () => {
   });
 });
 
+describe('紹介者の比較付き保存', () => {
+  const expected = {
+    name: 'Alice', rewardMode: 'fixed', commissionRate: 0, isActive: true,
+    email: null, holdDays: null, payoutCycle: null, notifyOnConversion: false,
+  };
+
+  it('画面が読んだ値をDBの比較条件へ渡し、保存結果を返す', async () => {
+    dbMocks.updateAffiliate.mockResolvedValue({ id: 'aff-1', name: '更新後', code: 'code1', commission_rate: 0, is_active: 1 });
+    const res = await put('/api/affiliates/aff-1', { name: '更新後', expected });
+    expect(res.status).toBe(200);
+    expect(dbMocks.updateAffiliate).toHaveBeenCalledWith(env.DB, 'aff-1', expect.objectContaining({ name: '更新後' }), expect.objectContaining({ tenantId: TENANT_ID }), {
+      name: 'Alice', reward_mode: 'fixed', commission_rate: 0, is_active: 1,
+      email: null, hold_days: null, payout_cycle: null, notify_on_conversion: 0,
+    });
+    expect(await res.json()).toMatchObject({ success: true, data: { name: '更新後' } });
+  });
+
+  it('同時保存の失敗をVERSION_CONFLICTの409にする', async () => {
+    dbMocks.updateAffiliate.mockRejectedValueOnce(new Error('AFFILIATE_VERSION_CONFLICT'));
+    const res = await put('/api/affiliates/aff-1', { name: '更新後', expected });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ success: false, error: { code: 'VERSION_CONFLICT' } });
+  });
+
+  it.each([null, [], {}, { ...expected, rewardMode: ['fixed'] }, { ...expected, rewardMode: { toString: 'fixed' } }, { ...expected, isActive: 1 }, { ...expected, email: 1 }, { ...expected, commissionRate: null }, { ...expected, holdDays: '7' }])('不正な比較条件 %j は保存前に400にする', async value => {
+    expect((await put('/api/affiliates/aff-1', { name: '更新後', expected: value })).status).toBe(400);
+    expect(dbMocks.updateAffiliate).not.toHaveBeenCalled();
+  });
+
+  it('比較なしの既存入力は比較を要求しない', async () => {
+    dbMocks.updateAffiliate.mockResolvedValue({ id: 'aff-1', name: '従来', commission_rate: 0, is_active: 0 });
+    expect((await put('/api/affiliates/aff-1', { isActive: false })).status).toBe(200);
+    expect(dbMocks.updateAffiliate.mock.calls[0][4]).toBeUndefined();
+  });
+
+  it('過去の承認額が不明な409は版の競合と区別する', async () => {
+    dbMocks.updateAffiliate.mockRejectedValueOnce(new Error('APPROVED_REWARD_SNAPSHOT_MISSING'));
+    const res = await put('/api/affiliates/aff-1', { rewardMode: 'none', expected });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: { code: 'APPROVED_REWARD_SNAPSHOT_MISSING' } });
+  });
+});
+
 describe('紹介者の停止と履歴保持', () => {
   it('DELETEでは物理削除せず、停止操作を案内する', async () => {
     dbMocks.getAffiliateById.mockResolvedValue({
@@ -393,9 +442,9 @@ describe('紹介者の停止と履歴保持', () => {
     });
     const res = await remove('/api/affiliates/aff-1');
     expect(res.status).toBe(405);
-    const body = (await res.json()) as { code: string; error: string };
-    expect(body.code).toBe('PHYSICAL_DELETE_DISABLED');
-    expect(body.error).toContain('紹介を止める操作');
+    const body = (await res.json()) as { code: string; error: { code: string; message: string } };
+    expect(body.error.code).toBe('PHYSICAL_DELETE_DISABLED');
+    expect(body.error.message).toContain('紹介を止める操作');
     expect(dbMocks.deleteAffiliate).not.toHaveBeenCalled();
   });
 
@@ -419,8 +468,8 @@ describe('報酬率の範囲検査（#554 点検#505中2）', () => {
   it.each([101, 1000, -1, Number.NaN, 'high'])('commissionRate=%s の作成を400で弾く', async (rate) => {
     const res = await post('/api/affiliates', { name: 'Alice', commissionRate: rate });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('0から100');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toContain('0から100');
     expect(dbMocks.createAffiliateWithRandomCode).not.toHaveBeenCalled();
     expect(dbMocks.createAffiliate).not.toHaveBeenCalled();
   });

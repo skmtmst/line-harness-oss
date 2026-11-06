@@ -1,11 +1,11 @@
 /**
- * 監査 R359・R360・R52追加の再現試験（m22u 追加分）。
+ * マイルの取消・期限切れ・失効設定の試験。
  *
- * - R359: 成果のマイルを取り消しても、交換用の付与内訳に使用可能なまま残る
- * - R360: 期限切れマイルが利用可能残高に含まれ、交換すると内訳エラーになる
- * - R52追加: 1日で失効の設定が付与処理に届かない
+ * - 成果のマイルを取り消したら、交換用の付与内訳も使えなくなる
+ * - 期限切れマイルは利用可能残高に含めない（含めると交換で内訳エラーになる）
+ * - 1日で失効の設定が付与処理に届く
  *
- * すべて「直す前は落ち・直した後は通る」ことを意図した恒久試験。
+ * 守りを外すと落ちる形にしてある。
  */
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
@@ -19,11 +19,11 @@ import {
   postMileageEntry,
   processPendingMileageEvents,
   syncAffiliateConversionMileage,
-} from '../src/mileage.js';
+} from '../src/mileage/index.js';
 import {
   publishMileageEarningRule,
   saveMileageEarningRuleDraft,
-} from '../src/mileage-admin-v6.js';
+} from '../src/mileage/admin-operations.js';
 import {
   MileageRewardError,
   createMileageRewardDraft,
@@ -31,7 +31,7 @@ import {
   publishMileageReward,
   refundMileageRewardRedemption,
   reserveMileageRewardRedemption,
-} from '../src/mileage-rewards.js';
+} from '../src/mileage/rewards.js';
 import { asD1 } from './d1-test-helper.js';
 
 const TENANT_ID = '00000000-0000-4000-8000-000000000001';
@@ -76,8 +76,10 @@ function lotOf(ledgerId: string) {
 }
 
 function grantLedgerIds(): string[] {
+  // 同一ミリ秒の作成で created_at が並ぶと id（乱数）の順で裏返るため、
+  // 投入順そのものの rowid で割る（付与の生成順＝この試験の前提）。
   return (sqlite.prepare(
-    `SELECT id FROM mileage_ledger WHERE entry_type = 'grant' AND status = 'available' ORDER BY created_at, id`,
+    `SELECT id FROM mileage_ledger WHERE entry_type = 'grant' AND status = 'available' ORDER BY created_at, rowid`,
   ).all() as Array<{ id: string }>).map((row) => row.id);
 }
 
@@ -250,4 +252,26 @@ describe('R52追加 失効日数の付与への反映', () => {
     expect(grants.length).toBe(1);
     expect(grants[0]!.lot_expires).toBe(expectedExpiry);
   });
+  it('PKG57: ルールの取消は付与内訳を閉じ、期限後も残高を二度減らさない', async () => {
+    const rule = await createMileageRule(db,{name:'予約',eventType:'booking_confirmed',source:'booking',amount:100,initialStatus:'available',lineAccountId:'account-1'});
+    const draft = await saveMileageEarningRuleDraft(db,{ruleId:rule.id,lineAccountId:'account-1',expectedVersion:null,draft:{name:'予約',eventType:'booking_confirmed',source:'booking',amount:100,initialStatus:'available',validFrom:null,validUntil:null,expiresAfterDays:1,cancellationEventTypes:['booking_cancelled'],targetConditions:null,sortOrder:0,notification:{enabled:false,messageTemplate:''}}});
+    await publishMileageEarningRule(db,{ruleId:rule.id,lineAccountId:'account-1',expectedVersion:draft.version,idempotencyKey:'publish-cancel'});
+    const occurredAt = new Date().toISOString();
+    await applyMileageRulesForEvent(db,{friendId:'friend-1',eventType:'booking_confirmed',source:'booking',sourceEventId:'booking-cancel',occurredAt});
+    await processPendingMileageEvents(db,{});
+    const id=grantLedgerIds()[0];
+    expect(lotOf(id)).toMatchObject({remaining_amount:100,status:'available'});
+    await applyMileageRulesForEvent(db,{friendId:'friend-1',eventType:'booking_cancelled',source:'booking',sourceEventId:'booking-cancel',occurredAt});
+    sqlite.exec("CREATE TRIGGER fail_rule_void BEFORE UPDATE ON mileage_grant_lots BEGIN SELECT RAISE(ABORT,'storage unavailable'); END");
+    expect((await processPendingMileageEvents(db,{})).failed).toBe(1);
+    expect(sqlite.prepare("SELECT COUNT(*) n FROM mileage_ledger WHERE entry_type='reversal'").get()).toEqual({n:0});
+    expect(lotOf(id)).toMatchObject({remaining_amount:100,status:'available'});
+    sqlite.exec('DROP TRIGGER fail_rule_void');
+    await processPendingMileageEvents(db,{now:new Date(Date.now()+600_000).toISOString()});
+    expect(lotOf(id)).toMatchObject({remaining_amount:0,status:'void'});
+    expect((await getMileageSummaryForFriend(db,'friend-1')).available).toBe(0);
+    sqlite.prepare("UPDATE mileage_grant_lots SET expires_at='2020-01-01' WHERE ledger_entry_id=?").run(id);
+    expect((await getMileageSummaryForFriend(db,'friend-1')).available).toBe(0);
+  });
+
 });

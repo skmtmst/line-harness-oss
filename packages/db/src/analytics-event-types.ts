@@ -17,6 +17,14 @@ export const ANALYTICS_EVENT_TYPE_LIST = [
   'conversion_approved',
   'conversion_rejected',
   'automation_completed',
+  'restaurant.reservation.created',
+  'restaurant.reservation.changed',
+  'restaurant.reservation.cancelled',
+  'restaurant.arrived',
+  'restaurant.arrival_undone',
+  'restaurant.departed',
+  'restaurant.departure_undone',
+  'restaurant.waitlist.invited',
   'ec.order.confirmed',
   'ec.order.payment_received',
   'ec.order.bank_transfer_reminder',
@@ -28,6 +36,7 @@ export const ANALYTICS_EVENT_TYPE_LIST = [
   'ec.subscription.card_updated',
   'ec.subscription.cancelled',
   'ec.customer.profile_updated',
+  'ec.site.publication_viewed',
 ] as const;
 
 export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPE_LIST)[number];

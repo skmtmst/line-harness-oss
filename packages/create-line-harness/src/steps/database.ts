@@ -1,5 +1,7 @@
 import * as p from "@clack/prompts";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { migrationBaselineSql, migrationRecordSql } from "@line-harness/update-engine";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { wrangler, WranglerError } from "../lib/wrangler.js";
 
@@ -11,6 +13,26 @@ interface DatabaseResult {
 interface BootstrapMeta {
   includedMigrations: string[];
   migrationCount: number;
+}
+
+const MIGRATION_NAME = /^\d{3,}_[A-Za-z0-9_-]+\.sql$/;
+
+// Only call after successful application on a database created by this run.
+// A file avoids command-line length limits when recording the whole baseline.
+async function recordMigrations(databaseName: string, names: string[], migrationsDir: string, initialize = false): Promise<void> {
+  if (!names.every(name => MIGRATION_NAME.test(name))) {
+    throw new Error("適用記録のファイル名が不正です");
+  }
+  const dir = mkdtempSync(join(tmpdir(), "line-harness-migration-ledger-"));
+  try {
+    const file = join(dir, "ledger.sql");
+    const files = new Map(names.map(name => [name, readFileSync(join(migrationsDir, name))]));
+    writeFileSync(file, initialize ? migrationBaselineSql(files, 'fresh-install-bootstrap', {ready: false})
+      : Array.from(files, ([name, sql]) => migrationRecordSql(name, sql)).join('\n'));
+    await runD1WithRetry(["d1", "execute", databaseName, "--remote", "--file", file], "適用記録の保存");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 const TRANSIENT_D1_ERROR = /code[:\s]*10043|cloudflarestatus|temporarily unavailable|internal error|timed out|timeout|fetch failed|network|connection reset/i;
@@ -36,7 +58,7 @@ async function runD1WithRetry(
       return await wrangler(args);
     } catch (err) {
       lastErr = err;
-      if (!isTransientD1Error(err) || attempt === D1_RETRY_ATTEMPTS) {
+      if (args[0] === 'd1' && args[1] === 'execute' && args.includes('--file') || !isTransientD1Error(err) || attempt === D1_RETRY_ATTEMPTS) {
         throw err;
       }
       p.log.warn(
@@ -47,16 +69,6 @@ async function runD1WithRetry(
   }
   throw lastErr;
 }
-
-const isBenignSchemaError = (err: unknown): boolean => {
-  if (!(err instanceof WranglerError)) return false;
-  const text = `${err.message}\n${err.stderr}`.toLowerCase();
-  return (
-    text.includes("duplicate column") ||
-    text.includes("already exists") ||
-    text.includes("table") && text.includes("already")
-  );
-};
 
 async function verifyLatestSchema(databaseName: string): Promise<void> {
   const verify = await runD1WithRetry(
@@ -84,9 +96,11 @@ function loadBootstrapMeta(repoDir: string): BootstrapMeta | null {
   try {
     const parsed = JSON.parse(readFileSync(metaPath, "utf8")) as BootstrapMeta;
     if (
-      typeof parsed.migrationCount !== "number" ||
+      !Number.isSafeInteger(parsed.migrationCount) ||
       !Array.isArray(parsed.includedMigrations) ||
-      !parsed.includedMigrations.every((value) => typeof value === "string")
+      !parsed.includedMigrations.every((value) => typeof value === "string" && MIGRATION_NAME.test(value)) ||
+      parsed.migrationCount !== parsed.includedMigrations.length ||
+      new Set(parsed.includedMigrations).size !== parsed.includedMigrations.length
     ) {
       return null;
     }
@@ -149,12 +163,15 @@ export async function createDatabase(
     }
   }
 
+  if (!createdNow) {
+    throw new Error("既存D1にはsetupのSQLを再実行しません。適用履歴・バックアップを確認し、チェックサムbaselineを準備してupdateを使用してください。");
+  }
+
   const bootstrapFile = join(repoDir, "packages/db/bootstrap.sql");
-  const schemaFile = join(repoDir, "packages/db/schema.sql");
   const migrationsDir = join(repoDir, "packages/db/migrations");
   const migrationFiles = readdirSync(migrationsDir)
     .filter((f) => f.endsWith(".sql"))
-    .sort();
+    .sort((a, b) => Number(a.split('_')[0]) - Number(b.split('_')[0]) || a.localeCompare(b));
   const bootstrapMeta = loadBootstrapMeta(repoDir);
   const includedMigrations = new Set(bootstrapMeta?.includedMigrations ?? []);
   const canUseBootstrap =
@@ -185,11 +202,12 @@ export async function createDatabase(
         "bootstrap 適用",
       );
     } catch (err) {
-      if (!isBenignSchemaError(err)) {
-        s.stop("bootstrap 適用に失敗");
-        throw err;
-      }
+      // A new DB must accept the complete baseline. Even a duplicate error
+      // can mean partial application, so it cannot justify ledger entries.
+      s.stop("bootstrap 適用に失敗");
+      throw err;
     }
+    await recordMigrations(databaseName, bootstrapMeta.includedMigrations, migrationsDir, true);
 
     for (const file of pendingMigrations) {
       try {
@@ -205,55 +223,13 @@ export async function createDatabase(
           `bootstrap 後 migration 適用: ${file}`,
         );
       } catch (err) {
-        if (!isBenignSchemaError(err)) {
-          s.stop(`migration 失敗: ${file}`);
-          throw err;
-        }
-      }
-    }
-  } else {
-    const totalFiles = 1 + migrationFiles.length;
-    s.start(`テーブル作成中（${totalFiles} files）...`);
-
-    try {
-      await runD1WithRetry(
-        [
-          "d1",
-          "execute",
-          databaseName,
-          "--remote",
-          "--file",
-          schemaFile,
-        ],
-        "ベーススキーマ適用",
-      );
-    } catch (err) {
-      if (!isBenignSchemaError(err)) {
-        s.stop("ベーススキーマ適用に失敗");
+        s.stop(`migration 失敗: ${file}`);
         throw err;
       }
+      await recordMigrations(databaseName, [file], migrationsDir);
     }
-
-    for (const file of migrationFiles) {
-      try {
-        await runD1WithRetry(
-          [
-            "d1",
-            "execute",
-            databaseName,
-            "--remote",
-            "--file",
-            join(migrationsDir, file),
-          ],
-          `migration 適用: ${file}`,
-        );
-      } catch (err) {
-        if (!isBenignSchemaError(err)) {
-          s.stop(`migration 失敗: ${file}`);
-          throw err;
-        }
-      }
-    }
+  } else {
+    throw new Error("新規導入には検証済みbootstrap.sqlと完全なbootstrap-meta.jsonが必要です。過去SQLの推測再実行は行いません。");
   }
 
   try {
@@ -263,6 +239,8 @@ export async function createDatabase(
     throw err;
   }
 
+  await runD1WithRetry(["d1", "execute", databaseName, "--remote", "--command",
+    "UPDATE _musubo_migration_history SET state='ready',updated_at=datetime('now') WHERE name='__lock__'"], "全適用の完了記録");
   s.stop("テーブル作成完了");
 
   return { databaseId, databaseName };

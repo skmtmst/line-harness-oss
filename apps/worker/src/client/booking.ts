@@ -1,12 +1,12 @@
-/**
- * LIFF Booking Page — Calendar-based slot booking
- *
- * Flow:
- * 1. Show calendar date picker (current month)
- * 2. Tap date → fetch available slots from API
- * 3. Tap slot → show confirm section
- * 4. Submit booking → show confirmation
- */
+import { escapeHtml } from '../lib/html-escape.js';
+import { responseLiffError } from '../../../liff/src/lib/api-error.js';
+import { createClientLogger } from '@line-crm/shared';
+import { jstCalendar, jstDate, jstTime } from '@line-crm/shared';
+
+
+import { customerMessage } from './customer-message.js';
+const clientLogger = createClientLogger('embedded');
+
 
 declare const liff: {
   init(config: { liffId: string }): Promise<void>;
@@ -36,26 +36,25 @@ interface BookingState {
   profile: { userId: string; displayName: string; pictureUrl?: string } | null;
   friendId: string | null;
   loading: boolean;
+  slotsFailed: boolean;
   submitting: boolean;
 }
 
 const state: BookingState = {
-  currentYear: new Date().getFullYear(),
-  currentMonth: new Date().getMonth(),
+  currentYear: jstCalendar().getUTCFullYear(),
+  currentMonth: jstCalendar().getUTCMonth(),
   selectedDate: null,
   slots: [],
   selectedSlot: null,
   profile: null,
   friendId: null,
   loading: false,
+  slotsFailed: false,
   submitting: false,
 };
+let slotsGeneration = 0;
 
-function escapeHtml(str: string): string {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+
 
 function apiCall(path: string, options?: RequestInit): Promise<Response> {
   return fetch(path, {
@@ -68,14 +67,13 @@ function apiCall(path: string, options?: RequestInit): Promise<Response> {
 }
 
 function formatTime(isoString: string): string {
-  const d = new Date(isoString);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return jstTime(new Date(isoString));
 }
 
 function formatDateJa(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date(dateStr + 'T00:00:00Z');
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日(${weekdays[d.getDay()]})`;
+  return `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月${d.getUTCDate()}日(${weekdays[d.getUTCDay()]})`;
 }
 
 function getApp(): HTMLElement {
@@ -85,23 +83,19 @@ function getApp(): HTMLElement {
 // ========== Calendar Rendering ==========
 
 function getDaysInMonth(year: number, month: number): number {
-  return new Date(year, month + 1, 0).getDate();
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 }
 
 function getFirstDayOfWeek(year: number, month: number): number {
-  return new Date(year, month, 1).getDay();
+  return new Date(Date.UTC(year, month, 1)).getUTCDay();
 }
 
 function isToday(year: number, month: number, day: number): boolean {
-  const now = new Date();
-  return now.getFullYear() === year && now.getMonth() === month && now.getDate() === day;
+  return dateToString(year, month, day) === jstDate();
 }
 
 function isPast(year: number, month: number, day: number): boolean {
-  const now = new Date();
-  const target = new Date(year, month, day);
-  now.setHours(0, 0, 0, 0);
-  return target < now;
+  return dateToString(year, month, day) < jstDate();
 }
 
 function dateToString(year: number, month: number, day: number): string {
@@ -127,7 +121,7 @@ function renderCalendar(): string {
       <div class="cal-days">
   `;
 
-  // Empty cells before first day
+
   for (let i = 0; i < firstDay; i++) {
     html += '<span class="cal-day empty"></span>';
   }
@@ -172,6 +166,11 @@ function renderSlots(): string {
     `;
   }
 
+  if (state.slotsFailed) {
+    return `<div class="slots-section"><h3>${formatDateJa(selectedDate)}</h3>
+      <p role="alert">予約枠を読み込めませんでした。電波のよいところで、もう一度お試しください。</p>
+      <button type="button" class="btn-primary" data-action="retry-slots">もう一度</button></div>`;
+  }
   if (slots.length === 0) {
     return `
       <div class="slots-section">
@@ -302,7 +301,7 @@ function renderError(message: string): void {
 function attachEvents(): void {
   const app = getApp();
 
-  // Month navigation
+
   app.querySelectorAll('.cal-nav').forEach((btn) => {
     btn.addEventListener('click', () => {
       const action = (btn as HTMLElement).dataset.action;
@@ -326,7 +325,7 @@ function attachEvents(): void {
     });
   });
 
-  // Date selection
+
   app.querySelectorAll('.cal-day.active').forEach((el) => {
     el.addEventListener('click', () => {
       const date = (el as HTMLElement).dataset.date;
@@ -341,14 +340,14 @@ function attachEvents(): void {
     });
   });
 
-  // Slot selection
+
   app.querySelectorAll('.slot-btn.available').forEach((btn) => {
     btn.addEventListener('click', () => {
       const startAt = (btn as HTMLElement).dataset.start!;
       const endAt = (btn as HTMLElement).dataset.end!;
       state.selectedSlot = { startAt, endAt, available: true };
       render();
-      // Scroll to confirm
+
       setTimeout(() => {
         const confirmEl = getApp().querySelector('.confirm-section');
         confirmEl?.scrollIntoView({ behavior: 'smooth' });
@@ -356,14 +355,21 @@ function attachEvents(): void {
     });
   });
 
-  // Confirm booking
+
   const confirmBtn = app.querySelector('[data-action="confirm-booking"]');
   confirmBtn?.addEventListener('click', () => submitBooking());
+  app.querySelector('[data-action="retry-slots"]')?.addEventListener('click', () => {
+    if (state.selectedDate) void fetchSlots(state.selectedDate);
+  });
 }
 
 // ========== API Calls ==========
 
 async function fetchSlots(date: string): Promise<void> {
+  const generation = ++slotsGeneration;
+  state.loading = true;
+  state.slotsFailed = false;
+  render();
   try {
     const params = new URLSearchParams({ date });
     if (CONNECTION_ID) params.set('connectionId', CONNECTION_ID);
@@ -371,13 +377,15 @@ async function fetchSlots(date: string): Promise<void> {
     if (!res.ok) throw new Error('スロット取得に失敗しました');
     const json = await res.json() as { success: boolean; data: Slot[] };
     if (!json.success) throw new Error('スロット取得に失敗しました');
-    state.slots = json.data;
+    if (generation === slotsGeneration && date === state.selectedDate) state.slots = json.data;
   } catch (err) {
-    state.slots = [];
-    console.error('fetchSlots error:', err);
+    if (generation === slotsGeneration && date === state.selectedDate) state.slotsFailed = true;
+    clientLogger.error("client_booking_failed");
   } finally {
-    state.loading = false;
-    render();
+    if (generation === slotsGeneration && date === state.selectedDate) {
+      state.loading = false;
+      render();
+    }
   }
 }
 
@@ -407,14 +415,13 @@ async function submitBooking(): Promise<void> {
     });
 
     if (!res.ok) {
-      const errData = await res.json().catch(() => null) as { error?: string } | null;
-      throw new Error(errData?.error || '予約に失敗しました');
+      throw await responseLiffError(res);
     }
 
     renderSuccess(selectedDate, selectedSlot);
   } catch (err) {
     state.submitting = false;
-    renderError(err instanceof Error ? err.message : '予約に失敗しました');
+    renderError(customerMessage(err, '予約に失敗しました'));
   }
 }
 
@@ -424,7 +431,7 @@ export async function initBooking(): Promise<void> {
   const profile = await liff.getProfile();
   state.profile = profile;
 
-  // Try to get friendId from UUID linking
+
   const UUID_STORAGE_KEY = 'lh_uuid';
   try {
     state.friendId = localStorage.getItem(UUID_STORAGE_KEY);
@@ -432,7 +439,7 @@ export async function initBooking(): Promise<void> {
     // silent
   }
 
-  // Silent UUID linking (same as main flow)
+
   const rawIdToken = liff.getIDToken();
   if (rawIdToken) {
     const existingUuid = state.friendId;

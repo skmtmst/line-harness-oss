@@ -1,5 +1,5 @@
 /*
- * IDEA-10: ウェビナー参加者の分類フィルタとライブ／録画の区別。
+ * ウェビナー参加者の分類フィルタとライブ／録画の区別。
  *
  * 実SQLite（bootstrap.sql を流した better-sqlite3）に実物の webinars
  * ルートを当てて確認する。分類ルールはサーバー側だけが持ち、
@@ -13,7 +13,7 @@
  */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
@@ -128,7 +128,7 @@ async function list(path: string) {
 }
 
 beforeEach(async () => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed(sqlite.raw);
   ({ webinarRoutes } = await import('./webinars.js'));
 });

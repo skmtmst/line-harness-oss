@@ -1,7 +1,7 @@
 /**
- * N-053: アクション保存前の参照検証。
+ * アクション保存前の参照検証。
  *
- * 幽霊参照・別アカウント参照を保存前に弾く。#644 の既存契約どおり、
+ * 幽霊参照・別アカウント参照を保存前に弾く。既存の参照の決まりどおり、
  * 資源側の共通（NULL）は tag/template/scenario の3種だけ通し、
  * それ以外へは広げない。書き込みは一切しない。
  */
@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { validateScenarioActionReferences } from '../src/scenarios.js';
+import { validateScenarioActionReferences } from '../src/scenarios/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

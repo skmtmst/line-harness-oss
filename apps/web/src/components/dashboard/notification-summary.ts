@@ -1,5 +1,6 @@
 import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import type { NotificationFilter, NotificationItem } from '@/components/shared/notification-panel'
+import { formatDateTime } from '@/lib/format'
 
 export type DashboardNotificationFilter = 'all' | 'error' | 'update'
 
@@ -30,14 +31,7 @@ export function notificationTime(createdAt: string): string {
   const time = new Date(createdAt)
   if (Number.isNaN(time.getTime())) return '日時不明'
   // 「9月2日 10:04」。月は long（9月）、日は numeric（2日）で出す。
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(time)
+  return formatDateTime(time)
 }
 
 export function dashboardNotificationItems(

@@ -1,0 +1,35 @@
+/*
+ * ★V8 飲食店向けの小さな部品（担当 a）。値は `--tpl-rt-*`。
+ */
+
+.panelAside {
+  flex: 0 0 auto;
+  color: var(--color-warning);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.panelAsideOk {
+  color: var(--color-success);
+}
+
+.panelNarrow {
+  flex: 0 0 var(--tpl-rt-tree-w);
+}
+
+.halfGrid {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-rt-half-gap);
+  min-width: 0;
+}
+
+.halfGrid > * {
+  flex: 1 1 0;
+}
+
+.status {
+  flex: 0 0 auto;
+}

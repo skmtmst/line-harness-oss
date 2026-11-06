@@ -9,14 +9,14 @@ import {
   createScenarioStep,
   publishScenarioVersion,
   updateScenarioStep,
-} from '../src/scenarios.js';
+} from '../src/scenarios/index.js';
 import { openSharedD1, type SharedD1 } from './shared-d1-test-helper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
 
 /*
- * 同時公開を**独立した接続**で確かめる（#644 再審査 4）。
+ * 同時公開を**独立した接続**で確かめる。
  *
  * これまでの競合テストは 1本の :memory: 接続に batch を差し替えて割り込みを
  * 作っていた。それでは「自分の中で自分と競合している」だけで、別の worker が

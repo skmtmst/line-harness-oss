@@ -10,6 +10,13 @@ const MAX_STRIPE_SIGNATURE_HEADER_BYTES = 4 * 1024;
 const MAX_STRIPE_V1_SIGNATURES = 8;
 const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
+/** 外側だけでなく、通知対象も明示的な試験データであることを確かめる。 */
+export function isStripeTestEvent(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const event = value as { livemode?: unknown; data?: { object?: { livemode?: unknown } } };
+  return event.livemode === false && event.data?.object?.livemode === false;
+}
+
 export function hexToBytes(value: string): Uint8Array | null {
   if (!/^[0-9a-f]{64}$/i.test(value)) return null;
   const bytes = new Uint8Array(value.length / 2);

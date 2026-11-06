@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
@@ -21,30 +23,48 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.push }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 vi.mock('@/components/shared/sticky-bar', () => ({
   default: ({ actions }: { actions: React.ReactNode }) => <div>{actions}</div>,
 }))
-vi.mock('@/lib/api', () => ({
-  webinarApi: {
-    folders: async () => ({ success: true, data: [] }),
-    create: fixture.create,
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ...actual,
+    webinarApi: {
+      folders: async () => ({ success: true, data: [] }),
+      create: fixture.create,
+    },
+  }
+})
+
+/* happy-dom に localStorage は無い。booking 配下と同じ memory stub を置く。 */
+const localStorageValues = new Map<string, string>()
+Object.defineProperty(window, 'localStorage', {
+  value: {
+    getItem: (key: string) => localStorageValues.get(key) ?? null,
+    setItem: (key: string, value: string) => { localStorageValues.set(key, String(value)) },
+    removeItem: (key: string) => { localStorageValues.delete(key) },
+    clear: () => { localStorageValues.clear() },
   },
-}))
+})
 
 let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.push.mockClear()
   fixture.create.mockReset()
   fixture.create.mockResolvedValue({ success: true, data: { id: 'new-webinar' } })
+  /* 保存できる担当者として描く（D001 の権限出し分けの対象外）。 */
+  window.localStorage.setItem('lh_staff_role', 'owner'); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -76,12 +96,13 @@ describe('ウェビナー作成からの段遷移 (#1002 DETAIL-03)', () => {
     await flush()
 
     await act(async () => {
-      fireEvent.change(host.querySelector('#webinar-title')!, { target: { value: '回帰ウェビナー' } })
+      fireEvent.change(host.querySelector('#webinar-new-title')!, { target: { value: '回帰ウェビナー' } })
     })
-    await act(async () => { buttonByText('動画設定へ').click() })
+    await act(async () => { buttonByText('動画の設定へ').click() })
     await flush()
 
     expect(fixture.create).toHaveBeenCalledTimes(1)
+    expect(fixture.create).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'account-a', status: 'draft' }))
     expect(fixture.push).toHaveBeenCalledWith('/webinars/edit?id=new-webinar&pane=video')
   })
 
@@ -90,11 +111,11 @@ describe('ウェビナー作成からの段遷移 (#1002 DETAIL-03)', () => {
     await render()
     await flush()
 
-    const titleInput = host.querySelector('#webinar-title')! as HTMLInputElement
+    const titleInput = host.querySelector('#webinar-new-title')! as HTMLInputElement
     await act(async () => {
       fireEvent.change(titleInput, { target: { value: '残したい名前' } })
     })
-    await act(async () => { buttonByText('動画設定へ').click() })
+    await act(async () => { buttonByText('動画の設定へ').click() })
     await flush()
 
     expect(fixture.push).not.toHaveBeenCalled()
@@ -105,7 +126,7 @@ describe('ウェビナー作成からの段遷移 (#1002 DETAIL-03)', () => {
     await render()
     await flush()
 
-    for (const label of ['基本設定', '動画', 'CTA・フォーム', '通知', '確認']) {
+    for (const label of ['基本設定', '動画', '案内ボタン・フォーム', '通知', '確認']) {
       expect(host.textContent).toContain(label)
     }
   })

@@ -1,7 +1,8 @@
 import { connect } from 'cloudflare:sockets';
+import { assertQaOutboundAllowed } from './staging-qa-safety.js';
 import PostalMime, { type Address } from 'postal-mime';
 import { buildMailData, encodeBase64, safeHeader, type MailMimeInput } from './mail-mime.js';
-import { storeSupportEmail } from './support-email.js';
+import { storeSupportEmail } from './support-email-store.js';
 
 const CONNECTION_TIMEOUT_MS = 15_000;
 const MAX_EMAIL_BYTES = 10 * 1024 * 1024;
@@ -15,7 +16,6 @@ type XServerMailEnv = {
   XSERVER_MAIL_PASSWORD?: string;
 };
 
-/** 中身の組み立ては mail-mime.ts が持つ。ここは送る手順だけを持つ。 */
 type SendMailInput = MailMimeInput;
 
 function requireConfig(env: XServerMailEnv): { host: string; user: string; password: string } {
@@ -148,6 +148,7 @@ class ImapClient {
 }
 
 async function connectImapStartTls(host: string): Promise<MailSocket> {
+  assertQaOutboundAllowed();
   const plain = new MailSocket(connect(
     { hostname: host, port: 143 },
     { secureTransport: 'starttls', allowHalfOpen: false },
@@ -271,6 +272,7 @@ async function smtpCommand(transport: MailSocket, command: string, expected: num
 }
 
 export async function sendXServerMail(env: XServerMailEnv, input: SendMailInput): Promise<string> {
+  assertQaOutboundAllowed();
   const config = requireConfig(env);
   const plain = new MailSocket(connect(
     { hostname: config.host, port: 587 },

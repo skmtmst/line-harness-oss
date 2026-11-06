@@ -1,23 +1,16 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .pagination {
   display: flex;
-  flex-wrap: wrap; /* 幅320で「次へ」が右に切れていた（★V7 修正方針 §3） */
+  flex-wrap: wrap; /* 幅320で「次へ」が右に切れていた（★管理画面 修正方針 §3） */
   align-items: center;
-  gap: 8px;
 }
 
 .item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 38px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
   background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: 1;
   white-space: nowrap;
 }
 
@@ -29,13 +22,24 @@ button.item:hover:not(:disabled, .current) {
   background: var(--color-canvas-sunken);
 }
 
-button.item:focus-visible {
-  outline: revert;
+/*
+ * ★V8 仕上げ（M10-2）：ページ送りの乗せた・押した動きと印。
+ * 色の変化は 120ms、押したときはほんの少し沈む（明るさで）。
+ * キーボードの印は青い焦点の輪。いまのページは薄い灰の地と太字で示す。
+ */
+:root button.item {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    filter var(--motion-fast) var(--motion-ease-out);
+}
+
+:root button.item:active:not(:disabled, .current) {
+  filter: brightness(0.95);
 }
 
 button.item:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .control {
@@ -47,17 +51,6 @@ button.item:disabled {
 }
 
 /*
- * いま開いているページ。**白文字が乗るので `$accent-deep`。**
- * `$accent`(#06c755) に白文字は 2.26:1 で、13px の数字が読めない。
- */
-.current {
-  border-color: var(--color-accent-deep);
-  background: var(--color-accent-deep);
-  color: var(--color-on-accent);
-  font-weight: 700;
-}
-
-/*
  * #639 タッチ端末では指の当たりとして44pxを確保する（PCは38pxのまま）。
  * 表記・構成の統一は #667 の範囲のため、ここでは高さだけを扱う。
  */
@@ -66,4 +59,124 @@ button.item:disabled {
     min-height: 44px;
   }
 }
+
+/*
+ * 帯の左端に出す件数の文（例「40件中 1〜20件を表示」）。互換経路は帯の外に
+ * 従来の件数表示があるので、ここは v8 のときだけ出す。
+ */
+
+/*
+ * ★V8「ページ送り」（jX2Uw）：帯の余白は上下10・左右20、間は 6。
+ * 各ボタンは 32×32・角丸 control・文字は 13px/1.5。前・次は「‹」「›」の
+ * 印だけの正方形にする。いまのページは薄い灰の地と太字で示す。
+ */
+:root .pagination {
+  gap: 6px;
+  padding: 10px 20px;
+  font-variant-numeric: var(--font-numeric);
+}
+
+:root .summary {
+  display: inline-flex;
+  align-items: center;
+  margin-right: auto;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: var(--font-weight-ui);
+  line-height: 1.5;
+}
+
+/* 中身は bare の ListRange（文字指定を持たない）を想定し、帯側が決める */
+
+:root .item {
+  height: 32px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+:root .page {
+  width: 32px;
+}
+
+:root .control {
+  width: 32px;
+  padding: 0;
+}
+
+:root .controlLabel {
+  display: none;
+}
+
+:root .controlGlyph {
+  display: inline;
+}
+
+:root .item {
+  border: 0; border-radius: var(--polish-radius-control); color: var(--color-ink-secondary);
+  outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow);
+  font-family: var(--font-inter), Inter, sans-serif; line-height: 20px;
+}
+:root span.item:not(.current) { outline-color: transparent; }
+:root .summary { font-family: var(--font-inter), Inter, system-ui, sans-serif; line-height: 20px; }
+
+:root .summary { flex: 1; gap: 0; }
+:root .pagination[data-spacing='restaurant']{padding:8px 0;gap:8px;}
+
+:root .pagination[data-spacing='roomy'] { padding: calc(var(--tpl-rs-stat-pad) + var(--tpl-rs-rsv-head-row-gap)) calc(var(--tpl-rs-stat-pad) + var(--tpl-rs-cell-side)); }
+
+}
+
+/* ：一覧の余白は型が持つ。件数と送り先を1つの右寄せの組にする。 */
+:root :global([data-list-skeleton]) .pagination { width: auto; justify-content: flex-end; padding: 0; }
+:root :global([data-list-skeleton]) .summary { flex: none; margin-right: var(--space-16); }
+:root :global([data-list-skeleton]) .pagination:has(> .summary) { flex: 1; min-width: 0; }
+:root :global([data-list-skeleton]) .pagination:has(> .summary) .summary { margin-right: auto; }
+
+/* 前後に進めない時も枠は残し、ほかの押せない操作と同じく全体を薄くする（影は付けない）。 */
+html:root button.control:disabled {
+  opacity: var(--polish-disabled-opacity);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  box-shadow: none;
+}
+
+/* 選択していない番号は枠と影を見せず、前後の操作の枠は残す。 */
+html:root button.page:not(.current) { outline-color: transparent; box-shadow: none; }
+
+/* 属性を重ねた共通の選択色より、ページの現在地の灰を優先する。枠・影を重ねない。 */
+html:root .current {
+  background: var(--color-canvas-sunken) !important;
+  color: var(--color-ink) !important;
+  border: 0;
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+  border-color: transparent;
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+  box-shadow: none !important;
+  font-weight: var(--polish-weight-title);
+}
+
+/* globals の aria-current の選択色より、ページ送りの灰を優先する。 */
+html:root nav[data-pagination] .current {
+  border-color: transparent !important;
+  background: var(--color-canvas-sunken) !important;
+  color: var(--color-ink) !important;
+  box-shadow: none !important;
+}
+
+/* 現在地の枠を消しても、キーボードの焦点の輪は残す。 */
+html:root nav[data-pagination] button.current:focus-visible,
+html:root button.item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* 選択していない番号は枠と影を見せず、前後の操作の枠は残す。 */
+html:root button.page:not(.current) { outline-color: transparent; box-shadow: none; }
+
+html:root button.item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }

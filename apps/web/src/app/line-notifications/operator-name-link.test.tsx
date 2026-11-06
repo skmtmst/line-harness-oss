@@ -12,7 +12,9 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
 const fixture = vi.hoisted(() => ({
   operatorList: vi.fn(),
@@ -51,7 +53,7 @@ vi.mock('@/lib/api', () => {
 })
 
 import type { OperatorNotificationRule } from '@/lib/api'
-import OperatorNotificationRules from './operator-notification-rules'
+import OperatorNotificationRules from '@/v8/settings/line-notifications/operator-tab'
 
 function rule(overrides: Partial<OperatorNotificationRule> = {}): OperatorNotificationRule {
   return {
@@ -74,6 +76,8 @@ const summary = { total: 1, published: 1, stopped: 0, missingRecipients: 0, reci
 
 beforeEach(() => {
   vi.clearAllMocks()
+  window.history.replaceState(null, '', '/line-notifications?tab=operator')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   fixture.operatorList.mockResolvedValue({ success: true, data: { items: [rule()], summary } })
   vi.stubGlobal('React', React)
 })
@@ -85,16 +89,19 @@ afterEach(() => {
 
 describe('NOTIFY-04 一覧の名前から編集画面へ戻る', () => {
   it('名前は ?id= 付きの編集画面へのリンクとして描かれる', async () => {
-    render(<OperatorNotificationRules lineAccountId="account-a" />)
+    render(<OperatorNotificationRules lineAccountId="account-a" canManage exportOpen={false} onExportClose={() => {}} />)
 
     const link = await screen.findByRole('link', { name: '新しい予約が入りました' })
     // id に空白があっても壊れない。デコードすると元の id に戻る形で出す。
-    expect(link.getAttribute('href')).toBe('/line-notifications/operator/new?id=rule-abc%20123')
+    const target = new URL(link.getAttribute('href')!, window.location.origin)
+    expect(target.pathname).toBe('/line-notifications/operator/new')
+    expect(target.searchParams.get('id')).toBe('rule-abc 123')
+    expect(target.searchParams.get('returnTo')).toBe('/line-notifications?tab=operator')
     expect(new URLSearchParams('id=rule-abc%20123').get('id')).toBe('rule-abc 123')
   })
 
   it('名前のクリックを表・行・セルのどこも止めない', async () => {
-    render(<OperatorNotificationRules lineAccountId="account-a" />)
+    render(<OperatorNotificationRules lineAccountId="account-a" canManage exportOpen={false} onExportClose={() => {}} />)
     const link = await screen.findByRole('link', { name: '新しい予約が入りました' })
 
     /*
@@ -118,22 +125,19 @@ describe('NOTIFY-04 一覧の名前から編集画面へ戻る', () => {
     expect(prevented).toBe(false)
   })
 
-  it('別の行の名前も同じ形のリンクで、絞り込みタブと検索は動いたまま', async () => {
+  it('別の行の名前も同じ形のリンクで、検索は動いたまま', async () => {
     fixture.operatorList.mockResolvedValue({
       success: true,
       data: { items: [rule(), rule({ id: 'rule-2', name: 'レビューが届きました' })], summary: { ...summary, total: 2 } },
     })
-    render(<OperatorNotificationRules lineAccountId="account-a" />)
+    render(<OperatorNotificationRules lineAccountId="account-a" canManage exportOpen={false} onExportClose={() => {}} />)
 
     const second = await screen.findByRole('link', { name: 'レビューが届きました' })
-    expect(second.getAttribute('href')).toBe('/line-notifications/operator/new?id=rule-2')
+    expect(new URL(second.getAttribute('href')!, window.location.origin).searchParams.get('id')).toBe('rule-2')
 
-    // 絞り込み（公開中だけ）と検索は行を絞るだけで、リンクの形は変わらない。
-    fireEvent.click(screen.getByRole('radio', { name: /出している/ }))
-    expect(screen.getByRole('link', { name: 'レビューが届きました' })).toBeTruthy()
+    // 板 ：絞り込みタブは無い。検索は行を絞るだけで、リンクの形は変わらない。
     fireEvent.change(screen.getByPlaceholderText('お知らせ名・きっかけで探す'), { target: { value: 'レビュー' } })
-    expect(screen.queryByRole('link', { name: '新しい予約が入りました' })).toBeNull()
-    expect(screen.getByRole('link', { name: 'レビューが届きました' }).getAttribute('href'))
-      .toBe('/line-notifications/operator/new?id=rule-2')
+    await waitFor(() => expect(screen.queryByRole('link', { name: '新しい予約が入りました' })).toBeNull())
+    expect(new URL(screen.getByRole('link', { name: 'レビューが届きました' }).getAttribute('href')!, window.location.origin).searchParams.get('id')).toBe('rule-2')
   })
 })

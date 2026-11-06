@@ -1,4 +1,8 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+
+const circuitFixtures = new Set<SqliteD1>();
+afterEach(() => { for (const fixture of circuitFixtures) fixture.raw.close(); circuitFixtures.clear(); });
 import { computeSlots, explainBookingSlot, getAvailability, type Interval } from './availability.js';
 
 const MENU_60 = { duration_minutes: 60, buffer_after_minutes: 0 };
@@ -180,8 +184,12 @@ interface StubData {
 }
 
 function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>): D1Database {
+  // 空き判定の fixture を保ち、停止状態の永続 SQL は実際に実行する。
+  const circuit = data.calendarConnection ? createTestD1() : undefined;
+  if (circuit) circuitFixtures.add(circuit);
   return {
     prepare(sql: string) {
+      if (circuit && sql.includes('workflow_steps')) return circuit.db.prepare(sql);
       return {
         bind(...args: unknown[]) {
           seen?.push({ sql, args });
@@ -199,6 +207,7 @@ function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>):
             };
           }
           if (sql.includes('FROM menus')) return data.menu ?? null;
+          if (sql.includes('FROM booking_calendar_switches')) return data.calendarConnection ? { read_enabled: 1, write_enabled: 0, version: 1 } : null;
           if (sql.includes('FROM google_calendar_connections')) return data.calendarConnection ?? null;
           return null;
         },
@@ -206,7 +215,7 @@ function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>):
           if (sql.includes('booking_availability_exceptions')) {
             return { results: data.exceptions ?? [] };
           }
-          if (sql.includes('booking_resource_consumptions')) {
+          if (sql.includes('booking_slot_resources')) {
             return { results: data.resourceBookings ?? [] };
           }
           if (sql.includes('booking_menu_resources')) {
@@ -233,7 +242,7 @@ function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>):
           if (sql.includes('FROM staff_breaks')) {
             return { results: data.breaks ?? [] };
           }
-          if (sql.includes('FROM bookings')) {
+          if (sql.includes('FROM booking_slot_allocations')) {
             return { results: data.bookings ?? [] };
           }
           return { results: [] };
@@ -371,7 +380,7 @@ describe('getAvailability', () => {
       menu: { duration_minutes: 60, buffer_after_minutes: 0, override_duration: null, override_price: null },
       staff: [{ id: 'S1', display_name: '山田', is_designation_optional: 0 }],
       shifts: [],
-      // 2030-01-05 is Saturday. This verifies the rule does not expire.
+      // 2030-01-05 は土曜。年をまたいでもルールが失効しないことを確かめる。
       rules: [{ staff_id: 'S1', weekday: 6, start_time: '10:00', end_time: '12:00' }],
       bookings: [],
     });
@@ -384,7 +393,7 @@ describe('getAvailability', () => {
 
   test('Googleカレンダーのbusy時間を予約候補から除外する', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      calendars: { 'cal@example.com': { busy: [{ start: '2026-05-09T02:00:00Z', end: '2026-05-09T03:00:00Z' }] } },
+      items: [{ start: '2026-05-09T02:00:00Z', end: '2026-05-09T03:00:00Z' }].map((entry,index)=>({id:'external-'+index,start:{dateTime:entry.start},end:{dateTime:entry.end}})),
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
     try {
       const db = stubDB({
@@ -799,7 +808,7 @@ describe('getAvailability の例外日（休業日・終日・時間帯）', () 
       now: new Date('2026-05-08T00:00:00Z'), minLeadTimeMinutes: 0,
     });
     expect(result.by_staff[0].slots).toEqual([]);
-    expect(seen.some((call) => call.sql.includes('booking_resource_consumptions'))).toBe(false);
+    expect(seen.some((call) => call.sql.includes('booking_slot_resources'))).toBe(false);
   });
 
   test('未知の種類の行は無視する', async () => {
@@ -1254,7 +1263,7 @@ describe('getAvailability のタイムゾーン（非JST）', () => {
 
   test('Google 予定は店舗TZの日へ落とす（New York）', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      calendars: { 'cal@example.com': { busy: [{ start: '2026-05-09T14:00:00Z', end: '2026-05-09T15:00:00Z' }] } },
+      items: [{ start: '2026-05-09T14:00:00Z', end: '2026-05-09T15:00:00Z' }].map((entry,index)=>({id:'external-'+index,start:{dateTime:entry.start},end:{dateTime:entry.end}})),
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
     try {
       const db = stubDB({
@@ -1306,7 +1315,7 @@ describe('getAvailability の夏時間切替日（New York）', () => {
 
   function googleDb(busy: Array<{ start: string; end: string }>, extra: Partial<StubData> = {}) {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      calendars: { 'cal@example.com': { busy } },
+      items: busy.map((entry,index)=>({id:'external-'+index,start:{dateTime:entry.start},end:{dateTime:entry.end}})),
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
     return stubDB({
       menu: MENU_60_HOURLY,
@@ -1410,7 +1419,7 @@ describe('getAvailability の夏時間切替日（New York）', () => {
   test('fold を跨ぐ Google 予定は instant で塞ぐ（壁 01:30→01:30 でも消えない）', async () => {
     // 05:30Z-06:30Z = 壁 01:30(EDT)→01:30(EST)。壁だけ見ると長さ 0 で消える。
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      calendars: { 'cal@example.com': { busy: [{ start: '2026-11-01T05:30:00Z', end: '2026-11-01T06:30:00Z' }] } },
+      items: [{ start: '2026-11-01T05:30:00Z', end: '2026-11-01T06:30:00Z' }].map((entry,index)=>({id:'external-'+index,start:{dateTime:entry.start},end:{dateTime:entry.end}})),
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
     try {
       const db = stubDB({
@@ -1507,7 +1516,7 @@ describe('getAvailability の店舗共通ルール（監査 R92）', () => {
     override_duration: null,
     override_price: null,
   };
-  // 監査の再現: 店舗ルールは24時間前・60日先まで。2026-09-27 の 18:30 JST
+  // 店舗ルールの24時間前・60日先の境界を、2026-09-27 の18:30 JSTを基準に試す。
   // （09:30Z）に翌 9/28 09:00 を見ると、店舗締切では取れない。
   function r92db(over: Partial<StubData> = {}) {
     return stubDB({

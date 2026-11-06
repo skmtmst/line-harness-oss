@@ -7,6 +7,7 @@
  *   - 操作権限を外すと操作だけ外れ、表示権限は残ること
  *   - 一覧の権限要約に操作権限の名前が出て、既存の表示が崩れないこと
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
@@ -15,20 +16,24 @@ import type { StaffMember } from '@line-crm/shared'
 
 const fixture = vi.hoisted(() => ({
   tab: 'members',
+  meRole: 'admin' as StaffMember['role'],
+  meId: 'me-1',
+  meReadOnly: false,
   updated: [] as Array<{ id: string; data: unknown }>,
 }))
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useRouter: (await import('@/test-utils/staff-navigation-mock')).staffTestRouter,
   usePathname: () => '/staff',
-  useSearchParams: () => new URLSearchParams(`tab=${fixture.tab}`),
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => <nav aria-label="ログインユーザーのタブ" />,
   useMergedTab: () => fixture.tab,
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -57,15 +62,17 @@ const state = {
   users: [] as ReturnType<typeof accessUser>[],
 }
 
-vi.mock('@/lib/api', () => {
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
   class ApiError extends Error {}
   return {
+    ...actual,
     ApiError,
-    fetchApi: vi.fn(),
+    fetchApi: vi.fn().mockResolvedValue({ success: true, data: [] }),
     api: {
       staff: {
         list: async () => ({ success: true, data: state.members }),
-        me: async () => ({ success: true, data: member({ id: 'me-1', name: '管理者', email: 'me@example.test', role: 'admin', isActive: true }) }),
+        me: async () => ({ success: true, data: member({ id: fixture.meId, name: '管理者', email: 'me@example.test', role: fixture.meRole, readOnly: fixture.meReadOnly, isActive: true }) }),
         update: async (id: string, data: unknown) => {
           fixture.updated.push({ id, data })
           return { success: true, data: member({}) }
@@ -91,23 +98,24 @@ vi.mock('@/lib/api', () => {
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-const { default: StaffPage } = await import('./page')
+const { default: StaffPage } = await import('@/test-utils/staff-test-routes')
 
 async function openEdit(expectOp = true) {
   await act(async () => { render(<StaffPage />) })
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: '変更する' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /の操作$/ })).toBeTruthy()
   })
   await act(async () => {
-    // ★V7: 変更するは行に直接出す（「…」メニューはやめた）。
-    fireEvent.click(screen.getByRole('button', { name: '変更する' }))
+    // : 変更するは「…」から開く。
+    fireEvent.click(screen.getByRole('button', { name: /の操作$/ }))
   })
+  await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '役割を変える' })) })
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: /変更を保存/ })).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'メールアドレス' })).toBeTruthy()
   })
   if (expectOp) {
     await waitFor(() => {
-      expect(screen.getByRole('checkbox', { name: '成果を承認・却下する' })).toBeTruthy()
+      expect(screen.getByRole('switch', { name: '成果を承認・却下する' })).toBeTruthy()
     })
   }
 }
@@ -118,7 +126,7 @@ async function saveEdit() {
 
 async function saveEditFull() {
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: /変更を保存/ }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
   })
   await waitFor(() => {
     expect(fixture.updated).toHaveLength(1)
@@ -128,6 +136,9 @@ async function saveEditFull() {
 
 beforeEach(() => {
   fixture.tab = 'members'
+  fixture.meRole = 'admin'
+  fixture.meId = 'me-1'
+  fixture.meReadOnly = false
   fixture.updated = []
   state.members = [member({})]
   state.users = [accessUser({})]
@@ -141,7 +152,7 @@ describe('既存スタッフの成果承認権限', () => {
   test('操作権限を選ぶと表示権限も組で保存される', async () => {
     await openEdit()
     await act(async () => {
-      fireEvent.click(screen.getByRole('checkbox', { name: '成果を承認・却下する' }))
+      fireEvent.click(screen.getByRole('switch', { name: '成果を承認・却下する' }))
     })
     const keys = await saveEdit()
     expect(keys).toEqual(expect.arrayContaining(['/conversions', 'conversion.approval.edit']))
@@ -152,8 +163,8 @@ describe('既存スタッフの成果承認権限', () => {
   test('操作権限を外すと操作だけ外れ、表示権限は残る', async () => {
     state.members = [member({ permissionKeys: ['/chats', '/conversions', 'conversion.approval.edit'] })]
     await openEdit()
-    const op = screen.getByRole('checkbox', { name: '成果を承認・却下する' }) as HTMLInputElement
-    expect(op.checked).toBe(true)
+    const op = screen.getByRole('switch', { name: '成果を承認・却下する' }) as HTMLInputElement
+    expect(op.getAttribute('aria-checked')).toBe('true')
     await act(async () => {
       fireEvent.click(op)
     })
@@ -167,8 +178,34 @@ describe('既存スタッフの成果承認権限', () => {
     state.users = [accessUser({ roleBundle: 'administrator' })]
     await openEdit(false)
     // 管理者に操作権限の欄は出ない。
-    expect(screen.queryByRole('checkbox', { name: '成果を承認・却下する' })).toBeNull()
+    expect(screen.queryByRole('switch', { name: '成果を承認・却下する' })).toBeNull()
+    fireEvent.change(screen.getByRole('textbox', { name: '名前' }), { target: { value: '変更後の管理者名' } })
     const payload = (await saveEditFull()) as Record<string, unknown>
     expect(payload.permissionKeys).toBeUndefined()
   })
+})
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))
+
+test('本人確認が失効したら、古い本人データが残っていても自己編集と2段階の変更を隠す', async () => {
+  fixture.meRole = 'staff'; fixture.meId = 'staff-1'
+  await act(async () => { render(<StaffPage />) })
+  const menu = await screen.findByRole('button', { name: /の操作$/ })
+  fireEvent.click(menu)
+  expect(screen.getByRole('menuitem', { name: '役割を変える' })).toBeTruthy()
+  const { forgetStaffIdentity } = await import('@/lib/staff-identity-state')
+  await act(async () => { forgetStaffIdentity() })
+  expect(screen.queryByRole('menuitem', { name: '役割を変える' })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: /二段階認証を設定する/ })).toBeNull()
+  expect(fixture.updated).toHaveLength(0)
+})
+
+test('閲覧のみのスタッフは自分の行でも編集と2段階の変更を出さない', async () => {
+  fixture.meRole = 'staff'; fixture.meId = 'staff-1'; fixture.meReadOnly = true
+  await act(async () => { render(<StaffPage />) })
+  fireEvent.click(await screen.findByRole('button', { name: /の操作$/ }))
+  expect(screen.queryByRole('menuitem', { name: '役割を変える' })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: /二段階認証を設定する/ })).toBeNull()
+  expect(fixture.updated).toHaveLength(0)
 })

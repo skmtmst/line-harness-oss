@@ -6,7 +6,7 @@
  *
  * 画面の契約テストの流儀に従い、対象の区間だけを切り出して見る。
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -58,12 +58,9 @@ describe('#548-9 メール取得の失敗は専用の行で知らせる', () => 
 
   it('失敗したら専用の文言を出し、成功したら消す', () => {
     expect(PAGE).toContain('const [emailError, setEmailError]')
-    expect(loader).toContain("setEmailError('メールの読み込みに失敗しました。')")
+    // 失敗の文そのものは、描いた画面で inbox-empty-state-react.test.tsx が見る。
     expect(loader).toContain("setEmailError('')")
   })
 
-  it('LINE側の失敗表示とは別に、読み込み直しのボタンを出す', () => {
-    expect(PAGE).toContain('メールを読み込み直す')
-    expect(PAGE).toContain('channel !== \'line\' && emailError')
-  })
+  // LINE側の失敗と同じ知らせにまとめても押せばメールも読み直すことは、inbox-list-retry-react.test.tsx が画面を描いて確かめる。
 })

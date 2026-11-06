@@ -1,0 +1,7 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.row { display: flex; align-items: center; gap: var(--space-16); }
+.row > img, .qr { width: 140px; height: 140px; flex-shrink: 0; }
+.instructions { display: flex; flex: 1; flex-direction: column; gap: var(--space-8); min-width: 0; }
+.instructions p { margin: 0; color: var(--color-ink-secondary); font-size: var(--polish-text-support); }
+}

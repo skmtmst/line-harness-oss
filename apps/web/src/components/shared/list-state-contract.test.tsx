@@ -41,13 +41,19 @@ describe('一覧の状態とページ送り', () => {
     )
     expect(html).toContain('予約一覧を再読み込み')
     // 渡さない画面では、重複する一律の押し口を勝手に出さない。
-    expect(renderToStaticMarkup(<ListState kind="error" />)).not.toContain('<button')
+    expect(renderToStaticMarkup(<ListState kind="error" />)).toContain('<button')
   })
 
   it('権限不足は「無い」ではなく「見られない」と言う', () => {
     const html = renderToStaticMarkup(<ListState kind="forbidden" />)
     expect(html).toContain('権限がありません')
     expect(html).not.toContain('データがありません')
+  })
+
+  it('指定された説明を権限不足の定型文で上書きしない', () => {
+    const html = renderToStaticMarkup(<ListState kind="forbidden" description="設定で有効にすると使えます。" />)
+    expect(html).toContain('設定で有効にすると使えます。')
+    expect(html).not.toContain('この操作の権限がありません')
   })
 
   it('画面から作れない記録一覧では作成を促さない', () => {
@@ -68,17 +74,17 @@ describe('一覧の状態とページ送り', () => {
     expect(html).not.toContain('作る')
   })
 
-  it('送る先が1ページしか無いとき、ページ送りを描かない', () => {
-    // 画面ごとに `{pageCount > 1 && …}` と書くと、書き忘れた画面だけ
-    // 出たままになる。**部品の側で決める。**
-    expect(renderToStaticMarkup(<Pagination page={1} pageCount={1} onPageChange={vi.fn()} />)).toBe('')
+  it('1ページ以下では移動を出さず、2ページあれば移動できる', () => {
+    const html = renderToStaticMarkup(<Pagination page={1} pageCount={1} onPageChange={vi.fn()} />)
+    expect(html).toBe('')
     expect(renderToStaticMarkup(<Pagination page={1} pageCount={0} onPageChange={vi.fn()} />)).toBe('')
     expect(renderToStaticMarkup(<Pagination page={1} pageCount={2} onPageChange={vi.fn()} />)).toContain('次へ')
   })
 
   it('取れなかった数を 0 と出さない', () => {
     // 数の無いところに 0 を入れると、「数えて0だった」と読めてしまう。
+    // D021: null だけでなく undefined・NaN も「—」にする。
     const kpis = read('kpi-card.tsx')
-    expect(kpis).toMatch(/value === null \? '—'/)
+    expect(kpis).toMatch(/isCountableValue\(value\) \? formatNumber\(value\)/)
   })
 })

@@ -1,0 +1,268 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/* dJZ7Q：画面の欄。選んだもの＋［選ぶ］／［変える］の1行。 */
+.field { display: flex; align-items: center; gap: var(--tpl-picker-gap); min-width: 0; width: 100%; height: var(--tpl-picker-field-h); padding: var(--tpl-picker-field-pad); border: 1px solid var(--color-control-border, var(--color-hairline)); border-radius: var(--radius-control); background: var(--color-canvas); }
+.field[data-invalid] { border-color: var(--color-danger); }
+.fieldIcon { flex-shrink: 0; color: var(--color-ink-secondary); }
+.fieldValue { display: flex; align-items: baseline; gap: var(--tpl-picker-gap); flex: 1; min-width: 0; overflow: hidden; }
+.fieldName { flex-shrink: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); font-weight: 600; color: var(--color-ink); }
+.field[data-invalid] .fieldName { color: var(--color-danger); }
+.fieldMeta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro, var(--text-caption)); color: var(--color-ink-secondary); }
+.fieldPlaceholder { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); color: var(--color-placeholder); }
+
+/* 窓の下の文字リンク（作る画面へ）。 */
+.createLink { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); min-width: 0; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-secondary); text-decoration: none; }
+.createLink:hover { color: var(--color-action); text-decoration: underline; }
+.createLink:focus-visible, .textButton:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-focus-ring); outline-offset: var(--tpl-bcpick-focus); border-radius: var(--radius-control); }
+.note { margin: 0; font-size: var(--text-caption); color: var(--color-warning); }
+
+/* まとめて選ぶ一覧。 */
+.embedded { flex: none; height: var(--tpl-picker-embed-h); }
+.multiList { gap: var(--tpl-picker-gap); padding: var(--tpl-picker-list-pad); }
+.multiRows { display: flex; flex-direction: column; gap: var(--tpl-picker-row-gap); min-height: 0; overflow-y: auto; }
+/* S2Vgi（正の形）：行は薄い枠の箱、選んだ行は緑の地と緑の枠。 */
+.multiRow { display: flex; flex: none; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); box-shadow: var(--tpl-bd-ring); }
+.multiRow[data-selected] { background: var(--polish-selection-bg); box-shadow: var(--tpl-bd-ring); }
+/* 窓の中身の高さは「テンプレートを選ぶ」と同じ。候補が多くても下の帯を画面の外へ押し出さない。 */
+/* 1つ選ぶ窓も高さを決め、候補が多いときは一覧の中を送る（：候補29件で下の段が画面の外へ出ていた）。 */
+.singleBody { height: var(--tpl-inbox-tp-body-h); max-height: var(--tpl-inbox-tp-body-max); }
+:root .singleBody .tpList > * { flex-shrink: 0; }
+:root .singleBody .tpCard { padding: var(--tpl-picker-single-card-pad); }
+.multiBody { height: var(--tpl-inbox-tp-body-h); max-height: var(--tpl-inbox-tp-body-max); }
+.multiBody .multiList > * { flex: none; }
+.multiBody .multiList > .multiRows { flex: 1 1 auto; }
+.multiName { display: flex; align-items: center; gap: var(--tpl-picker-gap); flex: 1 1 auto; min-width: 0; cursor: pointer; font-size: var(--text-caption); font-weight: 600; }
+.multiNameText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multiExtra { flex: 0 1 auto; min-width: 0; overflow: hidden; display: inline-flex; align-items: center; }
+.multiRow[data-stacked] { min-height: var(--tpl-picker-stack-row-h); padding: var(--tpl-picker-stack-row-pad); }
+.multiStack { display: flex; flex-direction: column; justify-content: center; gap: var(--tpl-picker-stack-gap); flex: 1 1 auto; min-width: 0; cursor: pointer; }
+.multiStack > .multiName { flex: none; cursor: inherit; }
+.multiSub { display: flex; align-items: center; min-width: 0; font-size: var(--text-micro, var(--text-caption)); line-height: var(--tpl-picker-stack-sub-lh); color: var(--color-ink-secondary); }
+.multiSubText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multiMeta { flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro, var(--text-caption)); color: var(--color-ink-secondary); }
+.textButton { padding: 0; border: 0; background: none; font: inherit; color: var(--color-action); cursor: pointer; }
+.textButton:hover { text-decoration: underline; }
+}
+
+@layer components {
+:root .field { box-shadow: var(--control-shadow); }
+}
+
+@layer components {
+/* ── テンプレートを選ぶ（段2「4.」幅640） ───────────── */
+.tpBody {
+  display: flex;
+  width: 100%;
+  height: var(--tpl-inbox-tp-body-h);
+  max-height: var(--tpl-inbox-tp-body-max);
+  box-shadow: var(--tpl-inbox-line-top);
+}
+:root .tpBody { flex: none; }
+:root .tpBody .tpList > * { flex-shrink: 0; }
+/* 統括の「テンプレートを選ぶ」窓：行は1つ選ぶ窓と同じ52、窓の高さは候補4件が見える分。 */
+:root .tpBody { height: var(--tpl-source-picker-body-h); }
+:root .tpBody .tpCard { padding: var(--tpl-picker-single-card-pad); }
+/* 1つ選ぶ窓：送るのは候補の一覧だけ。検索欄・「N件中」・下の帯は窓の中で動かない。
+   プレビューなどで高さが足りないときは、一覧が小さくなりすぎないよう最低の高さを持ち、足りない分だけ全体を送る。 */
+:root .singleBody .tpList > .tpCards,
+:root .tpBody .tpList > .tpCards { flex: 1 1 auto; min-height: 8rem; overflow-y: auto; }
+.tpSide {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  flex: none;
+  width: var(--tpl-folder-width);
+  overflow-y: auto;
+}
+.tpSideNote { color: var(--color-danger); font-size: var(--text-micro); }
+
+.tpList {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--tpl-inbox-composer-gap);
+  padding: var(--tpl-inbox-tp-list-pad);
+  overflow-y: auto;
+}
+.searchRow { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+.searchRow > :first-child { flex: 1; min-width: 0; }
+.searchRow > :last-child:not(:first-child) { flex: none; }
+.tpSearchField { flex: none; }
+.tpNote { color: var(--color-ink-faint); font-size: var(--text-caption); }
+.tpError { width: 100%; padding: var(--tpl-inbox-tp-band-pad); color: var(--color-danger); font-size: var(--text-caption); }
+.tpList .tpError { padding: 0; }
+.tpCards { display: flex; flex-direction: column; gap: var(--tpl-inbox-composer-gap); }
+.tpCard {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-row-gap);
+  width: 100%;
+  padding: var(--tpl-inbox-tp-card-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  text-align: left;
+  cursor: pointer;
+}
+.tpCard:hover { background: var(--color-surface-pearl); }
+.tpCard[data-selected], .tpCard[aria-pressed='true'] { background: var(--polish-selection-bg); outline: var(--polish-selection-outline); outline-offset: var(--tpl-inbox-tp-card-on-offset); }
+.tpCardText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: var(--tpl-inbox-row-line-gap); }
+.tpCardName { overflow: hidden; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tpCardBody { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
+.tpCardBody[data-lines='2'] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tpCardRow { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+.tpCardRow > .tpCard { flex: 1; min-width: 0; }
+.withPreview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; }
+.preview { --picker-preview-title-size: 16px; --picker-preview-action-height: 64px; display: flex; flex-direction: column; min-width: 0; height: var(--tpl-source-picker-body-h); max-height: var(--tpl-inbox-tp-body-max); border-left: 1px solid var(--color-hairline); }
+.previewHeader { display: flex; flex: none; align-items: center; gap: var(--space-8); padding: var(--space-12) var(--space-16); border-bottom: 1px solid var(--color-hairline); }
+.previewTitle { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--picker-preview-title-size); font-weight: 600; }
+.previewBody { flex: 1; min-height: 0; padding: var(--space-16); overflow-y: auto; }
+.previewActions { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: var(--space-8); height: var(--picker-preview-action-height); padding-inline: var(--space-16); border-top: 1px solid var(--color-hairline); }
+.tpNum {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-inbox-tp-num);
+  height: var(--tpl-inbox-tp-num);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+.tpBox {
+  flex: none;
+  width: var(--tpl-inbox-icon-md);
+  height: var(--tpl-inbox-icon-md);
+  border-radius: var(--tpl-inbox-badge-radius);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+}
+.tpBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-chead-gap);
+  width: 100%;
+  padding: var(--tpl-inbox-tp-band-pad);
+  background: var(--polish-selection-bg);
+  font-size: var(--text-caption);
+}
+.tpBandLabel { flex: none; color: var(--color-ink); font-weight: 700; }
+.tpBandOrder { min-width: 0; flex: 1; overflow: hidden; color: var(--color-ink); text-overflow: ellipsis; white-space: nowrap; }
+.tpBandCount { flex: none; color: var(--color-ink); font-weight: 700; }
+.tpFoot {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-inbox-composer-gap);
+  width: 100%;
+  padding: var(--tpl-inbox-tp-foot-pad);
+  box-shadow: var(--tpl-inbox-line-top);
+}
+.tpFootLead { display: flex; min-width: 0; flex: 1; align-items: center; gap: var(--tpl-inbox-composer-gap); }
+.tpFootText { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; font-size: var(--text-caption); }
+.tpFootTitle { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; white-space: nowrap; }
+.createRow { display: flex; align-items: center; gap: var(--tpl-picker-gap); }
+.createRow > :first-child { flex: 1; min-width: 0; }
+.tpFootNote { color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
+/* S2Vgi：一覧の下の「選んだもの」の帯（薄い緑の地・左に名前・右に件数）。 */
+.pickedBand { display: flex; align-items: center; gap: var(--tpl-picker-gap); width: 100%; min-width: 0; padding: var(--tpl-inbox-tp-band-pad); background: var(--polish-selection-bg); font-size: var(--text-caption); }
+.pickedLabel { flex: none; color: var(--color-ink); font-weight: 600; }
+.pickedNames { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink); text-overflow: ellipsis; white-space: nowrap; }
+.pickedCount { flex: none; color: var(--color-ink); font-weight: 600; }
+.tpFootSub { color: var(--color-ink-faint); font-size: var(--text-nano); white-space: nowrap; }
+.tpFootActions { display: flex; flex: none; align-items: center; gap: var(--tpl-inbox-composer-gap); }
+
+
+.selection { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-secondary); }
+.tpFootLead { flex-wrap: wrap; }
+.tpCards { padding: 0; margin: 0; list-style: none; }
+.tpCard[data-disabled], .tpCard:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
+.tpCard:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-action); outline-offset: var(--tpl-bcpick-focus); }
+.itemPreview { flex-shrink: 0; min-width: 0; }
+}
+
+@layer components {
+/* 案A：枠のどこからでも開く。外すボタンは開くボタンと兄弟にする。 */
+.field { position: relative; min-height: var(--tpl-picker-field-h); height: auto; padding: var(--tpl-picker-field-pad); }
+.fieldTrigger { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: var(--radius-control); background: transparent; cursor: pointer; }
+.fieldTrigger:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-action); outline-offset: var(--tpl-bcpick-focus); }
+.fieldTrigger:disabled { cursor: not-allowed; }
+.fieldValue, .fieldIcon, .fieldAction { pointer-events: none; }
+.fieldValue { align-items: center; }
+.fieldName { max-width: 100%; flex-shrink: 1; }
+/* の絞り込み：項目名と値を1行の本文として見せる。 */
+.field[data-value-prefix] .fieldName { max-width: 100%; font-size: var(--polish-text-body); font-weight: var(--font-weight-ui); line-height: var(--tpl-inbox-row-preview-lh); }
+.fieldAction { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); flex-shrink: 0; font-size: var(--text-body); font-weight: 600; color: var(--color-ink); }
+.fieldClear { position: relative; border: 0; background: none; color: var(--color-ink-secondary); font-size: var(--text-caption); cursor: pointer; }
+.fieldClear:focus-visible { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
+.fieldChips { display: flex; flex: 1; min-width: 0; flex-wrap: wrap; gap: var(--tpl-picker-tiny-gap); padding-block: var(--tpl-picker-tiny-gap); pointer-events: none; }
+.fieldChips button { position: relative; pointer-events: auto; }
+}
+
+@layer components {
+.tpCard { position: relative; }
+.cardRadio { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.tpCard:has(.cardRadio:focus-visible) { outline: var(--tpl-bcpick-focus) solid var(--color-action); outline-offset: var(--tpl-bcpick-focus); }
+}
+
+/* ：候補のカードも同じ選択の枠・輪・点。 */
+html:root .tpCard { position: relative; }
+html:root .tpCard[data-selected] { background: var(--polish-selection-bg); outline: var(--choice-card-ring) solid var(--polish-selection-ink); outline-offset: -2px; }
+html:root .cardRadio { position: static; flex: none; align-self: center; appearance: none; opacity: 1; width: var(--choice-size); height: var(--choice-size); margin: 0; border-radius: var(--radius-pill); border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
+html:root .cardRadio:checked { border-color: var(--polish-selection-ink); background: radial-gradient(circle, var(--polish-selection-ink) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
+html:root .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+
+:root .tpList > :first-child:not(.tpCards) { margin-bottom: var(--space-8); }
+
+/* 画面の選択入口だけをそろえ、窓内の候補・確定処理には触れない。 */
+:root .field:has(.fieldTrigger:hover:not(:disabled)) { background: var(--color-canvas-sunken); }
+:root .field[data-invalid] { border-color: var(--color-danger); }
+:root .field :is(.fieldName, .fieldPlaceholder, .fieldAction) { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
+:root .fieldAction { color: var(--color-ink); }
+
+:root .fieldAction { color: var(--color-ink-faint); }
+
+/* 画面の選ぶ欄も線ではなく影で浮かせる。 */
+:root .field {
+  border: 0;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+}
+
+:root .field[data-invalid] {
+  border: 0;
+  box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
+}
+
+:root .field[data-disabled] {
+  box-shadow: none;
+  opacity: var(--polish-disabled-opacity);
+}
+
+/* ラベル＋値の欄は、外の器（EntitySelect）が中身の幅になった時に一緒に広がる。 */
+:root [data-entity-content] .field {
+  width: 100%;
+  min-width: 0;
+}
+
+/* 絞り込みで「すべて」以外を選んでいる欄は、枠を緑の細い線にする。 */
+:root .field[data-filter-active]:not([data-invalid]) {
+  box-shadow: var(--shadow-raised-control), inset 0 0 0 var(--choice-ring) var(--color-selection-border);
+}
+
+/* 同じ操作の段では、部品の小型指定より共通の高さを優先する。 */
+html:root :is([data-toolbar-row], [data-control-row]) .field { height: var(--control-h); min-height: var(--control-h); }
+
+/* 権限で使えない入口は、触れても色を変えず押せないカーソルを保つ。 */
+:root .field:has(.fieldTrigger[data-permission-locked]):hover {
+  background: var(--gradient-raised-control) var(--color-canvas);
+}
+:root .field [data-permission-locked] { cursor: not-allowed; }
+/* 欄全体が薄いので、中の外す印は二重に薄くしない。 */
+:root .field[data-disabled] :global([data-permission-locked]) { opacity: var(--polish-enabled-opacity); }
+
+.navigation { padding-inline: var(--space-20); }

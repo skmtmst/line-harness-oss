@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { autoReplies } from './auto-replies.js';
@@ -93,7 +93,7 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
   let testDb: SqliteD1;
 
   beforeEach(() => {
-    testDb = createTestD1();
+    testDb = createTestD1({ loginPolicy: 'off' });
     testDb.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
     testDb.raw.prepare(
       `INSERT INTO line_accounts
@@ -161,7 +161,7 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
     expect(response.status).toBe(403);
   });
 
-  it('N-084: 公開前テストだけを権限とアカウント境界の内側のstaffへ許可する', async () => {
+  it('N-084: 権限とアカウント境界の内側のstaffへテストを許可し、鍵なしの変更は拒否する', async () => {
     const target = authenticatedApp(testDb.db);
     const runTest = (token: string) => target.request('/api/auto-replies/rule-1/test', token, {
       method: 'POST',
@@ -193,7 +193,7 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
 
     const staffMutation = (path: string, method: string, body: unknown) => target.request(
       path,
-      'staff-key',
+      'no-permission-key',
       {
         method,
         headers: { 'content-type': 'application/json', 'Idempotency-Key': 'staff-mutation-0001' },
@@ -213,6 +213,11 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
       current_draft_version_id: 'version-rule-1',
       current_published_version_id: null,
     });
+    const editable = await target.request('/api/auto-replies/drafts', 'staff-key', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(settings()),
+    });
+    expect(editable.status).toBe(201);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM auto_replies').get()).toEqual({ count: 3 });
   });
 
   it('中5: 下書きのvalidateはadminなら403にならない', async () => {
@@ -304,6 +309,19 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
       body: JSON.stringify({ isActive: false }),
     }, target.bindings);
     expect(response.status).toBe(200);
+  });
+
+  it('R527: 新規作成はstaffに403を返し、何も作らない', async () => {
+    const asStaff = app(testDb.db, staff);
+    const denied = await asStaff.instance.request('/api/auto-replies', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(settings()),
+    }, asStaff.bindings);
+    expect(denied.status).toBe(403);
+
+    const before = testDb.raw.prepare('SELECT COUNT(*) AS count FROM auto_replies').get();
+    expect(before).toEqual({ count: 2 });
   });
 
   it('AUTOREPLY-08: 新規作成はOFFをDBまで保持し、再読込・一致評価でも動かない', async () => {

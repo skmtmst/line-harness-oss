@@ -1,8 +1,9 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { friendFields } from './friend-fields.js';
@@ -20,6 +21,7 @@ function createApp(db: D1Database) {
   const app = new Hono<Env>();
   app.use('*', authMiddleware);
   app.route('/', friendFields);
+  app.onError(unhandledWorkerError);
   return { app, env: { DB: db } as Env['Bindings'] };
 }
 
@@ -58,7 +60,7 @@ describe('N-046 一括更新の原子性と冪等 (#812)', () => {
   let target: ReturnType<typeof createApp>;
 
   beforeEach(() => {
-    testDb = createTestD1();
+    testDb = createTestD1({ loginPolicy: 'off' });
     seed(testDb);
     target = createApp(testDb.db);
   });

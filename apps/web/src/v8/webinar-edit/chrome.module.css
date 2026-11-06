@@ -1,0 +1,19 @@
+/* ★V8 ウェビナーの編集の頭（・・）と作る手順の帯（・ ほか）。 */
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-wc-back-gap);
+  width: fit-content;
+  color: var(--tpl-identity-color);
+  font-size: var(--text-label);
+  font-weight: var(--tpl-identity-weight);
+  line-height: var(--tpl-identity-lh);
+  text-decoration: none;
+}
+.back:hover { text-decoration: underline; }
+
+/* タブ：横24の中で下に1pxの線。字 13/19・字の下10・選んだタブは墨の2px。 */
+.tabsRow {
+  padding: 0 var(--tpl-head-pad-side);
+}

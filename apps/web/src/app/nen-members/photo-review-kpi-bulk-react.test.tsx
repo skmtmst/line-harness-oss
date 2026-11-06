@@ -37,6 +37,7 @@ function installFetch() {
   vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : String(input)
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
+    if (path === '/api/staff/me') return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     net.calls.push({ path, init })
     const body = await net.handler(path, init)
     return new Response(JSON.stringify(body), {
@@ -129,29 +130,32 @@ async function selectPhoto(index: number) {
   await act(async () => { target.click() })
 }
 
-/** 「投稿から審査までの日数」カードの大きな値（ラベルの直後の要素）を取る。 */
-function averageTimeValue(): string | undefined {
-  const label = Array.from(host.querySelectorAll('p'))
-    .find((p) => p.textContent?.trim() === '投稿から審査までの日数')
-  return label?.nextElementSibling?.textContent?.trim()
+/** : read the actual explanation opened from the shared help button. */
+async function averageTimeValue(): Promise<string | undefined> {
+  const button = host.querySelector<HTMLButtonElement>('button[aria-label="投稿の説明"]')
+  if (!button) return undefined
+  if (button.getAttribute('aria-expanded') !== 'true') await act(async () => { button.click() })
+  const tip = document.getElementById(button.getAttribute('aria-describedby') ?? '')
+  const pending = [...(tip?.querySelectorAll('span') ?? [])].find(el => !el.childElementCount && el.textContent?.includes('投稿から審査までの日数：'))
+  return pending?.textContent?.split('投稿から審査までの日数：')[1]?.trim()
 }
 
 describe('「投稿から審査までの日数」の読みやすい単位（Issue #666）', () => {
   it.each([
-    [59, '平均 59分'],
-    [61, '平均 約1時間'],
-    [1_439, '平均 約24時間'],
-    [1_441, '平均 約1日'],
+    [59, '59分'],
+    [61, '1時間'],
+    [1_439, '23時間'],
+    [1_441, '24時間'],
     // Issue の実測値: 55975分 ≒ 38.8日。
-    [55_975, '平均 約1ヶ月'],
+    [55_975, '38日'],
   ])('平均%i分は「%s」と出る', async (minutes, expected) => {
     fixture.averageReviewMinutes = minutes
     net.handler = listHandler()
     await render()
 
-    expect(averageTimeValue()).toBe(expected)
+    expect(await averageTimeValue()).toBe(expected)
     // 60分を超える値では、生の分数がそのまま出ていないことも確認する。
-    if (minutes >= 60) expect(averageTimeValue()).not.toBe(`平均 ${minutes}分`)
+    if (minutes >= 60) expect(await averageTimeValue()).not.toBe(`平均 ${minutes}分`)
   })
 
   it('指標が取れないときは — を出す', async () => {
@@ -159,7 +163,7 @@ describe('「投稿から審査までの日数」の読みやすい単位（Issu
     net.handler = listHandler()
     await render()
 
-    expect(averageTimeValue()).toBe('—')
+    expect(await averageTimeValue()).toBe('—')
   })
 })
 

@@ -8,7 +8,7 @@ import {
   eventRowState,
   isLowApplication,
   summarizeEventAttention,
-} from './event-attention'
+} from '@/v8/events/attention'
 
 const NOW = Date.parse('2026-08-25T00:00:00.000Z')
 
@@ -84,8 +84,8 @@ describe('イベント予約の行動につながる帯', () => {
 
   it('申込者一覧も残り3席以下だけを声かけの目安にする', () => {
     expect(describeBookingCapacity(7, 10)).toBe('あと3人で満席です。声をかけると埋まります')
-    expect(describeBookingCapacity(6, 10)).toBe('定員 10 ・ 残り4')
-    expect(describeBookingCapacity(10, 10)).toBe('定員 10 ・ 満席です')
+    expect(describeBookingCapacity(6, 10)).toBe('定員 10・残り4')
+    expect(describeBookingCapacity(10, 10)).toBe('定員 10・満席です')
     expect(describeBookingCapacity(0, null)).toBe('定員なし')
   })
 

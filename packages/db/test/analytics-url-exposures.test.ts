@@ -15,7 +15,7 @@ import { asD1 } from './d1-test-helper.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-describe('V6 URL露出投影', () => {
+describe('URL露出投影', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 

@@ -1,4 +1,7 @@
+import { logger } from '@line-crm/shared/server';
+import { friendFieldReminderTargetStatements } from './reminders/index.js';
 import { jstNow } from './utils.js';
+import { ageFromBirthday, allergyValues, validateAllergyValues, DEFAULT_ALLERGY_OPTIONS } from '@line-crm/shared';
 
 /** 移行前の情報欄を所属させる既定テナント。既存IDと値は変えない。 */
 const LEGACY_TENANT_ID = '00000000-0000-4000-8000-000000000001';
@@ -21,6 +24,7 @@ export const FRIEND_FIELD_TYPES = [
   'number',
   'date',
   'datetime',
+  'time',
   'select',
   'multi_select',
   'checkbox',
@@ -40,6 +44,8 @@ export interface FriendField {
   field_key: string;
   type: string;
   type_v6?: string | null;
+  /** V8で追加した時刻。既存の型制約と値を保ったまま保存する（591）。 */
+  type_v8?: 'time' | null;
   options_json: string | null;
   default_value: string | null;
   source: string;
@@ -52,6 +58,11 @@ export interface FriendField {
   updated_at: string;
   status?: 'active' | 'read_only' | 'archived';
   version?: number;
+  fixed_key?: import("@line-crm/shared").FixedFriendFieldKey | null;
+  value_updated_at?: string | null;
+  source_type?: string | null;
+  source_id?: string | null;
+  source_name?: string | null;
 }
 
 export interface ScopedFriendField extends FriendField {
@@ -99,11 +110,13 @@ export interface FriendFieldUsageTarget {
 }
 
 function normalizeFriendField<T extends FriendField>(row: T): T {
-  return { ...row, type: row.type_v6 ?? row.type };
+  // DBの固定定義は不変。複数値は既存TEXTにJSONで保存し、読み取り側の型だけ補う。
+  if (row.field_key === 'fixed_allergy') return { ...row, type: 'multi_select', options_json: row.options_json ?? JSON.stringify(DEFAULT_ALLERGY_OPTIONS) };
+  return { ...row, type: row.type_v8 ?? row.type_v6 ?? row.type };
 }
 
 function legacyStoredType(type: FriendFieldType): string {
-  return type === 'datetime' || type === 'image' || type === 'pdf' ? 'text' : type;
+  return type === 'time' || type === 'datetime' || type === 'image' || type === 'pdf' ? 'text' : type;
 }
 
 /**
@@ -238,8 +251,8 @@ export async function createFriendField(
       `INSERT INTO friend_fields
          (id, folder_id, name, field_key, type, options_json, default_value,
           source, ec_field_path, ec_is_master, is_personal, is_starred,
-          display_order, type_v6, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          display_order, type_v6, type_v8, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -255,7 +268,8 @@ export async function createFriendField(
       input.isPersonal ? 1 : 0,
       input.isStarred ? 1 : 0,
       input.displayOrder ?? 0,
-      input.type,
+      input.type === 'time' ? 'text' : input.type,
+      input.type === 'time' ? 'time' : null,
       now,
       now,
     )
@@ -263,22 +277,119 @@ export async function createFriendField(
   return (await getFriendFieldById(db, id))!;
 }
 
+export class FriendFieldCreateError extends Error {
+  constructor(public readonly code: 'idempotency_conflict', message: string) {
+    super(message);
+    this.name = 'FriendFieldCreateError';
+  }
+}
+
+/**
+ * 同じ要求キーの再送で二重に作らないための指紋。
+ *
+ * 名前・差し込み名・種類・所属・選択肢・既定値・各種の印が
+ * 1つでも違えば別の要求とみなし、作らず止める。
+ */
+function friendFieldCreateFingerprint(input: CreateFriendFieldInput): string {
+  return JSON.stringify({
+    name: input.name,
+    fieldKey: input.fieldKey,
+    type: input.type,
+    folderId: input.folderId ?? null,
+    optionsJson: input.optionsJson ?? null,
+    defaultValue: input.defaultValue ?? null,
+    source: input.source ?? 'manual',
+    ecFieldPath: input.ecFieldPath ?? null,
+    ecIsMaster: input.ecIsMaster === true,
+    isPersonal: input.isPersonal === true,
+    isStarred: input.isStarred === true,
+    displayOrder: input.displayOrder ?? 0,
+  });
+}
+
+export interface FriendFieldCreateResult {
+  field: ScopedFriendField;
+  /** 同じ要求キーの再送で、保存済みの項目を返した。 */
+  replayed: boolean;
+}
+
+/**
+ * 要求キー付きで友だち情報欄を作る。
+ *
+ * 応答だけ失った再試行は、同じキー・同じ内容なら保存済みの項目を
+ * 返す（作り直さない）。同じキーに異なる内容が来たら作らず止める。
+ * 要求キーの行は本体と同じD1バッチで確定するため、同時に同じキーが
+ * 送られても1件だけ残る（負けた側のバッチは巻き戻る）。
+ * 対応マークの createSupportMarkIdempotent と同じ約束。
+ */
+export async function createFriendFieldIdempotent(
+  db: D1Database,
+  scope: FriendFieldScope,
+  input: CreateFriendFieldInput,
+  idempotencyKey: string,
+): Promise<FriendFieldCreateResult> {
+  const fingerprint = friendFieldCreateFingerprint(input);
+  const findRequest = () => db.prepare(
+    `SELECT field_id, request_fingerprint
+       FROM friend_field_create_requests
+      WHERE line_account_id = ? AND idempotency_key = ?`,
+  ).bind(scope.lineAccountId, idempotencyKey).first<{
+    field_id: string;
+    request_fingerprint: string;
+  }>();
+  const previous = await findRequest();
+  if (previous) {
+    if (previous.request_fingerprint !== fingerprint) {
+      throw new FriendFieldCreateError(
+        'idempotency_conflict',
+        '同じ要求キーに異なる内容が指定されました。一覧を確認してください',
+      );
+    }
+    const field = await getFriendFieldByIdForScope(db, previous.field_id, scope);
+    if (field) return { field, replayed: true };
+    // 保存済みのはずの項目が無い。古い予約を消して作り直す。
+    await db.prepare(
+      `DELETE FROM friend_field_create_requests
+        WHERE line_account_id = ? AND idempotency_key = ?`,
+    ).bind(scope.lineAccountId, idempotencyKey).run();
+  }
+  const fieldId = crypto.randomUUID();
+  try {
+    const field = await createFriendFieldForScope(db, scope, input, fieldId, {
+      key: idempotencyKey,
+      fingerprint,
+    });
+    return { field, replayed: false };
+  } catch (err) {
+    // 同時に同じキーが確定した可能性がある。勝った側の結果に従い、
+    // 勝者がいなければ元の失敗をそのまま返す（握りつぶさない）。
+    const raced = await findRequest().catch(() => null);
+    if (raced?.request_fingerprint === fingerprint) {
+      const field = await getFriendFieldByIdForScope(db, raced.field_id, scope).catch(() => null);
+      if (field) return { field, replayed: true };
+    }
+    throw err;
+  }
+}
+
 /** 新規項目と所属を同じD1バッチで作る。 */
 export async function createFriendFieldForScope(
   db: D1Database,
   scope: FriendFieldScope,
   input: CreateFriendFieldInput,
+  fieldId: string = crypto.randomUUID(),
+  idempotency?: { key: string; fingerprint: string },
 ): Promise<ScopedFriendField> {
-  const id = crypto.randomUUID();
+  const id = fieldId;
   const now = jstNow();
-  await db.batch([
+  const statements: D1PreparedStatement[] = [
     db
       .prepare(
         `INSERT INTO friend_fields
            (id, folder_id, name, field_key, type, options_json, default_value,
             source, ec_field_path, ec_is_master, is_personal, is_starred,
-            display_order, type_v6, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            display_order, type_v6, type_v8, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -294,7 +405,8 @@ export async function createFriendFieldForScope(
         input.isPersonal ? 1 : 0,
         input.isStarred ? 1 : 0,
         input.displayOrder ?? 0,
-        input.type,
+        input.type === 'time' ? 'text' : input.type,
+        input.type === 'time' ? 'time' : null,
         now,
         now,
       ),
@@ -305,7 +417,27 @@ export async function createFriendFieldForScope(
          VALUES (?, ?, ?, ?)`,
       )
       .bind(id, scope.tenantId, scope.lineAccountId, now),
-  ]);
+  ];
+  if (idempotency) {
+    // 要求キーの行も同じバッチで確定する。本体より後に積むため、
+    // 外部キーのある環境でも制約に当たらない。同じキーの同時実行は
+    // UNIQUE 制約で負けた側だけ巻き戻り、二重に残らない。
+    statements.push(db.prepare(
+      `INSERT INTO friend_field_create_requests
+         (id, line_account_id, idempotency_key, request_fingerprint,
+          field_id, response_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      scope.lineAccountId,
+      idempotency.key,
+      idempotency.fingerprint,
+      id,
+      JSON.stringify({ fieldId: id }),
+      now,
+    ));
+  }
+  await db.batch(statements);
   return (await getFriendFieldByIdForScope(db, id, scope))!;
 }
 
@@ -408,17 +540,16 @@ export async function countFriendFieldValuesForScopes(
 ): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
   if (fieldIds.length === 0) return counts;
-  const placeholders = fieldIds.map(() => '?').join(',');
   const result = await db
     .prepare(
       `SELECT v.field_id AS field_id, COUNT(*) AS c
          FROM friend_field_values v
          JOIN friends f ON f.id = v.friend_id
-        WHERE v.field_id IN (${placeholders}) AND f.line_account_id = ?
+        WHERE v.field_id IN (SELECT value FROM json_each(?)) AND f.line_account_id = ?
           AND v.value IS NOT NULL AND v.value != ''
         GROUP BY v.field_id`,
     )
-    .bind(...fieldIds, scope.lineAccountId)
+    .bind(JSON.stringify(fieldIds), scope.lineAccountId)
     .all<{ field_id: string; c: number }>();
   for (const row of result.results ?? []) counts.set(row.field_id, Number(row.c ?? 0));
   return counts;
@@ -444,7 +575,7 @@ export async function getFriendFieldValuesForMigration(
   return result.results;
 }
 
-/** V6 4-2 上部の4枚に使う、選択中アカウントだけの集計。 */
+/** 4-2 上部の4枚に使う、選択中アカウントだけの集計。 */
 export async function getFriendFieldListSummary(
   db: D1Database,
   scope: FriendFieldScope,
@@ -455,7 +586,6 @@ export async function getFriendFieldListSummary(
     return { total: 0, inUse: 0, registeredFriends: 0, updatedThisMonth: 0, formLinks: 0 };
   }
   const ids = fields.map((field) => field.id);
-  const placeholders = ids.map(() => '?').join(',');
   const row = await db
     .prepare(
       `SELECT
@@ -464,9 +594,9 @@ export async function getFriendFieldListSummary(
          COUNT(CASE WHEN v.updated_at >= ? THEN 1 END) AS updated_this_month
        FROM friend_field_values v
        JOIN friends f ON f.id = v.friend_id
-      WHERE f.line_account_id = ? AND v.field_id IN (${placeholders})`,
+      WHERE f.line_account_id = ? AND v.field_id IN (SELECT value FROM json_each(?))`,
     )
-    .bind(monthStart, scope.lineAccountId, ...ids)
+    .bind(monthStart, scope.lineAccountId, JSON.stringify(ids))
     .first<{ in_use: number; friends: number; updated_this_month: number }>();
   const base = {
     total: fields.length,
@@ -481,7 +611,7 @@ export async function getFriendFieldListSummary(
       formLinks: new Set(usages.filter((usage) => usage.kind === 'form').map((usage) => usage.id)).size,
     };
   } catch (error) {
-    console.error('friend field form usage unavailable:', error);
+    logger.error("src_friend_fields_failed");
     return {
       ...base,
       formLinks: null,
@@ -548,7 +678,7 @@ export async function getFriendFieldUsageForScope(
 
 /**
  * 画面から届いた「動かせる行だけの新しい順」を、届いていない行の位置を
- * 保ったまま全体の並びへ戻して、1回のバッチで書く（#1014 ATTR-03/04）。
+ * 保ったまま全体の並びへ戻して、1回のバッチで書く。
  *
  * 行ごとの PATCH だと途中失敗で一部だけ新しい順位が残る。ここでは
  * 依頼されたIDを動かせる行に限って位置だけ入れ替える。
@@ -593,10 +723,13 @@ export async function getFriendFieldsWithValues(
 ): Promise<Array<FriendField & { value: string | null; updated_by: string | null }>> {
   const result = await db
     .prepare(
-      `SELECT f.*, v.value, v.updated_by
+      `SELECT f.*, v.value, v.updated_by, v.updated_at AS value_updated_at,
+              fx.fixed_key, v.source_type, v.source_id, source_form.name AS source_name
          FROM friend_fields f
          LEFT JOIN friend_field_values v
            ON v.field_id = f.id AND v.friend_id = ?
+         LEFT JOIN friend_fixed_fields fx ON fx.field_id = f.id
+         LEFT JOIN forms source_form ON v.source_type = 'form' AND source_form.id = v.source_id
         ORDER BY f.display_order ASC, f.name ASC`,
     )
     .bind(friendId)
@@ -606,6 +739,7 @@ export async function getFriendFieldsWithValues(
 
 export interface FriendFieldValueCheckTarget {
   type: string;
+  field_key?: string;
   options_json?: string | null;
 }
 
@@ -663,7 +797,7 @@ function isExistingCalendarDate(value: string): boolean {
  *
  * 項目の種類は作成時に FRIEND_FIELD_TYPES からしか選べないが、古い行や
  * 直接書き込みで想定外の種類が残っている可能性がある。未知の種類を
- * 無条件で通すと、不正値の波及という N-042 の問題が残る。
+ * 無条件で通すと、不正値が波及する。
  */
 const VALUE_CHECKABLE_TYPES = new Set<string>(FRIEND_FIELD_TYPES);
 
@@ -671,12 +805,23 @@ export function validateFriendFieldValue(
   field: FriendFieldValueCheckTarget,
   raw: unknown,
 ): { ok: true; value: string | null } | { ok: false; error: string } {
+  if (field.field_key === 'fixed_allergy') {
+    const checked = validateAllergyValues(raw);
+    return checked.ok ? { ok: true, value: checked.values.length ? JSON.stringify(checked.values) : null } : checked;
+  }
   const type = typeof field.type === 'string' ? field.type : '';
   if (!VALUE_CHECKABLE_TYPES.has(type)) {
     return { ok: false, error: 'この項目の種類では値を保存できません' };
   }
   if (raw === null || raw === undefined) return { ok: true, value: null };
   if (typeof raw === 'string' && raw.trim() === '') return { ok: true, value: null };
+
+  if (field.field_key === 'fixed_age' && (!/^\d{1,3}$/.test(String(raw).trim()) || Number(raw) > 150)) {
+    return { ok: false, error: '年齢は0〜150の整数で入力してください' };
+  }
+  if (field.field_key === 'fixed_birthday' && ageFromBirthday(String(raw).trim()) === null) {
+    return { ok: false, error: '生年月日は過去の存在する日付で入力してください' };
+  }
 
   if (type === 'checkbox') {
     if (raw === true || raw === '1' || (typeof raw === 'string' && raw.trim().toLowerCase() === 'true')) {
@@ -734,6 +879,12 @@ export function validateFriendFieldValue(
     }
     return { ok: true, value: raw.trim() };
   }
+  if (type === 'time') {
+    if (typeof raw !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(raw.trim())) {
+      return { ok: false, error: 'HH:mmの時刻（00:00〜23:59）で入力してください' };
+    }
+    return { ok: true, value: raw.trim() };
+  }
   if (type === 'datetime') {
     if (typeof raw !== 'string') return { ok: false, error: '日時形式で入力してください' };
     const text = raw.trim();
@@ -741,7 +892,7 @@ export function validateFriendFieldValue(
       return { ok: false, error: '日時形式で入力してください' };
     }
     /*
-     * R181: Date.parse は存在しない日（2026-02-31）を翌月へ読み替えて
+     * Date.parse は存在しない日（2026-02-31）を翌月へ読み替えて
      * 通してしまう。先頭が YYYY-MM-DD のときは暦に存在するかも見る。
      * 日付型と同じ判定にし、既定値・個別値で同じ結果にする。
      */
@@ -762,7 +913,7 @@ export function validateFriendFieldValue(
     if (typeof raw !== 'string') return { ok: false, error: '電話番号は数字10〜15桁で入力してください' };
     const text = raw.trim();
     /*
-     * R181: 記号だけ（--------）が旧い検査を通っていた。移行プレビュー・
+     * 記号だけ（--------）が旧い検査を通っていた。移行プレビュー・
      * 本人特定と同じく数字の桁数で見る。入力の見た目（ハイフン等）は
      * 残し、保存する形は変えない。
      */
@@ -813,37 +964,37 @@ export function validateFriendFieldValue(
  * 空文字は行を消す。「空欄にした」と「一度も入れていない」を分けても
  * 画面上は同じ見え方になり、分けた分だけ判定が増えるため。
  */
-export async function setFriendFieldValue(
+export function friendFieldValueStatements(
   db: D1Database,
-  input: { friendId: string; fieldId: string; value: string | null; updatedBy: string; field?: FriendFieldValueCheckTarget },
-): Promise<void> {
+  input: { friendId: string; fieldId: string; value: string | null; updatedBy: string; field?: FriendFieldValueCheckTarget; sourceType?: string; sourceId?: string },
+): D1PreparedStatement[] {
   let value = input.value;
   if (input.field) {
     const checked = validateFriendFieldValue(input.field, value);
     if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`);
     value = checked.value;
   }
-  if (value === null || value === '') {
-    await db
-      .prepare(`DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?`)
-      .bind(input.friendId, input.fieldId)
-      .run();
-    return;
-  }
-  await db
-    .prepare(
-      `INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(friend_id, field_id)
-       DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by,
-                     updated_at = excluded.updated_at`,
-    )
-    .bind(input.friendId, input.fieldId, value, input.updatedBy, jstNow())
-    .run();
+  const now = jstNow();
+  const statement = value === null || value === ''
+    ? db.prepare(`DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?`).bind(input.friendId, input.fieldId)
+    : db.prepare(`INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at, source_type, source_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(friend_id, field_id)
+        DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at,
+          source_type = excluded.source_type, source_id = excluded.source_id`)
+        .bind(input.friendId,input.fieldId,value,input.updatedBy,now,input.sourceType ?? null,input.sourceId ?? null);
+  return [statement, ...friendFieldReminderTargetStatements(db, [{ friendId: input.friendId, fieldId: input.fieldId, value }], now)];
+}
+
+
+export async function setFriendFieldValue(
+  db: D1Database,
+  input: Parameters<typeof friendFieldValueStatements>[1],
+): Promise<void> {
+  await db.batch(friendFieldValueStatements(db, input));
 }
 
 /**
- * N-046(#812): 一括値を1回のD1 batchで書く。
+ * 一括値を1回のD1 batchで書く。
  *
  * 値は呼び出し側で validate済みの正規化ずみを渡すこと。batchは原子的で、
  * 途中の1文が失敗したら永続変更は0件になる。空配列は呼ばないこと。
@@ -872,7 +1023,43 @@ export async function setFriendFieldValuesBulk(
           )
           .bind(entry.friendId, input.fieldId, entry.value, input.updatedBy, input.now),
   );
-  await db.batch(statements);
+  await db.batch([...statements, ...friendFieldReminderTargetStatements(db,
+    input.entries.map(entry => ({ ...entry, fieldId: input.fieldId })), input.now)]);
+  return statements.length;
+}
+
+/**
+ * M046: 1人の複数項目を1回のD1 batchで書く。
+ *
+ * 値は呼び出し側で validate済みの正規化ずみを渡すこと。batchは原子的で、
+ * 途中の1文が失敗したら永続変更は0件になる。空配列は呼ばないこと。
+ */
+export async function setFriendFieldValuesForFriend(
+  db: D1Database,
+  input: {
+    friendId: string;
+    entries: Array<{ fieldId: string; value: string | null }>;
+    updatedBy: string;
+    now: string;
+  },
+): Promise<number> {
+  const statements = input.entries.map((entry) =>
+    entry.value === null || entry.value === ''
+      ? db
+          .prepare('DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?')
+          .bind(input.friendId, entry.fieldId)
+      : db
+          .prepare(
+            `INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(friend_id, field_id)
+             DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by,
+                           updated_at = excluded.updated_at`,
+          )
+          .bind(input.friendId, entry.fieldId, entry.value, input.updatedBy, input.now),
+  );
+  await db.batch([...statements, ...friendFieldReminderTargetStatements(db,
+    input.entries.map(entry => ({ ...entry, friendId: input.friendId })), input.now)]);
   return statements.length;
 }
 
@@ -889,7 +1076,7 @@ export async function getFriendFieldMap(
 ): Promise<Record<string, string>> {
   const result = await db
     .prepare(
-      `SELECT f.field_key, COALESCE(f.type_v6, f.type) AS field_type, f.options_json,
+      `SELECT f.field_key, COALESCE(f.type_v8, f.type_v6, f.type) AS field_type, f.options_json,
               COALESCE(v.value, f.default_value) AS value
          FROM friend_fields f
          LEFT JOIN friend_field_values v
@@ -899,6 +1086,7 @@ export async function getFriendFieldMap(
     .all<{ field_key: string; field_type: string; options_json: string | null; value: string | null }>();
   const out: Record<string, string> = {};
   for (const row of result.results) {
+    if (row.field_key === 'fixed_allergy' && row.value != null) { out[row.field_key] = allergyValues(row.value).join('、'); continue; }
     if (row.value == null || row.field_type === 'image' || row.field_type === 'pdf') continue;
     if (row.field_type === 'select' || row.field_type === 'multi_select') {
       try {
@@ -919,5 +1107,18 @@ export async function getFriendFieldMap(
     }
     out[row.field_key] = row.value;
   }
+  const derivedAge = ageFromBirthday(out.fixed_birthday);
+  if (derivedAge !== null) out.fixed_age = String(derivedAge);
   return out;
+}
+
+
+/** 固定項目の対応は migration 623 だけが定義する。アカウント固有のIDは使わない。 */
+export async function getFixedFriendField(
+  db: D1Database, key: import("@line-crm/shared").FixedFriendFieldKey,
+): Promise<FriendField | null> {
+  const row = await db.prepare(`SELECT f.* FROM friend_fields f
+    JOIN friend_fixed_fields fixed ON fixed.field_id = f.id WHERE fixed.fixed_key = ?`)
+    .bind(key).first<FriendField>();
+  return row ? normalizeFriendField(row) : null;
 }

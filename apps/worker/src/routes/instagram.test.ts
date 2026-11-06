@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { instagram } from './instagram.js';
 import {
@@ -114,8 +114,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 /**
- * 接続は一段。Instagram にログインして戻ってきた折り返しだけで保存が終わり、
- * ページを選ばせる画面は出さずに設定 › SNS連携へ帰る（2026-10-07 利用者承認）。
+ * 接続を途中で終わらせないよう、Instagram の認可から戻るだけで保存を完了し、ページ選択を挟まず設定の SNS 連携へ戻す。
  */
 async function connect() {
   const start = await read(await req('/api/instagram/oauth/start', {}));
@@ -626,10 +625,7 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
     line.includes('instagram_oauth_callback_failed'),
   );
   expect(record).toBeDefined();
-  // 原因調べに使う種別・番号は残る。
-  expect(record).toContain('type=OAuthException');
-  expect(record).toContain('code=100');
-  expect(record).toContain('subcode=33');
+  expect(JSON.parse(record!)).toEqual({ code: 'instagram_oauth_callback_failed', timestamp: expect.any(String), level: 'error', requestId: null, invocationId: null, source: 'background' });
   // 説明文（message）自体を記録に出さないため、どの表現も残らない。
   expect(record).not.toContain('message=');
   for (const secret of [

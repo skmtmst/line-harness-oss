@@ -83,7 +83,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-vi.mock('./media-direct-upload', () => ({
+vi.mock('@/v8/contents/media-direct-upload', () => ({
   extractMediaMetadata: () => Promise.resolve({}),
   fileMatchesMediaKind: () => true,
   mediaAcceptForKind: () => 'image/png',
@@ -91,7 +91,7 @@ vi.mock('./media-direct-upload', () => ({
   validateMediaFile: () => null,
 }))
 
-const { default: MediaDetailDialog } = await import('./media-detail-dialog')
+const { default: MediaDetailDialog } = await import('@/v8/contents/media-detail-dialog')
 
 const ITEM: MediaItem = {
   id: 'media-a',
@@ -163,7 +163,7 @@ async function setInputValue(input: HTMLInputElement, value: string) {
   })
 }
 
-/** 利用期限の日付の選択（★V7）で YYYY-MM-DD を選ぶ。値は今までどおりの文字列。 */
+/** 利用期限の日付の選択（★管理画面）で YYYY-MM-DD を選ぶ。値は今までどおりの文字列。 */
 async function pickExpiresDate(iso: string) {
   const [y, mo, d] = iso.split('-').map(Number)
   const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
@@ -192,6 +192,7 @@ async function pickExpiresDate(iso: string) {
     )!.click()
     await settle()
   })
+  await act(async () => { Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!.click(); await settle() })
 }
 
 /** 利用期限の日付の選択を空にする。 */
@@ -205,6 +206,7 @@ async function clearExpiresDate() {
     [...picker.querySelectorAll('button')].find((b) => b.textContent?.trim() === '消す')!.click()
     await settle()
   })
+  await act(async () => { Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!.click(); await settle() })
 }
 
 beforeEach(() => {

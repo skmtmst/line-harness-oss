@@ -1,3 +1,5 @@
+export type { Env } from './env.js';
+import type { Env } from './env.js';
 /**
  * LINE Harness Plugin: MyService
  *
@@ -9,13 +11,6 @@
 
 import { syncExternalData } from './sync.js'
 import { checkAndNotify } from './notify.js'
-
-export interface Env {
-  LINE_HARNESS_API_URL: string
-  LINE_HARNESS_API_KEY: string
-  EXTERNAL_API_KEY: string
-  LINE_ACCOUNT_ID?: string
-}
 
 export default {
   /**
@@ -56,24 +51,14 @@ export default {
 
     // Webhook endpoint: receives events from MyService
     if (url.pathname === '/webhook' && request.method === 'POST') {
-      try {
-        const body = await request.json() as Record<string, unknown>
-        console.log('[MyService Plugin] Webhook received:', JSON.stringify(body))
-
-        // TODO: Validate webhook signature from MyService
-        // TODO: Process the webhook event
-        // Example: a booking was confirmed → tag the friend, send confirmation message
-
-        return new Response(JSON.stringify({ received: true }), {
-          headers: { 'Content-Type': 'application/json' },
-        })
-      } catch (error) {
-        console.error('[MyService Plugin] Webhook error:', error)
-        return new Response(JSON.stringify({ error: 'Invalid request' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      }
+      // TODO: Validate webhook signature from MyService before reading its body.
+      // TODO: Process the verified webhook event with a stable idempotency key.
+      // This template has neither provider contract yet. Fail closed and never
+      // log customer payloads or acknowledge an unprocessed event as received.
+      return new Response(JSON.stringify({ error: 'Webhook integration is not configured' }), {
+        status: 501,
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
 
     return new Response('Not Found', { status: 404 })

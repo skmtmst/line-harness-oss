@@ -1,0 +1,184 @@
+// @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
+/*
+ * R621: 画像もタイトルもない本文の120文字上限と、一律60文字の注意文の矛盾。
+ *
+ * 決まり（送信境界・Worker の carousel-validation と同じ）は変えない。
+ * タイトルか画像があるパネルは60文字、両方なければ120文字。
+ * 現役の欄の上限・超過した文字数・補足が食い違わないことを実マウントで確かめる。
+ */
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://worker.example.com'
+})
+
+const routing = vi.hoisted(() => ({
+  params: new URLSearchParams(),
+  pushed: [] as string[],
+}))
+
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useRouter: () => ({
+    push: (href: string) => routing.pushed.push(href),
+    replace: (href: string) => routing.pushed.push(href),
+    refresh: () => {},
+    back: () => {},
+    forward: () => {},
+    prefetch: () => {},
+  }),
+  useSearchParams: () => routing.params,
+  usePathname: () => '/templates/carousel',
+}))
+
+vi.mock('next/link', () => ({
+  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
+    React.createElement('a', { href }, children),
+}))
+
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({
+    accounts: [{ id: 'account-a', name: 'A店' }],
+    selectedAccountId: 'account-a',
+    selectedAccount: { id: 'account-a', name: 'A店' },
+    setSelectedAccountId: () => {},
+    clearSelectedAccountId: () => {},
+    refreshAccounts: async () => {},
+    loading: false,
+  }),
+}))
+
+vi.mock('@/lib/use-feature-visibility', () => ({
+  useFeatureVisibility: () => ({
+    status: 'ready',
+    features: { friend_fields: true, common_vars: true },
+    enabled: () => true,
+  }),
+}))
+
+const calls = vi.hoisted(() => ({
+  foldersList: vi.fn(),
+}))
+
+vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
+  const actual = await importOriginal()
+  const empty = async () => ({ success: true as const, data: [] as never[] })
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'owner' } }) },
+      folders: { ...actual.api.folders, list: calls.foldersList },
+      tags: { ...actual.api.tags, list: empty },
+      friendFields: { ...actual.api.friendFields, list: empty },
+      supportMarks: { ...actual.api.supportMarks, list: empty },
+      scenarios: { ...actual.api.scenarios, list: empty },
+      commonVars: { ...actual.api.commonVars, list: empty },
+    },
+  }
+})
+
+import CarouselEditorPage from './page'
+
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+let container: HTMLDivElement
+let root: Root
+
+async function mountNew() {
+  routing.params = new URLSearchParams('')
+  container = document.createElement('div')
+  document.body.appendChild(container)
+  root = createRoot(container)
+  await act(async () => { root.render(React.createElement(CarouselEditorPage)) })
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
+
+/** 入力の欄へ、画面と同じく入力の出来事で入れる。 */
+function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const proto = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+  const setter = Object.getOwnPropertyDescriptor(proto, 'value')!.set!
+  setter.call(input, value)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
+/** 「気をつけること」の中のパネル本文の行。 */
+function bodyCaution(): HTMLElement | null {
+  return container.querySelector('[title*="本文はタイトルか画像があると"]')
+}
+
+const titleInput = () => document.getElementById('cr-title') as HTMLInputElement | null
+const bodyInput = () => document.getElementById('cr-text') as HTMLInputElement | null
+/** 現役は超過したときに文字数と減らす案内を出す。 */
+function bodyCounter(): HTMLElement | null {
+  return Array.from(container.querySelectorAll<HTMLElement>('p[role="alert"]')).find(element => element.textContent?.includes('多すぎる分を減らしてください')) ?? null
+}
+
+beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
+  routing.pushed = []
+  calls.foldersList.mockReset()
+  calls.foldersList.mockResolvedValue({ success: true, data: [] })
+  const store = new Map<string, string>([['lh_staff_role', 'owner']])
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => void store.set(key, value),
+    removeItem: (key: string) => void store.delete(key),
+  })
+})
+
+afterEach(async () => {
+  if (root) await act(async () => { root.unmount() })
+  container?.remove()
+  vi.unstubAllGlobals()
+})
+
+describe('R621: 本文の上限案内は画像・タイトルの有無と食い違わない', () => {
+  it('両方なければ120文字で案内し、注意文も120文字をうたう', async () => {
+    await mountNew()
+    // 欄のそばの注記とカウンタは120文字。
+    expect(bodyCounter()).toBeNull()
+    expect(container.textContent).toContain('120文字まで')
+    // 「気をつけること」は一律60文字ではなく、両方の条件を書く。
+    const caution = bodyCaution()?.getAttribute('title') ?? ''
+    expect(caution).toContain('60文字')
+    expect(caution).toContain('120文字')
+  })
+
+  it('タイトルを入れると60文字に切り替わる', async () => {
+    await mountNew()
+    await act(async () => { typeInto(titleInput()!, '夏の定番セット') })
+    expect(bodyCounter()).toBeNull()
+    expect(container.textContent).toContain('本文（タイトルか画像があると60文字まで）')
+  })
+
+  it('送信境界はそのまま：タイトルあり61文字は超過、なし120文字は収まる', async () => {
+    await mountNew()
+    // 両方なしで120文字ちょうどは赤くならない。
+    await act(async () => { typeInto(bodyInput()!, 'あ'.repeat(120)) })
+    expect(bodyInput()?.value).toHaveLength(120)
+    expect(bodyCounter()).toBeNull()
+    // タイトルを足すと上限が60に下がり、同じ本文が超過になる。
+    await act(async () => { typeInto(titleInput()!, '見出し') })
+    expect(bodyCounter()?.textContent).toContain('本文 120 / 60 文字')
+    expect(bodyCounter()?.textContent).toContain('多すぎる分を減らしてください')
+  })
+})
+
+describe('J60utH: 右の欄に届き方の見出しが出る', () => {
+  it('スマホの見本の上に「届き方」', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    await mountNew()
+    delete document.documentElement.dataset.theme
+    const heading = Array.from(container.querySelectorAll('h2')).find(
+      (element) => element.textContent === '届き方',
+    )
+    expect(heading).toBeTruthy()
+  })
+})

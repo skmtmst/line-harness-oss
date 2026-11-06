@@ -1,5 +1,6 @@
+import { processDueEcRetries } from '../features/ec-commerce/ec-retry.js';
 /*
- * N-328 / N-330 (#943): ECイベントからの顧客通知送信を、実D1で共通送信台帳
+ *  ECイベントからの顧客通知送信を、実D1で共通送信台帳
  * (notification_instances / notification_deliveries /
  *  notification_delivery_attempts) へつなぐことを固定する。
  *
@@ -10,8 +11,8 @@
  *  - 従来の ec_v6_dispatches / イベント台帳の動きは維持する
  */
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Env } from '../worker-env';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn());
@@ -33,7 +34,7 @@ vi.mock('../services/nen-engagement.js', () => ({
 }));
 
 const { ecIntegrations } = await import('./ec-integrations.js');
-const { ecNotificationRetryKey } = await import('../services/ec-event-publish.js');
+const { ecNotificationRetryKey } = await import('../features/ec-commerce/ec-event-publish.js');
 
 const LINE_USER_ID = `U${'a'.repeat(32)}`;
 
@@ -61,6 +62,8 @@ beforeEach(() => {
   `);
   pushMessageWithRequestId.mockResolvedValue({ data: {}, requestId: 'req-1' });
 });
+
+afterEach(()=>vi.useRealTimers());
 
 const app = new Hono<Env>();
 app.route('/', ecIntegrations);
@@ -136,6 +139,33 @@ function seedDefinition(status: string) {
 }
 
 describe('N-328: EC顧客通知を共通送信台帳へ書く', () => {
+  it.each([
+    [0, 1, '店舗Aの通知', false],
+    [1, 0, '店舗Aの通知', true],
+    [null, 0, 'ご注文ありがとうございます', true],
+  ] as const)('店舗の設定%s・他店舗%sのとき、受信先の設定または共通設定だけで送信する', async (ownEnabled, otherEnabled, title, sent) => {
+    sqlite.exec(`INSERT INTO line_accounts
+      (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('account-b', 'channel-b', 'B店', 'token-b', 'secret-b')`);
+    const setting = sqlite.prepare(`INSERT INTO ec_notification_account_settings
+      (line_account_id, event_type, is_enabled, title_override, created_at, updated_at)
+      VALUES (?, 'ec.order.confirmed', ?, ?, '2026-10-22', '2026-10-22')`);
+    setting.run('account-b', otherEnabled, '店舗Bの通知');
+    if (ownEnabled !== null) setting.run('account-a', ownEnabled, '店舗Aの通知');
+
+    expect((await post(baseEvent())).status).toBe(sent ? 200 : 202);
+
+    expect(pushMessageWithRequestId).toHaveBeenCalledTimes(sent ? 1 : 0);
+    if (sent) {
+      const message = JSON.stringify(pushMessageWithRequestId.mock.calls[0][1]);
+      expect(message).toContain(title);
+      expect(message).not.toContain('店舗Bの通知');
+      expect(deliveries()[0]).toMatchObject({ status: 'provider_accepted' });
+    } else {
+      expect(deliveries()[0]).toMatchObject({ status: 'excluded', attempts: 0, error_code: 'notification_disabled' });
+    }
+  });
+
   it('受理: 通知・送達・試行を1件ずつ残し、従来台帳も sent になる', async () => {
     const response = await post(baseEvent());
     expect(response.status).toBe(200);
@@ -192,7 +222,7 @@ describe('N-328: EC顧客通知を共通送信台帳へ書く', () => {
 
     expect(instances()[0]).toMatchObject({ status: 'failed' });
     expect(deliveries()[0]).toMatchObject({
-      status: 'failed', attempts: 1, error_code: 'line_temporary_failure',
+      status: 'failed', attempts: 1, error_code: 'delivery_unknown',
     });
     expect(String(deliveries()[0].error_message_safe)).not.toContain('Request failed');
     expect(attemptRows()).toHaveLength(1);
@@ -200,11 +230,15 @@ describe('N-328: EC顧客通知を共通送信台帳へ書く', () => {
     expect(dispatch()).toMatchObject({ subscriber: 'notification', status: 'failed' });
   });
 
-  it('失敗後の再送は同じ冪等キーの行を受理へ確定し、試行は2回になる', async () => {
+  it('確定した429の拒否は待機後に同じ冪等キーで再試行し、物理要求だけ数える', async () => {
+    vi.useFakeTimers();
     pushMessageWithRequestId.mockRejectedValueOnce(Object.assign(
-      new Error('Request failed with status 500'), { status: 500 },
+      new Error('Request failed with status 429'), { status: 429 },
     ));
     expect((await post(baseEvent())).status).toBe(503);
+    expect((await post(baseEvent())).status).toBe(503);
+    expect(pushMessageWithRequestId).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(60_000);
     pushMessageWithRequestId.mockResolvedValueOnce({ data: {}, requestId: 'req-2' });
     expect((await post(baseEvent())).status).toBe(200);
 
@@ -216,6 +250,28 @@ describe('N-328: EC顧客通知を共通送信台帳へ書く', () => {
     expect(attemptRows()).toHaveLength(2);
     expect(attemptRows()[0]).toMatchObject({ attempt_number: 1, outcome: 'failed' });
     expect(attemptRows()[1]).toMatchObject({ attempt_number: 2, outcome: 'provider_accepted' });
+  });
+
+
+  it('応答が不明なEC通知は再受信しても元の送信行を保持し、再送も架空の試行も増やさない',async()=>{
+    pushMessageWithRequestId.mockRejectedValueOnce(new Error('lost response'));
+    expect((await post(baseEvent())).status).toBe(503);
+    const first=deliveries()[0];
+    expect((await post(baseEvent())).status).toBe(503);
+    expect(pushMessageWithRequestId).toHaveBeenCalledOnce();expect(deliveries()).toHaveLength(1);
+    expect(deliveries()[0]).toMatchObject({id:first.id,idempotency_key:first.idempotency_key,attempts:1,error_code:'delivery_unknown'});
+    expect(attemptRows()).toHaveLength(1);
+  });
+
+  it('受理後の保存失敗でも元のEC送信行へprovider参照を残し、再送しない',async()=>{
+    sqlite.exec("CREATE TRIGGER fail_ec_checkpoint BEFORE UPDATE ON workflow_steps WHEN NEW.step_key='customer_notification' AND NEW.status='succeeded' BEGIN SELECT RAISE(ABORT,'injected'); END");
+    expect((await post(baseEvent())).status).toBe(503);
+    const receipt=sqlite.prepare("SELECT status,result_json,retry_key FROM workflow_steps WHERE step_key='customer_notification'").get() as {status:string,result_json:string,retry_key:string};
+    expect(receipt.status).toBe('unknown');expect(JSON.parse(receipt.result_json)).toEqual({requestId:'req-1'});
+    expect((await post(baseEvent())).status).toBe(503);
+    expect(pushMessageWithRequestId).toHaveBeenCalledOnce();
+    expect(deliveries()).toHaveLength(1);expect(deliveries()[0]).toMatchObject({attempts:1,idempotency_key:receipt.retry_key});
+    expect(attemptRows()).toHaveLength(1);
   });
 
   it('処理済みイベントの再送は新しい台帳行を作らない', async () => {
@@ -286,4 +342,23 @@ describe('N-328: EC顧客通知を共通送信台帳へ書く', () => {
     expect(deliveries()[0]).toMatchObject({ status: 'provider_accepted', attempts: 0 });
     expect(attemptRows()).toHaveLength(0);
   });
+});
+it('R-EC02: 注文保存が一度失敗してもcronだけで注文と明細を補う',async()=>{
+ sqlite.exec("CREATE TEMP TRIGGER fail_order BEFORE INSERT ON ec_orders BEGIN SELECT RAISE(ABORT,'sqlite artificial order failure'); END");
+ expect((await post(baseEvent({event_id:'read-model-recovery'}))).status).toBe(503);
+ expect(sqlite.prepare('SELECT COUNT(*) AS n FROM ec_orders').get()).toEqual({n:0});
+ sqlite.exec('DROP TRIGGER fail_order');
+ expect((await processDueEcRetries(db,{now:'2030-01-01T00:00:00Z'})).processed).toBe(1);
+ expect(sqlite.prepare('SELECT order_number FROM ec_orders').all()).toEqual([{order_number:'NEN-1001'}]);
+ expect(sqlite.prepare('SELECT product_name FROM ec_order_lines').all()).toEqual([{product_name:'鹿肉ミンチ'}]);
+ expect(sqlite.prepare("SELECT status FROM ec_events WHERE external_event_id='read-model-recovery'").get()).toEqual({status:'processed'});
+});
+it.each([true,false])('IN-H01: 停止したECは友だちの有無=%sでも運用者へ知らせない',async(linked)=>{
+ sqlite.prepare("INSERT INTO ec_connectors(id,line_account_id,provider,shop_domain,status,created_at,updated_at) VALUES('paused','account-a','ec_cube','fixture.test','paused','fixture','fixture')").run();
+ const {dispatchOperatorEvent}=await import('../services/operator-notification-dispatch.js');
+ const event:Record<string,unknown>=baseEvent({event_id:'paused-order'});if(!linked)delete event.line_user_id;
+ const response=await post(event);
+ expect(response.status).toBe(202);expect(await response.json()).toMatchObject({status:'paused'});
+ expect(dispatchOperatorEvent).not.toHaveBeenCalled();expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+ expect(sqlite.prepare("SELECT error_message FROM ec_events WHERE external_event_id='paused-order'").get()).toEqual({error_message:'connector_paused'});
 });

@@ -1,25 +1,39 @@
 // @vitest-environment happy-dom
 /*
- * 日付の選択（★V7 `Fw065`）。値は YYYY-MM-DD のまま、表示は日本語。
+ * 日付の選択（★管理画面 `Fw065`）。値は YYYY-MM-DD のまま、表示は日本語。
  */
 import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import DateField, { formatLabel, parseDate } from './date-field'
 
 afterEach(() => cleanup())
 
-function Harness({ initial = '2026-09-23', min }: { initial?: string; min?: string }) {
+function Harness({ initial = '2026-09-23', min, displayFormat }: { initial?: string; min?: string; displayFormat?: 'full' | 'short' }) {
   const [value, setValue] = useState(initial)
   return (
     <>
-      <DateField value={value} onChange={setValue} min={min} aria-label="配信日" />
+      <DateField value={value} onChange={setValue} min={min} displayFormat={displayFormat} aria-label="配信日" />
       <output data-testid="value">{value}</output>
     </>
   )
 }
 
-describe('日付の選択（★V7）', () => {
+describe('日付の選択（★管理画面）', () => {
+  it('短い表示でも年を含む全文と日付の選択を保持する', () => {
+    render(<Harness displayFormat="short" />)
+    const trigger = screen.getByRole('button', { name: '配信日' })
+    expect(trigger.textContent).toContain('9/23（水）')
+    expect(trigger.title).toBe('2026年9月23日（水）')
+    fireEvent.click(trigger)
+    fireEvent.keyDown(screen.getByRole('grid'), { key: 'ArrowRight' })
+    fireEvent.keyDown(screen.getByRole('grid'), { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: '確定' }))
+    expect(screen.getByTestId('value').textContent).toBe('2026-09-24')
+    expect(trigger.textContent).toContain('9/24（木）')
+    expect(trigger.title).toBe('2026年9月24日（木）')
+  })
+
   it('表示は「2026年9月23日（水）」、値は YYYY-MM-DD', () => {
     render(<Harness />)
     expect(screen.getByRole('button', { name: '配信日' }).textContent).toContain('2026年9月23日（水）')
@@ -36,13 +50,14 @@ describe('日付の選択（★V7）', () => {
     expect(document.activeElement?.getAttribute('aria-label')).toMatch(/^2026年9月23日（水）/)
   })
 
-  it('矢印で動かし Enter で選ぶと、値が替わって閉じる', () => {
+  it('矢印と Enter で選び、確定すると値が替わって閉じる', () => {
     render(<Harness />)
     fireEvent.click(screen.getByRole('button', { name: '配信日' }))
     const grid = screen.getByRole('grid')
     fireEvent.keyDown(grid, { key: 'ArrowRight' })
     fireEvent.keyDown(screen.getByRole('grid'), { key: 'ArrowDown' })
     fireEvent.keyDown(screen.getByRole('grid'), { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: '確定' }))
     expect(screen.getByTestId('value').textContent).toBe('2026-10-01')
     expect(screen.queryByRole('dialog')).toBeNull()
   })
@@ -54,6 +69,7 @@ describe('日付の選択（★V7）', () => {
     expect(screen.getByRole('grid').getAttribute('aria-label')).toBe('2026年2月')
     expect(screen.getByRole('grid').getAttribute('data-slide')).toBe('next')
     fireEvent.keyDown(screen.getByRole('grid'), { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: '確定' }))
     expect(screen.getByTestId('value').textContent).toBe('2026-02-28')
   })
 
@@ -76,4 +92,52 @@ describe('日付の選択（★V7）', () => {
     expect(screen.getByTestId('value').textContent).toBe('')
     expect(trigger.textContent).toContain('日付を選ぶ')
   })
+})
+
+it('日を選んでも確定まで元の値を保ち、Escでは変更を破棄する', () => {
+  render(<Harness />)
+  fireEvent.click(screen.getByRole('button', { name: '配信日' }))
+  fireEvent.click(screen.getByRole('button', { name: '2026年9月24日（木）' }))
+  expect(screen.getByTestId('value').textContent).toBe('2026-09-23')
+  fireEvent.keyDown(screen.getByRole('grid'), { key: 'Escape' })
+  expect(screen.getByTestId('value').textContent).toBe('2026-09-23')
+  fireEvent.click(screen.getByRole('button', { name: '配信日' }))
+  fireEvent.click(screen.getByRole('button', { name: '2026年9月25日（金）' }))
+  fireEvent.click(screen.getByRole('button', { name: '確定' }))
+  expect(screen.getByTestId('value').textContent).toBe('2026-09-25')
+})
+
+it('窓の外とキャンセルで仮の日付を捨て、再度開くと元の日付を選択する', () => {
+  render(<Harness />)
+  const trigger = screen.getByRole('button', { name: '配信日' })
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('button', { name: '2026年9月24日（木）' }))
+  fireEvent.pointerDown(document.body)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.getByTestId('value').textContent).toBe('2026-09-23')
+  fireEvent.click(trigger)
+  expect(screen.getByRole('button', { name: '2026年9月23日（水）' }).getAttribute('data-selected')).toBe('true')
+  fireEvent.click(screen.getByRole('button', { name: '2026年9月25日（金）' }))
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(screen.getByTestId('value').textContent).toBe('2026-09-23')
+})
+
+it('編集中に外から値が変われば古い仮選択を確定できない', () => {
+  const onChange = vi.fn()
+  const view = render(<DateField value="2026-09-23" onChange={onChange} aria-label="配信日" />)
+  fireEvent.click(screen.getByRole('button', { name: '配信日' }))
+  fireEvent.click(screen.getByRole('button', { name: '2026年9月24日（木）' }))
+  view.rerender(<DateField value="2026-09-25" onChange={onChange} aria-label="配信日" />)
+  expect((screen.getByRole('button', { name: '確定' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.getByRole('status').textContent).toContain('ほかで日付が変わりました。開き直してください')
+  fireEvent.click(screen.getByRole('button', { name: '確定' })); expect(onChange).not.toHaveBeenCalled()
+})
+
+it('暦の確定は主ボタン、キャンセルは副ボタン、今日と消すは文字操作', () => {
+  render(<Harness />)
+  fireEvent.click(screen.getByRole('button', { name: '配信日' }))
+  expect(screen.getByRole('button', { name: '確定' }).getAttribute('data-variant')).toBe('primary')
+  expect(screen.getByRole('button', { name: 'キャンセル' }).getAttribute('data-variant')).toBe('secondary')
+  expect(screen.getByRole('button', { name: '今日' }).getAttribute('data-variant')).toBe('text')
+  expect(screen.getByRole('button', { name: '消す' }).getAttribute('data-variant')).toBe('text')
 })

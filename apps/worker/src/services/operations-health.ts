@@ -1,16 +1,25 @@
+import { lineAccountConnectionState, LINE_TOKEN_REFRESH_DAYS, lineTokenExpiry, lineConnectionRisk, jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 import {
+  getLineAccountListStats,
   completeOperationHealthRun,
   enqueuePendingOperationAlertNotifications,
   failOperationHealthRun,
   reconcileOperationHealthAlerts,
+  reopenFailedOperationHealthRun,
   startOperationHealthRun,
   type OperationHealthResultInput,
   type OperationHealthStatus,
 } from '@line-crm/db';
 
-import { fetchQuota } from './broadcast-quota-guard.js';
+
+import { fetchQuotaDetails } from '../features/broadcasts/broadcast-quota-guard/index.js';
 import { findPlan } from './billing-plans.js';
+import { hasLineTokenRefreshFailure } from './line-token-notices.js';
 import { collectOperationDispatchHealth } from './operation-dispatch-health.js';
+import { externalIntegrationsSummary } from './operations-health-delivery.js';
+import { runSecurityMonitor } from './security-monitor.js';
+import type { WorkerBindings } from '../worker-bindings.js';
 
 type AccountRow = {
   id: string;
@@ -22,12 +31,16 @@ type AccountRow = {
 
 /** R2・Queue の束縛は環境次第で無いので、持っているものだけ渡す。 */
 export type OperationInfraDeps = {
+  security?: WorkerBindings;
   r2?: R2Bucket;
   queue?: Queue<unknown>;
 };
 
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
-const CREDENTIAL_WARNING_DAYS = 14;
+/**
+ * 鍵は残り7日未満で自動で取り替える（token-refresh）。取り替える窓とは別に、
+ * 画面の14日前の予告と分けて、期限切れ・交換失敗・交換の時期を過ぎた時だけ注意にする。
+ */
+
 const INFRA_SLOW_MS = 3_000;
 const INFRA_ALERT_AFTER = 3;
 /** 解消も3回連続の成功で確定する。1回の成功で閉じると「解消→再発」が繰り返される。 */
@@ -39,17 +52,17 @@ const FRIEND_DECREASE_MIN_ABSOLUTE = 10;
 /**
  * 台帳の JST 壁時計（オフセット無し）と比べるための境界を、保存と同じ書式で返す。
  * line_webhook_events.received_at は strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours') の
- * JST 文字列で入る。observedAt は UTC の ISO なので datetime() のまま比べると
+ * JST 文字列で入る。observedAt は UTC の ISO なので datetime のまま比べると
  * 9時間ぶん受信が新しく見え（区切りが T と空白で違うため大小も狂う）、
  * 26時間前の受信を「直近24時間にあった」と数えてしまう。
  */
 function jstCutoff(nowIso: string, backMs: number): string {
-  return new Date(Date.parse(nowIso) + JST_OFFSET_MS - backMs).toISOString().replace('Z', '');
+  return japanCalendar(new Date(Date.parse(nowIso) - backMs)).toISOString().replace('Z', '');
 }
 
 /** JST の月初・翌月初を、台帳の JST 壁時計（オフセット無し）と同じ形で返す。 */
 function jstMonthBounds(nowIso: string): { monthStart: string; monthEnd: string; resetAt: string } {
-  const jst = new Date(Date.parse(nowIso) + JST_OFFSET_MS);
+  const jst = japanCalendar(new Date(Date.parse(nowIso)));
   const y = jst.getUTCFullYear();
   const m = jst.getUTCMonth();
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -150,26 +163,20 @@ async function collectChecks(
 ): Promise<OperationHealthResultInput[]> {
   return Promise.all([
     isolate('line_connection', observedAt, async () => {
-      const row = await db.prepare(
-        `SELECT risk_level, error_code, error_count, created_at
-           FROM account_health_logs WHERE line_account_id = ?
-          ORDER BY created_at DESC LIMIT 1`,
-      ).bind(account.id).first<{
-        risk_level: 'normal' | 'warning' | 'danger'; error_code: number | null;
-        error_count: number; created_at: string;
-      }>();
-      if (!row) return result('line_connection', 'unknown', 'LINE接続の確認記録がありません', 'account_health_logs', observedAt);
-      return result('line_connection', row.risk_level,
-        row.risk_level === 'normal' ? 'LINE接続は正常です' : 'LINE接続に問題があります',
-        'account_health_logs', row.created_at,
-        { errorCode: row.error_code, consecutiveErrors: row.error_count });
+      const connection = (await getLineAccountListStats(db, [account.id]))[account.id]?.connection;
+      const risk = lineConnectionRisk(connection);
+      const state = lineAccountConnectionState({ connection });
+      return result('line_connection', risk ?? 'unknown',
+        risk === 'normal' ? 'LINE接続は正常です' : risk ? 'LINE接続に問題があります' : `LINE接続は${state.label}です`,
+        'LINE接続の確認記録', connection?.checkedAt ?? observedAt,
+        { issues: (connection?.issues ?? []).map(({ kind, result, httpStatus, webhookActive }) => ({ kind, result, httpStatus, webhookActive })) });
     }),
     isolate('message_quota', observedAt, async () => {
       // LINE公式側とHarness契約側の両方を見る。送れる数は小さい方で、
-      // 予定済み配信の見込み通数を引いた forecast も返す（v6-32 §5-2）。
+      // 予定済み配信の見込み通数を引いた forecast も返す（-32 §5-2）。
       const { monthStart, monthEnd, resetAt } = jstMonthBounds(observedAt);
       const [quota, harnessUsedRow, tenantRow, scheduledRow] = await Promise.all([
-        fetchQuota(account.channel_access_token),
+        fetchQuotaDetails(account.channel_access_token),
         db.prepare(
           `SELECT COUNT(*) AS used FROM messages_log
             WHERE line_account_id = ? AND direction = 'outgoing'
@@ -194,14 +201,18 @@ async function collectChecks(
       const scheduledPlanned = Number(scheduledRow?.planned ?? 0);
 
       if (quota.limit === null && harnessLimit === null) {
-        return result('message_quota', 'unknown', 'LINEとHarnessの配信上限をどちらも取得できませんでした', 'line_messaging_api', observedAt);
+        return result('message_quota', 'unknown', '配信上限を確認できませんでした', 'line_messaging_api', observedAt);
       }
       const lineRemaining = quota.limit === null || quota.used === null
         ? null : Math.max(0, quota.limit - quota.used);
       const harnessRemaining = harnessLimit === null
         ? null : Math.max(0, harnessLimit - harnessUsed);
       // 実際に送れる残数は小さい方。片側だけの「余裕あり」はしない。
-      const sendable = lineRemaining === null ? harnessRemaining
+      const lineKnown = quota.unlimited || lineRemaining !== null;
+      const harnessKnown = !tenantRow?.plan_key || harnessRemaining !== null;
+      const limitsKnown = lineKnown && harnessKnown;
+      const sendable = !limitsKnown ? null
+        : lineRemaining === null ? harnessRemaining
         : harnessRemaining === null ? lineRemaining
         : Math.min(lineRemaining, harnessRemaining);
       const lineRatio = quota.limit === null || quota.used === null ? null
@@ -213,15 +224,21 @@ async function collectChecks(
       // 正常↔注意を5分ごとに往復する（通知のばたつきの原因）。
       const ratios = [lineRatio, harnessRatio].filter((ratio): ratio is number => ratio !== null);
       const bindingRatio = ratios.length === 0 ? null : Math.max(...ratios);
+      const knownRemaining = lineRemaining === null ? harnessRemaining
+        : harnessRemaining === null ? lineRemaining
+        : Math.min(lineRemaining, harnessRemaining);
       const forecastRemaining = sendable === null ? null : sendable - scheduledPlanned;
+      const knownForecastExceeded = knownRemaining !== null && knownRemaining < scheduledPlanned;
       const status: OperationHealthStatus = bindingRatio === null
         ? 'unknown'
-        : bindingRatio >= 0.95 || (forecastRemaining !== null && forecastRemaining < 0) ? 'danger'
+        : bindingRatio >= 0.95 || knownForecastExceeded ? 'danger'
         : bindingRatio >= 0.8 ? 'warning'
+        : !limitsKnown ? 'unknown'
         : 'normal';
       return result('message_quota', status,
-        status === 'normal' ? '今月の配信枠に余裕があります'
-          : forecastRemaining !== null && forecastRemaining < 0
+        status === 'unknown' ? '配信上限を確認できませんでした'
+          : status === 'normal' ? '今月の配信枠に余裕があります'
+          : knownForecastExceeded
             ? '予定済みの配信を送ると、今月の配信枠を超える見込みです'
             : '今月の配信枠が少なくなっています',
         'line_messaging_api', observedAt,
@@ -233,30 +250,18 @@ async function collectChecks(
         { warningRatio: 0.8, dangerRatio: 0.95 });
     }),
     isolate('external_integrations', observedAt, async () => {
-      const row = await db.prepare(
-        `SELECT COUNT(*) AS active_count,
-                COALESCE(SUM(CASE WHEN consecutive_failures > 0 THEN 1 ELSE 0 END), 0) AS failing_count,
-                COALESCE(MAX(consecutive_failures), 0) AS max_failures
-           FROM outgoing_webhooks WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL`,
-      ).bind(account.id).first<{ active_count: number; failing_count: number; max_failures: number }>();
-      // #838 第2段: Google Sheets 連携の連続失敗・要再接続も同じ確認に畳む。
-      // 要再接続（expired）は連続失敗カウンタと別系のため、警告側の件数に足す。
-      const sheets = await db.prepare(
-        `SELECT COUNT(*) AS active_count,
-                COALESCE(SUM(CASE WHEN consecutive_failures > 0 OR status = 'expired' THEN 1 ELSE 0 END), 0) AS failing_count,
-                COALESCE(MAX(consecutive_failures), 0) AS max_failures
-           FROM google_sheets_integrations WHERE line_account_id = ?`,
-      ).bind(account.id).first<{ active_count: number; failing_count: number; max_failures: number }>();
-      const failing = Number(row?.failing_count ?? 0) + Number(sheets?.failing_count ?? 0);
-      const maxFailures = Math.max(Number(row?.max_failures ?? 0), Number(sheets?.max_failures ?? 0));
-      const status: OperationHealthStatus = maxFailures >= 3 ? 'danger' : failing > 0 ? 'warning' : 'normal';
+      // Webhook・Google Sheets（ 第2段）・デリバリー連携（出前館QA#3）を
+      // 1つの確認へ畳んで数える。板の9行は増やさない。
+      const totals = await externalIntegrationsSummary(db, account.id, observedAt);
+      const status: OperationHealthStatus =
+        totals.maxFailures >= 3 ? 'danger' : totals.failingCount > 0 ? 'warning' : 'normal';
       return result('external_integrations', status,
         status === 'normal' ? '外部連携に連続失敗はありません' : '外部連携に連続失敗があります',
         'outgoing_webhooks', observedAt,
         {
-          activeCount: Number(row?.active_count ?? 0) + Number(sheets?.active_count ?? 0),
-          failingCount: failing,
-          maxConsecutiveFailures: maxFailures,
+          activeCount: totals.activeCount,
+          failingCount: totals.failingCount,
+          maxConsecutiveFailures: totals.maxFailures,
         },
         { warningFailures: 1, dangerFailures: 3 });
     }),
@@ -310,7 +315,7 @@ async function collectChecks(
     isolate('friend_change', observedAt, async () => {
       // 前日比だけでなく、同曜日（7日前）と過去28日の最大を baseline にする。
       // 小規模アカウントの減少を%だけで拾わないよう、絶対人数の下限を併用する
-      // （v6-32 §5-6）。webhook取りこぼしの見せかけの減少は、同曜日baseline
+      // （-32 §5-6）。webhook取りこぼしの見せかけの減少は、同曜日baseline
       // より上なら異常としない。
       const rows = await db.prepare(
         `SELECT date, active, added, blocked
@@ -357,24 +362,22 @@ async function collectChecks(
         });
     }),
     isolate('credential_expiry', observedAt, async () => {
-      if (!account.token_expires_at) {
-        return result('credential_expiry', 'unknown', 'LINEの鍵の期限がまだ記録されていません', 'line_accounts', observedAt);
-      }
-      const expiresAt = Date.parse(account.token_expires_at);
-      const daysLeft = Math.floor((expiresAt - Date.parse(observedAt)) / (24 * 60 * 60 * 1000));
-      const status: OperationHealthStatus =
-        daysLeft < 0 ? 'danger' : daysLeft <= CREDENTIAL_WARNING_DAYS ? 'warning' : 'normal';
+      const expiry = lineTokenExpiry(account.token_expires_at, Date.parse(observedAt));
+      const daysLeft = expiry.daysLeft;
+      const refreshFailed = expiry.status !== 'expired'
+        && await hasLineTokenRefreshFailure(db, account.id, account.token_expires_at);
+      if (daysLeft === null && !refreshFailed) return result('credential_expiry', 'unknown', expiry.label, 'line_accounts', observedAt);
+      const status: OperationHealthStatus = expiry.status === 'expired' ? 'danger'
+        : refreshFailed || (daysLeft !== null && daysLeft < LINE_TOKEN_REFRESH_DAYS) ? 'warning' : 'normal';
       return result('credential_expiry', status,
-        status === 'normal' ? 'LINEの鍵の期限に余裕があります'
-          : daysLeft < 0 ? 'LINEの鍵の期限が切れています'
-          : `LINEの鍵の期限が${daysLeft}日後に迫っています`,
+        refreshFailed ? 'トークンを自動で取り替えられていません' : status === 'normal' && expiry.status === 'expiring' ? '自動で取り替える時期の前です' : expiry.label,
         'line_accounts', observedAt,
-        { expiresAt: account.token_expires_at, daysLeft },
-        { warningDays: CREDENTIAL_WARNING_DAYS });
+        { expiresAt: account.token_expires_at, daysLeft, refreshFailed },
+        { refreshWindowDays: LINE_TOKEN_REFRESH_DAYS });
     }),
     isolate('infra_canary', observedAt, async () => {
       // 実際に読み書きして試す。1回の失敗では知らせず、遅い・失敗が
-      // 3回続いたときだけ異常にする（v6-32 §5-3）。
+      // 3回続いたときだけ異常にする（-32 §5-3）。
       const targets: Array<{ kind: string; ok: boolean; ms: number; note?: string }> = [];
       const probe = async (kind: string, run: () => Promise<void>) => {
         const started = Date.now();
@@ -392,7 +395,7 @@ async function collectChecks(
             .bind(probeId, 'd1', probeId.slice(0, 8), observedAt),
           db.prepare('SELECT payload FROM operation_infra_probes WHERE id = ?').bind(probeId),
           db.prepare('DELETE FROM operation_infra_probes WHERE id = ?').bind(probeId),
-          // created_at は observedAt（UTCのISO・Z付き）で入れている。datetime() は
+          // created_at は observedAt（UTCのISO・Z付き）で入れている。datetime は
           // 'YYYY-MM-DD HH:MM:SS' を返して書式が違うため、同じ書式のまま引き算して比べる。
           db.prepare('DELETE FROM operation_infra_probes WHERE created_at < ?')
             .bind(new Date(Date.parse(observedAt) - 24 * 60 * 60_000).toISOString()),
@@ -496,8 +499,19 @@ export async function runOperationHealthChecks(
         lineAccountId: input.lineAccountId, runId: started.run.id, results: started.run.results,
       });
       await enqueuePendingOperationAlertNotifications(db, { lineAccountId: input.lineAccountId });
+      return { duplicate: true, run: started.run };
     }
-    return { duplicate: true, run: started.run };
+    /*
+     * failed の枠は塞がず、同じ5分枠の押し直しで確認からやり直す。
+     * 結果保存の失敗で failed になった行を重複として返すだけだと、
+     * 運用者が押しても新しい確認結果が得られない。running に戻せたときだけ
+     * 下の通常経路へ進み、戻せなかったとき（並列で誰かが先に開け直した等）は
+     * 重複として返す。running の並列実行は従来どおり重複にする。
+     */
+    if (started.run.status !== 'failed'
+      || !(await reopenFailedOperationHealthRun(db, started.run.id))) {
+      return { duplicate: true, run: started.run };
+    }
   }
   let completed = false;
   try {
@@ -525,6 +539,10 @@ export async function runScheduledOperationHealthChecks(
   db: D1Database,
   deps: OperationInfraDeps = {},
 ): Promise<void> {
+  if (deps.security) {
+    try { await runSecurityMonitor(deps.security); }
+    catch { logger.error("security_monitor_failed"); }
+  }
   const rows = await db.prepare('SELECT id FROM line_accounts WHERE is_active = 1 ORDER BY id')
     .all<{ id: string }>();
   await Promise.allSettled((rows.results ?? []).map((account) =>

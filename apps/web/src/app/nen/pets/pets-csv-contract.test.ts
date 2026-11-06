@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../v8/nen-pets/parts.tsx'), 'utf8')
 
 /**
  * #999 DEEP-25: ペットCSVの数式インジェクション対策は共通 csvCell へ統合。

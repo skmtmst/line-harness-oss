@@ -1,0 +1,74 @@
+/* 運営のメンバー管理 V8。値は --tpl-op-*。 */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-htn-aside-w); min-height: 100%; }
+.main { display: flex; flex-direction: column; gap: var(--polish-space-card); min-width: 0; padding: var(--polish-space-section) var(--polish-space-card); }
+.main > :global([data-list-toolbar]) { flex: 0 0 auto; }
+.securityAside { min-width: 0; padding: var(--polish-space-section) var(--polish-space-card); border-left: 1px solid var(--color-divider); }
+.listCard { min-width: 0; padding: var(--polish-space-card); border: 1px solid var(--card-edge); border-radius: var(--radius-card); background: var(--color-canvas); box-shadow: var(--card-shadow); }
+.listTitle { margin: 0; font-size: var(--polish-text-section); font-weight: 700; color: var(--color-ink); }
+.listCount { margin: var(--polish-space-row) 0 var(--polish-space-card); color: var(--color-ink-faint); font-size: var(--text-caption); }
+.listFoot { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-card); color: var(--color-ink-faint); font-size: var(--text-micro); }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 1339.98px) { .layout { display: flex; flex-direction: column; } .securityAside { border-left: 0; border-top: 1px solid var(--color-divider); } }
+
+.invite {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+}
+
+.inviteField {
+  width: var(--tpl-op-mem-invite-w);
+  max-width: 100%;
+}
+
+.invite svg {
+  width: var(--tpl-op-auth-icon);
+  height: var(--tpl-op-auth-icon);
+}
+
+.colMail {
+  width: var(--tpl-op-mem-mail-w);
+}
+
+.colTotp {
+  width: var(--tpl-op-mem-totp-w);
+}
+
+.colState {
+  width: var(--tpl-op-mem-state-w);
+}
+
+.colLogin {
+  width: var(--tpl-op-mem-login-w);
+}
+
+.colOps {
+  width: var(--tpl-op-mem-ops-w);
+  flex-shrink: 0;
+}
+
+.ops {
+  display: flex;
+  gap: var(--tpl-op-me-gap);
+  white-space: nowrap;
+}
+
+.selfRow {
+  height: var(--tpl-op-mem-self-h);
+}
+
+.memberRow {
+  height: var(--tpl-op-dash-alert-h);
+}
+
+.faint {
+  color: var(--color-ink-faint);
+}
+.shortText { white-space: nowrap; }
+
+@media (max-width: 1023.98px) {
+  .colMail,
+  .colLogin {
+    display: none;
+  }
+}

@@ -1,18 +1,22 @@
+import { apiContractMiddleware } from '../middleware/api-contract.js';
+vi.mock('../services/line-messaging-identity.js', () => ({ verifyLineMessagingIdentity: vi.fn().mockResolvedValue(true) }));
 import { describe, expect, test, beforeEach, vi } from 'vitest';
-import { Hono } from 'hono';
+import { Hono, type ErrorHandler } from 'hono';
+import type { Env } from '../worker-env.js';
 
-// Mock @line-crm/db so we can assert on the values the route forwards to the
-// DB layer without needing a real D1Database. The route's responsibility is
-// "normalize body → call DB function with correct args", so capturing those
-// args is the meaningful assertion.
+// route の責務である入力正規化と引数の接続を確かめるため、実 D1 でなく DB 関数へ渡る値を観測する。
 const dbMocks = {
   getLineAccounts: vi.fn(),
   getLineAccountScopeEntries: vi.fn(),
   getLineAccountsByIds: vi.fn(),
   getLineAccountListStats: vi.fn(),
+  getLineAccountFoldersByAccountIds: vi.fn(async()=>({})),
+  getLineAccountTag: vi.fn(),
+  getLineAccountTagsByAccountIds: vi.fn(async () => ({})),
   getLineAccountById: vi.fn(),
   getLineAccountCredentialHealth: vi.fn(),
   createLineAccount: vi.fn(),
+  listLineAccountTags: vi.fn(async () => [{id:'tag-own',tenant_id:'tenant-1'}]),
   updateLineAccount: vi.fn(),
   updateLineAccountFields: vi.fn(),
   updateLineAccountOrder: vi.fn(),
@@ -35,35 +39,40 @@ const dbMocks = {
   LineAccountLifecycleError: class LineAccountLifecycleError extends Error {
     constructor(public readonly code: string) { super(code); this.name = 'LineAccountLifecycleError'; }
   },
-  // V: 接続・鍵・停止の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
+  // 接続・鍵・停止の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
   consumeStepUpGrant: vi.fn(async () => true),
   getAdminSessionByTokenHash: vi.fn(async () => null),
   jstNow: vi.fn(() => '2026-08-10T12:00:00.000+09:00'),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
+const styleMocks=vi.hoisted(()=>({initializeAccountStyle:vi.fn(async()=>({}))}));
+vi.mock('../services/style-setup.js',()=>styleMocks);
+
 const lineClientMocks = {
   getFollowersInsight: vi.fn(),
   getFollowerIds: vi.fn(),
 };
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => lineClientMocks),
+  LineClient: vi.fn().mockImplementation(function () { return lineClientMocks; }),
 }));
 
-// Re-import after mock so the module picks up mocked deps.
+// 差替済みの依存を使うよう、モック登録後に再読込する。
 const { lineAccounts } = await import('./line-accounts.js');
+const { unhandledWorkerError } = await import('../lib/unhandled-error.js');
+const receiptErrorReport = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: receiptErrorReport }));
 
 type TestEnv = {
   Variables: { staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean; tenantId?: string | null } };
   Bindings: { DB: D1Database };
 };
 
-// Minimal D1 stub: every prepare/bind/first chain resolves to `null` (no row).
-// Used for the uniqueness check in checkUniqueLoginAndLiff — tests that need
-// to assert duplicate-rejection override `firstResult` per request.
+// 一意性の検証は既定で未検出とし、重複を試す場合だけ firstResult を変える。
 function makeDbStub(firstResult: unknown = null): D1Database {
   return {
     prepare: vi.fn(() => ({
+      all: vi.fn().mockResolvedValue({ results: [] }),
       bind: vi.fn(() => ({
         first: vi.fn().mockResolvedValue(firstResult),
       })),
@@ -80,11 +89,13 @@ function setupApp(
   app.use('*', async (c, next) => {
     c.set('staff', { id: 'test-staff', name: 'Test', role, readOnly: false, ...staffOverride });
     c.env = { DB: dbStub };
-    // V: 大事な操作の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
+    // 大事な操作の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
     c.req.raw.headers.set('x-step-up-token', 'test-step-up');
     await next();
   });
   app.route('/', lineAccounts);
+  // 通知先が未設定でも応答を返せるため、最小の試験環境へ共通の失敗処理を接続する。
+  app.onError(unhandledWorkerError as ErrorHandler);
   return app;
 }
 
@@ -116,14 +127,54 @@ const fakeAccount = {
   updated_at: '2026-05-08T00:00:00.000',
 };
 
+describe('GET /api/line-accounts/:id/registration-receipt', () => {
+  test.each(['account scope', 'inbound receipt'])('unexpected %s failure reaches the shared incident handler', async (stage) => {
+    const secret = 'private-customer secret-token';
+    const db = makeDbStub();
+    if (stage === 'account scope') dbMocks.getLineAccountScopeEntries.mockRejectedValueOnce(new Error(secret));
+    else vi.mocked(db.prepare).mockImplementationOnce(() => { throw new Error(secret); });
+    const app = new Hono<Env>().route('/', setupApp('owner', db));
+    app.onError(unhandledWorkerError);
+    const response = await app.request('/api/line-accounts/acc-1/registration-receipt?token=secret-token');
+    const body = await response.json<{ incidentId: string }>();
+    expect(response.status).toBe(500);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(receiptErrorReport).toHaveBeenLastCalledWith(expect.anything(), {
+      source: 'worker', message: 'unhandled_worker_error',
+      path: 'GET /api/line-accounts/:id/registration-receipt', incidentId: body.incidentId,
+    });
+    expect(JSON.stringify([body, receiptErrorReport.mock.calls])).not.toMatch(/private-customer|secret-token/);
+  });
+
+  test('only exposes a receipt in the current account scope', async () => {
+    const app = setupApp('owner', makeDbStub(), {
+      assignedLineAccountId: 'acc-1', canAccessDescendantAccounts: false,
+    });
+    const allowed = await app.request('/api/line-accounts/acc-1/registration-receipt');
+    expect(allowed.status).toBe(200);
+    expect(allowed.headers.get('Cache-Control')).toBe('no-store');
+    expect(await allowed.json()).toEqual({
+      success: true, data: { status: 'waiting', receivedAt: null },
+    });
+    const denied = await app.request('/api/line-accounts/acc-other/registration-receipt');
+    expect(denied.status).toBe(404);
+    expect(await denied.json()).toEqual({ success: false, code: 'LINE_ACCOUNT_NOT_FOUND', error: 'LINE公式アカウントが見つかりません。一覧から開き直してください。' });
+  });
+});
+
 beforeEach(() => {
+  styleMocks.initializeAccountStyle.mockClear();
   for (const fn of Object.values(dbMocks)) {
     if ('mockReset' in fn) fn.mockReset();
   }
   lineClientMocks.getFollowersInsight.mockReset();
   lineClientMocks.getFollowerIds.mockReset();
   dbMocks.getAccountSetting.mockResolvedValue(null);
-  dbMocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
+  dbMocks.getLineAccountFoldersByAccountIds.mockResolvedValue({});
+  dbMocks.getLineAccountTag.mockResolvedValue({id:'folder-1'});
+  dbMocks.listLineAccountTags.mockResolvedValue([{id:'tag-own',tenant_id:'tenant-1'}]);
+  dbMocks.getStaffById.mockResolvedValue({ is_active: 1, account_scope: 'all' });
   dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
   dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, parent_line_account_id: null }]);
   dbMocks.getLineAccountScopeEntries.mockImplementation(async () =>
@@ -501,7 +552,7 @@ describe('GET /api/line-accounts/:id/credential-health', () => {
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({
       success: false,
-      error: 'LINE account not found',
+      code: 'LINE_ACCOUNT_NOT_FOUND', error: 'LINE公式アカウントが見つかりません。一覧から開き直してください。',
     });
     expect(dbMocks.getLineAccountCredentialHealth).not.toHaveBeenCalled();
     expect(dbMocks.getLineAccountById).not.toHaveBeenCalled();
@@ -582,6 +633,35 @@ describe('GET /api/line-accounts/:id/follower-insight', () => {
     expect(res.status).toBe(200);
     expect(lineClientMocks.getFollowersInsight).toHaveBeenCalled();
   });
+
+  test('reports the LINE status number on failure so 401 is not hidden behind 502', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
+    const lineError = Object.assign(new Error('LINE API error: 401 Unauthorized — {}'), { status: 401 });
+    lineClientMocks.getFollowersInsight.mockRejectedValue(lineError);
+
+    const app = setupApp('owner');
+    const res = await app.request('/api/line-accounts/acc-1/follower-insight?date=20260616');
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { success: boolean; error: string; lineStatus: number | null };
+    expect(body.lineStatus).toBe(401);
+    // 本文・トークンは外に出さない。
+    expect(body.error).toBe('Failed to fetch LINE follower insight');
+    expect(JSON.stringify(body)).not.toContain('Unauthorized');
+    expect(JSON.stringify(body)).not.toContain(fakeAccount.channel_access_token);
+  });
+
+  test('keeps lineStatus null when the failure is not a LINE API response', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
+    lineClientMocks.getFollowersInsight.mockRejectedValue(new Error('network down'));
+
+    const app = setupApp('owner');
+    const res = await app.request('/api/line-accounts/acc-1/follower-insight?date=20260616');
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { lineStatus: number | null };
+    expect(body.lineStatus).toBeNull();
+  });
 });
 
 function installAutoConnectFetch() {
@@ -596,7 +676,7 @@ function installAutoConnectFetch() {
     }
     if (url.endsWith('/v2/bot/channel/webhook/endpoint') && method === 'PUT') return Response.json({});
     if (url.endsWith('/v2/bot/channel/webhook/endpoint')) {
-      return Response.json({ endpoint: 'http://localhost/webhook', active: true });
+      return Response.json({ endpoint: 'http://localhost/webhook/123456789', active: true });
     }
     if (url.endsWith('/v2/bot/channel/webhook/test')) return Response.json({ success: true });
     if (url.endsWith('/liff/v1/apps') && method === 'GET') return Response.json({ apps: [] });
@@ -628,7 +708,53 @@ describe('POST /api/line-accounts/connect', () => {
     expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
   });
 
-  test('5段成功時に1行だけ保存し、認証済みなら友だち取り込みを開始する', async () => {
+  test.each(['owner', 'admin'] as const)('%s の接続検査の成功時はV8の5行に載る内訳を返す', async (role) => {
+    installAutoConnectFetch();
+    lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
+    lineClientMocks.getFollowersInsight.mockResolvedValue({ status: 'ready', followers: 1284 });
+    const res = await setupApp(role).request('/api/line-accounts/connect/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      success: boolean;
+      data: {
+        steps: Array<{ order: number; state: string }>;
+        verification: {
+          tokenOk: boolean; loginOk: boolean; sameProvider: boolean;
+          webhook: { registeredUrl: string | null; active: boolean | null; testPassed: boolean | null };
+          followerTotal: number | null;
+        };
+      };
+    };
+    expect(body.success).toBe(true);
+    expect(body.data.verification).toMatchObject({
+      tokenOk: true,
+      loginOk: true,
+      sameProvider: true,
+      webhook: { registeredUrl: 'http://localhost/webhook/123456789', active: true, testPassed: true },
+      followerTotal: 1284,
+    });
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+
+  test('友だち総数が取れなくても検査は通りfollowerTotalはnullになる', async () => {
+    installAutoConnectFetch();
+    lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
+    lineClientMocks.getFollowersInsight.mockRejectedValue(new Error('LINE API error: 503 Service Unavailable'));
+    const res = await setupApp('owner').request('/api/line-accounts/connect/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    const body = await res.json() as { success: boolean; data: { followerImport: { capability: string }; verification: { followerTotal: number | null } } };
+    expect(body.success).toBe(true);
+    expect(body.data.verification.followerTotal).toBeNull();
+  });
+
+  test.each(['owner', 'admin'] as const)('%s は自分の統括に保存し、認証済みなら友だち取り込みを開始する', async (role) => {
     installAutoConnectFetch();
     let followerSetting: string | null = null;
     dbMocks.getAccountSetting.mockImplementation(async () => followerSetting);
@@ -646,14 +772,16 @@ describe('POST /api/line-accounts/connect', () => {
     dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
     lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
 
-    const res = await setupApp('owner').request('/api/line-accounts/connect', {
+    const res = await setupApp(role, makeDbStub(), { tenantId: 'tenant-current' }).request('/api/line-accounts/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(autoConnectBody),
+      body: JSON.stringify({ ...autoConnectBody, tenantId: 'forged-tenant' }),
     });
     expect(res.status).toBe(201);
     expect(dbMocks.createLineAccount).toHaveBeenCalledOnce();
+    expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account',expect.anything(),expect.anything(),undefined,{bucket:undefined,publicBaseUrl:undefined,reportError:expect.any(Function)});
     expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
+      tenantId: 'tenant-current',
       name: 'LINE公式名',
       channelAccessToken: 'issued-token',
       loginChannelId: '2007123456',
@@ -697,10 +825,41 @@ describe('POST /api/line-accounts/connect', () => {
     expect(res.status).toBe(502);
     expect(dbMocks.deleteUncommittedLineAccount).toHaveBeenCalledWith(expect.anything(), 'rollback-account');
   });
+
+  test('同時登録の負け側は重複したLoginチャネルIDを409で案内する', async () => {
+    installAutoConnectFetch();
+    // 事前検査は通ったがINSERTで一意制約に当たった競争の負け側。
+    dbMocks.createLineAccount.mockRejectedValue(
+      new Error('UNIQUE constraint failed: line_accounts.login_channel_id'),
+    );
+    const res = await setupApp('owner').request('/api/line-accounts/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toMatch(/loginChannelId.*already assigned/);
+  });
+
+  test('同時登録の負け側は重複したLIFF IDを409で案内する', async () => {
+    installAutoConnectFetch();
+    dbMocks.createLineAccount.mockRejectedValue(
+      new Error('UNIQUE constraint failed: line_accounts.liff_id'),
+    );
+    const res = await setupApp('owner').request('/api/line-accounts/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toMatch(/liffId.*already assigned/);
+  });
 });
 
 describe('POST /api/line-accounts', () => {
-  test('passes loginChannelId / loginChannelSecret / liffId through to createLineAccount', async () => {
+  test.each(['owner', 'admin'] as const)('%s registers credentials in the authenticated tenant only', async (role) => {
     dbMocks.createLineAccount.mockResolvedValue({
       ...fakeAccount,
       login_channel_id: '2009624792',
@@ -708,11 +867,12 @@ describe('POST /api/line-accounts', () => {
       liff_id: '2009624792-XXXX',
     });
 
-    const app = setupApp('owner', makeDbStub(), { tenantId: 'tenant-line-owner' });
+    const app = setupApp(role, makeDbStub(), { tenantId: 'tenant-line-owner' });
     const res = await app.request('/api/line-accounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        tenantId: 'forged-tenant',
         channelId: '123456789',
         name: 'メイン',
         channelAccessToken: 'token',
@@ -739,7 +899,7 @@ describe('POST /api/line-accounts', () => {
     expect(body.success).toBe(true);
     expect(body.data.loginChannelId).toBe('2009624792');
     expect(body.data.liffId).toBe('2009624792-XXXX');
-    // Saved credentials are never echoed to the browser after persistence.
+    // 保存した資格情報をブラウザへ返さないことを確かめる。
     expect(body.data.loginChannelSecret).toBeUndefined();
     expect(body.data.loginChannelSecretConfigured).toBe(true);
   });
@@ -797,9 +957,9 @@ describe('POST /api/line-accounts', () => {
     });
   });
 
-  test('担当範囲外の親アカウントは存在を明かさず404にする', async () => {
+  test.each(['owner', 'admin'] as const)('%s にも担当範囲外の親アカウントは存在を明かさず404にする', async (role) => {
     dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, id: 'visible' }]);
-    const res = await setupApp('owner').request('/api/line-accounts', {
+    const res = await setupApp(role).request('/api/line-accounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -818,8 +978,8 @@ describe('POST /api/line-accounts', () => {
     expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
   });
 
-  test('adminはアカウントを登録できない', async () => {
-    const res = await setupApp('admin').request('/api/line-accounts', {
+  test('staffはアカウントを登録できない', async () => {
+    const res = await setupApp('staff').request('/api/line-accounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -856,8 +1016,7 @@ describe('POST /api/line-accounts', () => {
   test('LIFF IDが空なら登録しない', async () => {
     dbMocks.createLineAccount.mockResolvedValue(fakeAccount);
 
-    // Use a complete login pair (both id+secret present) to focus on the
-    // trim/empty-string normalization behavior. liffId is independent.
+    // 空白・空文字の正規化だけを試すため、ログイン ID と秘密値は両方そろえる。LIFF ID は独立に扱う。
     const app = setupApp('owner');
     const res = await app.request('/api/line-accounts', {
       method: 'POST',
@@ -958,11 +1117,49 @@ describe('POST /api/line-accounts/:id/connection-checks', () => {
         accountId: 'acc-1',
         revision: 2,
         expectedUrls: {
-          webhook: 'http://localhost/webhook',
+          webhook: 'http://localhost/webhook/123456789',
           callback: 'http://localhost/auth/callback',
           liffEndpoint: 'http://localhost?liffId=2009624792-XXXX',
         },
       },
+    });
+  });
+
+  test.each([
+    ['https://stg.example.test/webhook', 'matched'],
+    ['https://alias.example.test/webhook', 'matched'],
+    ['https://alias.example.test/webhook/', 'matched'],
+    ['https://prod.example.test/webhook', 'mismatched'],
+  ] as const)('この Worker の別の入口（%s）に登録された Webhook は %s と判定する', async (registered, expected) => {
+    dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/v2/bot/info')) return Response.json({ displayName: 'テスト' });
+      if (url.endsWith('/v2/bot/channel/webhook/endpoint')) return Response.json({ endpoint: registered, active: true });
+      if (url.endsWith('/v2/bot/channel/webhook/test')) return Response.json({ success: true });
+      return new Response(null, { status: 404 });
+    }));
+    const app = new Hono<TestEnv>();
+    app.use('*', async (c, next) => {
+      c.set('staff', { id: 'test-staff', name: 'Test', role: 'owner', readOnly: false });
+      c.env = {
+        DB: makeDbStub(),
+        WORKER_PUBLIC_URL: 'https://stg.example.test',
+        WORKER_URL: 'https://stg.example.test',
+        WORKER_ALIAS_URLS: 'https://alias.example.test/, not-a-url',
+      } as unknown as TestEnv['Bindings'];
+      await next();
+    });
+    app.route('/', lineAccounts);
+
+    const res = await requestCheck(app);
+    expect(res.status).toBe(200);
+    const webhook = dbMocks.saveLineAccountConnectionChecks.mock.calls[0][1].checks
+      .find((check: { kind: string }) => check.kind === 'webhook_endpoint');
+    expect(webhook).toMatchObject({
+      result: expected,
+      expectedUrl: 'https://stg.example.test/webhook/123456789',
+      registeredUrl: registered,
     });
   });
 
@@ -1057,7 +1254,7 @@ describe('PATCH /api/line-accounts/hierarchy', () => {
     expect(batch.mock.calls[0][0]).toHaveLength(1);
   });
 
-  test('担当外の同一統括アカウントを含めて循環を拒否する', async () => {
+  test('店舗の管理者による統括の親子構成変更を拒否する', async () => {
     dbMocks.getLineAccounts.mockResolvedValue([
       { ...fakeAccount, id: 'account-a', parent_line_account_id: 'unassigned' },
       { ...fakeAccount, id: 'unassigned', parent_line_account_id: 'account-b' },
@@ -1076,14 +1273,25 @@ describe('PATCH /api/line-accounts/hierarchy', () => {
       }),
     });
 
-    expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: expect.stringMatching(/循環/) });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ error: '統括の権限が必要です' });
     expect(batch).not.toHaveBeenCalled();
   });
 });
 
 describe('GET /api/line-accounts', () => {
-  test('資格情報は末尾4文字と更新日だけを返す', async () => {
+  test('フォルダの色と1所属を返し、フォルダと未分類で一覧を絞る',async()=>{
+    dbMocks.getLineAccounts.mockResolvedValue([{...fakeAccount,folder_id:'folder-1'},{...fakeAccount,id:'acc-2',channel_id:'2',folder_id:null}]);
+    const f={id:'folder-1',name:'渋谷',color:'#2f6fde',kind:'line_account',parentId:null};
+    dbMocks.getLineAccountFoldersByAccountIds.mockResolvedValue({'acc-1':f});
+    const app=setupApp();
+    const list=await app.request('/api/line-accounts?folderId=folder-1',{}, {DB:makeDbStub()} as any);
+    expect(list.status).toBe(200);const result=await list.json() as any;
+    expect(result.data).toHaveLength(1);expect(result.data[0]).toMatchObject({folderId:'folder-1',folder:f});
+    const unclassified=await app.request('/api/line-accounts?folderId=__none__',{}, {DB:makeDbStub()} as any);
+    expect((await unclassified.json() as any).data.map((a:any)=>a.id)).toEqual(['acc-2']);
+  });
+  test('資格情報は末尾4文字と更新日だけを返す' , async () => {
     dbMocks.getLineAccounts.mockResolvedValue([{
       ...fakeAccount,
       channel_access_token: 'full-access-token',
@@ -1115,7 +1323,7 @@ describe('GET /api/line-accounts', () => {
     expect(serialized).not.toContain('full-login-secret');
   });
 
-  test('担当店舗だけを返し、担当外店舗を一覧から除外する', async () => {
+  test.each(['staff', 'admin'] as const)('%s は担当店舗だけを返し、担当外店舗を一覧から除外する', async (role) => {
     dbMocks.getLineAccounts.mockResolvedValue([
       fakeAccount,
       { ...fakeAccount, id: 'acc-2', channel_id: '987654321', name: '担当外' },
@@ -1123,7 +1331,7 @@ describe('GET /api/line-accounts', () => {
     dbMocks.getStaffById.mockResolvedValue({ account_scope: 'accounts' });
     dbMocks.getStaffAccountScopeIds.mockResolvedValue(['acc-1']);
 
-    const res = await setupApp('staff').request('/api/line-accounts');
+    const res = await setupApp(role).request('/api/line-accounts');
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({
@@ -1200,7 +1408,7 @@ describe('GET /api/line-accounts', () => {
     const res = await setupApp('owner').request('/api/line-accounts');
 
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ success: false, error: 'Internal server error' });
+    expect(await res.json()).toEqual({ success: false, error: 'Internal Server Error', incidentId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -1215,7 +1423,7 @@ describe('GET /api/line-accounts', () => {
     };
     expect(body.data[0].webhook).toMatchObject({
       status: 'matched',
-      expectedUrl: 'http://localhost/webhook',
+      expectedUrl: 'http://localhost/webhook/123456789',
     });
     expect(body.data[0].channelAccessToken).toBeUndefined();
     expect(body.data[0].plan).toMatchObject({
@@ -1260,6 +1468,53 @@ describe('GET /api/line-accounts', () => {
   });
 });
 
+test.each([
+  ['PUT', '/api/line-accounts/default', { accountId: 'acc-1' }],
+  ['PATCH', '/api/line-accounts/order', { ordered: [{ id: 'acc-1', displayOrder: 1 }] }],
+  ['PATCH', '/api/line-accounts/hierarchy', { relationships: [{ id: 'acc-1', parentLineAccountId: null }] }],
+  ['POST', '/api/line-accounts/acc-1/archive', { reason: 'test' }],
+  ['POST', '/api/line-accounts/acc-1/restore', {}],
+] as const)('店舗の管理者は統括の構成変更 %s %s を実行できない', async (method, path, body) => {
+  dbMocks.getStaffById.mockResolvedValue({ is_active: 1, account_scope: 'accounts' });
+  dbMocks.getStaffAccountScopeIds.mockResolvedValue(['acc-1']);
+  const response = await setupApp('owner').request(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  expect(response.status).toBe(403);
+});
+
+describe('GET /api/line-accounts/profile-pictures', () => {
+  test('閲覧可能で稼働中の公式アカウント画像だけを最新取得する', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...fakeAccount, id: 'acc-1', tenant_id: 'tenant-a' },
+      { ...fakeAccount, id: 'acc-2', tenant_id: 'tenant-a', is_active: 0 },
+      { ...fakeAccount, id: 'acc-3', tenant_id: 'tenant-b' },
+    ]);
+    const external = vi.fn(async () => Response.json({ displayName: 'THE SHED', pictureUrl: 'https://line.example/shed.png' }));
+    vi.stubGlobal('fetch', external);
+
+    const response = await setupApp('owner', makeDbStub(), { tenantId: 'tenant-a' })
+      .request('/api/line-accounts/profile-pictures');
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      data: [{ id: 'acc-1', pictureUrl: 'https://line.example/shed.png' }],
+    });
+    expect(external).toHaveBeenCalledTimes(1);
+  });
+
+  test('LINEへの画像照会失敗時は保存済みの画像を消す応答を返さない', async () => {
+    const external = vi.fn(async () => new Response(null, { status: 503 }));
+    vi.stubGlobal('fetch', external);
+    const response = await setupApp().request('/api/line-accounts/profile-pictures');
+    await expect(response.json()).resolves.toEqual({ success: true, data: [] });
+  });
+});
+
 describe('GET /api/line-accounts/summary', () => {
   test('閲覧できる稼働中アカウントの友だちを重複除外して集計する', async () => {
     dbMocks.getLineAccounts.mockResolvedValue([fakeAccount]);
@@ -1270,7 +1525,7 @@ describe('GET /api/line-accounts/summary', () => {
     const res = await app.request('/api/line-accounts/summary');
 
     expect(res.status).toBe(200);
-    expect(bind).toHaveBeenCalledWith('acc-1');
+    expect(bind).toHaveBeenCalledWith(JSON.stringify(['acc-1']));
     await expect(res.json()).resolves.toMatchObject({
       success: true,
       data: { uniqueFriendCount: 37 },
@@ -1279,37 +1534,47 @@ describe('GET /api/line-accounts/summary', () => {
 });
 
 describe('PATCH /api/line-accounts/:id', () => {
-  test('stores a lin.ee official profile URL and returns it', async () => {
+  test.each([
+    'https://lin.ee/nen-official',
+    'https://line.me/R/ti/p/@nen-official',
+  ])('stores the official profile URL %s and returns it', async (officialProfileUrl) => {
     dbMocks.updateLineAccountFields.mockResolvedValue({
       ...fakeAccount,
-      official_profile_url: 'https://lin.ee/nen-official',
+      official_profile_url: officialProfileUrl,
     });
 
     const res = await setupApp('admin').request('/api/line-accounts/acc-1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ officialProfileUrl: 'https://lin.ee/nen-official' }),
+      body: JSON.stringify({ officialProfileUrl }),
     });
 
     expect(res.status).toBe(200);
     expect(dbMocks.updateLineAccountFields.mock.calls[0][2]).toMatchObject({
-      officialProfileUrl: 'https://lin.ee/nen-official',
+      officialProfileUrl,
     });
     await expect(res.json()).resolves.toMatchObject({
-      data: { officialProfileUrl: 'https://lin.ee/nen-official' },
+      data: { officialProfileUrl },
     });
   });
 
-  test('rejects a profile URL outside lin.ee without updating data', async () => {
+  test.each([
+    'https://example.com/not-line',
+    'https://line.me/other-path',
+    'https://line.me/R/ti/p/nen-official',
+  ])('rejects the invalid profile URL %s without updating data', async (officialProfileUrl) => {
     const res = await setupApp('admin').request('/api/line-accounts/acc-1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ officialProfileUrl: 'https://example.com/not-line' }),
+      body: JSON.stringify({ officialProfileUrl }),
     });
 
     expect(res.status).toBe(400);
     expect(dbMocks.updateLineAccountFields).not.toHaveBeenCalled();
     expect(dbMocks.updateLineAccount).not.toHaveBeenCalled();
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('https://lin.ee/ or https://line.me/R/ti/p/@'),
+    });
   });
 
   test('updates loginChannelId / loginChannelSecret / liffId via metadata path', async () => {
@@ -1419,7 +1684,7 @@ describe('Login pair / uniqueness validation', () => {
   });
 
   test('POST: rejects duplicate liffId', async () => {
-    // makeDbStub returns "another row already has this liff_id"
+    // 同じ liff_id を持つ別の行を返し、重複を検証する。
     const app = setupApp('owner', makeDbStub({ id: 'other-acc' }));
 
     const res = await app.request('/api/line-accounts', {
@@ -1442,10 +1707,33 @@ describe('Login pair / uniqueness validation', () => {
     expect(body.error).toMatch(/already assigned/);
   });
 
+  test('POST: 同時登録の負け側は重複したLoginチャネルIDを409で案内する', async () => {
+    dbMocks.createLineAccount.mockRejectedValue(
+      new Error('UNIQUE constraint failed: line_accounts.login_channel_id'),
+    );
+    const res = await setupApp('owner', makeDbStub(), { tenantId: 'tenant-line-owner' }).request(
+      '/api/line-accounts',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelId: '123456789',
+          name: 'メイン',
+          channelAccessToken: 'token',
+          channelSecret: 'secret',
+          loginChannelId: '2009624792',
+          loginChannelSecret: 'login-secret',
+          liffId: '2009624792-XXXX',
+        }),
+      },
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.error).toMatch(/loginChannelId.*already assigned/);
+  });
+
   test('PATCH: LIFF-only edit succeeds against half-configured Login (id-only) account', async () => {
-    // Setup CLI persists login_channel_id without secret as a best-effort.
-    // Adding a LIFF ID later via the dashboard must NOT trip the pair check
-    // because the request doesn't touch the Login fields at all.
+    // CLI が ID だけを保存した既存アカウントでも、ログイン項目に触れない LIFF 更新まで組合せ検査で拒まない。
     dbMocks.getLineAccountById.mockResolvedValue({
       ...fakeAccount,
       login_channel_id: 'setup-cli-id',
@@ -1516,8 +1804,7 @@ describe('Login pair / uniqueness validation', () => {
   });
 
   test('PATCH: keeps existing secret when only changing the loginChannelId', async () => {
-    // Current row already has both id+secret. Caller changes only the id —
-    // pair check should pass because the unchanged secret keeps the pair complete.
+    // ID だけの変更でも、保存済みの秘密値と組になれば許可する。
     dbMocks.getLineAccountById.mockResolvedValue({
       ...fakeAccount,
       login_channel_id: 'old-id',
@@ -1580,10 +1867,141 @@ describe('PUT /api/line-accounts/:id', () => {
       login_channel_id: '2009624792',
       liff_id: '2009624792-XXXX',
     });
-    // country/role uses the fields helper (separate code path)
+    // country/role は専用の項目更新関数へ渡る。
     expect(dbMocks.updateLineAccountFields.mock.calls[0][2]).toMatchObject({
       country: '日本',
       role: '本店',
     });
   });
+});
+
+test('登録前のタグをLINE通信前に検査する', async () => {
+ const remote=vi.fn(); vi.stubGlobal('fetch',remote);
+ for(const tagIds of [['not-own'],['tag-own','tag-own']]) {
+  const response=await setupApp('owner').request('/api/line-accounts/connect/check',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...autoConnectBody,tagIds})});
+  expect(response.status).toBe(tagIds[0] === 'not-own' ? 403 : 422);
+ }
+ expect(remote).not.toHaveBeenCalled();
+});
+test('登録に選んだタグを保存し、秘密と分けてLINE取得項目を返す', async () => {
+ installAutoConnectFetch();
+ let followerSetting: string | null = null;
+ dbMocks.getAccountSetting.mockImplementation(async () => followerSetting);
+ dbMocks.setAccountSetting.mockImplementation(async (_db,_id,_key,value) => {followerSetting=value;});
+ dbMocks.createLineAccount.mockResolvedValue({...fakeAccount,id:'created-account',channel_access_token:'issued-token',revision:1});
+ dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
+ lineClientMocks.getFollowerIds.mockResolvedValue({userIds:[]});
+ const insertTags = vi.fn();
+ const db = { prepare: vi.fn((sql: string) => ({ bind: (...args: unknown[]) => {
+  if (sql.startsWith('INSERT INTO line_account_tag_links')) insertTags(...args);
+  return { first: async () => sql.startsWith('SELECT id FROM staff_members') || sql.startsWith('SELECT id FROM line_account_tags') ? {id:'valid'} : null };
+ } })), batch: vi.fn(async () => []) } as unknown as D1Database;
+ const response=await setupApp('owner', db).request('/api/line-accounts/connect',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...autoConnectBody,tagIds:['tag-own']})});
+ expect(response.status).toBe(201);
+ expect(insertTags).toHaveBeenCalledExactlyOnceWith('created-account','tag-own', expect.any(String));
+ expect(db.batch).toHaveBeenCalledOnce();
+ expect(await response.json()).toMatchObject({data:{basicId:'@line',pictureUrl:'https://example.com/icon.png'}});
+});
+
+
+describe('selected registration style', () => {
+  test.each(['standard','ec','restaurant','salon','consult','lesson'])('%s reaches the same account initializer',async style=>{
+    installAutoConnectFetch();
+    let followerSetting:string|null=null;
+    dbMocks.getAccountSetting.mockImplementation(async()=>followerSetting);
+    dbMocks.setAccountSetting.mockImplementation(async(_db,_id,_key,value)=>{followerSetting=value;});
+    dbMocks.createLineAccount.mockResolvedValue({...fakeAccount,id:'created-account',tenant_id:'tenant-1',channel_access_token:'issued-token'});
+    dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
+    lineClientMocks.getFollowerIds.mockResolvedValue({userIds:[]});
+    const res=await setupApp('owner').request('/api/line-accounts/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...autoConnectBody,style})});
+    expect(res.status).toBe(201);
+    expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account','tenant-1','test-staff',style,{bucket:undefined,publicBaseUrl:undefined,reportError:expect.any(Function)});
+  });
+  test.each(['meeting','',null,{},42])('rejects invalid style %j before external calls and creation',async style=>{
+    const external=vi.fn();vi.stubGlobal('fetch',external);
+    for(const path of ['/api/line-accounts','/api/line-accounts/connect']){
+      const res=await setupApp('owner').request(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...autoConnectBody,style})});
+      expect(res.status).toBeGreaterThanOrEqual(400);expect(res.status).toBeLessThan(500);
+    }
+    expect(external).not.toHaveBeenCalled();expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+  test.each([
+    ['/api/line-accounts/connect',{...autoConnectBody,style:'consult'}],
+    ['/api/line-accounts',{channelId:'123456789',name:'メイン',channelAccessToken:'token',channelSecret:'secret',loginChannelId:'2009624792',loginChannelSecret:'login-secret',liffId:'2009624792-XXXX',style:'consult'}],
+  ])('returns the created account for style retry without deleting it or creating a second account: %s',async(path,body)=>{
+    installAutoConnectFetch();let followerSetting:string|null=null;
+    dbMocks.getAccountSetting.mockImplementation(async()=>followerSetting);dbMocks.setAccountSetting.mockImplementation(async(_db,_id,_key,value)=>{followerSetting=value;});
+    dbMocks.createLineAccount.mockResolvedValue({...fakeAccount,id:'created-account',channel_access_token:'issued-token',login_channel_id:'2009624792',login_channel_secret:'login-secret',liff_id:'2009624792-XXXX'});
+    dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);lineClientMocks.getFollowerIds.mockResolvedValue({userIds:[]});styleMocks.initializeAccountStyle.mockRejectedValueOnce(new Error('db failure'));
+    const app=new Hono<TestEnv>();app.use('*',apiContractMiddleware);app.route('/',setupApp('owner'));
+    const res=await app.request(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({success:false,error:{code:'style_save_failed',requestId:res.headers.get('X-Request-ID'),fieldErrors:[]},data:{accountId:'created-account',style:'consult',styleSaved:false,retryAt:'/api/dashboard/style?account_id=created-account',starterRetryAt:'/api/dashboard/style/starter-items/ensure?account_id=created-account'}});
+    expect(dbMocks.createLineAccount).toHaveBeenCalledOnce();expect(dbMocks.deleteUncommittedLineAccount).not.toHaveBeenCalled();
+  });
+});
+
+test.each(['/api/line-accounts/connect/check', '/api/line-accounts/connect'])('registered channels are rejected before LINE changes: %s', async (path) => {
+  const response = await setupApp('owner', makeDbStub({ id: 'other-customer' })).request(path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(autoConnectBody),
+  });
+  expect(response.status).toBe(409);
+  expect(fetch).not.toHaveBeenCalled();
+  expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+});
+
+test('a mismatched Messaging credential cannot be saved by the owner', async () => {
+  const { verifyLineMessagingIdentity } = await import('../services/line-messaging-identity.js');
+  vi.mocked(verifyLineMessagingIdentity).mockResolvedValueOnce(false);
+  const response = await setupApp('owner').request('/api/line-accounts/acc-1', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelAccessToken: 'other-shop-token' }),
+  });
+  expect(response.status).toBe(422);
+  expect(dbMocks.updateLineAccount).not.toHaveBeenCalled();
+});
+
+
+describe('registration authorization boundaries', () => {
+  const endpoints = ['/api/line-accounts/verify-connection', '/api/line-accounts/connect/check', '/api/line-accounts/connect', '/api/line-accounts'];
+  test.each(endpoints)('%s rejects staff and read-only managers before LINE or DB side effects', async (path) => {
+    for (const actor of [{ role: 'staff', readOnly: false }, { role: 'admin', readOnly: true }, { role: 'owner', readOnly: true }] as const) {
+      const res = await setupApp(actor.role, makeDbStub(), { readOnly: actor.readOnly }).request(path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(autoConnectBody),
+      });
+      expect(res.status).toBe(403);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+
+  test.each(['/api/line-accounts/connect', '/api/line-accounts'])('%s still requires admin step-up verification', async (path) => {
+    dbMocks.consumeStepUpGrant.mockResolvedValueOnce(false);
+    const res = await setupApp('admin').request(path, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toMatchObject({ code: 'STEP_UP_REQUIRED' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+
+  test.each(['owner', 'admin'] as const)('%s can verify credentials before saving', async (role) => {
+    const res = await setupApp(role).request('/api/line-accounts/verify-connection', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channelAccessToken: 'token', loginChannelId: '2007123456', loginChannelSecret: 'secret', liffId: '2007123456-test' }),
+    });
+    expect(res.status).toBe(200);
+    expect(fetch).toHaveBeenCalled();
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+});
+
+
+test.each(['/api/line-accounts/connect/check', '/api/line-accounts/connect'])('admin cannot grant staff access through registration: %s', async (path) => {
+  const response = await setupApp('admin').request(path, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...autoConnectBody, staffIds: ['another-staff'] }),
+  });
+  expect(response.status).toBe(403);
+  expect(fetch).not.toHaveBeenCalled();
+  expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
 });

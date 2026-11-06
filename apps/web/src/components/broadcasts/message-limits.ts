@@ -1,3 +1,4 @@
+import { formatNumber } from '@/lib/format'
 /**
  * 一斉配信の本文の上限（設計 `XQfMD` 6-1-C）。
  *
@@ -39,26 +40,26 @@ export function messageLengthNotice(input: {
     return {
       tone: 'error',
       title: '本文が長すぎます',
-      description: `1通は${MAX_TEXT_LENGTH.toLocaleString('ja-JP')}文字までです。`
-        + `いまいちばん長い通は${input.longest.toLocaleString('ja-JP')}文字あります。`,
+      description: `1通は${formatNumber(MAX_TEXT_LENGTH)}文字までです。`
+        + `いまいちばん長い通は${formatNumber(input.longest)}文字あります。`,
     }
   }
   if (input.longest > SPLIT_HINT_LENGTH) {
     return {
       tone: 'hint',
       title: '長いので、通を分けることをおすすめします',
-      description: `${SPLIT_HINT_LENGTH.toLocaleString('ja-JP')}文字を超えると読みにくくなります。`
+      description: `${formatNumber(SPLIT_HINT_LENGTH)}文字を超えると読みにくくなります。`
         + `「＋ 吹き出しを追加」で分けられます（${MAX_BUBBLES}通まで）。`,
     }
   }
   return {
     tone: 'ok',
     title: '本文の長さは問題ありません',
-    description: `合計${input.total.toLocaleString('ja-JP')}文字・${input.bubbles}通で届きます。`,
+    description: `合計${formatNumber(input.total)}文字・${input.bubbles}通で届きます。`,
   }
 }
 
 /** 帯に出す「238 / 5,000」。取得できた0文字は0のまま出す。 */
 export function messageLengthLabel(longest: number): string {
-  return `${longest.toLocaleString('ja-JP')} / ${MAX_TEXT_LENGTH.toLocaleString('ja-JP')}`
+  return `${formatNumber(longest)} / ${formatNumber(MAX_TEXT_LENGTH)}`
 }

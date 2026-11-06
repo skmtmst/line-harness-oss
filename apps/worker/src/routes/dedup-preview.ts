@@ -1,28 +1,29 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { computeDedupBroadcastPreview } from '../services/dedup-broadcast.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import type { Env } from '../index.js';
-
+import type { Env } from '../worker-env.js';
+import { fail } from '../lib/fail.js';
 const dedupPreview = new Hono<Env>();
 
 dedupPreview.post(
   '/api/broadcasts/dedup-preview',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<{ accountIds: unknown; dedupPriority: unknown; targetTagId?: unknown }>();
     if (!Array.isArray(body.accountIds) || !body.accountIds.every((x) => typeof x === 'string')) {
-      return c.json({ success: false, error: 'accountIds: array of strings required' }, 400);
+      return fail(c, 400, 'ACCOUNT_IDS_ARRAY_OF_STRINGS_REQUIRED', {}, ["accountIds"]);
     }
     if (!Array.isArray(body.dedupPriority) || !body.dedupPriority.every((x) => typeof x === 'string')) {
-      return c.json({ success: false, error: 'dedupPriority: array of strings required' }, 400);
+      return inputError(c, { success: false, error: 'dedupPriority: array of strings required' }, 400, ["dedupPriority"]);
     }
     if (
       body.targetTagId !== undefined &&
       body.targetTagId !== null &&
       typeof body.targetTagId !== 'string'
     ) {
-      return c.json({ success: false, error: 'targetTagId: string or null' }, 400);
+      return inputError(c, { success: false, error: 'targetTagId: string or null' }, 400, ["targetTagId"]);
     }
     const accountIds = body.accountIds as string[];
     const dedupPriority = body.dedupPriority as string[];
@@ -39,8 +40,7 @@ dedupPreview.post(
       targetTagId,
     );
 
-    // Strip recipients[] before returning — it's needed only by the send executor,
-    // not the UI. Keeps the response payload small for large broadcasts.
+    // 多数配信でも応答を大きくしないよう、送信実行だけで使う recipients を返さない。
     return c.json({
       success: true,
       data: {

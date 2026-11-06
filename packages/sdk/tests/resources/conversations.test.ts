@@ -7,7 +7,7 @@ function mockHttp(overrides: Partial<HttpClient> = {}): HttpClient {
 }
 
 describe('ConversationsResource', () => {
-  it('list() no params calls GET /api/conversations', async () => {
+  it('list no params calls GET /api/conversations', async () => {
     const data = { total: 0, items: [] }
     const http = mockHttp({ get: vi.fn().mockResolvedValue({ success: true, data }) })
     const resource = new ConversationsResource(http)
@@ -16,7 +16,7 @@ describe('ConversationsResource', () => {
     expect(result).toEqual(data)
   })
 
-  it('list() with filters builds query string', async () => {
+  it('list with filters builds query string', async () => {
     const data = { total: 0, items: [] }
     const http = mockHttp({ get: vi.fn().mockResolvedValue({ success: true, data }) })
     const resource = new ConversationsResource(http)
@@ -24,7 +24,7 @@ describe('ConversationsResource', () => {
     expect(http.get).toHaveBeenCalledWith('/api/conversations?lineAccountId=acc_1&minHoursSince=24&limit=10&offset=20')
   })
 
-  it('get() calls GET /api/conversations/:friendId', async () => {
+  it('get calls GET /api/conversations/:friendId', async () => {
     const detail = {
       friend: { friendId: 'frd_1', lineUserId: 'U1', displayName: 'A', lineAccountId: null, lineAccountName: null, isFollowing: true, tags: [] },
       messages: [],
@@ -36,7 +36,7 @@ describe('ConversationsResource', () => {
     expect(result).toEqual(detail)
   })
 
-  it('get() with limit/before builds query string', async () => {
+  it('get with limit/before builds query string', async () => {
     const detail = {
       friend: { friendId: 'frd_1', lineUserId: 'U1', displayName: null, lineAccountId: null, lineAccountName: null, isFollowing: true, tags: [] },
       messages: [],

@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 export type LineWebhookEventStatus = 'received' | 'processing' | 'succeeded' | 'failed';
 
 export type LineWebhookErrorClassification = 'line_api_error' | 'db_error' | 'unknown';
@@ -46,15 +47,16 @@ export async function reserveLineWebhookEvent(
 export async function markLineWebhookEventSucceeded(
   db: D1Database,
   webhookEventId: string,
+  lineAccountId?: string | null,
 ): Promise<void> {
   await db
     .prepare(
       `UPDATE line_webhook_events
           SET status = 'succeeded', last_error = NULL,
               updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE webhook_event_id = ?`,
+        WHERE webhook_event_id = ? ${lineAccountId === undefined ? '' : 'AND line_account_id IS ?'}`,
     )
-    .bind(webhookEventId)
+    .bind(webhookEventId, ...(lineAccountId === undefined ? [] : [lineAccountId]))
     .run();
 }
 
@@ -62,15 +64,16 @@ export async function markLineWebhookEventFailed(
   db: D1Database,
   webhookEventId: string,
   classification: LineWebhookErrorClassification,
+  lineAccountId?: string | null,
 ): Promise<void> {
   await db
     .prepare(
       `UPDATE line_webhook_events
           SET status = 'failed', attempts = attempts + 1, last_error = ?,
               updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE webhook_event_id = ?`,
+        WHERE webhook_event_id = ? ${lineAccountId === undefined ? '' : 'AND line_account_id IS ?'}`,
     )
-    .bind(classification, webhookEventId)
+    .bind(classification, webhookEventId, ...(lineAccountId === undefined ? [] : [lineAccountId]))
     .run();
 }
 
@@ -128,9 +131,9 @@ export async function listLineWebhookEvents(
     rows.push(...result.results);
   }
   for (const accountIds of accountChunks) {
-    const placeholders = accountIds.map(() => '?').join(', ');
+    const placeholders = sqlIdSet(accountIds).sql;
     const statusClause = input.status ? 'AND status = ?' : '';
-    const bindings: Array<string | number> = [...accountIds];
+    const bindings: Array<string | number> = [...(accountIds.length ? sqlIdSet(accountIds).binds : [])];
     if (input.status) bindings.push(input.status);
     bindings.push(limit);
 

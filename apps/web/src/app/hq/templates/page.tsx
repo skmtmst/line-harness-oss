@@ -3,22 +3,25 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { TEMPLATE_TYPES, type TemplateType } from '@/lib/hq-templates-api'
-import HqTemplatePage from '../hq-template-page'
+import HqTemplatesV8 from '@/v8/hq-templates/console'
+import TemplateDefinitionEditor from './template-definition-editor'
+import HqDeliveryConsole from '@/v8/hq-deliveries/console'
+import { HQ_DELIVERY_TEMPLATE_TYPES, type HqDeliveryTemplateType } from '@line-crm/shared'
 
 /** `/hq/templates?type=...` は旧URLとして残し、新しい正規画面へ同じ内容を出す。 */
 function Content() {
   const requested = useSearchParams().get('type')
+  if (requested && HQ_DELIVERY_TEMPLATE_TYPES.includes(requested as HqDeliveryTemplateType)) {
+    return <HqDeliveryConsole type={requested as HqDeliveryTemplateType} />
+  }
   const type = requested && TEMPLATE_TYPES.includes(requested as TemplateType)
     ? requested as TemplateType
     : 'template'
-  const config = type === 'tag'
-    ? { label: '友だち属性', target: 'tags' as const }
-    : type === 'rich_menu'
-      ? { label: 'リッチメニュー', target: 'rich-menus' as const }
-      : type === 'form'
-        ? { label: '回答フォーム', target: 'form-submissions' as const }
-        : { label: 'テンプレート', target: 'templates' as const }
-  return <HqTemplatePage type={type} {...config} />
+  /*
+   * ★V8（・・）は src/v8 の新しい画面。タグ・リッチメニュー・回答フォーム・
+   * シナリオのひな形の中身は、今の編集部品をそのまま渡す（src/v8 は @/app を読まないため）。
+   */
+  return <HqTemplatesV8 type={type} DefinitionEditor={TemplateDefinitionEditor} />
 }
 
 export default function HqTemplatesPage() {

@@ -1,46 +1,44 @@
-/* Pencil `J33xq/V2WbXF`。高さ76・padding [14,16]・gap 10。 */
-.root {
+/* 提供された横長ロゴの透明余白だけを表示領域で切る。 */
+/*
+ * 塊の高さは中身通り（上2・絵24・下1＝27）にし、54 の箱の下にあった
+ * 28 の空きを取る。絵の上端（上の余白16＋2＝18）は動かさないので、
+ * 絵は今までどおり上の帯（高さ60）の縦の中心にそろう。下の 1px は
+ * 組の見出しの文字の上端を右の板の上端（60）に合わせる分。
+ */
+.logoRoot {
   display: flex;
   min-width: 0;
-  height: 76px;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
+  height: auto;
+  align-items: flex-start;
+  padding: var(--space-2) var(--space-20) 1px;
 }
 
-.mark {
-  display: flex;
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-control);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-  font-size: var(--text-lead);
-  font-weight: 700;
-}
-
-.text {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.name {
+.logoViewport {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 118px;
+  height: 24px;
   overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 700;
-  line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.version {
-  color: var(--color-ink-faint);
-  font-size: var(--text-nano);
-  font-weight: 600;
-  line-height: 1.4;
+.logoImage {
+  position: absolute;
+  top: -9px;
+  left: -11px;
+  display: block;
+  width: 140px;
+  max-width: none;
+  height: auto;
 }
+
+.compact { padding: 2px 0 0; }
+
+:root [data-collapsed] .logoRoot {
+  height: 40px;
+  justify-content: center;
+  padding: 5px 0 0;
+}
+
+:root [data-collapsed] .logoViewport { width: 18px; height: 18px; }
+:root [data-collapsed] .logoImage { top: -11px; left: -12px; width: 138px; }

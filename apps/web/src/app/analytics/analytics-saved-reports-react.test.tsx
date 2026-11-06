@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -29,8 +30,8 @@ vi.mock('next/link', () => ({
     <a href={href}>{children}</a>
   ),
 }))
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/analytics',
+  useSearchParams: () => new URLSearchParams({ tab: 'saved' }),
 }))
 
 vi.mock('@/components/layout/merged-tabs', () => ({
@@ -113,6 +114,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   fixture.accountId = 'account-a'
   fixture.role = 'owner'
   net.calls.length = 0
@@ -137,6 +139,16 @@ async function render() {
   await act(async () => { root.render(<AnalyticsPage />) })
 }
 
+/** 定期レポートの行の「…」を開き、中の項目を返す（行の右端は「…」1つ・）。 */
+async function scheduleMenuItem(label: string): Promise<HTMLElement> {
+  const trigger = Array.from(host.querySelectorAll('button')).find((item) => item.getAttribute('aria-label')?.startsWith('定期レポート「'))
+  if (!trigger) throw new Error('定期レポートの「…」が見つからない')
+  await act(async () => { trigger.click() })
+  const found = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((item) => item.textContent?.trim() === label)
+  if (!found) throw new Error(`メニューの項目が見つからない: ${label}`)
+  return found
+}
+
 function button(label: string): HTMLButtonElement {
   const found = Array.from(host.querySelectorAll('button')).find(
     (item) => item.textContent?.trim() === label,
@@ -155,30 +167,33 @@ function dialogButton(label: string): HTMLButtonElement {
   return found as HTMLButtonElement
 }
 
-describe('V6 保存タブの定期レポート', () => {
+describe('管理画面 保存タブの定期レポート', () => {
   it('実データの一覧(名前・間隔・次回・状態)を出し、「なし」の決め打ちを残さない', async () => {
     await render()
     expect(host.textContent).toContain('週次まとめ')
-    expect(host.textContent).toContain('毎週月曜 09:00')
-    expect(host.textContent).toContain('送る予定あり')
+    expect(host.textContent).toContain('毎週 月 09:00')
+    expect(host.textContent).toContain('動いている')
     expect(host.textContent).not.toContain('定期レポートは現在「なし」です')
     // 選んでいる保存分析へ紐づく件数も実数で出る
     expect(host.textContent).toContain('定期レポート 1件')
     // 作成への導線がある
     expect(host.querySelector('a[href="/analytics/reports/new"]')).not.toBeNull()
-    expect(host.querySelector('a[href="/analytics/reports/new?id=report-1"]')).not.toBeNull()
+    const menu = host.querySelector('button[aria-label="定期レポート「週次まとめ」の操作"]') as HTMLButtonElement
+    expect(menu).not.toBeNull()
+    await act(async () => { menu.click() })
+    expect(document.body.textContent).toContain('内容を変える')
   })
 
   it('止める・また送るを読み取った版つきで送る', async () => {
     await render()
-    await act(async () => { button('止める').click() })
+    await act(async () => { (await scheduleMenuItem('止める')).click() })
     const pauseCall = net.calls.find((call) => call.path.startsWith('/api/analytics/report-schedules/report-1/status'))
     expect(pauseCall?.method).toBe('PUT')
     expect(pauseCall?.body).toMatchObject({ status: 'paused', expectedUpdatedAt: '2026-09-01T00:00:00.000Z' })
 
     // 停止後は「また送る」に変わる
     expect(host.textContent).toContain('止めている')
-    await act(async () => { button('また送る').click() })
+    await act(async () => { (await scheduleMenuItem('また送る')).click() })
     const resumeCall = net.calls.filter((call) => call.path.includes('/status')).at(-1)
     expect(resumeCall?.body).toMatchObject({ status: 'active' })
   })
@@ -191,7 +206,7 @@ describe('V6 保存タブの定期レポート', () => {
       return defaultHandler(path, init)
     }
     await render()
-    await act(async () => { button('しまう').click() })
+    await act(async () => { (await scheduleMenuItem('しまう')).click() })
     // 確認窓が出る。まだ送っていない
     expect(document.body.textContent).toContain('定期レポートをしまいますか')
     expect(net.calls.filter((call) => call.path.includes('/status'))).toHaveLength(0)
@@ -211,7 +226,7 @@ describe('V6 保存タブの定期レポート', () => {
       }
       return defaultHandler(path, init)
     }
-    await act(async () => { button('止める').click() })
+    await act(async () => { (await scheduleMenuItem('止める')).click() })
     expect(host.textContent).toContain('別の画面で先に更新されました')
     // 読み直しが走る
     expect(net.calls.filter((call) => call.path.startsWith('/api/analytics/report-schedules') && call.method === 'GET').length).toBeGreaterThanOrEqual(2)
@@ -233,7 +248,10 @@ describe('V6 保存タブの定期レポート', () => {
     fixture.role = 'staff'
     await render()
     expect(host.textContent).toContain('週次まとめ')
-    for (const label of ['止める', 'また送る', 'しまう', '内容を変える', '定期レポートを作る']) {
+    const edit = [...host.querySelectorAll('button')].find(item => item.textContent?.trim() === '内容を変える')!
+    expect(edit.getAttribute('aria-disabled') === 'true' || edit.hasAttribute('disabled')).toBe(true)
+    expect(host.querySelector('a[title="条件を変えるときは、元の分析で集計し直してから保存します"]')).toBeNull()
+    for (const label of ['止める', 'また送る', 'しまう', '定期レポートを作る']) {
       expect(Array.from(host.querySelectorAll('button, a')).some((item) => item.textContent?.trim() === label)).toBe(false)
     }
   })
@@ -259,6 +277,7 @@ async function typeSearch(text: string) {
   await act(async () => {
     setter.call(input, text)
     input.dispatchEvent(new Event('input', { bubbles: true }))
+    await new Promise(resolve => setTimeout(resolve, 350))
   })
 }
 
@@ -267,31 +286,31 @@ describe('監査 R226 保存済み分析の絞り込み', () => {
     net.handler = twoItemsHandler
     await render()
     // 初期は先頭（流入別の成果）が選ばれ、履歴欄に名前が出る
-    expect(host.textContent).toContain('流入別の成果 ／ 定期レポート')
+    expect(host.textContent).toContain('選んだ分析の履歴：流入別の成果')
 
     await typeSearch('存在しない言葉')
     expect(host.textContent).toContain('条件に合う保存済み分析はありません')
     // 一覧は空だが「まだありません」（保存ゼロ）にはならない
     expect(host.textContent).not.toContain('保存した分析はまだありません')
     // 条件に合わない分析の履歴は見せ続けない
-    expect(host.textContent).not.toContain('流入別の成果 ／ 定期レポート')
+    expect(host.textContent).not.toContain('選んだ分析の履歴：流入別の成果')
     expect(host.textContent).toContain('一覧から分析を選んでください')
 
-    // 「検索をやめる」で元の一覧へ戻り、先頭が選び直されて履歴も戻る
-    await act(async () => { button('検索をやめる').click() })
-    expect(host.textContent).toContain('流入別の成果 ／ 定期レポート')
+    // 「キャンセル」で元の一覧へ戻り、先頭が選び直されて履歴も戻る
+    await act(async () => { (host.querySelector('button[aria-label="検索語を消す"]') as HTMLButtonElement).click() })
+    expect(host.textContent).toContain('選んだ分析の履歴：流入別の成果')
     expect(host.textContent).toContain('曜日別の推移')
   })
 
   it('絞り込みで選んだ項目が見えなくなったら、見えている先頭へ選び直す', async () => {
     net.handler = twoItemsHandler
     await render()
-    expect(host.textContent).toContain('流入別の成果 ／ 定期レポート')
+    expect(host.textContent).toContain('選んだ分析の履歴：流入別の成果')
 
     await typeSearch('曜日')
     // 一覧から「流入別の成果」の行が消え、「曜日別の推移」だけ残る
     expect(host.textContent).toContain('曜日別の推移')
-    expect(host.textContent).toContain('曜日別の推移 ／ 定期レポート')
+    expect(host.textContent).toContain('選んだ分析の履歴：曜日別の推移')
     expect(net.calls.some((call) => call.path.startsWith('/api/analytics/saved/saved-2/snapshots'))).toBe(true)
   })
 })

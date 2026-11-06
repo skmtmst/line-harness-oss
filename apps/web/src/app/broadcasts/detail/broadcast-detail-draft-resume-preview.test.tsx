@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /*
  * 下書き詳細の編集導線と中身の見せ方（監査 R207・R211）。
  *
@@ -105,7 +106,7 @@ function draft(over: Record<string, unknown> = {}) {
 }
 
 function resumeLink(): HTMLAnchorElement | null {
-  return [...host.querySelectorAll('a')].find((a) => a.textContent === '編集を続ける') ?? null
+  return host.querySelector('a[href^="/broadcasts/new?draft=bc-1"]')
 }
 
 describe('下書き詳細の編集導線とプレビュー（R207・R211）', () => {
@@ -115,7 +116,7 @@ describe('下書き詳細の編集導線とプレビュー（R207・R211）', ()
     try {
       const link = resumeLink()
       expect(link, '下書きに編集導線がない').not.toBeNull()
-      expect(link!.getAttribute('href')).toBe('/broadcasts/new?draft=bc-1')
+      expect(link!.getAttribute('href')).toBe('/broadcasts/new?draft=bc-1&step=basic')
     } finally {
       unmount()
     }
@@ -158,7 +159,7 @@ describe('下書き詳細の編集導線とプレビュー（R207・R211）', ()
     try {
       expect(host.textContent).toContain('保存していた本文')
       expect(host.textContent).toContain('資料を見る')
-      expect(host.textContent).toContain('まだ誰にも届いていません')
+      expect(host.textContent).toContain('まだ送っていません')
     } finally {
       unmount()
     }

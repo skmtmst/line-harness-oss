@@ -5,13 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsTenantDetailPage from './page'
 
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('id=t1') }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/ops/tenants/detail', useSearchParams: () => new URLSearchParams('id=t1') }))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 /**
  * 契約先の詳細「概要」タブ。1440px の撮影で「契約先の情報」「契約の状況」の
- * 行が見出しと同じ左端に付かず、最後の「機能パック」が下端で切れていた。
+ * 行が見出しと同じ左端に付かず、最後の行が下端で切れていた。
  * 行の入れ物に見出しと同じ横の余白と下の余白を持たせた。再発防止。
  */
 
@@ -39,6 +39,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input)
+    if (url.endsWith('/api/ops/me')) return new Response(JSON.stringify({ success: true, data: { id: 'ops-1', readOnly: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (url.endsWith('/api/ops/tenants/t1')) {
       return new Response(JSON.stringify({ success: true, data: payload }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
@@ -60,15 +61,17 @@ async function flush() {
 }
 
 describe('契約先の詳細の概要', () => {
-  it('2つのカードの見出しと行（統括名〜機能パック）が出る', async () => {
+  it('2つのカードの見出しと契約情報が出る', async () => {
     await act(async () => { root.render(<OpsTenantDetailPage />) })
     await flush()
     const text = host.textContent ?? ''
     expect(text).toContain('契約先の情報')
     expect(text).toContain('契約の状況')
-    for (const row of ['統括名', '登録日', '店舗数', '権限者数', '最終ログイン', '機能パック']) {
+    for (const row of ['統括名', '登録日', '使用量', '店舗 1', '権限者 1', '最終ログイン']) {
       expect(text, `行「${row}」がない`).toContain(row)
     }
+    expect(text).not.toContain('飲食店機能')
+    expect(host.querySelector('button[role="switch"]')).toBeNull()
     expect(text).toContain('検証商事')
   })
 
@@ -78,8 +81,10 @@ describe('契約先の詳細の概要', () => {
     const lists = Array.from(host.querySelectorAll('dl'))
     expect(lists.length).toBe(2)
     for (const dl of lists) {
-      expect(dl.className).toContain('px-4')
-      expect(dl.className).toContain('pb-4')
+      expect(dl.className).toContain('kvs')
+      const card = dl.closest('[data-design-part="card"]')
+      expect(card).not.toBeNull()
+      expect((card as HTMLElement).style.getPropertyValue('--card-content-padding')).toBe('var(--polish-space-section)')
     }
   })
 })

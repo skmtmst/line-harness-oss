@@ -131,7 +131,7 @@ describe('FRIEND-13 詳細条件の窓', () => {
   it('入れ子の「条件を保存」が開いている間、Escapeは入れ子だけを閉じる', async () => {
     await openDialog()
     const saveButton = Array.from(host.querySelectorAll('button')).find(
-      (b) => b.textContent === '条件を保存',
+      (b) => b.textContent === '条件を保存する',
     )!
     await act(async () => {
       saveButton.click()

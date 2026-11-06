@@ -199,6 +199,7 @@ export interface TemplateUsages {
     scenarioName: string
     stepId: string
     stepOrder: number
+    displayOrder?: number
   }>
   automations: Array<{ id: string; name: string; eventType: string }>
   reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>
@@ -225,6 +226,7 @@ export interface FriendScenarioEnrollment {
 
 // ─── Broadcast ──────────────────────────────────────────
 export interface Broadcast {
+  version: number
   id: string
   title: string
   messageType: MessageType
@@ -274,7 +276,14 @@ export interface CreateBroadcastInput {
   trackLinks?: boolean
 }
 
+/** 本送信の明示的な確認。サーバーも同じ値を検査する。 */
+export interface BroadcastSendOptions {
+  confirmIrreversible?: 'broadcast-send'
+  confirmedRecipientCount?: number
+}
+
 export interface UpdateBroadcastInput {
+  expectedVersion: number
   title?: string
   messageType?: MessageType
   messageContent?: string
@@ -403,6 +412,7 @@ export interface FormField {
 }
 
 export interface Form {
+  contentRevision: number
   id: string
   name: string
   description: string | null
@@ -422,6 +432,7 @@ export interface Form {
 }
 
 export interface CreateFormInput {
+  accountId?: string
   name: string
   description?: string
   fields: FormField[]
@@ -435,7 +446,12 @@ export interface CreateFormInput {
   ogImageUrl?: string | null
 }
 
-export interface UpdateFormInput {
+// Folder-only moves are exempt; every content update carries the observed revision.
+export type UpdateFormInput = UpdateFormContentInput | { folderId: string | null; expectedContentRevision?: never }
+
+interface UpdateFormContentInput {
+  expectedContentRevision: number
+  folderId?: string | null
   name?: string
   description?: string | null
   fields?: FormField[]

@@ -12,7 +12,7 @@ import MenuPortal, { hasMoreBelow, MENU_PORTAL_MARGIN } from './menu-portal'
  * （画面 − ボタン − 余白8px）まで使い、入るなら全部出す。
  * 入りきらない時だけ中でスクロールし、下端に影（続きの目印）を付ける。
  *
- * 回答フォームの「＋ ブロックを追加（12種）」は器の中で
+ * 回答フォームの「＋ ブロックを追加（15種）」は器の中で
  * 20rem（約7項目）で切れていた。直しを戻す（器に上限なし・
  * メニューの portal 側に 20rem の上限あり）と赤くなる。
  */
@@ -33,7 +33,7 @@ beforeEach(() => {
   document.body.appendChild(host)
   root = createRoot(host)
   anchor = document.createElement('button')
-  anchor.textContent = '＋ ブロックを追加（12種）'
+  anchor.textContent = '＋ ブロックを追加（15種）'
   host.appendChild(anchor)
 })
 
@@ -96,6 +96,26 @@ async function openTallMenu() {
 }
 
 describe('器は使える高さまで使う（1440×900 の撮影条件）', () => {
+  it('ダイアログ内では色パレットが本文の終端より下へ出ない', async () => {
+    mockViewport(560, 900)
+    const content = document.createElement('div')
+    content.setAttribute('data-dialog-content', '')
+    content.appendChild(anchor)
+    host.appendChild(content)
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      const rect = this === content
+        ? { top: 180, bottom: 420, left: 0, right: 560 }
+        : { top: 370, bottom: 402, left: 440, right: 480 }
+      return { x: rect.left, y: rect.top, width: rect.right - rect.left, height: rect.bottom - rect.top, ...rect, toJSON: () => ({}) } as DOMRect
+    })
+    mockPanelLayout(64, 64)
+    await openTallMenu()
+    const panel = portal()
+    expect(panel?.getAttribute('data-placement')).toBe('up')
+    expect(Number.parseFloat(panel?.style.top ?? '0') + 64).toBeLessThanOrEqual(370)
+    expect(panel?.style.top).toBe('302px')
+  })
+
   it('入る時は上限が使える高さいっぱいで、影もスクロールもない', async () => {
     // 12項目 ≒ 500px が下の空き 656px に入る置き方。
     mockViewport(1440, 900)

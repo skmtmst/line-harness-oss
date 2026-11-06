@@ -9,10 +9,12 @@ const computed: BundleHashes = {
   worker: 'sha256:workerbytes',
   admin: 'sha256:adminbytes',
   liff: 'sha256:liffbytes',
+  migrations:'sha256:migrations',
 };
 
 const entry = {
   version: '0.17.0',
+  migrations_hash:'sha256:migrations',
   admin_hash: 'sha256:adminbytes',
   liff_hash: 'sha256:liffbytes',
   worker_bundle_hash: 'sha256:workerbytes',
@@ -21,6 +23,11 @@ const entry = {
 describe('verifyBundleIntegrity', () => {
   it('passes when worker bytes match worker_bundle_hash and admin/liff match', () => {
     expect(() => verifyBundleIntegrity(computed, entry)).not.toThrow();
+  });
+
+  it('SQLを含む配布物は初回適用前にも期待hashを必要とする',()=>{
+    expect(()=>verifyBundleIntegrity(computed,{...entry,migrations_hash:undefined})).toThrow('migrations hash');
+    expect(()=>verifyBundleIntegrity({...computed,migrations:'sha256:other'},entry)).toThrow('migrations hash');
   });
 
   it('rejects releases without worker_bundle_hash (pre-pipeline bundles are undeployable)', () => {

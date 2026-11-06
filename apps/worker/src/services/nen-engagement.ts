@@ -1,3 +1,7 @@
+import { formatYen, jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
+import { currentOrderState, orderNumberFromPayload } from './nen-order-state.js';
+import { EXTERNAL_DELIVERY_MAX_ATTEMPTS as MAX_DELIVERY_ATTEMPTS } from './external-delivery-retry.js';
 import {
   accountFeatureOffExclusionSql,
   activeTenantLineAccountSql,
@@ -8,9 +12,9 @@ import {
 } from '@line-crm/db';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH, effectiveAnniversaryMonthDay, type LeapYearPolicy } from '@line-crm/shared';
+
 import type { Message } from '@line-crm/line-sdk';
-import type { EcEvent } from '../routes/ec-integrations.js';
-import { logOutgoingMessage } from './event-bus.js';
+import type { EcEvent } from '../features/ec-commerce/member-snapshot/index.js';
 import { createFeatureJobGate, featureJobCanRun } from './feature-enforcement.js';
 import { createEccubeCoupon } from './eccube-coupon.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
@@ -24,12 +28,13 @@ const FOLLOW_UP_KEYS = ['arrival_check', 'review_request', 'cross_sell'] as cons
 const MAX_JOBS_PER_TICK = 30;
 // 送信に失敗した job を何回まで試すか。これを超えた job は拾われなくなり、
 // status='failed' のまま残る（last_error に理由が入る）。
-const MAX_DELIVERY_ATTEMPTS = 5;
-// 要件 v6-21 §8: 1アカウントが1回の実行で送る上限。一斉配信の batch と同じく、
+const DELIVERY_LEASE_MS = 5 * 60_000;
+const RETRY_DELAYS_MS = [60_000, 300_000, 1_800_000];
+// 要件 -21 §8: 1アカウントが1回の実行で送る上限。一斉配信の batch と同じく、
 // 1つのアカウントが上限ぶん先頭を占めて他のアカウントを止めないようにする。
 const MAX_JOBS_PER_ACCOUNT_PER_TICK = 10;
-// 要件 v6-21 §5・§8: 深夜に送らない時間帯（JST）。この時間帯の予約は claim せず
-// pending のまま残し、朝8時を過ぎた tick が送る。時刻の既定は司令塔の確認待ち。
+// 要件 -21 §5・§8: 深夜に送らない時間帯（JST）。この時間帯の予約は claim せず
+// 朝8時前は pending のまま残し、送信可能な時刻の tick で送る。
 export const NEN_QUIET_HOURS_START_JST = 21;
 export const NEN_QUIET_HOURS_END_JST = 8;
 
@@ -76,9 +81,9 @@ export type CampaignRow = {
   button_label: string | null;
   button_url: string | null;
   image_url: string | null;
-  /** 0 disables suppression; otherwise do not schedule the same campaign within this many days. */
+  /** 0は抑止なし、それ以外は同じキャンペーンを指定日数以内に予約しない。 */
   dedup_window_days?: number;
-  /** When an open_form action is connected, skip friends who already submitted that form. */
+  /** open_form が設定されている場合、既に回答した友だちは除く。 */
   exclude_form_respondents?: number;
   after_actions?: NenCampaignAfterAction[];
   /*
@@ -138,7 +143,7 @@ export type NenBirthdayCouponSettingRow = {
   benefit_label: string;
   discount_amount: number;
   validity_days: number;
-  /** 419: 2月29日生まれの子への平年の扱い。未保存の古い設定は 'skip' 扱い（従来は平年に届かなかった）。 */
+  /** 2月29日生まれの平年の扱い。未保存の設定は、選ばれていない配信を増やさないよう skip とする。 */
   leap_year_policy?: LeapYearPolicy;
   updated_at: string;
 };
@@ -163,6 +168,7 @@ async function writeAccountSetting(db: D1Database, lineAccountId: string, key: s
 }
 
 type DeliveryJob = {
+  attempts?: number;
   id: string;
   campaign_key: string;
   friend_id: string;
@@ -192,7 +198,7 @@ function sqliteDate(date: Date): string {
 
 function scheduledAfter(occurredAt: string, days: number, deliveryTime: string): string {
   const base = new Date(occurredAt);
-  const jst = new Date(base.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(base);
   const [hour, minute] = deliveryTime.split(':').map(Number);
   jst.setUTCDate(jst.getUTCDate() + days);
   jst.setUTCHours(Number.isFinite(hour) ? hour : 10, Number.isFinite(minute) ? minute : 0, 0, 0);
@@ -215,7 +221,7 @@ function renderCampaignCopy(value: string, payload: Record<string, unknown>): st
 }
 
 /**
- * 送信直前の多重防御としての切り詰め。保存時の上限判定（#659）が効いて
+ * 送信直前の多重防御としての切り詰め。保存時の上限判定が効いて
  * いれば、ここで実際に切ることは起きないはず。**発動したのなら、保存時の
  * 検査をすり抜けたか、既存データが旧仕様のまま残っているなど、どこかに
  * 不具合があるということ。** 黙って切ると、利用者が保存できた本文が
@@ -224,14 +230,7 @@ function renderCampaignCopy(value: string, payload: Record<string, unknown>): st
  */
 function truncateForSend(value: string, maxLength: number, context: { campaignKey: string; field: string }): string {
   if (value.length <= maxLength) return value;
-  console.error(JSON.stringify({
-    event: 'nen_body_truncated_at_send',
-    campaignKey: context.campaignKey,
-    field: context.field,
-    beforeLength: value.length,
-    afterLength: maxLength,
-    droppedLength: value.length - maxLength,
-  }));
+  logger.error("nen_body_truncated_at_send");
   return value.slice(0, maxLength);
 }
 
@@ -246,7 +245,7 @@ function campaignResponseFormId(campaign: CampaignRow): string | null {
 }
 
 /*
- * NEN-07 (#1078): 「回答フォームを開く」配信は、つなぐフォームが使える状態に
+ * 「回答フォームを開く」配信は、つなぐフォームが使える状態に
  * あるかを保存・稼働開始・job生成の各入口で確かめる。フォームが消えた・公開を
  * 止めた・別アカウント専用になった既存の稼働中設定は「設定不足」として扱い、
  * 新しい送信jobを積まずに理由を配信履歴へ残す。
@@ -347,7 +346,7 @@ async function alreadyRespondedToCampaignForm(
 }
 
 /*
- * #749 案2: 送信直前の窓の見直し。積む側の抑止は残したまま、claim 後に
+ *  案2: 送信直前の窓の見直し。積む側の抑止は残したまま、claim 後に
  * 最新のアカウント別設定を正として代表1件だけを送る。
  * 代表は同一 campaign_key・friend_id の窓内 job を (scheduled_at, id) の
  * 昇順で並べた先頭。自分より先の pending/processing/sent/failed が1件でも
@@ -384,44 +383,7 @@ export async function hasEarlierWindowDelivery(
 }
 
 /**
- * IDEA-21: job の payload から起点となった注文番号を取り出す。
- * 発送後の案内（arrival_check / review_request / cross_sell）の payload は
- * `{ event }` の形で `event.order.number` を持つ。コラム・誕生日の payload は
- * 注文を持たないので null が返り、後続の注文状態チェックを素通りする。
- */
-function orderNumberFromPayload(raw: string): string | null {
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown> | null;
-    const event = parsed?.event as Record<string, unknown> | undefined;
-    const order = event?.order as Record<string, unknown> | undefined;
-    const number = order?.number;
-    return typeof number === 'string' && number.trim() ? number.trim() : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * IDEA-21: ECの注文台帳（ec_orders）の現在状態を返す。
- * `external_order_id` は注文番号。行が無いときは「取り消しとは言えない」ので
- * null を返し、呼び出し側は送信を止めない（連携の未到着で案内を欠かさない）。
- */
-async function currentOrderState(
-  db: D1Database,
-  lineAccountId: string | null,
-  orderNumber: string,
-): Promise<string | null> {
-  if (!lineAccountId) return null;
-  const row = await db.prepare(
-    `SELECT normalized_status FROM ec_orders
-      WHERE line_account_id = ? AND external_order_id = ?
-      ORDER BY updated_at DESC LIMIT 1`,
-  ).bind(lineAccountId, orderNumber).first<{ normalized_status: string }>();
-  return row?.normalized_status ?? null;
-}
-
-/**
- * IDEA-21: 注文の取り消し・返金が届いたとき、その注文を起点に待っている
+ * 注文の取り消し・返金が届いたとき、その注文を起点に待っている
  * 発送後の案内を「送らない」へ倒す。送信時の再検証（processNenDeliveries）の
  * 手前で一覧からも外し、「これから送ります」と表示したまま不適切な案内を
  * 残さない。既に送った記録や他の注文の予約は触らない。
@@ -494,7 +456,7 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
       /*
        * 「回答フォームを開く」が保存JSONにはあるのに必須項目欠落で parse に
        * 落ちた=旧仕様の未選択設定。黙って捨てると設定不足が検出できないので
-       * 手掛かりだけ残す(NEN-07)。
+       * 手掛かりだけ残す。
        */
       form_action_dropped: (
         Array.isArray(parsed.after_actions)
@@ -513,8 +475,7 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
 }
 
 /*
- * 1500: `c7069559b`（2026-08-13）で導入。根拠の記録は無い。動かす前提が
- * 出てきたら、この数値そのものを見直すこと（#711 の司令塔裁定で確認済み）。
+ * 1500 の根拠は確認できていない。運用条件が変わる場合は数値の妥当性を再確認する。
  */
 const NEN_COLUMN_INTRO_MAX_LENGTH = 1500;
 
@@ -524,17 +485,11 @@ const NEN_COLUMN_INTRO_MAX_LENGTH = 1500;
  * ここで実際に切ることは起きないはず。**発動したのなら、入口の検査をすり
  * 抜けたか、固定文言が伸びたなど、どこかに不具合があるということ。** 黙って
  * 切ると、紹介文の結びが途中で消えたことに誰も気づけない。`truncateForSend`
- * （#659）と同じ考え方で、切ったときだけ記録する。
+ * と同じ考え方で、切ったときだけ記録する。
  */
 function truncateColumnIntro(value: string, maxLength: number, context: { title: string }): string {
   if (value.length <= maxLength) return value;
-  console.error(JSON.stringify({
-    event: 'nen_column_intro_truncated',
-    title: context.title.slice(0, 120),
-    beforeLength: value.length,
-    afterLength: maxLength,
-    droppedLength: value.length - maxLength,
-  }));
+  logger.error("nen_column_intro_truncated");
   return value.slice(0, maxLength);
 }
 
@@ -560,7 +515,7 @@ function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): M
     || (event?.event_type === 'ec.order.shipped' ? event.shipping?.tracking_url : event?.order?.detail_url)
     || campaign.button_url || '');
   const title = renderCampaignCopy(String(article?.title || campaign.title), payload);
-  // 保存時は差し込み前の本文だけを見ており（#659差し戻し1点目）、差し込み
+  // 保存時は差し込み前の本文だけを見ており、差し込み
   // 値（ペットの名前など）でここまで膨らみうる。保存時の検査だけに頼らず、
   // 実際にLINEへ送る直前でも同じ採用上限で切る（多重防御）。UTF-16 code
   // unit単位で、保存時の数え方と揃っている。発動したら記録する
@@ -575,7 +530,7 @@ function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): M
   const items = event ? orderSummary(event) : '';
   if (items) details.push({ type: 'text', text: items, size: 'sm', color: '#64748B', wrap: true });
   if (typeof event?.order?.total === 'number') {
-    details.push({ type: 'text', text: `合計：¥${Math.round(event.order.total).toLocaleString('ja-JP')}`, size: 'sm', color: '#64748B', wrap: true });
+    details.push({ type: 'text', text: `合計：${formatYen(event.order.total)}`, size: 'sm', color: '#64748B', wrap: true });
   }
   if (event?.order?.delivery_date) {
     details.push({
@@ -761,7 +716,7 @@ export async function enqueuePostShippingFollowUps(
     const dedupWindowDays = campaign.dedup_window_days ?? 30;
     const excludeFormRespondents = campaign.exclude_form_respondents ?? 0;
     /*
-     * NEN-07: 稼働中でも「つなぐ回答フォーム」が使えない配信は新しい送信jobを
+     * 稼働中でも「つなぐ回答フォーム」が使えない配信は新しい送信jobを
      * 積まない。本来予約されるはずだった分だけ「対象外」の記録を配信履歴へ
      * 残し、理由コードを last_error へ入れる(重複防止で積まれない分は従来
      * どおり記録もしない)。すでに予約済みの job はここでは触らない
@@ -841,7 +796,7 @@ export async function queueColumnDelivery(
         ))`,
   ).bind(lineAccountId, column.target_mode, column.target_tag_id).all<{ id: string }>();
   const now = jstNow();
-  // 友だち1人ずつ順番に書き込むと千人規模で千回超の書き込みになる(点検 #512 の中1)。
+  // 友だち1人ずつ順番に書き込むと千人規模で千回超の書き込みになる(点検  の中1)。
   // 100件ずつまとめて送る。INSERT OR IGNORE なので入り直しても重複しない。
   const articlePayload = JSON.stringify({ article: column });
   const snapshot = campaignSnapshot(campaign);
@@ -872,7 +827,7 @@ export function birthdayDeliveryTarget(now: Date): {
   monthDay: string;
   deliveryAt: Date;
 } {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(now);
   const targetBirthday = new Date(Date.UTC(
     jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate() + 3,
   ));
@@ -923,7 +878,7 @@ export async function enqueueBirthdayCoupons(
   const pets = await db.prepare(
     `SELECT p.id, p.friend_id, p.name, p.birthday, f.line_account_id
        FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
-      WHERE p.birthday IS NOT NULL AND substr(p.birthday, -5) IN (?, '02-29') AND f.is_following = 1`,
+      WHERE p.archived_at IS NULL AND p.birthday IS NOT NULL AND substr(p.birthday, -5) IN (?, '02-29') AND f.is_following = 1`,
   ).bind(monthDay).all<{ id: string; friend_id: string; name: string; birthday: string; line_account_id: string | null }>();
   const issuedAt = jstNow();
   const accountConfiguration = new Map<string, {
@@ -933,11 +888,11 @@ export async function enqueueBirthdayCoupons(
   let queued = 0;
   let failed = 0;
   const report = async (failure: NenCouponIssueFailure) => {
-    console.error(JSON.stringify({ event: 'nen_birthday_coupon_issue_failed', ...failure }));
+    logger.error("nen_engagement.issue_birthday_coupon_failed");
     try {
       await onIssueFailed?.(failure);
     } catch (notifyError) {
-      console.error('nen birthday coupon failure notify error:', notifyError);
+      logger.error("nen_engagement.report_failed");
     }
   };
   for (const pet of pets.results) {
@@ -996,7 +951,7 @@ export async function enqueueBirthdayCoupons(
           const snapshot = campaignSnapshot(campaign);
           const revived = await db.prepare(
             `UPDATE nen_delivery_jobs
-             SET status = 'pending', attempts = 0, scheduled_at = ?, payload = ?, campaign_snapshot = ?, updated_at = ?
+             SET status = 'pending', attempts = 0, next_attempt_at = NULL, claim_token = NULL, scheduled_at = ?, payload = ?, campaign_snapshot = ?, updated_at = ?
              WHERE campaign_key = 'birthday_coupon' AND source_key = ? AND status = 'cancelled'`,
           ).bind(sqliteDate(deliveryAt), payload, snapshot, issuedAt, jobKey).run();
           if (revived.meta.changes) {
@@ -1082,7 +1037,7 @@ export async function syncNenPetProfiles(
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(external_id) DO UPDATE SET friend_id = excluded.friend_id,
            customer_id = excluded.customer_id, name = excluded.name, animal_type = excluded.animal_type,
-           gender = excluded.gender, birthday = excluded.birthday, updated_at = excluded.updated_at`,
+           gender = excluded.gender, birthday = excluded.birthday, updated_at = excluded.updated_at WHERE nen_pet_profiles.archived_at IS NULL`,
       ).bind(
         crypto.randomUUID(), externalId, friendId,
         event.customer_id == null ? null : String(event.customer_id), name,
@@ -1110,27 +1065,33 @@ export async function processNenDeliveries(
   const now = options.now ?? new Date();
   const maxJobsPerTick = options.maxJobsPerTick ?? MAX_JOBS_PER_TICK;
   const maxJobsPerAccountPerTick = options.maxJobsPerAccountPerTick ?? MAX_JOBS_PER_ACCOUNT_PER_TICK;
-  const dueWhere = `status IN ('pending', 'failed') AND datetime(scheduled_at) <= datetime('now')
-        AND attempts < ?`;
+  // 中断後も同じプロキシの冪等キーを再利用する。
+  await db.prepare(`UPDATE nen_delivery_jobs SET status='failed', next_attempt_at=?, updated_at=?
+    WHERE status='processing' AND datetime(updated_at) <= datetime(?)`).bind(
+      now.toISOString(), now.toISOString(), new Date(now.getTime() - DELIVERY_LEASE_MS).toISOString(),
+    ).run();
+  const dueWhere = `status IN ('pending', 'failed') AND attempts < ?
+        AND datetime(scheduled_at) <= datetime(?)
+        AND (next_attempt_at IS NULL OR datetime(next_attempt_at) <= datetime(?))`;
   await db.prepare(
     `UPDATE nen_delivery_jobs
         SET status='skipped', last_error='tenant_suspended', updated_at=?
       WHERE ${dueWhere}
         AND line_account_id IS NOT NULL
         AND ${stoppedTenantLineAccountSql('nen_delivery_jobs.line_account_id')}`,
-  ).bind(jstNow(), MAX_DELIVERY_ATTEMPTS).run();
+  ).bind(jstNow(), MAX_DELIVERY_ATTEMPTS, now.toISOString(), now.toISOString()).run();
   const campaignsOff = accountFeatureOffExclusionSql('nen_delivery_jobs.line_account_id', 'nen_campaigns');
   // オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、オフの行が
   // 上限ぶん先頭を占めたまま、後ろに並ぶ動作中アカウントの配信が進まない。
   const jobs = await db.prepare(
     `SELECT id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
-            scheduled_at, retry_generation
+            scheduled_at, retry_generation, attempts
        FROM nen_delivery_jobs
       WHERE ${dueWhere}
         AND NOT ${campaignsOff}
         AND (line_account_id IS NULL OR ${activeTenantLineAccountSql('nen_delivery_jobs.line_account_id')})
       ORDER BY scheduled_at ASC LIMIT ?`,
-  ).bind(MAX_DELIVERY_ATTEMPTS, maxJobsPerTick).all<DeliveryJob>();
+  ).bind(MAX_DELIVERY_ATTEMPTS, now.toISOString(), now.toISOString(), maxJobsPerTick).all<DeliveryJob>();
   // 止めた行も同じ上限ぶんだけ読み、skipped に数えて監査を残す。
   // 読むだけで status も attempts も動かさない。
   const offJobs = await db.prepare(
@@ -1139,7 +1100,7 @@ export async function processNenDeliveries(
         AND line_account_id IS NOT NULL
         AND ${campaignsOff}
       ORDER BY scheduled_at ASC LIMIT ?`,
-  ).bind(MAX_DELIVERY_ATTEMPTS, MAX_JOBS_PER_TICK).all<{ line_account_id: string }>();
+  ).bind(MAX_DELIVERY_ATTEMPTS, now.toISOString(), now.toISOString(), MAX_JOBS_PER_TICK).all<{ line_account_id: string }>();
   let sent = 0;
   let failed = 0;
   let skipped = 0;
@@ -1170,16 +1131,18 @@ export async function processNenDeliveries(
       skipped += 1;
       continue;
     }
-    // 緊急停止 (#1050): broadcast_dispatch が止まっている統括は claim せず
+    // 緊急停止 : broadcast_dispatch が止まっている統括は claim せず
     // pending のまま残す。復旧すれば次の tick が拾う。
     if (job.line_account_id &&
         await isOperationCapabilityStopped(db, job.line_account_id, 'broadcast_dispatch')) {
       continue;
     }
+    const claimToken = crypto.randomUUID();
     const claim = await db.prepare(
-      `UPDATE nen_delivery_jobs SET status = 'processing', attempts = attempts + 1, updated_at = ?
-        WHERE id = ? AND status IN ('pending', 'failed')`,
-    ).bind(jstNow(), job.id).run();
+      `UPDATE nen_delivery_jobs SET status = 'processing', attempts = attempts + 1, updated_at = ?, claim_token = ?
+        WHERE id = ? AND status IN ('pending', 'failed') AND attempts = ?
+          AND (next_attempt_at IS NULL OR datetime(next_attempt_at) <= datetime(?))`,
+    ).bind(now.toISOString(), claimToken, job.id, Number(job.attempts ?? 0), now.toISOString()).run();
     if (!claim.meta.changes) continue;
     try {
       const [friend, currentCampaign, account] = await Promise.all([
@@ -1205,13 +1168,13 @@ export async function processNenDeliveries(
                 ? 'campaign_snapshot_missing'
                 : 'campaign_disabled';
         await db.prepare(
-          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
-        ).bind(reason, jstNow(), job.id).run();
+          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ? AND claim_token = ?`,
+        ).bind(reason, jstNow(), job.id, claimToken).run();
         skipped++;
         continue;
       }
       /*
-       * IDEA-21: 注文起点の案内は、送る直前に注文の現在状態を確かめる。
+       * 注文起点の案内は、送る直前に注文の現在状態を確かめる。
        * 発送をきっかけに予約された案内（到着確認・口コミ・次の商品）は、
        * あとから注文が取り消し・返金になっても payload の写しのまま残る。
        * EC台帳（ec_orders）の現在状態が取り消し・返金なら送らない。
@@ -1222,20 +1185,20 @@ export async function processNenDeliveries(
         const orderState = await currentOrderState(db, job.line_account_id, orderNumber);
         if (orderState === 'cancelled' || orderState === 'refunded') {
           await db.prepare(
-            `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
-          ).bind(orderState === 'cancelled' ? 'order_cancelled' : 'order_refunded', jstNow(), job.id).run();
+            `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ? AND claim_token = ?`,
+          ).bind(orderState === 'cancelled' ? 'order_cancelled' : 'order_refunded', jstNow(), job.id, claimToken).run();
           skipped++;
           continue;
         }
       }
       if (await alreadyRespondedToCampaignForm(db, campaign, friend.id)) {
         await db.prepare(
-          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
-        ).bind('campaign_form_already_submitted', jstNow(), job.id).run();
+          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ? AND claim_token = ?`,
+        ).bind('campaign_form_already_submitted', jstNow(), job.id, claimToken).run();
         skipped++;
         continue;
       }
-      // #749 案2: claim 後に最新のアカウント別設定を正として窓を見直す。
+      //  案2: claim 後に最新のアカウント別設定を正として窓を見直す。
       // 0なら頻度抑止なし。代表より後なら新しい固定理由で skip し、監査に残す。
       const windowDays = currentCampaign.dedup_window_days ?? 30;
       if (await hasEarlierWindowDelivery(db, {
@@ -1246,19 +1209,19 @@ export async function processNenDeliveries(
         windowDays,
       })) {
         await db.prepare(
-          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
-        ).bind('frequency_suppressed', jstNow(), job.id).run();
+          `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ? AND claim_token = ?`,
+        ).bind('frequency_suppressed', jstNow(), job.id, claimToken).run();
         skipped++;
         continue;
       }
       // claim と送信の間に緊急停止へ切り替わった分は、claim を pending へ
-      // 差し戻す (#1050)。停止を失敗として数えない (attempts を戻す)。
+      // 差し戻す。停止を失敗として数えない (attempts を戻す)。
       if (job.line_account_id &&
           await isOperationCapabilityStopped(db, job.line_account_id, 'broadcast_dispatch')) {
         await db.prepare(
           `UPDATE nen_delivery_jobs SET status = 'pending', attempts = attempts - 1, updated_at = ?
-            WHERE id = ? AND status = 'processing'`,
-        ).bind(jstNow(), job.id).run();
+            WHERE id = ? AND status = 'processing' AND claim_token = ?`,
+        ).bind(jstNow(), job.id, claimToken).run();
         continue;
       }
       const accessToken = account.channel_access_token;
@@ -1271,19 +1234,9 @@ export async function processNenDeliveries(
       await pushViaHarnessProxy(
         options.proxyBaseUrl, accessToken, friend.line_user_id, messages, idempotencyKey, options.proxyDispatch,
       );
-      for (const message of messages) {
-        await logOutgoingMessage(db, {
-          friendId: friend.id,
-          messageType: message.type,
-          content: message.type === 'text' ? message.text : JSON.stringify(message),
-          deliveryType: 'push',
-          source: `nen_${job.campaign_key}`,
-          lineAccountId: account.id,
-        });
-      }
       await db.prepare(
-        `UPDATE nen_delivery_jobs SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ?`,
-      ).bind(jstNow(), jstNow(), job.id).run();
+        `UPDATE nen_delivery_jobs SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ? AND claim_token = ?`,
+      ).bind(jstNow(), jstNow(), job.id, claimToken).run();
       sent++;
       if (job.line_account_id) {
         perAccountSent.set(job.line_account_id, (perAccountSent.get(job.line_account_id) ?? 0) + 1);
@@ -1291,9 +1244,9 @@ export async function processNenDeliveries(
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 500) : 'Unknown error';
       await db.prepare(
-        `UPDATE nen_delivery_jobs SET status = 'failed', last_error = ?, updated_at = ? WHERE id = ?`,
-      ).bind(message, jstNow(), job.id).run();
-      console.error(JSON.stringify({ event: 'nen_delivery_failed', jobId: job.id, error: message }));
+        `UPDATE nen_delivery_jobs SET status = 'failed', last_error = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND claim_token = ?`,
+      ).bind(message, new Date(now.getTime() + RETRY_DELAYS_MS[Math.min(Number(job.attempts ?? 0), 2)]).toISOString(), now.toISOString(), job.id, claimToken).run();
+      logger.error("nen_delivery_failed");
       failed++;
     }
   }

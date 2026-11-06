@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import type { Message } from '@line-crm/line-sdk';
 import type { OperationCapability } from '@line-crm/db';
 import { OPERATION_PROXY_CAPABILITY_HEADER } from './operation-send-paths.js';
@@ -9,7 +10,7 @@ export type HarnessProxyDispatch = (request: Request) => Promise<Response>;
  * プロキシ側が送信履歴の記録も担当するため、呼び出し元で messages_log を
  * 二重に書かないこと。
  *
- * #1050: capability を渡すと X-Line-Harness-Capability として名乗り、
+ * capability を渡すと X-Line-Harness-Capability として名乗り、
  * プロキシの緊急停止判定がその停止対象を見る。省略時はプロキシ側で
  * broadcast_dispatch (安全側) として扱われる。
  */
@@ -44,8 +45,8 @@ export async function pushViaHarnessProxy(
     response.status === 409 && Boolean(response.headers.get('x-line-accepted-request-id'));
   if (response.ok || alreadyAccepted) {
     return {
-      requestId: response.headers.get('x-line-request-id')
-        ?? response.headers.get('x-line-accepted-request-id'),
+      requestId: response.headers.get('x-line-accepted-request-id')
+        ?? response.headers.get('x-line-request-id'),
     };
   }
 

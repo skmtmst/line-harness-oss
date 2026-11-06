@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { Miniflare } from 'miniflare';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const access = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(async (_db: unknown, _staff: unknown, ids: string[]) => (
@@ -198,7 +198,7 @@ describe('staff×menu 割り当て保存の原子性', () => {
       { staff_id: 'staff-a1', menus: [] },
     ]);
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toMatchObject({ error: 'duplicate_staff_id' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'duplicate_staff_id' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('一括口もstaffロールでは403', async () => {

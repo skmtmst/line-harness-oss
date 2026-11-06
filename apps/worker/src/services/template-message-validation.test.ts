@@ -29,7 +29,7 @@ describe('テンプレート本文の文字数検査', () => {
 
   it('Flexや画像はテキスト本文の上限へ混ぜない', () => {
     const longContent = 'a'.repeat(TEMPLATE_TEXT_MAX_CHARACTERS + 1);
-    expect(validateTemplateMessage('flex', longContent)).toEqual({ ok: true });
+    expect(validateTemplateMessage('flex', JSON.stringify({type:'bubble',body:{type:'box',layout:'vertical',contents:[{type:'text',text:longContent}]}}))).toEqual({ ok: true });
     expect(validateTemplateMessage('image', longContent)).toEqual({ ok: true });
   });
 });

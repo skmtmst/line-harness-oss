@@ -1,0 +1,104 @@
+'use client'
+
+/*
+ * ★V8 成果とアフィリエイトの入口（/affiliates）。?tab= で6つのタブを切り替える。
+ * 受け付ける指定は今の画面と同じ（BEHAVIOR.md「受け付ける URL と指定」）。
+ *
+ * コンバージョン（成果地点）も同じ外枠のタブとして開く。
+ */
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import ListState from '@/components/shared/list-state'
+import { useAccount } from '@/contexts/account-context'
+import { api } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { listAllConversionApprovals } from './display'
+import { AFFILIATE_TABS, AffiliateShell, type AffiliateTabCounts, type AffiliateTabKey } from './frame'
+import AffiliatorsTab from './affiliators'
+import OffersTab from './offers'
+import ApprovalsTab from './approvals'
+import PaymentTab from './payment'
+import ReportTab from './report'
+import { ConversionListV8 } from '@/v8/conversions'
+
+/* 上の帯・タブの題は画面名だけ（タブ名を括弧で足さない。・ と同じ・2026-10-15 判定役）。 */
+const PAGE_TITLE = '成果とアフィリエイト'
+
+function AffiliatesInner() {
+  const params = useSearchParams()
+  const rawTab = params.get('tab')?.split('/')[0]
+  const tab: AffiliateTabKey = AFFILIATE_TABS.some((item) => item.key === rawTab) ? (rawTab as AffiliateTabKey) : 'affiliates'
+  const focusAffiliateId = params.get('affiliate')
+
+  usePageTitle(PAGE_TITLE)
+  usePageCrumbs([{ label: 'ホーム', href: '/' }])
+
+  const role = useStaffRole()
+  /* ：変える操作は出さない。CSV・検索・絞り込み・明細を見るは使える。 */
+  const readonly = !canManageRole(role)
+  const narrow = useNarrowViewport()
+  const { selectedAccountId } = useAccount()
+
+  /*
+   * タブの名の横の件数（アフィリエイター・案件・成果承認）。開いていないタブの数も出す。
+   * 開いているタブが読み直したら、その数で上書きする。
+   */
+  const [counts, setCounts] = useState<AffiliateTabCounts>({})
+  const setCount = useCallback((key: AffiliateTabKey, text: string | null) => {
+    setCounts((current) => {
+      const next = text ?? undefined
+      if (current[key] === next) return current
+      return { ...current, [key]: next }
+    })
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setCounts({})
+    if (!selectedAccountId) return
+    void Promise.allSettled([
+      api.affiliates.list(selectedAccountId),
+      api.affiliateOffers.list(),
+      listAllConversionApprovals('pending', 0, { accountId: selectedAccountId }),
+    ]).then(([affiliates, offers, pending]) => {
+      if (cancelled) return
+      if (affiliates.status === 'fulfilled' && affiliates.value.success && Array.isArray(affiliates.value.data)) {
+        setCount('affiliates', formatNumber(affiliates.value.data.length))
+      }
+      if (offers.status === 'fulfilled' && offers.value.success && Array.isArray(offers.value.data)) {
+        setCount('offers', formatNumber(offers.value.data.length))
+      }
+      if (pending.status === 'fulfilled') setCount('approvals', formatNumber(pending.value.items.length))
+    })
+    return () => { cancelled = true }
+  }, [selectedAccountId, setCount])
+
+  const shell = useMemo(
+    () => ({ tab, readonly, narrow, accountId: selectedAccountId, counts, setCount, focusAffiliateId }),
+    [tab, readonly, narrow, selectedAccountId, counts, setCount, focusAffiliateId],
+  )
+
+  if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="画面上部で選ぶと、このアカウントの成果を確認できます。" />
+
+  return (
+    <AffiliateShell.Provider value={shell}>
+      {tab === 'affiliates' ? <AffiliatorsTab key={tab} /> : null}
+      {tab === 'offers' ? <OffersTab key={tab} /> : null}
+      {tab === 'approvals' ? <ApprovalsTab key={tab} /> : null}
+      {tab === 'payment' ? <PaymentTab key={tab} /> : null}
+      {tab === 'report' ? <ReportTab key={tab} /> : null}
+      {tab === 'points' ? <ConversionListV8 key={tab} accountId={selectedAccountId} embedded /> : null}
+    </AffiliateShell.Provider>
+  )
+}
+
+export default function AffiliatesV8() {
+  return (
+    <Suspense fallback={<ListState kind="loading" title="成果とアフィリエイトを読み込んでいます" />}>
+      <AffiliatesInner />
+    </Suspense>
+  )
+}

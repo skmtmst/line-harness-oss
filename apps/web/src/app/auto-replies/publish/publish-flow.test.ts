@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { AutoReplyDryRunResult, AutoReplyValidationResult } from '@line-crm/shared'
-import { canPublish, conflictTone, publishGates } from './publish-flow'
+import { canPublish, conflictTone, publishGates } from '../../../v8/auto-replies/publish/publish-flow'
 
 const conflict = (id: string, certainty: 'certain' | 'possible', winner: string) => ({
   autoReplyId: id, name: id, certainty, winnerAutoReplyId: winner, reason: '',

@@ -34,6 +34,12 @@ function setup() {
 }
 
 describe('LINE account default and archive lifecycle', () => {
+  it('saves timezone without changing credentials and rejects invalid zones', async () => {
+    const { sqlite, db } = setup();
+    await updateLineAccountFields(db, 'account-b', { timezone: 'Europe/Paris' });
+    expect(sqlite.prepare("SELECT timezone, channel_access_token FROM line_accounts WHERE id = 'account-b'").get()).toEqual({ timezone: 'Europe/Paris', channel_access_token: 'token' });
+    await expect(updateLineAccountFields(db, 'account-b', { timezone: 'invalid/zone' })).rejects.toThrow();
+  });
   it('stores and clears an official profile short URL', async () => {
     const { sqlite, db } = setup();
 
@@ -116,7 +122,7 @@ describe('LINE account default and archive lifecycle', () => {
   });
 });
 
-// X-1: 送受信の停止・再開。止めた理由と時刻を残し、再開で消す。
+// 送受信の停止・再開。止めた理由と時刻を残し、再開で消す。
 describe('送受信の停止と再開', () => {
   it('理由つきで止めて、再開すると理由を消す', async () => {
     const { db } = setup();
@@ -157,7 +163,7 @@ describe('送受信の停止と再開', () => {
   });
 });
 
-// X-2: 止めている間に送らなかった配信の台帳。
+// 止めている間に送らなかった配信の台帳。
 describe('送れなかった配信の記録', () => {
   it('同じ配信は一度だけ残す', async () => {
     const { sqlite, db } = setup();
@@ -173,7 +179,7 @@ describe('送れなかった配信の記録', () => {
   });
 });
 
-// X-4: プールの自動入れ替えの記録。
+// プールの自動入れ替えの記録。
 describe('プール切替の記録', () => {
   it('out→in の直近状態だけを「外れ中」として返す', async () => {
     const { sqlite, db } = setup();

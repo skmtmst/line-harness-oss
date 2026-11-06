@@ -1,0 +1,157 @@
+/* 運営コンソールの V8 外枠（左メニューの頭・板の頭・注意の帯）。値は globals.css の --tpl-op-*。 */
+
+.meNote {
+  padding: var(--tpl-op-me-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.meRetry {
+  margin-left: var(--tpl-op-me-gap);
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+/* 左メニューの下の小さな印「操作は記録されます」（各画面の帯の代わり）。 */
+.auditMark {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+  margin: 0;
+  padding: var(--tpl-op-me-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.auditMark svg {
+  width: var(--tpl-op-icon);
+  height: var(--tpl-op-icon);
+  flex-shrink: 0;
+}
+
+.side {
+  min-width: 0;
+}
+
+/* 1024px 未満：上に「メニュー」の1行を置き、押すと左から引き出しで開く。 */
+.mobileBar {
+  display: flex;
+  height: var(--mobile-header-height);
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  padding: var(--tpl-op-mobile-pad);
+}
+
+.mobileButton {
+  display: flex;
+  min-height: var(--tpl-op-touch);
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+  border-radius: var(--radius-control);
+  padding: var(--tpl-op-mobile-button-pad);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.mobileButton svg,
+.drawerClose svg {
+  width: var(--tpl-op-icon);
+  height: var(--tpl-op-icon);
+}
+
+.mobileTitle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--color-scrim);
+}
+
+.drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 50;
+  display: flex;
+  width: var(--tpl-op-drawer-w);
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--color-shell);
+  padding-top: var(--tpl-op-drawer-top);
+}
+
+.drawerClose {
+  display: flex;
+  min-width: var(--tpl-op-touch);
+  min-height: var(--tpl-op-touch);
+  align-self: flex-end;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-secondary);
+}
+
+@media (min-width: 1024px) {
+  .mobileBar {
+    display: none;
+  }
+}
+
+/* --- 板の頭 ----------------------------------------------------------- */
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-head-after);
+  padding-inline: var(--space-24);
+}
+
+.headRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-head-gap);
+  padding-bottom: var(--tpl-op-head-after);
+}
+
+.headText {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-op-head-text-gap);
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
+  line-height: var(--tpl-title-lh);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-op-head-desc-lh);
+}
+
+.headActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-op-head-gap);
+}

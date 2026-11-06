@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/format'
 /**
  * 編集保存がほかの人と競合したときの言い方(#723)。
  *
@@ -15,13 +16,7 @@ export function formatSavedAt(updatedAt: string): string {
   if (!updatedAt) return ''
   const parsed = new Date(updatedAt)
   if (Number.isNaN(parsed.getTime())) return ''
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  }).format(parsed)
+  return formatDateTime(parsed)
 }
 
 export function conflictMessage(updatedAt: string): string {

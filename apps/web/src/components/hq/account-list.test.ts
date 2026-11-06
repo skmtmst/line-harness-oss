@@ -14,11 +14,11 @@ const account = (values: Partial<AccountWithStats>): AccountWithStats => ({
 })
 
 describe('統括アカウント一覧のアイコン', () => {
-  it('LINE公式画像、手動画像、頭文字の順で使う', () => {
+  it('手動のアカウント画像、LINE公式画像、頭文字の順で使う', () => {
     expect(accountIconUrl(account({ pictureUrl: 'https://line.example/icon.jpg', iconUrl: 'https://manual.example/icon.jpg' })))
-      .toBe('https://line.example/icon.jpg')
-    expect(accountIconUrl(account({ pictureUrl: null, iconUrl: 'https://manual.example/icon.jpg' })))
       .toBe('https://manual.example/icon.jpg')
+    expect(accountIconUrl(account({ pictureUrl: 'https://line.example/icon.jpg', iconUrl: null })))
+      .toBe('https://line.example/icon.jpg')
     expect(accountIconUrl(account({ pictureUrl: null, iconUrl: null }))).toBeNull()
   })
 })

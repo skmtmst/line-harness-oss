@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 export type LineMonthlyPlanKey = 'communication' | 'light' | 'standard' | 'unknown';
 
 export type LineMonthlyPlan = {

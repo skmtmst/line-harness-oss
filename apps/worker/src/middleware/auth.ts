@@ -1,551 +1,50 @@
+import { timingMiddleware, timingSpan } from '../lib/server-timing.js';
+import { rememberAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
+import { logger } from '@line-crm/shared/server';
+/** 内部の認証モジュールにある手動確認の境界を保ち、既存の公開入口を提供する。 */
+import { bearerToken } from './auth-http.js';
+import { isPublicApiBoundary, isPublicFormDefinition } from './public-api-boundary.js';
+import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
 import type { Context, Next } from 'hono';
-import { getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
-import type { Env } from '../index.js';
+import { deleteAdminSession, getPlatformSetting, getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
+import type { Env } from '../worker-env.js';
 import { isForbiddenWhileImpersonating, resolveImpersonation } from './impersonation.js';
+import { isOutputRequest } from './output-request.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { ADMIN_SESSION_BEARER_PREFIX, CSRF_HEADER, adminSessionTokenFromCookie, csrfTokenFromCookie, sha256Hex } from './auth/credentials/auth.js';
+import { toAuthenticatedStaff, isTenantUnavailable, isTenantSuspensionExemptPath, TENANT_SUSPENDED_CODE, TENANT_SUSPENDED_ERROR, type AuthenticatedStaff } from './auth/principal/auth.js';
+import { gap2ReadOperation, gap2SelfPreference, readOperationPermissions, permissionForApiPath, isStaffSelfEndpoint, isStaffExplicitAllow } from './auth/permissions/auth.js';
 
-import type { AdminSameSite } from './admin-auth-config.js';
-
-export type TenantStatus = 'active' | 'suspended' | 'archived';
-export const TENANT_SUSPENDED_CODE = 'TENANT_SUSPENDED';
-export const TENANT_SUSPENDED_ERROR = '現在ご利用いただけません。お問い合わせは「お問い合わせ」画面からお送りください';
-
-export const ADMIN_AUTH_COOKIE = 'lh_admin_session';
-export const ADMIN_SESSION_BEARER_PREFIX = 'lh_session:';
-export const CSRF_COOKIE = 'lh_csrf';
-export const CSRF_HEADER = 'x-csrf-token';
-
-// 既定は 8 時間（要件 v6-30 §10）。利用者が明示して「記憶する」を選んだ
-// ときだけ 7 日にする。cookie の Max-Age と admin_sessions.expires_at は
-// 必ずこの同じ秒数から作り、ブラウザ側とサーバー側の期限を一致させる。
-export const SESSION_DEFAULT_MAX_AGE = 8 * 60 * 60;
-export const SESSION_REMEMBER_MAX_AGE = 7 * 24 * 60 * 60;
-export const SESSION_MAX_AGE = SESSION_REMEMBER_MAX_AGE;
+export { ADMIN_AUTH_COOKIE, ADMIN_SESSION_BEARER_PREFIX, CSRF_COOKIE, CSRF_HEADER, SESSION_DEFAULT_MAX_AGE, SESSION_REMEMBER_MAX_AGE, SESSION_MAX_AGE, adminSessionTokenHashFromRequest, adminSessionTokenFromCookie, csrfTokenFromCookie, adminSessionCookie, csrfCookie, expiredCookie, sha256Hex } from './auth/credentials/auth.js';
+export { toAuthenticatedStaff, isTenantUnavailable, isTenantSuspensionExemptPath, TENANT_SUSPENDED_CODE, TENANT_SUSPENDED_ERROR, type AuthenticatedStaff, type StaffRole, type TenantStatus } from './auth/principal/auth.js';
+export { gap2ReadOperation, permissionForApiPath, isStaffSelfRouteTemplate, isStaffSelfEndpoint, isStaffExplicitAllow } from './auth/permissions/auth.js';
+export { isPublicApiBoundary } from './public-api-boundary.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-
-/**
- * decodeURIComponent throws on malformed percent escapes (e.g. `%`). Cookie
- * headers are client-controlled, so fall back to the raw value rather than
- * letting the exception turn a request into a 500.
- */
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-function parseCookieHeader(cookieHeader: string | undefined): Record<string, string> {
-  if (!cookieHeader) return {};
-  const cookies: Record<string, string> = {};
-  for (const part of cookieHeader.split(';')) {
-    const [rawName, ...rawValue] = part.trim().split('=');
-    if (!rawName) continue;
-    cookies[rawName] = safeDecode(rawValue.join('=') || '');
-  }
-  return cookies;
-}
-
-function bearerToken(c: Context<Env>): string | null {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  return authHeader.slice('Bearer '.length);
-}
-
-/**
- * Return the hash key of the existing opaque admin session for server-side
- * session context. API-key authentication deliberately returns null because
- * it has no admin_sessions row to update.
- */
-export async function adminSessionTokenHashFromRequest(
-  c: Context<Env>,
-): Promise<string | null> {
-  const bearer = bearerToken(c);
-  if (bearer) {
-    if (!bearer.startsWith(ADMIN_SESSION_BEARER_PREFIX)) return null;
-    const token = bearer.slice(ADMIN_SESSION_BEARER_PREFIX.length);
-    return token ? sha256Hex(token) : null;
-  }
-  const cookie = adminSessionTokenFromCookie(c);
-  return cookie ? sha256Hex(cookie) : null;
-}
-
-export function adminSessionTokenFromCookie(c: Context<Env>): string | null {
-  return parseCookieHeader(c.req.header('Cookie'))[ADMIN_AUTH_COOKIE] || null;
-}
-
-export function csrfTokenFromCookie(c: Context<Env>): string | null {
-  return parseCookieHeader(c.req.header('Cookie'))[CSRF_COOKIE] || null;
-}
-
-function buildCookie(
-  name: string,
-  value: string,
-  sameSite: AdminSameSite,
-  maxAge: number,
-  httpOnly: boolean,
-): string {
-  const parts = [`${name}=${encodeURIComponent(value)}`, 'Path=/'];
-  if (httpOnly) parts.push('HttpOnly');
-  parts.push('Secure', `SameSite=${sameSite}`, `Max-Age=${maxAge}`);
-  return parts.join('; ');
-}
-
-/** HttpOnly session cookie carrying the API token. */
-export function adminSessionCookie(token: string, sameSite: AdminSameSite, maxAge = SESSION_DEFAULT_MAX_AGE): string {
-  return buildCookie(ADMIN_AUTH_COOKIE, token, sameSite, maxAge, true);
-}
-
-/**
- * CSRF cookie. NOT HttpOnly so it can participate in double-submit, but in a
- * cross-site topology the SPA cannot read it (different registrable domain) —
- * the token is therefore also returned in the login/session response body and
- * the SPA echoes it via the X-CSRF-Token header. The Worker validates that
- * header against this cookie, which the browser does send back to the API
- * (SameSite=None).
- */
-export function csrfCookie(token: string, sameSite: AdminSameSite, maxAge = SESSION_DEFAULT_MAX_AGE): string {
-  return buildCookie(CSRF_COOKIE, token, sameSite, maxAge, false);
-}
-
-export function expiredCookie(name: string, sameSite: AdminSameSite): string {
-  return buildCookie(name, '', sameSite, 0, name === ADMIN_AUTH_COOKIE);
-}
-
-export type StaffRole = 'owner' | 'admin' | 'staff';
-
-/**
- * 認証済みの利用者。
- *
- * 役割と読み取り専用は別々に持つ。以前は access_level='read_only' の人を
- * 役割にかかわらず 'viewer' へ潰していたため、「閲覧のみのオーナー」と
- * 「閲覧のみのスタッフ」を区別できず、機密情報の閲覧をサーバー側で
- * 制御できなかった。
- *
- * 更新の可否は readOnly、閲覧の可否は role で判定する。
- */
-export type AuthenticatedStaff = {
-  id: string;
-  name: string;
-  role: StaffRole;
-  /** true なら役割にかかわらず更新・削除・設定変更をさせない。 */
-  readOnly: boolean;
-  permissionKeys?: string[];
-  /** N-424: 「見えるだけ」の key。GET系だけを許可し、変更系は edit の key が要る。 */
-  viewPermissionKeys?: string[];
-  /** N-424: スタッフのメール表示。未設定は従来判定（access.user.email.view）。 */
-  emailMask?: 'full' | 'masked' | 'none' | null;
-  assignedLineAccountId?: string | null;
-  canAccessDescendantAccounts?: boolean;
-  /** 所属する統括。認可への実適用は後続工程で行う。 */
-  tenantId?: string | null;
-  /** 所属統括の実効状態。既定の運営会社と env-owner は active。 */
-  tenantStatus?: TenantStatus;
-  /** 機能オフ middleware が一覧処理へ渡す、このリクエストだけの追加絞り込み。 */
-  featureEnabledLineAccountIds?: string[];
-  /**
-   * どの資格情報で入ったか。'session' は管理画面から人がログインした状態、
-   * 'api-key' は長期間使える鍵（env の API_KEY / LEGACY_API_KEY、スタッフ個別の
-   * APIキー）をプログラムから提示した状態。
-   *
-   * Googleビジネスのルートはこれを見て 'api-key' を拒む。Google Business Profile
-   * APIのポリシー（https://developers.google.com/my-business/content/policies 、
-   * 2026-08-28更新）が「End users of your Business Profile APIs need to manually
-   * sign in to use it.」「You cannot provide indirect access to your Business
-   * Profile project.」と定めているため、鍵1本で外部スクリプトからGoogleへ
-   * 書ける経路を残せない。
-   */
-  credential?: 'session' | 'api-key';
-};
-
-function toAuthenticatedStaff(staff: {
-  id: string;
-  name: string;
-  role: StaffRole;
-  access_level?: 'full' | 'read_only';
-  permission_keys?: string;
-  view_permission_keys?: string | null;
-  email_mask?: string | null;
-  assigned_line_account_id?: string | null;
-  can_access_descendant_accounts?: number;
-  tenant_id?: string | null;
-  tenant_status?: TenantStatus;
-}): AuthenticatedStaff {
-  let permissionKeys: string[] = [];
-  try { permissionKeys = staff.permission_keys ? JSON.parse(staff.permission_keys) as string[] : []; } catch { permissionKeys = []; }
-  let viewPermissionKeys: string[] = [];
-  try { viewPermissionKeys = staff.view_permission_keys ? JSON.parse(staff.view_permission_keys) as string[] : []; } catch { viewPermissionKeys = []; }
-  const emailMask = staff.email_mask === 'full' || staff.email_mask === 'masked' || staff.email_mask === 'none'
-    ? staff.email_mask
-    : null;
-  return {
-    id: staff.id,
-    name: staff.name,
-    role: staff.role,
-    readOnly: staff.access_level === 'read_only',
-    permissionKeys,
-    viewPermissionKeys,
-    emailMask,
-    assignedLineAccountId: staff.assigned_line_account_id ?? null,
-    canAccessDescendantAccounts: Boolean(staff.can_access_descendant_accounts),
-    tenantId: staff.tenant_id ?? null,
-    tenantStatus: staff.tenant_status ?? 'active',
-  };
-}
-
-export function isTenantUnavailable(status: TenantStatus | null | undefined): boolean {
-  return status === 'suspended' || status === 'archived';
-}
-
-/** 停止中でも契約先が自分で確認・問い合わせできる最小経路。 */
-export function isTenantSuspensionExemptPath(method: string, path: string): boolean {
-  const upper = method.toUpperCase();
-  const supportPath = path === '/api/hq/support' || path.startsWith('/api/hq/support/');
-  const noticePath = path === '/api/hq/notices' || path.startsWith('/api/hq/notices/');
-  return (upper === 'GET' && path === '/api/auth/session')
-    || (upper === 'POST' && path === '/api/auth/logout')
-    || supportPath
-    || (upper === 'GET' && noticePath)
-    || (upper === 'POST' && /^\/api\/hq\/notices\/[^/]+\/read$/.test(path))
-    // 運営会社の統括と運営マスターは契約先停止の対象外。実際の許可は
-    // 各 route の requirePlatformAdmin が引き続き担う。
-    || path.startsWith('/api/ops/');
-}
-
-const STAFF_API_PERMISSIONS: Array<[string, string]> = [
-  ['/api/inbox', '/chats'], ['/api/chats', '/chats'], ['/api/conversations', '/chats'],
-  ['/api/support', '/chats'], ['/api/operators', '/chats'],
-  ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
-  ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/support-mark-rules', '/tags'],
-  ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],
-  ['/api/scenarios', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/reminders', '/reminders'],
-  ['/api/friend-reminders', '/reminders'], ['/api/reminder-runs', '/reminders'],
-  ['/api/auto-replies', '/auto-replies'], ['/api/auto-reply-runs', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
-  ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/rich-menus', '/rich-menus'],
-  ['/api/rich-menu-groups', '/rich-menus'], ['/api/rich-menu-images', '/rich-menus'],
-  ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'], ['/api/media', '/contents'],
-  // 危険なファイルの検査は登録メディアと同じ contents の鍵で守る。
-  // 一覧・設定・戻し・消去は route 側で owner/admin に絞っている。
-  ['/api/file-scans', '/contents'],
-  // 共通情報は登録メディアと同じ contents.ts 配下。メニューの href と同じ鍵を使う。
-  ['/api/common-vars', '/contents/vars'],
-  // 流入計測の入口経路と文面は /inflow-links 画面が呼ぶ。
-  ['/api/entry-routes', '/inflow-links'], ['/api/entry-route-genres', '/inflow-links'],
-  ['/api/message-templates', '/inflow-links'],
-  // 広告費の台帳(#818)も流入画面の一部。書き込みは route 側で owner/admin に絞る。
-  ['/api/ad-costs', '/inflow-links'],
-  ['/api/funnels', '/analytics'],
-  // ダッシュボード(ホーム)の数字と表示設定。'/' 鍵はメニューの href と同じ。
-  // /api/list-stats は複数画面の集計で帰属を決められないため登録しない
-  // (fail-closed。N-423 の残課題として司令塔へ報告する)。
-  ['/api/dashboard', '/'],
-  ['/api/getting-started', '/getting-started'],
-  ['/api/conversions', '/conversions'], ['/api/measurement-sites', '/conversions'], ['/api/scoring', '/scoring'], ['/api/scoring-rules', '/scoring'],
-  ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
-  ['/api/mileage', '/mileage'], ['/api/action-scores', '/mileage'],
-  ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
-  ['/api/automation-templates', '/automations'], ['/api/automation-drafts', '/automations'],
-  ['/api/automation-draft-resources', '/automations'], ['/api/common-actions', '/automations'],
-  ['/api/webhooks', '/webhooks'], ['/api/line-notifications', '/line-notifications'],
-  ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
-  // 個別相談の変更・取消は予約と同じ `/booking/bookings` 権限で守る
-  // (N-065 #623 司令塔裁定。`/api/meet-callback` は公開コールバックのため対象外)。
-  ['/api/meet-consultations', '/booking/bookings'],
-  // 友だち追加時の配信ルールと実行記録。旧 `/api/friend-add` 項目に
-  // 合う実経路は無いが、互換のため残す。
-  ['/api/friend-add-rules', '/friend-add-settings'], ['/api/friend-add-runs', '/friend-add-settings'],
-  ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
-  // 然の会員（★V6 37-1）。メニューの href は /nen/members。
-  ['/api/nen/rank-settings', '/nen/members'], ['/api/nen/lifetime-milestones', '/nen/members'], ['/api/nen/members', '/nen/members'],
-  // 然のマイペット・健康日記（★V6 37-3／37-4）。主食のカロリー表はマイペット画面へ移した。
-  ['/api/nen/feeding-products', '/nen/pets'], ['/api/nen/pets', '/nen/pets'], ['/api/nen/health', '/nen/health'],
-  // ログインユーザー一覧・権限のかたまり・監査の閲覧は「設定」の点キーで守る（N-424）。
-  // route 側の requirePermission が最終判定を握る。
-  ['/api/access', 'access.user.view'],
-  ['/api/audit', 'access.audit.view'],
-];
-
-/**
- * A few APIs live under /api/friends for URL compatibility but expose another
- * feature. Resolve them before the broad /api/friends prefix so a staff member
- * cannot inherit chat or friend-attribute access from the friends permission.
- */
-const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
-  // 予約の細かい権限（N-411）。広い '/api/booking' → '/booking/bookings' より先に評価する。
-  // 本人勤務は route 側で「自分に紐づく予約スタッフか」を確認する。
-  [/^\/api\/booking\/admin\/staff\/me(?:\/|$)/, 'booking.staff.own'],
-  [/^\/api\/booking\/admin\/staff\/[^/]+\/(?:availability-rules|breaks|break-dates|shifts|google-calendar)(?:\/|$)/, 'booking.staff.own'],
-    // メニューと担当割当は「予約メニュー」の鍵。
-  [/^\/api\/booking\/admin\/staff-menus(?:\/|$)/, '/booking/menus'],
-  [/^\/api\/booking\/admin\/staff\/[^/]+\/menus(?:\/|$)/, '/booking/menus'],
-  [/^\/api\/booking\/admin\/menus(?:\/|$)/, '/booking/menus'],
-  // 予約設定（受付枠・資源・例外）の GET は予約の閲覧に含め、
-  // 変更は route 側で 'booking.settings' を要求する（後方互換のため）。
-  // 運用状態の健全性サマリは '/health' 権限で守る（N-424）。
-  // /api/accounts 全体ではなくこの配下だけを対象にする。
-  [/^\/api\/accounts\/health-summary(?:\/|$)/, '/health'],
-  [/^\/api\/accounts\/[^/]+\/health(?:\/|$)/, '/health'],
-  [/^\/api\/nen-members\/photos\/decisions\/bulk(?:\/|$)/, 'photo.submission.bulk_review'],
-  [/^\/api\/nen-members\/photos\/(?:original-download\/[^/]+|[^/]+\/original-download)(?:\/|$)/, 'photo.original.download'],
-  [/^\/api\/nen-members\/photos\/[^/]+\/(?:assessments\/re-evaluate|assets\/process|review|notification\/retry)(?:\/|$)/, 'photo.submission.review'],
-  // ポイント付与の復旧（再試行・照合）は審査権限とは別の専用鍵（PHOTO-06）。
-  [/^\/api\/nen-members\/photos\/[^/]+\/(?:point-retry|point-reconcile)(?:\/|$)/, 'photo.reward.reconcile'],
-  // 公開の撤回・掲載先の変更は審査権限ではなく掲載管理の上位権限（#931 N-311）。
-  // 一覧の表示（GET publications）は審査と同じ閲覧権限のままにする。
-  [/^\/api\/nen-members\/photos\/publications\/[^/]+\/(?:withdraw|placements)(?:\/|$)/, 'photo.publication.manage'],
-  [/^\/api\/nen-members\/photos(?:\/|$)/, 'photo.submission.view'],
-  [/^\/api\/friends\/[^/]+\/messages(?:\/|$)/, '/chats'],
-  [/^\/api\/friends\/[^/]+\/fields(?:\/|$)/, '/tags'],
-  [/^\/api\/friends\/[^/]+\/support-mark(?:\/|$)/, '/tags'],
-  [/^\/api\/friends\/support-mark\/bulk(?:\/|$)/, '/tags'],
-  // 友だち単位の購読操作（#949 N-054 / 機能05 §7）は操作ごとの個別鍵で
-  // 委譲する。失敗の再送だけを任された staff（scenario.step_run.retry）が
-  // 購読の操作権限なしで retry へ届くよう、第一関門も操作単位の鍵を見る。
-  // route 側の requirePermission が最終判定を握る。
-  [/^\/api\/scenario-subscriptions\/[^/]+\/retry(?:\/|$)/, 'scenario.step_run.retry'],
-  [/^\/api\/scenario-subscriptions(?:\/|$)/, 'scenario.subscription.edit'],
-];
-
-export function permissionForApiPath(path: string): string | null {
-  const override = STAFF_API_PERMISSION_OVERRIDES.find(([pattern]) => pattern.test(path));
-  if (override) return override[1];
-  return STAFF_API_PERMISSIONS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;
-}
-
-/**
- * 役割に関わらず認証済みなら通す本人・自組織・シェル必須の口。
- *
- * いずれも route 側で対象を絞っている: 自分の表示・自組織の名前・
- * 可視アカウントだけの一覧・秘密値を含まない版情報・自分の二段階認証
- * (handler 内で本人確認)・失敗報告の受付。exact 一致で列挙し、
- * 新しい口は fail-closed (staff 403) に倒す。
- */
-const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
-  ['GET', '/api/auth/session'],
-  ['POST', '/api/auth/step-up'],
-  // 本人のログイン中セッション一覧と一括失効。handler が本人分だけを対象にする。
-  ['GET', '/api/auth/sessions'],
-  ['POST', '/api/auth/sessions/revoke-others'],
-  ['GET', '/api/staff/me'],
-  ['GET', '/api/tenants/me'],
-  ['POST', '/api/client-errors'],
-  ['GET', '/api/capabilities'],
-  ['GET', '/api/line-accounts'],
-  ['GET', '/api/line-accounts/summary'],
-  // 殻の表示に要る最小boolean。管理用の機能設定GETは owner/admin 専用。
-  ['GET', '/api/settings/features/visibility'],
-  // 共通アップローダ。受信箱の 1 対 1 返信など staff の付与機能から使う。
-  // 読み取りは公開の /images/* 経由で、鍵は機能 API の応答で渡る。
-  ['POST', '/api/images'],
-  // 失敗文面の対応表。エラー表示は役割を問わず全スタッフに必要な
-  // シェル機能で、内容は文言の対応表だけ（秘密値・個人情報を含まない）。
-  ['GET', '/api/error-messages'],
-];
-
-/**
- * route 定義を静的検査するときだけ本人系として扱う template。
- * 固定 path を `:id` と同じ形で判定しないため、実リクエスト用の判定とは分ける。
- */
-const STAFF_SELF_ROUTE_TEMPLATES: Array<[method: string, path: string]> = [
-  ['GET', '/api/staff/:id'],
-  ['PATCH', '/api/staff/:id'],
-  ['POST', '/api/staff/:id/two-factor/setup'],
-  ['POST', '/api/staff/:id/two-factor/confirm'],
-  ['DELETE', '/api/staff/:id/two-factor'],
-  ['DELETE', '/api/auth/sessions/:tokenHash'],
-];
-
-export function isStaffSelfRouteTemplate(method: string, path: string): boolean {
-  const normalizedMethod = method.toUpperCase();
-  if (STAFF_SELF_ENDPOINTS.some(([m, p]) => m === normalizedMethod && p === path)) return true;
-  return STAFF_SELF_ROUTE_TEMPLATES.some(([m, p]) => m === normalizedMethod && p === path);
-}
-
-/**
- * `/api/staff/:id` 配下の本人操作。
- *
- * URL の形だけでは本人系にしない。将来 `/api/staff/export` のような固定 path が
- * 追加されても permission 検査を迂回しないよう、path 内の id と認証済み staff.id
- * が一致する場合だけ通す。
- */
-const STAFF_SELF_PATH_PATTERNS: Array<[method: string, pattern: RegExp]> = [
-  ['GET', /^\/api\/staff\/([^/]+)$/],
-  ['PATCH', /^\/api\/staff\/([^/]+)$/],
-  ['POST', /^\/api\/staff\/([^/]+)\/two-factor\/(?:setup|confirm)$/],
-  ['DELETE', /^\/api\/staff\/([^/]+)\/two-factor$/],
-];
-
-/**
- * handler が本人の資産だけを対象にする口。path の可変部は staff id ではない
- * ため id 比較をせず、認証済みなら誰でも通す（中身は本人分に閉じる）。
- */
-const STAFF_SELF_SCOPED_PATTERNS: Array<[method: string, pattern: RegExp]> = [
-  ['DELETE', /^\/api\/auth\/sessions\/[^/]+$/],
-];
-
-export function isStaffSelfEndpoint(method: string, path: string, staffId?: string): boolean {
-  const normalizedMethod = method.toUpperCase();
-  if (STAFF_SELF_ENDPOINTS.some(([m, p]) => m === normalizedMethod && p === path)) return true;
-  if (STAFF_SELF_SCOPED_PATTERNS.some(([m, pattern]) => m === normalizedMethod && pattern.test(path))) return true;
-  if (!staffId) return false;
-  return STAFF_SELF_PATH_PATTERNS.some(([m, pattern]) => {
-    if (m !== normalizedMethod) return false;
-    return pattern.exec(path)?.[1] === staffId;
-  });
-}
-
-/**
- * route が staff へ明示許可している既存の口の写し。
- *
- * 旧一覧の GET /api/staff は handler が他人のメールを伏せる意図的な
- * 仕様として維持する(司令塔裁定 #670)。飲食店テストは点検対象外の
- * ため route の明示許可を写すだけで、闇雲に広げない。
- */
-const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
-  ['GET', '/api/staff'],
-  ['GET', '/api/restaurant-test/stores'],
-  ['GET', '/api/restaurant-test/store-context'],
-  ['GET', '/api/restaurant-test/terms-agreement'],
-  ['POST', '/api/restaurant-test/stores/selection/clear'],
-  ['GET', '/api/restaurant-test/snapshot'],
-  ['POST', '/api/restaurant-test/reservations/manual'],
-  // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
-  ['GET', '/api/restaurant-test/google/connection'],
-  ['GET', '/api/restaurant-test/google/reviews'],
-  ['POST', '/api/restaurant-test/google/reviews/sync'],
-  // Googleビジネス第2段（GB-10〜GB-19）：担当者もプロフィールを読み、変更案を作れる。Googleへの送信は店舗管理者以上。
-  ['GET', '/api/restaurant-test/google/profile'],
-  ['POST', '/api/restaurant-test/google/profile/sync'],
-  ['GET', '/api/restaurant-test/google/holidays'],
-  ['GET', '/api/restaurant-test/google/photos'],
-  ['POST', '/api/restaurant-test/google/hours/propose'],
-  ['POST', '/api/restaurant-test/google/profile/propose'],
-  ['GET', '/api/restaurant-test/google/changes'],
-  // Googleビジネス第3段（GB-4〜GB-14）：担当者も投稿を読み、下書きを作れる。Googleへの送信・削除は店舗管理者以上。
-  ['GET', '/api/restaurant-test/google/posts'],
-  ['POST', '/api/restaurant-test/google/posts'],
-  ['POST', '/api/restaurant-test/google/posts/sync'],
-  // Googleビジネス第4段（GB-9）：パフォーマンスは読み取りのみ。担当者も見られる。
-  // performance/sync は口コミ・投稿・プロフィールのsyncと同じくGoogleから読んで自DBに書くだけ（Googleへの書き込みは無い）ため、担当者にも許可する。
-  ['GET', '/api/restaurant-test/google/performance'],
-  ['POST', '/api/restaurant-test/google/performance/sync'],
-  // 運営からのお知らせ（★V6 37-7）は本人宛て。担当者でも読んで既読にできる。
-  ['GET', '/api/hq/notices'],
-  ['GET', '/api/hq/notices/line-registration'],
-];
-
-const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
-  ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
-  ['PATCH', /^\/api\/restaurant-test\/reservations\/[^/]+$/],
-  ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
-  ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
-  ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],
-  ['GET', /^\/api\/restaurant-test\/google\/changes\/[^/]+$/],
-  ['POST', /^\/api\/restaurant-test\/google\/changes\/[^/]+\/cancel$/],
-  ['GET', /^\/api\/restaurant-test\/google\/posts\/[^/]+$/],
-  ['PUT', /^\/api\/restaurant-test\/google\/posts\/[^/]+$/],
-  ['POST', /^\/api\/restaurant-test\/google\/posts\/[^/]+\/cancel$/],
-  ['POST', /^\/api\/hq\/notices\/[^/]+\/read$/],
-];
-
-export function isStaffExplicitAllow(method: string, path: string): boolean {
-  const normalizedMethod = method.toUpperCase();
-  if (STAFF_EXPLICIT_ALLOW.some(([m, p]) => m === normalizedMethod && p === path)) return true;
-  return STAFF_EXPLICIT_ALLOW_PATTERNS.some(([m, pattern]) => m === normalizedMethod && pattern.test(path));
-}
-
-/**
- * 管理者認証より手前へ通す公開境界。authMiddleware の skip 判定と
- * 同じ意味で、method を区別する口もここで扱う。
- */
-export function isPublicApiBoundary(method: string, path: string): boolean {
-  const normalizedMethod = method.toUpperCase();
-  // フォーム定義の GET は LIFF が認証なしで読む。PUT/DELETE は管理 API。
-  if (normalizedMethod === 'GET' && /^\/api\/forms\/[^/]+$/.test(path)) return true;
-  // LIFF の回答・開封・途中保存は route 側で LINE 署名を見る。
-  if (
-    normalizedMethod === 'POST' &&
-    (/^\/api\/forms\/[^/]+\/submit$/.test(path) ||
-      /^\/api\/forms\/[^/]+\/opened$/.test(path) ||
-      /^\/api\/forms\/[^/]+\/partial$/.test(path))
-  ) {
-    return true;
-  }
-  return (
-    path === '/webhook' ||
-    path === '/docs' ||
-    path === '/openapi.json' ||
-    path === '/api/affiliates/click' ||
-    path === '/webhooks/xserver/support-email' ||
-    path === '/api/public/nen/adopted-photos' ||
-    path === '/api/public/nen/gallery-preview' ||
-    path === '/api/site/collect' ||
-    path === '/api/site/script.js' ||
-    // #819: 計測タグからの成果受信。サイトIDと許可ドメインで検証する
-    // 公開口で、管理画面の認証は通さない(OPTIONSの事前確認も含む)。
-    path === '/api/public/web-conversions' ||
-    path.startsWith('/t/') ||
-    path.startsWith('/r/') ||
-    path.startsWith('/pool/') ||
-    path.startsWith('/images/') ||
-    path.startsWith('/api/liff/') ||
-    path === '/api/auth/login' ||
-    path === '/api/auth/logout' ||
-    path === '/api/auth/line' ||
-    path === '/api/auth/line/callback' ||
-    path === '/api/auth/two-factor/verify' ||
-    // TOTP未登録の管理者の初回設定。合言葉で本人確認する公開経路（N-426）。
-    path === '/api/auth/two-factor/setup' ||
-    path === '/api/auth/two-factor/setup/confirm' ||
-    // 会員登録・メールログイン・パスワード再設定。Turnstile と回数制限で守る。
-    /^\/api\/auth\/(register|password|ops-invite)\//.test(path) ||
-    /^\/api\/staff\/invitations\/[^/]+\/verify$/.test(path) ||
-    // N-433: メール変更の確定。トークン自体が資格情報で、ログイン状態に依らない。
-    path === '/api/staff/email-change/confirm' ||
-    path.startsWith('/auth/') ||
-    path === '/setup' ||
-    path === '/api/integrations/stripe/webhook' ||
-    // 課金の Stripe Webhook は route 内で署名検証する。
-    path === '/api/hq/billing/webhook' ||
-    path === '/api/integrations/eccube/events' ||
-    path === '/api/integrations/eccube/columns' ||
-    // ECから届く誕生日クーポンの利用記録。route 内で同じHMAC署名を確かめる。
-    path === '/api/integrations/eccube/coupon-usages' ||
-    path === '/api/internal/deployments/events' ||
-    path === '/api/integrations/codex-slack/events' ||
-    path === '/api/integrations/ai-loop/reports' ||
-    path === '/api/integrations/slack/actions' ||
-    path === '/api/integrations/slack/events' ||
-    /^\/api\/webhooks\/incoming\/[^/]+\/receive$/.test(path) ||
-    // N-270: 外部システムからの成果受信。route 内で地点ごとの
-    // 受信鍵をHMAC-SHA256で照合する。管理画面の認証は通さない。
-    (normalizedMethod === 'POST' && /^\/api\/conversions\/ingest\/[^/]+$/.test(path)) ||
-    // #939 N-380: 外部システム向け公開API。route 内で integration_api_tokens
-    // の Bearer トークンを照合する。管理画面の認証は通さない。
-    path.startsWith('/api/public/v1/') ||
-    path === '/api/meet-callback' ||
-    path === '/api/qr' ||
-    path === '/api/public/brand' ||
-    path === '/api/health'
-  );
-}
-
-export async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
 
 export async function authenticateAdminSession(
   c: Context<Env>,
   token: string | null,
 ): Promise<AuthenticatedStaff | null> {
-  if (!token) return null;
-  const staff = await getStaffByAdminSession(c.env.DB, await sha256Hex(token), new Date().toISOString());
-  if (!staff) return null;
-  return { ...toAuthenticatedStaff(staff), credential: 'session' };
+  return timingSpan(c, 'session', async () => {
+    if (!token) return null;
+    const tokenHash = await sha256Hex(token);
+    const staff = await timingSpan(c, 'staff', () => getStaffByAdminSession(c.env.DB, tokenHash, new Date().toISOString()));
+    if (!staff) return null;
+    const configured = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY);
+    const registered = Boolean(staff.totp_enabled_at && staff.totp_secret_enc);
+    // 方針と確認済みの印は独立。未登録者の印は読んでも許可できないので取らない。
+    const [policy, verified] = await Promise.all([
+      configured ? getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) : null,
+      registered ? getPlatformSetting(c.env.DB, `auth.mfa.session:${tokenHash}`) : null,
+    ]);
+    const required = configured && policy !== 'false';
+    if ((required && !registered) || (registered && verified !== staff.id)) {
+      await deleteAdminSession(c.env.DB, tokenHash);
+      return null;
+    }
+    return rememberAuthenticatedStaffRecord(c.env.DB, { ...toAuthenticatedStaff(staff), credential: 'session' }, staff);
+  });
 }
 
 async function authenticateCookieToken(
@@ -554,60 +53,53 @@ async function authenticateCookieToken(
 ): Promise<AuthenticatedStaff | null> {
   const session = await authenticateAdminSession(c, token);
   if (session) return session;
-  // Backward-compatible emergency session created by the hidden API-key route.
+  // 非公開の API キー経路で作成した緊急用セッションとの互換性を保つ。
   return authenticateApiToken(c, token);
 }
 
-/**
- * Resolve a token (from a Bearer header or the session cookie) to a staff
- * identity. Shared by the auth middleware and the /api/auth/login endpoint so
- * cookie and Bearer auth accept exactly the same credentials.
- */
+/** Cookie と Bearer で受け付ける資格情報がずれないよう、認証 middleware とログインが同じトークン解決を使う。 */
 export async function authenticateApiToken(
   c: Context<Env>,
   token: string | null,
 ): Promise<AuthenticatedStaff | null> {
   if (!token) return null;
 
-  // Some iOS/LINE WebViews reject the workers.dev cookie when the admin SPA
-  // is hosted on pages.dev. In that cross-site topology the OAuth callback
-  // hands the existing opaque admin-session token to the SPA via a URL
-  // fragment, and the SPA presents it as a Bearer credential.
+  // iOS/LINE WebView で別サイトの Cookie が拒まれる場合に備え、OAuth コールバックは既存の不透明なセッショントークンを fragment で渡し、管理画面が Bearer で提示する。
   if (token.startsWith(ADMIN_SESSION_BEARER_PREFIX)) {
     return authenticateAdminSession(c, token.slice(ADMIN_SESSION_BEARER_PREFIX.length));
   }
 
-  const staff = await getStaffByApiKey(c.env.DB, token);
+  const staff = await timingSpan(c, 'staff', () => getStaffByApiKey(c.env.DB, token));
   if (staff) {
-    return { ...toAuthenticatedStaff(staff), credential: 'api-key' };
+    const required = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) !== 'false';
+    // この入口は一次資格情報を確認課題へ交換するだけとし、ほかの API が使える認証済みコンテキストを渡さない。
+    if (c.req.path !== '/api/auth/login' && (required || staff.totp_enabled_at)) return null;
+    return rememberAuthenticatedStaffRecord(c.env.DB, { ...toAuthenticatedStaff(staff), credential: 'api-key' }, staff);
   }
 
-  // Fallback: env API_KEY acts as owner (current rotation slot)
+  // 環境変数の現行 API_KEY は owner として扱う。
   if (token === c.env.API_KEY) {
+    if (mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${DEFAULT_TENANT_ID}`) !== 'false') return null;
     return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
 
-  // Legacy fallback: LEGACY_API_KEY accepted during rotation grace period.
-  // Same-value guard: if both env vars are set to the same secret, the primary
-  // check above already accepts it; this branch must skip to avoid false
-  // LEGACY counters. Logs accept_via=LEGACY_API_KEY so operators can confirm
-  // zero legacy usage before deleting the secret.
+  // ローテーション猶予中は LEGACY_API_KEY も受け付ける。同じ値なら現行キーで処理済みなので旧キーの計数を増やさない。削除前に利用が0か確認できるよう accept_via を記録する。
   if (
     c.env.LEGACY_API_KEY &&
     c.env.LEGACY_API_KEY !== c.env.API_KEY &&
     token === c.env.LEGACY_API_KEY
   ) {
-    console.log('[auth] accept_via=LEGACY_API_KEY');
+    if (mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${DEFAULT_TENANT_ID}`) !== 'false') return null;
+    logger.log("auth_accept_via_LEGACY_API_KEY");
     return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
 
   return null;
 }
 
-export async function authMiddleware(c: Context<Env>, next: Next): Promise<Response | void> {
-  // Skip auth for the LINE webhook endpoint — it uses signature verification instead
-  // Skip auth for OpenAPI docs — public documentation
-  const path = new URL(c.req.url).pathname;
+async function authenticateRequest(c: Context<Env>, next: Next): Promise<Response | void> {
+  // LINE Webhook は署名認証、OpenAPI は公開文書のため、スタッフ認証を省く。
+  const path = c.req.path;
   // LIFF / admin の SPA アセットは Authorization ヘッダなしで HTML を取りに
   // くる。Worker は API 以外のパスを ASSETS バインディングから配信するので、
   // /api/ で始まらないパスは認証 skip して static asset として返す。
@@ -628,15 +120,9 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     }
   }
 
-  // A form definition is public because the LIFF client must render it before
-  // submission. Authenticate opportunistically so the same GET can still
-  // return the full admin representation to SDK/admin callers, while an
-  // unauthenticated LIFF caller receives the redacted public representation.
-  // Crucially, this exception is method-aware: PUT/DELETE on the same path
-  // must continue through the normal admin authentication below.
-  const isPublicFormDefinition =
-    method === 'GET' && /^\/api\/forms\/[^/]+$/.test(path);
-  if (isPublicFormDefinition) {
+  // LIFF は回答前にフォーム定義が必要なので GET は公開用に伏せた内容を返す。認証済みの管理 API には完全な定義を返す。同じパスの PUT/DELETE は例外にせず通常の管理認証を通す。
+  const publicForm = isPublicFormDefinition(method, path);
+  if (publicForm && !c.req.query('account_id')) {
     const bearer = bearerToken(c);
     const cookie = adminSessionTokenFromCookie(c);
     const staff = bearer
@@ -649,7 +135,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   // 公開境界(LIFF・webhook・署名検証の入口)は認証より手前へ通す。
   // 判定の中身は isPublicApiBoundary に集約し、契約テストと共有する。
   // (LIFF の回答系は route 側で LINE 署名を見るため管理認証の対象外)
-  if (isPublicApiBoundary(method, path)) return next();
+  if (isPublicApiBoundary(method, path) && !(publicForm && c.req.query('account_id'))) return next();
 
   const bearer = bearerToken(c);
   const cookie = adminSessionTokenFromCookie(c);
@@ -660,9 +146,10 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
 
-  // 代理ログイン（★V6 37-5）。運営マスターが契約先の画面に入っている間だけ、
+  // 代理ログイン（★37-5）。運営マスターが契約先の画面に入っている間だけ、
   // 見ている統括を差し替える。既定は閲覧のみなので、この直後の readOnly 判定に乗る。
-  const impersonated = await resolveImpersonation(c, staff, path);
+  const authenticated = staff;
+  const impersonated = await timingSpan(c, 'impersonation', () => resolveImpersonation(c, authenticated, path));
   if (impersonated) {
     staff = impersonated.staff;
     c.set('impersonation', impersonated.context);
@@ -679,35 +166,37 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     return c.json({ success: false, code: TENANT_SUSPENDED_CODE, error: TENANT_SUSPENDED_ERROR }, 403);
   }
 
-  if (staff.readOnly && !SAFE_METHODS.has(method)) {
+  if (staff.readOnly && !SAFE_METHODS.has(method) && !gap2ReadOperation(method,path) && !gap2SelfPreference(method,path)) {
     return c.json({ success: false, error: '閲覧のみの権限では変更操作を実行できません' }, 403);
   }
 
-  // N-423 (#670): staff は deny-by-default。権限表に無い管理 API は
+  const outputRequest = isOutputRequest(path, c.req.query('format'), method);
+  if (staff.readOnly && outputRequest && !(path==='/api/hq/store-comparison/export'||/^\/api\/hq\/store-comparison\/exports\/[^/]+\/download$/.test(path))) {
+    return c.json({ success: false, error: '閲覧のみの権限では書き出しを実行できません' }, 403);
+  }
+
+  //  staff は deny-by-default。権限表に無い管理 API は
   // 本人・自組織と明示許可の口以外すべて 403。owner/admin は従来どおり通す。
   // 運営メンバーは、運営会社の統括に属する通常の staff として作る。
-  // /api/ops/* は直後の route 側で requirePlatformAdmin() が全件を守るため、
+  // /api/ops/* は直後の route 側で requirePlatformAdmin が全件を守るため、
   // ここで通常スタッフ向けの画面権限へ落とすと、登録済みの運営メンバーまで
   // 専用判定へ到達する前に 403 になる。運営 API だけは専用の門番へ委ねる。
-  const usesPlatformAdminAuthorization = path.startsWith('/api/ops/');
+  const usesPlatformAdminAuthorization = path.startsWith('/api/ops/') || path === '/api/auth/two-factor/policy';
   if (staff.role === 'staff'
       && !usesPlatformAdminAuthorization
       && !isStaffSelfEndpoint(method, path, staff.id)
       && !isStaffExplicitAllow(method, path)) {
     const requiredPermission = permissionForApiPath(path);
-    // N-424: 「見えるだけ」の key は GET系だけを許可する。変更系は edit の key が要る。
-    const granted = requiredPermission
-      && (staff.permissionKeys?.includes(requiredPermission)
-        || (SAFE_METHODS.has(method) && staff.viewPermissionKeys?.includes(requiredPermission)));
-    if (!requiredPermission || !granted) {
+    const requiredPermissions = readOperationPermissions(method, path) ?? (requiredPermission ? [requiredPermission] : []);
+    // 閲覧鍵は安全なメソッドか、表に登録された読取操作だけに使う。
+    const granted = requiredPermissions.some(permission => staff.permissionKeys?.includes(permission)
+      || ((SAFE_METHODS.has(method)||gap2ReadOperation(method,path)) && !outputRequest && staff.viewPermissionKeys?.includes(permission)));
+    if (!granted) {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     }
   }
 
-  // CSRF protection applies ONLY to cookie-authenticated, state-changing
-  // requests. Bearer callers (SDK/MCP) cannot be driven cross-site by a
-  // browser (an attacker cannot set the Authorization header), so they are
-  // exempt. Safe methods (GET/HEAD/OPTIONS) never mutate, so they are exempt.
+  // CSRF は Cookie 認証の更新要求だけに適用する。Bearer は攻撃側が Authorization を付けられず、GET/HEAD/OPTIONS は更新しないため対象外とする。
   if (!bearer && cookie && !SAFE_METHODS.has(c.req.method.toUpperCase())) {
     const header = c.req.header(CSRF_HEADER);
     const expected = csrfTokenFromCookie(c);
@@ -718,4 +207,10 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
 
   c.set('staff', staff);
   return next();
+}
+
+const timedAuthentication = timingMiddleware('auth', authenticateRequest);
+
+export async function authMiddleware(c: Context<Env>, next: Next): Promise<Response | void> {
+  return timedAuthentication(c, next);
 }

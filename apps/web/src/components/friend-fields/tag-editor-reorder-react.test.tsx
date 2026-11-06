@@ -14,9 +14,13 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import TagEditorV4, { type LinkedAction, type TagEditorValues } from './tag-editor-v4'
+import type { LinkedAction, TagEditorValues } from './tag-editor-v4'
+import { TagEditForm } from '@/v8/tag-edit/edit-form'
+import type { Tag } from '@line-crm/shared'
+import { within } from '@testing-library/react'
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => (
     <a href={typeof href === 'string' ? href : '#'}>{children}</a>
@@ -43,41 +47,42 @@ async function renderEditor(onSave: (values: TagEditorValues) => Promise<void>) 
   await act(async () => {
     root = createRoot(host!)
     root.render(
-      <TagEditorV4
-        mode="create"
+      <TagEditForm
+        tag={{ id: 't1', name: '順番テスト', linkedEnabled: true } as Tag}
+        accountId="" readOnly={false} dependencies={null}
+        conflict={false} compareBusy={false} onCompare={() => {}} onReloadLatest={() => {}}
+        retroactiveReference={false} initialActions={[ACTION_A, ACTION_B]} onDelete={() => {}}
         groups={[]}
-        embedded
         saving={false}
         onCancel={() => {}}
         onSave={onSave}
-        initialValues={{ name: '順番テスト', linked: true, actions: [ACTION_A, ACTION_B] }}
       />,
     )
+  })
+  await act(async () => {
+    const section = host!.querySelector('section[aria-label="タグ連動"]')!
+    within(section as HTMLElement).getByRole('button', { name: '開く', exact: true }).click()
   })
   return host!
 }
 
-function byLabel(container: ParentNode, name: string): HTMLButtonElement {
-  const found = Array.from(container.querySelectorAll('button')).find(
-    (button) => button.getAttribute('aria-label') === name,
-  )
-  if (!found) throw new Error(`ボタンが無い: ${name}`)
-  return found as HTMLButtonElement
+function handle(container: ParentNode, number: number) {
+  return container.querySelector<HTMLButtonElement>(`button[aria-label="${number}つ目の行うことを並べ替える"]`)!
 }
-
 function actionOrder(container: ParentNode): string[] {
-  const list = container.querySelector('ol')
-  if (!list) throw new Error('連動アクションの一覧が無い')
-  return Array.from(list.querySelectorAll(':scope > li')).map((item) => item.textContent ?? '')
+  return Array.from(container.querySelectorAll('[data-action-row]')).map(item => item.textContent ?? '')
+}
+async function keyMove(container: ParentNode, number: number, key: string) {
+  await act(async () => { handle(container, number).dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })) })
 }
 
 describe('連動アクションの上へ・下へ(#670 28)', () => {
-  it('端の行のボタンは押せない', async () => {
+  it('端で上下キーを押しても範囲外に動かない', async () => {
     const container = await renderEditor(async () => {})
-    expect(byLabel(container, '1番目のアクションを上へ').disabled).toBe(true)
-    expect(byLabel(container, '1番目のアクションを下へ').disabled).toBe(false)
-    expect(byLabel(container, '2番目のアクションを上へ').disabled).toBe(false)
-    expect(byLabel(container, '2番目のアクションを下へ').disabled).toBe(true)
+    const before = actionOrder(container)
+    await keyMove(container, 1, 'ArrowUp')
+    await keyMove(container, 2, 'ArrowDown')
+    expect(actionOrder(container)).toEqual(before)
   })
 
   it('2番目を上へ押すと1番目と入れ替わり、保存する値に届く', async () => {
@@ -89,16 +94,14 @@ describe('連動アクションの上へ・下へ(#670 28)', () => {
     expect(before[0]).toContain('AAAへ付与')
     expect(before[1]).toContain('BBBを送信')
 
-    await act(async () => {
-      byLabel(container, '2番目のアクションを上へ').click()
-    })
+    await keyMove(container, 2, 'ArrowUp')
     const after = actionOrder(container)
     expect(after[0]).toContain('BBBを送信')
     expect(after[1]).toContain('AAAへ付与')
 
     await act(async () => {
       const save = Array.from(container.querySelectorAll('button')).find(
-        (button) => button.textContent === 'タグを作る',
+        (button) => button.textContent === 'タグを保存する',
       )
       if (!save) throw new Error('保存ボタンが無い')
       save.click()

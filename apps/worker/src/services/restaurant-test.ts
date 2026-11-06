@@ -5,6 +5,10 @@
  * `inbound_only` を型と実行時の両方で固定し、誤って双方向化できないようにする。
  */
 
+import { selectAssignment } from '../features/booking/booking-assignment-selector/index.js';
+import { defaultAssignmentResource } from '../features/booking/booking-assignment-settings/index.js';
+import { normalizePhone, phoneProblem } from '@line-crm/shared';
+
 export const RESTAURANT_RESERVATION_SOURCES = [
   'restaurant_board',
   'reszaiko',
@@ -16,6 +20,7 @@ export const RESTAURANT_RESERVATION_SOURCES = [
   'line',
   'phone',
   'manual',
+  'walk_in',
 ] as const;
 
 export type RestaurantReservationSource = (typeof RESTAURANT_RESERVATION_SOURCES)[number];
@@ -49,7 +54,7 @@ export function isRestaurantReservationSource(value: unknown): value is Restaura
 
 export function validateInboundReservation(value: unknown):
   | { ok: true; value: InboundReservation }
-  | { ok: false; error: string } {
+  | { ok: false; error: string; field?: string } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return { ok: false, error: 'reservation が必要です' };
   }
@@ -59,27 +64,30 @@ export function validateInboundReservation(value: unknown):
   const guestCount = Number(row.guestCount);
   const startsAt = typeof row.startsAt === 'string' ? row.startsAt : '';
   const endsAt = typeof row.endsAt === 'string' ? row.endsAt : '';
-  if (!externalId) return { ok: false, error: 'externalId が必要です' };
-  if (!customerName) return { ok: false, error: 'customerName が必要です' };
+  if (!externalId) return { ok: false, error: 'externalId が必要です', field: 'externalId' };
+  if (!customerName) return { ok: false, error: 'customerName が必要です', field: 'customerName' };
   if (!Number.isInteger(guestCount) || guestCount < 1 || guestCount > 100) {
-    return { ok: false, error: 'guestCount は1〜100の整数で指定してください' };
+    return { ok: false, error: 'guestCount は1〜100の整数で指定してください', field: 'guestCount' };
   }
   const start = Date.parse(startsAt);
   const end = Date.parse(endsAt);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-    return { ok: false, error: 'startsAt / endsAt の日時が正しくありません' };
+    return { ok: false, error: 'startsAt / endsAt の日時が正しくありません', field: !Number.isFinite(start) ? 'startsAt' : 'endsAt' };
   }
   const allowedStatuses = new Set(['pending', 'confirmed', 'seated', 'visited', 'cancelled', 'no_show']);
   const status = typeof row.status === 'string' && allowedStatuses.has(row.status)
     ? row.status as InboundReservation['status']
     : 'confirmed';
   const optional = (key: string) => typeof row[key] === 'string' ? String(row[key]).trim() || null : null;
+  if (row.customerPhone != null && (typeof row.customerPhone !== 'string' || phoneProblem(row.customerPhone))) {
+    return { ok: false, error: '電話番号は0から始まる10〜11桁の数字で入れてください。', field: 'customerPhone' };
+  }
   return {
     ok: true,
     value: {
       externalId,
       customerName,
-      customerPhone: optional('customerPhone'),
+      customerPhone: normalizePhone(optional('customerPhone') ?? '') || null,
       lineUid: optional('lineUid'),
       guestCount,
       startsAt: new Date(start).toISOString(),
@@ -103,7 +111,8 @@ export function chooseRestaurantTable(candidates: RestaurantTableCandidate[], gu
       if (waste !== 0) return waste;
       return a.maxCapacity - b.maxCapacity || a.id.localeCompare(b.id);
     });
-  return suitable[0]?.id ?? null;
+  return selectAssignment(suitable.map(t => ({ ...t, ...defaultAssignmentResource(t.id), dailyCount: 0, periodCount: 0 })),
+    { method: 'legacy_first', guestCount })?.id ?? null;
 }
 
 export function restaurantRoleFromAdminRole(role: 'owner' | 'admin' | 'staff' | 'viewer'):

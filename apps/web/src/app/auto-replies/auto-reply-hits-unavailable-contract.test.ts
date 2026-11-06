@@ -1,12 +1,12 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-import { metricWord } from './auto-reply-words'
+import { metricWord } from '../../v8/auto-replies/auto-reply-words'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readUiSource(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
 
 /**
  * 自動応答一覧（設計 `cmDfJ` 8-1 ／ `q8wSqO` 8-1-J）で、
@@ -34,40 +34,19 @@ describe('ヒット数の未取得', () => {
   })
 })
 
+/*
+ * 一覧の帯・行・絞り込みで未取得を 0 にしない動きは
+ * v8/auto-replies/list.test.tsx と list-behavior.test.tsx が描いて確かめる。
+ * ここには足りない合計・0 埋めへ戻さない禁止の見張りだけを残す。
+ */
 describe('一覧の帯と行（設計 8-1 `cmDfJ`）', () => {
   it('ヒット数が1つでも欠けていたら、合計を出さない', () => {
-    expect(PAGE).toContain('const hitsAllKnown = items.length > 0 && items.every((r) => r.hits !== undefined)')
     expect(PAGE, '足りない合計をそのまま出している').not.toContain(
       'const monthlyHits = items.reduce((sum, r) => sum + (r.hits?.period ?? 0), 0)',
     )
-    expect(PAGE).toContain('const monthlyHits = hitsAllKnown')
-    expect(PAGE).toContain('const totalHits = hitsAllKnown')
-  })
-
-  it('「未ヒット」の絞り込みも、未取得を混ぜない', () => {
-    expect(PAGE).toContain("if (savedFilter === 'never') return r.hits?.total === 0")
   })
 
   it('行のヒット数を 0 で埋めない', () => {
-    expect(PAGE).toContain("{r.hits?.period ?? '—'}")
-    expect(PAGE).toContain("累計 {r.hits?.total ?? '—'}回")
     expect(PAGE).not.toContain("{r.hits?.period ?? 0}")
-    expect(PAGE).not.toContain("累計 {r.hits?.total ?? 0}回")
-  })
-
-  it('累計の副題にも、未取得のときは数を出さない', () => {
-    expect(PAGE).toContain("累計 ${totalHits ?? '—'}回")
-  })
-})
-
-describe('「準備中」を出さない（v6-common-rules §5-5）', () => {
-  it('絞り込みの説明に「準備中」を残さない', () => {
-    /*
-     * 「一度も当たっていないルール（30日以上の絞り込みは準備中）」と
-     * 出ていた。**動くまで描かない。** 押せない機能の位置だけを見せても、
-     * いつ使えるようになるのか分からない。
-     */
-    expect(PAGE).not.toContain('準備中')
-    expect(PAGE).toContain("note: '一度も当たっていないルール'")
   })
 })

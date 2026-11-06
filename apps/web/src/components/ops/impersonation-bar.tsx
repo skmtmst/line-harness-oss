@@ -2,17 +2,26 @@
 
 import { Eye, PencilLine } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { api, type OpsImpersonation } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import { TextArea } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
-import { forgetSessionSnapshot } from '@/lib/session-snapshot'
+import { deferImpersonationSnapshot, forgetSessionSnapshot, readPermissionSessionSnapshot, readSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { forgetAuthCheck } from '@/lib/auth-check-marker'
+import { formatListTimestamp } from '@/lib/format'
+import Notice from '@/components/shared/notice'
+import Button from '@/components/shared/button'
+
+/** 帯の「10/1 15:20」（日本時間）。 */
+function startedLabel(iso: string): string {
+  return formatListTimestamp(iso, { fallback: '' })
+}
 
 /**
- * 代理ログイン帯（★V6 37 共通 `WXp5T`）。代理ログイン中は全画面の上に常時出す。
+ * 代理ログイン帯（★管理画面 37 共通 `WXp5T`）。代理ログイン中は全画面の上に常時出す。
  *
  * - 閲覧中（赤 `status-danger`）: 「◯◯ として閲覧中（書き込みはできません）」
  * - 書き込み中（濃い赤 `danger`）: 「◯◯ として書き込み中」
@@ -32,18 +41,40 @@ export default function ImpersonationBar({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const update = (next: OpsImpersonation | null) => {
-    if (next) setState(next)
-    // 帯の状態が変わったら、AuthGuard の確認結果（切替前のもの）を次に使わせない（V6R-S0-a）。
-    forgetSessionSnapshot()
+  const update = async (next: OpsImpersonation) => {
+    // 再読込時に切替前の控えを復元させず、今の画面には確定したモードをすぐ配る。
+    forgetAuthCheck()
+    const known = readSessionSnapshot()
+    if (known) {
+      rememberSessionSnapshot({ ...known, impersonation: next })
+    } else {
+      const pending = deferImpersonationSnapshot(next)
+      setState({ ...next, mode: 'read' })
+      try {
+        const body = await api.auth.session()
+        const data = body?.success ? body.data : null
+        if (!data || data.impersonation?.id !== next.id || data.impersonation.tenantId !== next.tenantId || data.impersonation.mode !== next.mode) throw new Error('session not confirmed')
+        // 別の認証確認が先に終わっていたら、この古い読込で上書きしない。
+        if (readPermissionSessionSnapshot() !== pending) return
+        rememberSessionSnapshot({
+          impersonation: { ...data.impersonation, tenantName: next.tenantName },
+          unfamiliarAt: typeof data.unfamiliarAt === 'string' ? data.unfamiliarAt : null,
+          stepUpMethod: data.stepUpMethod === 'totp' || data.stepUpMethod === 'password' ? data.stepUpMethod : 'none',
+        })
+      } catch {
+        setError('切り替え後のログインを確認できませんでした。書き込みを止めています。画面を読み直してください。')
+        return
+      }
+    }
+    setState(next)
     onChange?.(next)
   }
 
   const toRead = async () => {
     setBusy(true)
     const res = await opsCall(api.ops.impersonation.read())
+    if (res.success) { setError(''); await update({ ...state, mode: 'read' }) }
     setBusy(false)
-    if (res.success) update({ ...state, mode: 'read' })
   }
 
   const end = async () => {
@@ -65,44 +96,33 @@ export default function ImpersonationBar({
     const res = dialog === 'write'
       ? await opsCall(api.ops.impersonation.write(reason))
       : await opsCall(api.ops.impersonation.revealPii(reason))
+    if (!res.success) { setBusy(false); setError(res.error || '切り替えできませんでした。時間をおいて、もう一度お試しください。'); return }
+    await update({ ...state, ...res.data, tenantName: state.tenantName })
     setBusy(false)
-    if (!res.success) { setError(res.error || '切り替えできませんでした'); return }
-    update({ ...state, ...res.data, tenantName: state.tenantName })
     setDialog(null)
     router.refresh()
   }
 
   const writing = state.mode === 'write'
   const name = state.tenantName ?? '契約先'
+  const started = startedLabel(state.startedAt)
 
   return (
     <>
-      <div
-        data-design-node="WXp5T"
-        role="status"
-        className={writing
-          ? 'flex h-12 items-center justify-between gap-3 bg-danger px-5 text-on-accent'
-          : 'flex h-12 items-center justify-between gap-3 bg-danger px-5 text-on-accent'}
-      >
-        <span className="flex min-w-0 items-center gap-2.5 text-label font-bold">
-          {writing ? <PencilLine aria-hidden="true" className="h-4.5 w-4.5" /> : <Eye aria-hidden="true" className="h-4.5 w-4.5" />}
-          <span className="truncate">
-            {name} として{writing ? '書き込み中' : '閲覧中（書き込みはできません）'}
-            {state.piiRevealed ? '・個人情報を表示中' : ''}
-          </span>
-        </span>
-        <span className="flex shrink-0 items-center gap-2">
-          {!state.piiRevealed ? (
-            <BarButton onClick={() => setDialog('pii')} disabled={busy}>個人情報を表示する</BarButton>
-          ) : null}
-          {writing ? (
-            <BarButton onClick={() => void toRead()} disabled={busy}>閲覧のみに戻す</BarButton>
-          ) : (
-            <BarButton onClick={() => setDialog('write')} disabled={busy}>書き込みに切り替える</BarButton>
-          )}
-          <BarButton onClick={() => void end()} disabled={busy} solid>代理ログインを終える</BarButton>
-        </span>
-      </div>
+      <Notice tone={writing ? 'danger' : 'warn'} role="status"
+        data-design-node={writing ? 'WXp5T' : 'VtJQ6'}
+        icon={writing ? <PencilLine aria-hidden="true" /> : <Eye aria-hidden="true" />}
+        heading={writing
+          ? <>{name} として書き込み中{state.piiRevealed ? '・個人情報を表示中' : ''}</>
+          : `代理ログイン中：${name}（閲覧のみ）${state.piiRevealed ? '・個人情報を表示中' : ''}`}
+        action={<>
+          {!state.piiRevealed ? <Button type="button" onClick={() => setDialog('pii')} disabled={busy}>個人情報を表示する</Button> : null}
+          {writing
+            ? <Button type="button" onClick={() => void toRead()} disabled={busy}>閲覧のみに戻す</Button>
+            : <Button type="button" onClick={() => setDialog('write')} disabled={busy}>書き込みに切り替える</Button>}
+          <Button type="button" variant="primary" onClick={() => void end()} disabled={busy}>代理ログインを終える</Button>
+        </>}
+      >{!dialog && error ? error : !writing && started ? `${started}〜` : null}</Notice>
       {dialog ? (
         <ReasonDialog
           kind={dialog}
@@ -113,25 +133,6 @@ export default function ImpersonationBar({
         />
       ) : null}
     </>
-  )
-}
-
-/**
- * 帯の上に置く小さなボタン。帯の色（赤）の上に乗るので、共通 `Button` の
- * 白地・緑地ではなく、帯と同じ色系で描く。
- */
-function BarButton({ onClick, disabled, solid, children }: { onClick: () => void; disabled?: boolean; solid?: boolean; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={solid
-        ? 'h-8 rounded-control bg-canvas px-3.5 text-caption font-bold text-danger disabled:opacity-60'
-        : 'h-8 rounded-control border border-on-accent/60 bg-on-accent/15 px-3.5 text-caption font-bold text-on-accent hover:bg-on-accent/25 disabled:opacity-60'}
-    >
-      {children}
-    </button>
   )
 }
 
@@ -169,7 +170,7 @@ function ReasonDialog({
     >
       <div className="flex flex-col gap-3">
         <label className="block">
-          <span className="mb-1.5 block text-caption font-bold text-ink">理由<RequiredBadge /><span className="font-normal text-ink-faint">（4文字以上）</span></span>
+          <span className="mb-1.5 block text-caption font-medium text-ink">理由<RequiredBadge /><span className="font-medium text-ink-faint">（4文字以上）</span></span>
           <TextArea
             value={reason}
             onChange={(event) => setReason(event.target.value)}

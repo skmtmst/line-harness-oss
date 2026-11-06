@@ -324,6 +324,8 @@ export async function captureFriendAddEventAttribution(
     return { refCode: existing.ref_code, entryRouteId: existing.entry_route_id };
   }
 
+  if (!existing) return null;
+
   await db.prepare(
     `UPDATE friend_add_attribution_candidates SET status = 'expired'
       WHERE line_account_id = ? AND friend_id = ? AND status = 'pending' AND expires_at < ?`,
@@ -332,28 +334,38 @@ export async function captureFriendAddEventAttribution(
   const candidate = await db.prepare(
     `SELECT id, ref_code, entry_route_id
        FROM friend_add_attribution_candidates
-      WHERE line_account_id = ? AND friend_id = ? AND status = 'pending' AND expires_at >= ?
-      ORDER BY occurred_at DESC LIMIT 1`,
-  ).bind(input.lineAccountId, input.friendId, now)
+      WHERE line_account_id = ? AND friend_id = ?
+        AND ((status = 'pending' AND expires_at >= ?)
+          OR (status = 'consumed' AND consumed_by_event_id = ?))
+      ORDER BY CASE WHEN consumed_by_event_id = ? THEN 0 ELSE 1 END, occurred_at DESC, id DESC LIMIT 1`,
+  ).bind(input.lineAccountId, input.friendId, now, input.eventId, input.eventId)
     .first<{ id: string; ref_code: string; entry_route_id: string | null }>();
   if (!candidate) return null;
 
-  const claimed = await db.prepare(
-    `UPDATE friend_add_attribution_candidates
+  await db.batch([
+    db.prepare(`UPDATE friend_add_attribution_candidates
         SET status = 'consumed', consumed_by_event_id = ?
-      WHERE id = ? AND line_account_id = ? AND friend_id = ? AND status = 'pending'`,
-  ).bind(input.eventId, candidate.id, input.lineAccountId, input.friendId).run();
-  if ((claimed.meta?.changes ?? 0) !== 1) return null;
-
-  await db.prepare(
-    `UPDATE friend_add_events
+      WHERE id = ? AND line_account_id = ? AND friend_id = ?
+        AND ((status = 'pending' AND expires_at >= ?) OR (status = 'consumed' AND consumed_by_event_id = ?))
+        AND EXISTS (SELECT 1 FROM friend_add_events
+          WHERE id = ? AND line_account_id = ? AND friend_id = ? AND attribution_status = 'unavailable')`)
+      .bind(input.eventId, candidate.id, input.lineAccountId, input.friendId, now, input.eventId,
+        input.eventId, input.lineAccountId, input.friendId),
+    db.prepare(`UPDATE friend_add_events
         SET attribution_status = 'captured', ref_code = ?, entry_route_id = ?, candidate_id = ?
-      WHERE id = ? AND line_account_id = ? AND friend_id = ?`,
-  ).bind(
-    candidate.ref_code, candidate.entry_route_id, candidate.id,
-    input.eventId, input.lineAccountId, input.friendId,
-  ).run();
-  return { refCode: candidate.ref_code, entryRouteId: candidate.entry_route_id };
+      WHERE id = ? AND line_account_id = ? AND friend_id = ? AND attribution_status = 'unavailable'
+        AND EXISTS (SELECT 1 FROM friend_add_attribution_candidates
+          WHERE id = ? AND line_account_id = ? AND friend_id = ?
+            AND status = 'consumed' AND consumed_by_event_id = ?)`)
+      .bind(candidate.ref_code, candidate.entry_route_id, candidate.id,
+        input.eventId, input.lineAccountId, input.friendId,
+        candidate.id, input.lineAccountId, input.friendId, input.eventId),
+  ]);
+  const saved = await db.prepare(`SELECT ref_code, entry_route_id FROM friend_add_events
+    WHERE id = ? AND line_account_id = ? AND friend_id = ? AND attribution_status = 'captured'`)
+    .bind(input.eventId, input.lineAccountId, input.friendId)
+    .first<{ ref_code: string; entry_route_id: string | null }>();
+  return saved ? { refCode: saved.ref_code, entryRouteId: saved.entry_route_id } : null;
 }
 
 /**
@@ -371,7 +383,7 @@ export const FRIEND_ADD_SEND_CLAIM_TTL_MINUTES = 2;
  * 上限を考えれば数分で足りる。ここを無期限にすると、通信が1回切れただけで
  * その友だちへ**二度と**友だち追加配信が届かなくなる（印を消す経路が
  * 予約の解放しか無く、送達不明では解放しないため）。混雑時の 429 でも
- * 起きるので、例外的な事故ではない。
+ * 起きるので、例外的な出来事ではない。
  *
  * 期限を過ぎたあとの「送ったかもしれない相手へ送り直さない」は、台帳側の
  * 再送制限が受け持つ（`delivery_unknown` の行を届いた形跡として数える）。

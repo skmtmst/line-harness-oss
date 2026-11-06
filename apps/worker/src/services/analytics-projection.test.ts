@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  featureJobCanRun: vi.fn(),
   rebuildAnalyticsDailyMetricsChunk: vi.fn(),
   recentAnalyticsProjectionRange: vi.fn(),
   ensureAnalyticsEventCoverage: vi.fn(),
@@ -14,13 +15,14 @@ vi.mock('@line-crm/db', async () => ({
   ...mocks,
 }));
 
-vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
+vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: mocks.featureJobCanRun }));
 
 const { refreshRecentAnalyticsProjections, selectNextAnalyticsProjectionAccount } =
   await import('./analytics-projection.js');
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.featureJobCanRun.mockResolvedValue(true);
   mocks.recentAnalyticsProjectionRange.mockReturnValue({
     fromDate: '2026-08-20', toDate: '2026-08-26',
   });
@@ -129,4 +131,21 @@ describe('分析の日別投影更新', () => {
     expect(selectNextAnalyticsProjectionAccount(accounts, 'account-a')?.id).toBe('account-c');
     expect(selectNextAnalyticsProjectionAccount(accounts, 'account-c')?.id).toBe('account-a');
   });
+});
+
+it('分析OFFでも巡回を進め、次のONのアカウントを処理する', async () => {
+  let cursor = '';
+  mocks.getAnalyticsProjectionSchedulerCursor.mockImplementation(async () => cursor);
+  mocks.saveAnalyticsProjectionSchedulerCursor.mockImplementation(async (_db, id) => { cursor = id; });
+  mocks.featureJobCanRun.mockImplementation(async (_db, input) => input.accountId !== 'account-a');
+  const accounts = [{ id: 'account-a', is_active: 1 }, { id: 'account-b', is_active: 1 }] as never;
+  const results = [];
+  for (let tick = 0; tick < 3; tick++) results.push(await refreshRecentAnalyticsProjections(
+    {} as D1Database, accounts, new Date('2026-10-08T00:00:00Z')));
+  expect(results.map(result => result.processed)).toEqual([0, 1, 0]);
+  expect(mocks.rebuildAnalyticsDailyMetricsChunk).toHaveBeenCalledTimes(1);
+  expect(mocks.rebuildAnalyticsDailyMetricsChunk).toHaveBeenCalledWith({}, expect.objectContaining({ accountId: 'account-b' }));
+  expect(mocks.ensureAnalyticsEventCoverage).toHaveBeenCalledTimes(1);
+  expect(mocks.saveAnalyticsProjectionSchedulerCursor.mock.calls.map(call => call[1]))
+    .toEqual(['account-a', 'account-b', 'account-a']);
 });

@@ -1,5 +1,5 @@
 /*
- * シナリオアクションの参照検証を、本物のルートと本物の SQLite で確かめる(N-053)。
+ * シナリオアクションの参照検証を、本物のルートと本物の SQLite で確かめる。
  *
  * 手書きモックだと「幽霊IDが保存されない」「他アカウントが弾かれる」
  * 「弾かれたときに1行も残らない」を確かめられない。ここは実物の
@@ -8,8 +8,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 
-import type { Env } from '../index';
-import type { AuthenticatedStaff } from '../middleware/auth';
+import type { Env } from '../worker-env';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { scenarios } from './scenarios';
 

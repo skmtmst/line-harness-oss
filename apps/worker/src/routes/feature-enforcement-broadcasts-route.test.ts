@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { featureEnforcementMiddleware } from '../middleware/feature-enforcement.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { broadcasts } from './broadcasts.js';
@@ -104,8 +104,9 @@ describe('一斉配信routeの機能停止境界', () => {
     });
   });
 
-  it('複数アカウント一覧は同じtenantの料金を1回だけ読み、D1呼出をN＋定数に保つ', async () => {
-    for (const id of ['account-1', 'account-2', 'account-3']) {
+  it.each([3, 13])('%sアカウントの一覧は同じtenantの料金を1回だけ読み、D1呼出をN＋定数に保つ', async (accountCount) => {
+    for (let i = 1; i <= accountCount; i++) {
+      const id = `account-${i}`;
       insertAccount(testDb, id);
       setBroadcastSetting(testDb, id, true);
     }
@@ -125,7 +126,7 @@ describe('一斉配信routeの機能停止境界', () => {
     const response = await routeApp(countedDb).request('/api/broadcasts', {}, { DB: countedDb });
     expect(response.status).toBe(200);
     expect(tenantBillingReads).toBe(1);
-    // 3件の設定読取 + scope/handlerの固定分。account件数に比例するのは設定だけ。
-    expect(prepareCalls).toBeLessThanOrEqual(12);
+    // 設定は各店1回。SQLページングの件数・状態・フォルダ集計は固定分。
+    expect(prepareCalls).toBeLessThanOrEqual(accountCount + 12);
   });
 });

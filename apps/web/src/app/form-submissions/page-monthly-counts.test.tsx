@@ -18,6 +18,12 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   return { ...actual, fetchApi, api: { ...(actual as unknown as { api: object }).api, folders: apiFolders } }
 })
 
+/* 役割はサーバへ聞かず、手元の値（lh_staff_role）で決める。新しい一覧は答えが来るまで手元の値を使う。 */
+vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
+  const actual = await importOriginal()
+  return { ...actual, useStaffRole: () => null }
+})
+
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href }, children),
@@ -32,7 +38,8 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
-import FormSubmissionsPage from './page'
+/* 新しい一覧（src/v8/forms/list.tsx）を描く。2026-10-06 に `./list-v8` から向け直した。 */
+import FormSubmissionsPage from '@/v8/forms/list'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -109,15 +116,10 @@ describe('一覧の今月の数（P・実マウント）', () => {
       root.render(<FormSubmissionsPage />)
     })
     await act(async () => {})
-    expect(host.textContent).toContain('今月 12件')
-    expect(host.textContent).toContain('完了率 50%')
-    expect(host.textContent).toContain('今月 —')
-    expect(host.textContent).toContain('完了率 —')
-    // 「？」は見出しに1つだけ。行には置かない（7行に7個並ぶ騒がしさを避ける）。
-    const helps = host.querySelectorAll('button[aria-label="今月の完了率の説明"]')
-    expect(helps.length).toBe(1)
-    expect(helps[0].closest('thead')).toBeTruthy()
-    expect(host.querySelectorAll('tbody button[aria-label="今月の完了率の説明"]').length).toBe(0)
+    expect(host.textContent).toContain('今月 12・完了 50%')
+    expect(host.textContent).toContain('今月 —・完了 —')
+    // 板に「？」は無い。見出しにも行にも置かない。
+    expect(host.querySelectorAll('button[aria-label="今月の完了率の説明"]').length).toBe(0)
   })
 
   it('死んでいた今週表示は出さない', async () => {

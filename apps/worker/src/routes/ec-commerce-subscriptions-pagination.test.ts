@@ -1,23 +1,14 @@
 /*
- * 定期便の一覧・集計・ページ送り(#731)。**実 SQLite に本物のルータを通す。**
- *
- * 直す前はこうだった。
- *   - スナップショット(=定期便を持つ友だち)を `LIMIT 500` で切ってから、
- *     JS で契約を展開して数えていた。**501人目以降の契約は一覧にも集計にも
- *     入らず、切ったことを知らせる手がかりも無かった。**
- *   - 画面は `limit=100` を送るだけで `offset` を送らず、101件目から先へ
- *     行く手立てが無かった。
- *
- * ここでは契約900件(友だち600人)を実際に入れて、数と到達を確かめる。
- * 差し替えているのはアカウント可視範囲の判定だけで、**SQL も集計も本物**。
+ * 一覧・集計・ページ送りで契約を取り落とさないよう、友だち600人の契約900件を実 SQLite に入れ、全件への到達と件数を確かめる。
+ * アカウント可視範囲の判定だけを差し替え、SQL と集計は実処理を通す。
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const mocks = vi.hoisted(() => ({ canAccess: vi.fn(), scope: vi.fn() }));
 vi.mock('../services/account-access.js', () => ({
@@ -188,7 +179,7 @@ describe('#731 定期便の一覧と集計', () => {
     expect(body.data.items.every((item) => item.status === 'paused')).toBe(true);
   });
 
-  /* 直す前の実装が返していた値を、そのまま引き継いでいること(既存試験からの移設)。 */
+  /** 保存済みの定期便と同じ応答値を返すことを確かめる。 */
   test('1件の契約の中身と集計は、直す前と同じに返す', async () => {
     sqlite.prepare(
       `INSERT INTO friends (id, line_user_id, display_name, line_account_id, created_at, updated_at)
@@ -227,4 +218,19 @@ describe('#731 定期便の一覧と集計', () => {
     expect(body.data.summary.monthlyStats).toEqual([]);
     expect(body.data.risk.predictiveScoreAvailable).toBe(false);
   });
+});
+
+
+afterEach(() => vi.useRealTimers());
+test.each(['2026-09-30T15:00:00Z', '2026-09-30T23:59:59Z'])('日本時間の月初の朝に今月の定期便開始・取消を数える: %s', async (at) => {
+  vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(at));
+  seedContracts(2);
+  sqlite.prepare('UPDATE nen_ec_member_snapshots SET subscription_json=? WHERE friend_id=?').run(JSON.stringify({ contracts: [
+    { id: 'current', status_code: 'cancelled', amount: 1000, started_at: '2026-10-01', cancelled_at: '2026-10-01' },
+    { id: 'previous', status_code: 'cancelled', amount: 1000, started_at: '2026-09-01', cancelled_at: '2026-09-30' },
+    { id: 'previous-2', status_code: 'cancelled', amount: 500, started_at: '2026-09-15', cancelled_at: '2026-09-30' },
+  ] }), 'f0000');
+  const res = await app().request('/api/ec-commerce/subscriptions?lineAccountId=account-a&limit=10');
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ data: { summary: { startedThisMonth: 1, cancelledThisMonth: 1 } } });
 });

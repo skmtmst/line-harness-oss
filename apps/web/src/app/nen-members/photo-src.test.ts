@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { safePhotoSrc } from './photo-src'
+import { safePhotoSrc } from '@/v8/nen-posts/src'
 
 describe('写真の表示URL検査', () => {
   it('保管先のhttpsを通す', () => {

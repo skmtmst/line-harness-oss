@@ -4,11 +4,11 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, test as vitestTest, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { AsyncTestScope } from '../test-utils/async-test-scope.js';
 
 /**
- * フォーム回答の冪等化の実DBテスト(N-165)。
+ * フォーム回答の冪等化の実DBテスト。
  *
  * 本物の bootstrap.sql を better-sqlite3 に流し、本物の @line-crm/db
  * ヘルパーと本物の送信口で動かす。差し替えるのは本人確認・LINE送信・
@@ -67,10 +67,20 @@ function asD1(sqlite: Database.Database, injected: { current: Inject }) {
         const result = statement.run(...params);
         return { success: true, meta: { changes: result.changes }, results: [] } as T;
       },
+      // 本物の D1 の batch と同じく、1つの取引でまとめて流す（W7 の欄の書き込みと予定の入れ直し）。
+      __batchRun() {
+        if (statement.reader) return { success: true, meta: {}, results: statement.all(...params) };
+        const result = statement.run(...params);
+        return { success: true, meta: { changes: result.changes }, results: [] };
+      },
     } as unknown as D1PreparedStatement);
     return bound([]);
   }
-  return { prepare } as unknown as D1Database;
+  async function batch(statements: D1PreparedStatement[]) {
+    const run = sqlite.transaction(() => statements.map((statement) => (statement as unknown as { __batchRun: () => unknown }).__batchRun()));
+    return run();
+  }
+  return { prepare, batch } as unknown as D1Database;
 }
 
 const pushCalls: Array<{ to: string; messages: unknown[]; retryKey: string }> = [];
@@ -98,8 +108,7 @@ let sqlite: Database.Database;
 let injected: { current: Inject };
 let scope: AsyncTestScope;
 
-// A timeout rejects Vitest's wrapper, not this body. Keep owning the body until
-// its requests, assertions and finally blocks have settled in afterEach.
+// Vitest のタイムアウト後も本文の非同期処理は残るため、afterEach で要求・検証・finally が終わるまで責任を持って待つ。
 function test(name: string, body: () => Promise<void>, timeoutMs?: number) {
   vitestTest(name, () => scope.run(body), timeoutMs);
 }
@@ -193,16 +202,69 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  // Release fake I/O first, then join work, then restore globals/close the DB.
-  // Never clear the next test's counters while an old request can still send.
+  // 次の試験の状態を古い要求が変更しないよう、偽 I/O の解除、処理完了待ち、グローバルの復元、DB の close の順で片付ける。
   await scope.dispose();
   sqlite.close();
   vi.unstubAllGlobals();
 });
 
+describe('W12 特典の参照先（実DB・回答API）', () => {
+  for (const source of ['ref', 'first-touch'] as const) {
+    for (const ownership of [
+      { name: '同じ店', account: 'account-a', allowed: true },
+      { name: '既定統括の未割当の友だち', account: 'account-a', nullFriend: true, defaultTenant: true, allowed: true },
+      { name: '別の店', account: 'account-b', allowed: false },
+      { name: '未割当・別の統括', account: null, allowed: false },
+      { name: '未割当・既定統括', account: null, defaultTenant: true, allowed: true },
+      { name: '同じ店のシナリオ', account: null, scenarioAccount: 'account-a', allowed: true },
+      { name: '別の店のシナリオ', account: null, scenarioAccount: 'account-b', allowed: false },
+      { name: '停止中', account: 'account-a', inactive: true, allowed: false },
+    ]) {
+      test(`${source}: ${ownership.name}の特典を回答アカウントと照合する`, async () => {
+        sqlite.exec(`
+          INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+          VALUES ('account-b', 'ch-b', 'B', 'tok-b', 'sec-b', 'tenant-1');
+          INSERT INTO message_templates (id, name, message_type, message_content)
+          VALUES ('reward', '特典', 'text', 'リンク特典');
+          INSERT INTO forms (id, name, fields, layout, save_to_metadata, is_active, on_submit_message_type, on_submit_message_content)
+          VALUES ('form-reward', 'R', '[]', '${TEXT_LAYOUT}', 0, 1, 'text', 'フォーム返信');
+          INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-reward', 'account-a');
+        `);
+        sqlite.prepare(`INSERT INTO tracked_links (id, name, original_url, reward_template_id, line_account_id)
+          VALUES ('reward-link', '入口', 'https://example.test', 'reward', ?)` ).run(ownership.account);
+        if (ownership.defaultTenant) sqlite.exec("UPDATE line_accounts SET tenant_id=NULL WHERE id='account-a'");
+        if (ownership.nullFriend) sqlite.exec("UPDATE friends SET line_account_id=NULL WHERE id='friend-1'");
+        if (ownership.inactive) sqlite.exec("UPDATE tracked_links SET is_active=0 WHERE id='reward-link'");
+        if (ownership.scenarioAccount) {
+          sqlite.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id)VALUES('reward-scenario','Reward','manual',?)").run(ownership.scenarioAccount);
+          sqlite.exec("UPDATE tracked_links SET scenario_id='reward-scenario' WHERE id='reward-link'");
+        }
+        if (source === 'first-touch') {
+          sqlite.exec(`UPDATE friends SET first_tracked_link_id = 'reward-link' WHERE id = 'friend-1'`);
+        }
+        const request = submitRequest('form-reward', { full_name: '山田', pet: '犬' }, KEY, 'user-1');
+        const response = await app().fetch(new Request(request, {
+          body: JSON.stringify({ data: { full_name: '山田', pet: '犬' },
+            ...(source === 'ref' ? { trackedLinkId: 'reward-link' } : {}) }),
+        }), env());
+        expect(response.status).toBe(201);
+        expect(pushCalls[0]?.messages).toEqual([{ type: 'text', text: ownership.allowed ? 'リンク特典' : 'フォーム返信' }]);
+        expect(count('form_submissions')).toBe(1);
+        expect(claimStatus(KEY, 'friend-1')).toBe('completed');
+        const repeat = await app().fetch(new Request(`https://worker.example.test/api/forms/form-reward/submit`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer user-1', 'Idempotency-Key': KEY },
+          body: JSON.stringify({ data: { full_name: '山田', pet: '犬' },
+            ...(source === 'ref' ? { trackedLinkId: 'reward-link' } : {}) }),
+        }), env());
+        expect(repeat.status).toBe(200);
+        expect(pushCalls).toHaveLength(1);
+      });
+    }
+  }
+});
+
 describe('フォーム回答の冪等化(実DB)', () => {
-  // Deliberately do not wrap these two probes with scope.run: the test itself
-  // stands in for afterEach after Vitest has stopped awaiting the original body.
+  // Vitest が本文を待たなくなった後の afterEach を再現するため、この2つだけは scope.run で包まない。
   vitestTest('#757 cleanup waits for the real request and its body continuation', async () => {
     const gate = scope.gate(() => new Response(JSON.stringify({ eligible: true }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
@@ -228,7 +290,7 @@ describe('フォーム回答の冪等化(実DB)', () => {
     }));
     vi.stubGlobal('fetch', vi.fn(async () => gate.promise));
     const request = app().fetch(submitRequest('form-webhook', { full_name: '山田' }, KEY, 'user-1'), env());
-    // No body awaits this request: this models an assertion failing before join.
+    // 完了待ちより先に期待値が失敗した状況を再現するため、要求を待たずに残す。
     await scope.dispose();
     expect(pushCalls).toHaveLength(1);
     expect(claimStatus(KEY, 'friend-1')).toBe('completed');
@@ -256,9 +318,12 @@ describe('フォーム回答の冪等化(実DB)', () => {
     const secondRes = settledSecond === 'TIMEOUT' ? await second : settledSecond;
 
     const statuses = [firstRes.status, secondRes.status];
-    expect(statuses).toContain(201);
+    // 落ちたときにどちらが何で断られたのか分かるよう、応答の中身まで出す。
+    const bodies = [await firstRes.clone().text(), await secondRes.clone().text()];
+    const detail = `statuses=${JSON.stringify(statuses)} bodies=${JSON.stringify(bodies)}`;
+    expect(statuses, detail).toContain(201);
     const other = statuses.find((status) => status !== 201);
-    expect(other === 200 || other === 429).toBe(true);
+    expect(other === 200 || other === 429, detail).toBe(true);
 
     // 実DBで数える。外部への呼び出しは勝った側の1回だけ。
     expect(count('form_submissions')).toBe(1);
@@ -278,6 +343,39 @@ describe('フォーム回答の冪等化(実DB)', () => {
     ).get(KEY) as { tenant_id: string; line_account_id: string; status: string };
     expect(claim.tenant_id).toBe('tenant-1');
     expect(claim.line_account_id).toBe('account-a');
+  });
+
+  // 送信の口は本文を二度読まない。手前の検査済みを使う経路と、
+  // 手前を通らない（本文なし）経路の両方で、断り方が変わっていないことを見る。
+  test('本文が無い・壊れている送信は本文を二度読まずに400で断る', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer user-1',
+      'Idempotency-Key': KEY,
+    };
+    const url = 'https://worker.example.test/api/forms/form-webhook/submit';
+
+    // 本文なし：手前の口は素通りし、ルート側の読み取りで断る。
+    const empty = await app().fetch(new Request(url, { method: 'POST', headers }), env());
+    expect(empty.status).toBe(400);
+
+    // 壊れたJSON：手前の口が符号つきで断る。
+    const broken = await app().fetch(
+      new Request(url, { method: 'POST', headers, body: '{"data":' }),
+      env(),
+    );
+    expect(broken.status).toBe(400);
+    expect((await broken.json() as { code?: string }).code).toBe('INVALID_JSON');
+
+    // どちらも回答を作らず、外部への送信もしない。
+    expect(count('form_submissions')).toBe(0);
+    expect(count('form_submit_claims')).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(pushCalls.length).toBe(0);
   });
 
   test('成功後のDB失敗は500にし、同じキーで再開して補完する', async () => {
@@ -375,7 +473,7 @@ describe('フォーム回答の冪等化(実DB)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'form-2conn-'));
     const file = join(dir, 'test.sqlite');
     const primary = new Database(file);
-    // #743: 起動SQLの素の再生は文ごとに確定・fsyncし、列車274では並行
+    // 起動SQLの素の再生は文ごとに確定・fsyncし、では並行
     // 480ファイルの確定待ちで行列して準備だけで15秒を超えた。1つの確定に
     // まとめる(判定内容・待ち時間は変えない。WAL化は確定の後)。
     primary.exec('BEGIN;');
@@ -556,7 +654,7 @@ describe('N-042 型検証の接続(#702) F1旧項目対応表', () => {
 
   test('F1 型に合わない回答は保存せず、回答自体は受け付ける', async () => {
     const { res, body } = await submitLegacy({ visits: 'あいう' }, KEY1);
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(202);
     expect(body.data.destinationWrite).toMatchObject({ attempted: 1, succeeded: 0, failed: 1 });
     expect(fieldValue('ff-num')).toBeNull();
     expect(count('form_submissions')).toBe(1);
@@ -575,4 +673,11 @@ describe('N-042 型検証の接続(#702) F1旧項目対応表', () => {
     expect(body.data.destinationWrite).toMatchObject({ attempted: 1, succeeded: 1, failed: 0 });
     expect(fieldValue('ff-multi')).toBe(JSON.stringify(['犬', '猫']));
   });
+});
+
+// URL・内部 IP の検査と Webhook 通信は実物を使い、DNS だけを差し替えて実際の試行回数を数える。
+vi.mock('../features/forms/form-webhook.js', async original => {
+  const actual = await original<typeof import('../features/forms/form-webhook.js')>();
+  return { ...actual, callFormWebhook: (...[form, answers, eventId]: Parameters<typeof actual.callFormWebhook>) =>
+    actual.callFormWebhook(form, answers, eventId, { lookupHost: async () => ['93.184.216.34'] }) };
 });

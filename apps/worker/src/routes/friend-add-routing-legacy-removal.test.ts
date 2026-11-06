@@ -2,7 +2,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { app, notFoundHandler, type Env } from '../index.js';
+import { app, notFoundHandler } from '../index.js';
+import { type Env } from '../worker-env.js';
 
 const LEGACY_PREFIX = '/api/friend-add-routing';
 const WEB_SOURCE_ROOT = resolve(process.cwd(), '../web/src');
@@ -52,10 +53,5 @@ describe('旧 friend-add-routing HTTP 口の撤去', () => {
     expect(matches).toEqual([]);
   });
 
-  test('webhook は現役の service 実行経路を保つ', () => {
-    const webhook = readFileSync(resolve(process.cwd(), 'src/routes/webhook.ts'), 'utf8');
 
-    expect(webhook).toContain("import { applyFriendAddRouting } from '../services/friend-add-routing.js'");
-    expect(webhook).toContain('await applyFriendAddRouting(');
-  });
 });

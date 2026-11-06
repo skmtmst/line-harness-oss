@@ -7,7 +7,7 @@ import { asD1 } from './d1-test-helper.js'
 import { FOLDER_ITEM_COUNT_TABLES, FOLDER_KINDS, getFolderItemCounts } from '../src/folders.js'
 
 /**
- * フォルダ件数（#631）を、一覧画面と同じ母集団（アカウント可視範囲）で
+ * フォルダ件数を、一覧画面と同じ母集団（アカウント可視範囲）で
  * 数えることを、実スキーマ（bootstrap.sql）へ実データを入れて確かめる。
  *
  * 固定モックではなく、`reminders` テーブルへ実際に行を挿入し、
@@ -112,8 +112,8 @@ describe('getFolderItemCounts(#631)', () => {
     expect(asBoth!.byFolderId['folder-1']).toBe(7)
   })
 
-  it('対応表に無い種別（event・#730）は undefined を返す。0件と混同しない', async () => {
-    const counts = await getFolderItemCounts(db, 'event', {
+  it('対応表に無い種別（friend_field）は undefined を返す。0件と混同しない', async () => {
+    const counts = await getFolderItemCounts(db, 'friend_field', {
       allowedAccountIds: ['account-a'],
       canSeeUnassigned: false,
     })
@@ -139,7 +139,7 @@ describe('getFolderItemCounts(#631)', () => {
   })
 
   /**
-   * 独立審査#631: 一覧（apps/worker/src/routes/reminders.ts:425）は
+   * 一覧（apps/worker/src/routes/reminders.ts）は
    * `deleted_at IS NULL` で論理削除済みを除くが、件数側にその絞りが
    * 無かった。一覧5件・フォルダ6件のような食い違いが、リマインダを
    * 1件消すだけで起きる。
@@ -216,18 +216,20 @@ describe('FOLDER_ITEM_COUNT_TABLES(#631)', () => {
     }
   })
 
-  it('対応表は統一パターンの9種別ちょうど。新しい種別が増減したらこの試験が気づく', () => {
+  it('対応表は統一パターンの16種別ちょうど。新しい種別が増減したらこの試験が気づく', () => {
+    // 自動化・共通アクション・成果も folder_id 列（migration 582）で件数を数える。
     expect(Object.keys(FOLDER_ITEM_COUNT_TABLES).sort()).toEqual(
-      ['auto_reply', 'broadcast', 'common_var', 'media', 'reminder', 'rich_menu', 'scenario', 'tag', 'template'].sort(),
+      ['affiliate', 'affiliate_offer', 'mileage_reward', 'friend_add_rule', 'auto_reply', 'automation', 'broadcast', 'common_action', 'common_var', 'conversion', 'media', 'reminder', 'rich_menu', 'scenario', 'tag', 'template'].sort(),
     )
   })
 
-  it('対応表に無い残り6種別(webinarを除く)は、理由コメント付きで意図して外している', () => {
+  it('対応表に無い残り5種別(webinar・webhookを除く)は、理由コメント付きで意図して外している', () => {
     const covered = new Set(Object.keys(FOLDER_ITEM_COUNT_TABLES))
     covered.add('webinar') // 別実装(getWebinarFolderCounts)でカバー済み
+    covered.add('webhook') // getFolderItemCounts の中の別処理（受け取る・送るの2表を合算）でカバー済み
     const uncovered = FOLDER_KINDS.filter((kind) => !covered.has(kind))
     expect(uncovered.sort()).toEqual(
-      ['automation', 'entry_route', 'event', 'form', 'friend_field', 'mileage_rule'].sort(),
+      ['entry_route', 'event', 'form', 'friend_field', 'mileage_rule'].sort(),
     )
   })
 })

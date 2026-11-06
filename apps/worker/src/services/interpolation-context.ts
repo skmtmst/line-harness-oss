@@ -1,9 +1,12 @@
+import { logger } from '@line-crm/shared/server';
+import { normalizeStoreInterpolations, isBroadcastAssetKind } from '@line-crm/shared';
 import {
   getFriendFieldMap,
   getCommonVarMap,
   resolveCommonVarValuesAt,
   type CommonVarResolutionFailureReason,
 } from '@line-crm/db';
+
 import { commonVarKeysInContent } from './common-var-snapshot.js';
 
 /**
@@ -30,7 +33,7 @@ export async function resolveInterpolationExtra(
   content: string,
 ): Promise<InterpolationExtra> {
   const needsFields = FIELD_PATTERN.test(content);
-  const needsVars = VAR_PATTERN.test(content);
+  const needsVars = VAR_PATTERN.test(normalizeStoreInterpolations(content));
   if (!needsFields && !needsVars) return {};
 
   const account = needsVars
@@ -130,7 +133,7 @@ export async function resolveSendCommonVars(
       )));
     } catch (ledgerError) {
       // 台帳の書き込み失敗で送信拒否自体を潰さない。拒否は必ず成立させる。
-      console.error('common_var_resolution_failures insert failed:', ledgerError);
+      logger.error("interpolation_context.resolve_send_common_vars_failed");
     }
     throw new CommonVarResolutionFailedError(resolved.failures, source);
   }
@@ -171,15 +174,40 @@ export function contentNeedsFriendFields(content: string): boolean {
   return FIELD_PATTERN.test(content);
 }
 
+// 判別は送信側が指定する種別を使う。JSONらしいplain textを推測で変換しない。
+const STRUCTURED_MESSAGE_TYPES = new Set(['flex', 'carousel', 'location', 'image', 'video', 'audio', 'sticker', 'imagemap']);
+function isStructuredMessageType(messageType: string): boolean {
+  return STRUCTURED_MESSAGE_TYPES.has(messageType) || isBroadcastAssetKind(messageType);
+}
+
+function mapStringValues(value: unknown, visit: (text: string) => string): unknown {
+  if (typeof value === 'string') return visit(value);
+  if (Array.isArray(value)) return value.map((item) => mapStringValues(item, visit));
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, mapStringValues(item, visit)]));
+  }
+  return value;
+}
+
+function commonVarContentValues(content: string, messageType: string | undefined): string {
+  if (!isStructuredMessageType(messageType ?? 'text')) return content;
+  const values: string[] = [];
+  mapStringValues(JSON.parse(content), (text) => { values.push(text); return text; });
+  return values.join('\n');
+}
+
 /** 解決済みの共通情報を本文へ流し込む。描画側と同じ空白許容の表記で拾う。 */
 export function substituteCommonVars(
   content: string,
   vars: Record<string, string>,
+  messageType = 'text',
 ): string {
-  return content.replace(
+  const substitute = (text: string) => normalizeStoreInterpolations(text).replace(
     /\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g,
     (_match, key: string) => vars[key],
   );
+  if (!isStructuredMessageType(messageType)) return substitute(content);
+  return JSON.stringify(mapStringValues(JSON.parse(content), substitute));
 }
 
 /**
@@ -196,10 +224,11 @@ export async function expandSendCommonVars(
   db: D1Database,
   content: string,
   source: CommonVarSendSource,
-  target: { lineAccountId?: string | null; friendId?: string },
+  target: { lineAccountId?: string | null; friendId?: string; messageType?: string },
   executionAt?: string,
 ): Promise<string> {
-  const varKeys = commonVarKeysInContent(content);
+  const contentValues = commonVarContentValues(content, target.messageType);
+  const varKeys = commonVarKeysInContent(contentValues);
   if (varKeys.length === 0) return content;
   let lineAccountId = target.lineAccountId;
   if (!lineAccountId && target.friendId) {
@@ -208,8 +237,8 @@ export async function expandSendCommonVars(
     ).bind(target.friendId).first<{ line_account_id: string | null }>();
     lineAccountId = account?.line_account_id;
   }
-  const vars = await resolveSendCommonVars(db, lineAccountId, content, source, executionAt);
-  return substituteCommonVars(content, vars ?? {});
+  const vars = await resolveSendCommonVars(db, lineAccountId, contentValues, source, executionAt);
+  return substituteCommonVars(content, vars ?? {}, target.messageType);
 }
 
 /**

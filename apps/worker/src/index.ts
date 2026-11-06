@@ -1,56 +1,73 @@
+import { bookingStripeWebhook } from './routes/booking-stripe-webhook.js';
+import { escapeHtml as escapeHtmlAttribute } from './lib/html-escape.js';
+import { failureMessage } from './lib/failure-messages.js';
+import { logger, resumeInvocation, withInvocation } from '@line-crm/shared/server';
+import { setHolidayCoverageWarningHandler } from '@line-crm/shared';
+import { stagingQa } from './routes/staging-qa.js';
+import { qaEnabled, qaOutboundStopped, qaSafeBindings, withQaOutboundBoundary } from './services/staging-qa-safety.js';
+import { scheduled } from './cron/scheduled.js';
+import { apiContractMiddleware } from './middleware/api-contract.js';
+
+import { accountAiFeatures } from './routes/account-ai-features.js';
+import { broadcastSimulation } from './routes/broadcast-simulation.js';
+import { bookingPassNotices } from './routes/booking-pass-notices.js';
+import { bookingMonthly } from './routes/booking-monthly.js';
+import { bookingPassBilling } from './routes/booking-pass-billing.js';
+import { deliveryPurposePreview } from './routes/delivery-purpose-preview.js';
+import { mcpRpc } from './routes/mcp-rpc.js';
+import { customerSegments } from './routes/customer-segments.js';
+import { memberRanks } from './routes/member-ranks.js';
+import { storeComparison } from './routes/store-comparison.js';
+import { ecAutoLine } from './routes/ec-auto-line.js';
+import { bookingPassPlans } from './routes/booking-pass-plans.js';
+import { bookingGap3 } from './routes/booking-gap3.js';
+import { aiAnswerLogs } from './routes/ai-answer-logs.js';
+import { mcpConnections } from './routes/mcp-connections.js';
+
+import { operatorPush } from './routes/operator-push.js';
+import { aiDrafts } from './routes/ai-drafts.js';
+import { broadcastAb } from './routes/broadcast-ab.js';
+
+import { bookingMakeup } from './routes/booking-makeup.js';
+
+import { formRouting } from './routes/form-routing.js';
+import { bookingSeries } from './routes/booking-series.js';
+import { bookingCalendarSettings } from './routes/booking-calendar-settings.js';
+import { bookingCancellation } from './routes/booking-cancellation.js';
+import { inboxSla } from './routes/inbox-sla.js';
+import { lineSenders } from './routes/line-senders.js';
+import { sensitiveOperationMiddleware } from './middleware/sensitive-step-up.js';
+import type { Env } from './worker-env.js';
+
+export type { Env } from './worker-env.js';import { liffNotificationPreferences } from './routes/liff-notification-preferences.js';
+import { styles } from './routes/styles.js';
+import { buildOgForLiffPath } from './liff-open-graph.js';
+
+import { formDocuments } from './routes/form-documents.js';
+
+import { autoReplyUnmatched } from './routes/auto-reply-unmatched.js';
+import { instagram } from './routes/instagram.js';
+
+import { restaurantCustomerBooking } from './routes/restaurant-customer-booking.js';
+
+import { chatMessages } from './routes/chat-messages.js';
+import { scenarioDrafts } from './routes/scenario-drafts.js';
+import { broadcastMediaDirect } from './routes/broadcast-media-direct.js';
+import { hqBroadcasts } from './routes/hq-broadcasts.js';
+import { visitStamps } from './routes/visit-stamps.js';
+
 import { Hono, type Context } from 'hono';
+import { noindexHeaderMiddleware, robotsTxtHandler } from './lib/robots.js';
 import { cors } from 'hono/cors';
-import { LineClient } from '@line-crm/line-sdk';
-import {
-  getLineAccounts,
-  getTrafficPoolBySlug,
-  getTrafficPoolById,
-  getRandomPoolAccount,
-  getPoolAccounts,
-  getEntryRouteByRefCode,
-  getEntryRouteByRefCodeAny,
-  getLineAccountById,
-  isLineAccountTenantActive,
-  getAffiliateLinkByRefCode,
-  incrementAffiliateLinkClick,
-  enqueueFollowingMileageMilestones,
-  processPendingMileageEvents,
-  processActionScoreInactivity,
-} from '@line-crm/db';
-import { processStepDeliveries } from './services/step-delivery.js';
-import { processScheduledBroadcasts, processQueuedBroadcasts } from './services/broadcast.js';
-import { processReminderDeliveries } from './services/reminder-delivery.js';
-import { processFriendFieldReminders } from './services/friend-field-reminders.js';
-import { toJstParts } from '@line-crm/shared';
-import { checkAccountHealth } from './services/ban-monitor.js';
-import { refreshLineAccessTokens } from './services/token-refresh.js';
-import { processInsightFetch } from './services/insight-fetcher.js';
-import { processDueReminders } from './services/booking-reminders.js';
-import { runExpirer } from './services/booking-expirer.js';
-import { processDueEventReminders } from './services/event-booking-reminders.js';
-import { processDueMeetConsultationReminders } from './services/meet-consultation-reminders.js';
-import { processDueAutomationRuns } from './services/automation-engine.js';
-import { processDueFriendBulkRuns } from './services/friend-bulk-runs.js';
-import { createAutomationActionExecutors } from './services/automation-action-executors.js';
-import {
-  processOverdueSupportMarkTriggers,
-  processScheduledAutomationTriggers,
-} from './services/automation-triggers.js';
-import { dispatchActionScoreApplications } from './services/action-score-events.js';
-import { processDueMileageRewardDeliveries } from './services/mileage-reward-delivery.js';
-import { runEventBookingExpirer } from './services/event-booking-expirer.js';
-import { sendEventBookingNotification } from './services/event-booking-notifier.js';
-import {
-  createEventWaitlistOfferSender,
-  processEventWaitlistPromotionJobs,
-} from './services/event-waitlist.js';
-import { sendBookingNotification } from './services/booking-notifier.js';
-import { DEFAULT_ACCOUNT_SETTINGS } from './services/booking-types.js';
+
+import { getTrafficPoolBySlug, getTrafficPoolById, getRandomPoolAccount, getPoolAccounts, getEntryRouteByRefCode, getEntryRouteByRefCodeAny, getLineAccountById, getAffiliateLinkByRefCode, incrementAffiliateLinkClick, getStaffById } from '@line-crm/db';
+
 import { authMiddleware } from './middleware/auth.js';
-import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { tenantPublicBoundaryMiddleware } from './middleware/tenant-public-boundary.js';
-import { rateLimitMiddleware } from './middleware/rate-limit.js';
+import { rateLimitMiddleware, authenticatedRateLimitMiddleware } from './middleware/rate-limit.js';
+
+import { htmlSecurityMiddleware } from './middleware/html-security.js';
 import { businessAuditMiddleware } from './middleware/business-audit.js';
 import { featureEnforcementMiddleware } from './middleware/feature-enforcement.js';
 import { webhook } from './routes/webhook.js';
@@ -61,12 +78,17 @@ import { tags } from './routes/tags.js';
 import { scenarios } from './routes/scenarios.js';
 import { broadcasts } from './routes/broadcasts.js';
 import { broadcastApprovals } from './routes/broadcast-approvals.js';
+import { customerDownloads } from './routes/customer-downloads.js';
+import { chatAttachments } from './routes/chat-attachments.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
+import { lineAccountFolders } from './routes/line-account-folders.js';
+import { lineAccountTags } from './routes/line-account-tags.js';
 import { lineAccounts } from './routes/line-accounts.js';
 import { gettingStarted } from './routes/getting-started.js';
 import { recipes } from './routes/recipes.js';
 import { hqTemplates } from './routes/hq-templates.js';
+import { hqFormTests } from './routes/hq-form-tests.js';
 import { manualLinks } from './routes/manual-links.js';
 import { errorMessages } from './routes/error-messages.js';
 import { accountHandovers } from './routes/account-handovers.js';
@@ -81,7 +103,6 @@ import { openapi } from './routes/openapi.js';
 import { liffRoutes } from './routes/liff.js';
 import { affiliateSelfRoutes } from './routes/affiliate-self.js';
 import { affiliatePayouts } from './routes/affiliate-payouts.js';
-// Round 3 ルート
 import { webhooks } from './routes/webhooks.js';
 import { publicApi } from './routes/public-api.js';
 import { calendar } from './routes/calendar.js';
@@ -92,7 +113,6 @@ import { actionScoreRules } from './routes/action-score-rules.js';
 import { templates } from './routes/templates.js';
 import { chats } from './routes/chats.js';
 import { conversations } from './routes/conversations.js';
-// 旧通知ルールCRUDはインボックスへ置き換え済み。ダッシュボードの通知パネルだけを公開する。
 import { notificationCenter } from './routes/notification-center.js';
 import { notifications } from './routes/notifications.js';
 import { lineNotifications } from './routes/line-notifications.js';
@@ -104,6 +124,7 @@ import { richMenus } from './routes/rich-menus.js';
 import { trackedLinks } from './routes/tracked-links.js';
 import { entryRoutes } from './routes/entry-routes.js';
 import { forms } from './routes/forms.js';
+import { postalCode } from './routes/postal-code.js';
 import { adPlatforms } from './routes/ad-platforms.js';
 import { adCosts } from './routes/ad-costs.js';
 import { webMeasurement } from './routes/web-measurement.js';
@@ -112,13 +133,20 @@ import { access } from './routes/access.js';
 import { capabilities } from './routes/capabilities.js';
 import { images } from './routes/images.js';
 import { accountSettings } from './routes/account-settings.js';
+import { companySettings } from './routes/company-settings.js';
 import { setup } from './routes/setup.js';
 import { autoReplies } from './routes/auto-replies.js';
 import { autoReplyRuns } from './routes/auto-reply-runs.js';
 import { adminAuth } from './routes/admin-auth.js';
+import { adminPasskeysSelf } from './routes/admin-passkeys-self.js';
+import { adminPasskeysLogin } from './routes/admin-passkeys-login.js';
 import { resolveCorsOrigin } from './middleware/admin-auth-config.js';
-import { timingMark, timingStart, type ServerTiming } from './lib/server-timing.js';
+import { timingHandler, timingMiddleware, timingStart } from './lib/server-timing.js';
 import booking from './routes/booking.js';
+import { bookingEntitlements } from './routes/booking-entitlements.js';
+import { bookingPayments } from './routes/booking-payments.js';
+import { bookingPaymentAdmin } from './routes/booking-payment-admin.js';
+import { bookingPlus } from './routes/booking-plus.js';
 import events from './routes/events.js';
 import { trafficPools } from './routes/traffic-pools.js';
 import { meetCallback } from './routes/meet-callback.js';
@@ -127,11 +155,12 @@ import dedupPreview from './routes/dedup-preview.js';
 import { profileRefresh } from './routes/profile-refresh.js';
 import { richMenuGroups } from './routes/rich-menu-groups.js';
 import { lineProxy } from './routes/line-proxy.js';
+import { research } from './routes/research.js';
 import { webinarRoutes } from './routes/webinars.js';
 import { instagramEngagement } from './routes/instagram-engagement.js';
-import { instagram } from './routes/instagram.js';
 import adminVersion from './routes/admin-version.js';
 import adminUpdate from './routes/admin-update.js';
+import { privateImageResponseMiddleware } from './services/image-access.js';
 import { ecIntegrations } from './routes/ec-integrations.js';
 import { ecCommerce } from './routes/ec-commerce.js';
 import { ecOperations } from './routes/ec-operations.js';
@@ -153,15 +182,21 @@ import { analytics } from './routes/analytics.js';
 import { analyticsExports } from './routes/analytics-exports.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
+
 import { restaurantTest } from './routes/restaurant-test.js';
+import { restaurantExternalLinks } from './routes/restaurant-external-links.js';
 import { restaurantGoogle } from './routes/restaurant-google.js';
 import { googleSheets } from './routes/google-sheets.js';
+import { tiktokPnl } from './routes/tiktok-pnl.js';
 import { restaurantGoogleProfile } from './routes/restaurant-google-profile.js';
 import { restaurantGooglePosts } from './routes/restaurant-google-posts.js';
 import { restaurantGooglePerformance } from './routes/restaurant-google-performance.js';
+import { restaurantDelivery } from './routes/restaurant-delivery.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
-import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
+import { opsApplications } from './routes/ops-applications.js';
+import { piiMaskMiddleware } from './middleware/impersonation.js';
+import { outputAuditMiddleware } from './middleware/output-audit.js';
 import { hqBanners } from './routes/hq-banners.js';
 import { hqSupport } from './routes/hq-support.js';
 import { hqBilling } from './routes/hq-billing.js';
@@ -178,231 +213,16 @@ import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
 import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
-import { tiktokPnl } from './routes/tiktok-pnl.js';
-import { runScheduledOperationHealthChecks } from './services/operations-health.js';
-import { observeOperationDispatcher } from './services/operation-dispatch-health.js';
-import { processOperationNotificationOutbox } from './services/operation-notifications.js';
-import { processOperationAlertNotificationOutbox } from './services/operation-alert-notifications.js';
-import {
-  OPERATOR_NOTIFICATION_SWEEP_LIMIT,
-  sweepOperatorNotifications,
-} from './services/operator-notification-dispatch.js';
-import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
-import { routeInboundEmail } from './services/inbound-email-router.js';
-import { deleteExpiredRestaurantRawEmails } from './services/restaurant-email-intake.js';
-import {
-  runIsolatedScheduledJobs,
-  scheduledLane,
-  type ScheduledJob,
-} from './services/scheduled-job-isolation.js';
-import {
-  classifyCodexMonitorError,
-  createCodexQueueFailureLog,
-  markCodexMentionFailed,
-  processCodexMentionMessage,
-  shouldStopCodexQueueRetry,
-  type CodexMentionQueueMessage,
-} from './services/codex-cloud-monitor.js';
-import {
-  createQrImage,
-  isQrDataAllowed,
-  normalizeQrFormat,
-  normalizeQrSize,
-  qrResponseHeaders,
-  QrInputError,
-  QR_MAX_RESPONSE_BYTES,
-} from './lib/qr-response.js';
-import { safeRedirectTarget } from './lib/safe-redirect.js';
-import { isLinkPreviewBot } from './lib/og-bot.js';
-import { buildOgHtml } from './lib/og-html.js';
-import { restaurantTestEnabled } from './lib/environment-features.js';
-import {
-  resolveOgForEvent,
-  resolveOgForForm,
-  resolveOgForAccount,
-} from './lib/og-resolver.js';
+import { securityAlerts } from './routes/security-alerts.js';
 
-export type Env = {
-  Bindings: {
-    DB: D1Database;
-    IMAGES: R2Bucket;
-    /** 飲食店向けの受信メール原本。本番 wrangler.toml には束縛が無いので任意 */
-    RAW_MAIL?: R2Bucket;
-    ASSETS: Fetcher;
-    AI?: Ai;
-    /**
-     * バナー生成の用途寸法への整形（Cloudflare Images・R120）。
-     * R2 の `IMAGES` とは別物なので `CF_IMAGES` という名前にしている。
-     * 未設定の環境（手元・試験）では変換を飛ばして元の画像を保存する。
-     */
-    CF_IMAGES?: ImagesBinding;
-    /** 運営コンソールの返信下書きに使う Workers AI のモデル名。未設定なら routes/ops-support.ts の既定。 */
-    OPS_SUPPORT_AI_MODEL?: string;
-    EMAIL?: SendEmail;
-    CONTACT_EMAIL?: string;
-    SUPPORT_INBOUND_EMAIL?: string;
-    RESTAURANT_INTAKE_DOMAIN?: string;
-    RESTAURANT_TEST_ENABLED?: string;
-    RAW_MAIL_RETENTION_DAYS?: string;
-    RESTAURANT_REQUEST_HOLD_END_HOUR?: string;
-    XSERVER_MAIL_HOST?: string;
-    XSERVER_MAIL_USER?: string;
-    XSERVER_MAIL_PASSWORD?: string;
-    XSERVER_RELAY_URL?: string;
-    XSERVER_RELAY_SECRET?: string;
-    MEET_CALLBACK_SECRET?: string;
-    LINE_CHANNEL_SECRET: string;
-    LINE_CHANNEL_ACCESS_TOKEN: string;
-    API_KEY: string;
-    LEGACY_API_KEY?: string;
-    LIFF_URL: string;
-    LINE_CHANNEL_ID: string;
-    LINE_LOGIN_CHANNEL_ID: string;
-    LINE_LOGIN_CHANNEL_SECRET: string;
-    /**
-     * 管理画面ログイン専用のLINE Loginチャネル。他社向けサービスの入口を
-     * 自社プロバイダーから切り離すために使う。未設定なら
-     * `LINE_LOGIN_CHANNEL_ID` / `LINE_LOGIN_CHANNEL_SECRET` を使う。
-     * 会員向けLIFF連携（`routes/liff.ts`）はこの設定を見ない。
-     */
-    ADMIN_LINE_LOGIN_CHANNEL_ID?: string;
-    ADMIN_LINE_LOGIN_CHANNEL_SECRET?: string;
-    /** Stripe Webhook署名キー。未設定時はStripe受信ルートだけ503で拒否する。 */
-    STRIPE_WEBHOOK_SECRET?: string;
-    /** 統括のバナー生成（OpenAI 画像生成）。未設定時は生成だけ503で断る。 */
-    OPENAI_API_KEY?: string;
-    /** 画像生成モデル名。未設定時は gpt-image-1。 */
-    OPENAI_IMAGE_MODEL?: string;
-    /** 統括ごとの月間生成上限（枚）。未設定時は150。料金プラン導入後はプランの値を使う。 */
-    BANNER_MONTHLY_IMAGES?: string;
-    /** 生成の品質（low|medium|high）。運用者には選ばせず、未設定時は medium。 */
-    BANNER_IMAGE_QUALITY?: string;
-    /** 統括からのお問い合わせを知らせる運営の宛先。未設定なら CONTACT_EMAIL。 */
-    SUPPORT_NOTIFY_EMAIL?: string;
-    /** 統括の課金（Stripe サブスクリプション）。値は secret／var で持ち、ここには書かない。 */
-    STRIPE_SECRET_KEY?: string;
-    STRIPE_BILLING_WEBHOOK_SECRET?: string;
-    STRIPE_PRICE_LIGHT?: string;
-    STRIPE_PRICE_STANDARD?: string;
-    STRIPE_PRICE_PRO?: string;
-    STRIPE_PRICE_LIGHT_YEAR?: string;
-    STRIPE_PRICE_STANDARD_YEAR?: string;
-    STRIPE_PRICE_PRO_YEAR?: string;
-    /** 会員登録・パスワード再設定のロボット対策（Cloudflare Turnstile）の秘密の鍵。未設定なら登録を受け付けない。 */
-    TURNSTILE_SECRET_KEY?: string;
-    TOTP_ENCRYPTION_KEY?: string;
-    /** 署名済みの配備イベント受信用。管理画面へは公開しない。 */
-    OPERATIONS_DEPLOYMENT_SIGNING_SECRET?: string;
-    // AES-GCM key for credentials stored in line_accounts. Optional so a
-    // missing secret does not stop unrelated Worker routes from starting.
-    LINE_CREDENTIAL_ENCRYPTION_KEY?: string;
-    /** 飲食店向けGoogleビジネス：利用者のGoogleアカウントで認可するOAuthクライアント。環境ごとに分ける。 */
-    GOOGLE_BUSINESS_OAUTH_CLIENT_ID?: string;
-    GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET?: string;
-    /** 'true' のときだけGoogleへ書き込む（口コミ返信の公開）。既定は読み取りのみ。 */
-    GOOGLE_BUSINESS_WRITE_ENABLED?: string;
-    /** 口コミ返信の下書きに使う Workers AI のモデル。未設定なら OPS_SUPPORT_AI_MODEL → 既定値。 */
-    GOOGLE_BUSINESS_AI_MODEL?: string;
-    /** Google Sheets連携(#838)：利用者のGoogleアカウントで認可するOAuthクライアント。環境ごとに分ける。 */
-    GOOGLE_SHEETS_OAUTH_CLIENT_ID?: string;
-    GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?: string;
-    ECCUBE_WEBHOOK_SECRET?: string;
-    NEN_EC_BASE_URL?: string;
-    NEN_RICH_MENU_STORE_URL?: string;
-    WORKER_URL: string;
-    // Admin auth topology (see middleware/admin-auth-config.ts):
-    ADMIN_ORIGIN?: string;          // Comma-separated admin web origin allowlist for credentialed CORS
-    ADMIN_COOKIE_SAMESITE?: string; // Optional override: 'Strict' | 'Lax' | 'None'
-    ADMIN_ALLOW_CROSS_SITE?: string; // 'true' opts into SameSite=None cross-site cookies
-    META_APP_ID?: string;
-    META_APP_SECRET?: string;
-    // Instagram API with Instagram Login (no Facebook Page). Separate credentials
-    // from META_APP_*: App Dashboard > Instagram > API setup with Instagram login.
-    INSTAGRAM_APP_ID?: string;
-    INSTAGRAM_APP_SECRET?: string;
-    META_REDIRECT_URI?: string;
-    META_GRAPH_API_VERSION?: string;
-    META_TOKEN_ENCRYPTION_KEY?: string;
-    META_WEBHOOK_VERIFY_TOKEN?: string;
-    X_HARNESS_URL?: string;  // Optional: X Harness API URL for account linking
-    IG_HARNESS_URL?: string;  // Optional: IG Harness API URL for cross-platform linking
-    IG_HARNESS_LINK_SECRET?: string;  // Shared secret for IG Harness link-line webhook
-    // Phase 5 self-update — consumed by /admin/update/*. Defaults live in
-    // wrangler.toml [vars]; secrets (CF_API_TOKEN, ADMIN_API_KEY) come from
-    // `wrangler secret put`. All are optional at the type level so the rest
-    // of the worker still type-checks in test environments that don't set
-    // them; the /admin/update/* route guards on their presence at runtime.
-    ADMIN_API_KEY?: string;
-    CF_API_TOKEN?: string;
-    CF_ACCOUNT_ID?: string;
-    /** R2 S3 API credentials are Worker secrets. Bucket name is a non-secret deployment var. */
-    MEDIA_R2_ACCESS_KEY_ID?: string;
-    MEDIA_R2_SECRET_ACCESS_KEY?: string;
-    MEDIA_R2_BUCKET_NAME?: string;
-    WORKER_NAME?: string;
-    ADMIN_PAGES_PROJECT?: string;
-    LIFF_PAGES_PROJECT?: string;
-    D1_DATABASE_ID?: string;
-    MANIFEST_URL?: string;
-    WORKER_PUBLIC_URL?: string;
-    ADMIN_PUBLIC_URL?: string;
-    LIFF_PUBLIC_URL?: string;
-    // Google Calendar booking sync. Store the private key as a Worker secret.
-    // Calendar owners only enter/share their Google Calendar ID in admin UI.
-    GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
-    GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
-    // Read-only Google Search Console performance dashboard.
-    SEARCH_CONSOLE_SITE_URL?: string;
-    // Codex lifecycle events -> Slack relay. Tokens/secrets are Worker secrets;
-    // channel ids and range mapping are non-secret deployment variables.
-    CODEX_SLACK_RELAY_SECRET?: string;
-    CODEX_SLACK_RELAY_SECRET_KENTA?: string;
-    CODEX_SLACK_RELAY_SECRET_MASATO?: string;
-    /** AI開発ループの報告専用HMAC鍵。既存のCodex中継鍵と共有しない。 */
-    AI_LOOP_SLACK_REPORT_SECRET?: string;
-    SLACK_BOT_TOKEN?: string;
-    SLACK_COMMAND_CHANNEL_ID?: string;
-    SLACK_ERROR_CHANNEL_ID?: string;
-    SLACK_IDEA_CHANNEL_ID?: string;
-    SLACK_DEFAULT_PR_CHANNEL_ID?: string;
-    SLACK_PR_CHANNELS_JSON?: string;
-    SLACK_KENTA_USER_ID?: string;
-    SLACK_MASATO_USER_ID?: string;
-    SLACK_TASK_CHANNEL_ID?: string;
-    /** AI開発ループの一方向レポート専用。Slackからの操作には使用しない。 */
-    SLACK_AI_LOOP_CHANNEL_ID?: string;
-    SLACK_SIGNING_SECRET?: string;
-    SLACK_USER_TOKEN?: string;
-    // Slack mention -> official Codex receipt -> user-authored Slack relay.
-    // User ids and grace time are non-secret vars. Tokens and signing secret
-    // must be stored with `wrangler secret put`.
-    CODEX_SLACK_USER_ID?: string;
-    CODEX_SLACK_MONITOR_SIGNING_SECRET?: string;
-    CODEX_ALLOWED_TEAM_IDS?: string;
-    CODEX_ALLOWED_CHANNEL_IDS?: string;
-    CODEX_ALLOWED_CHANNEL_NAME_PREFIXES?: string;
-    CODEX_RELAY_SOURCE_USER_IDS?: string;
-    CODEX_RELAY_ENABLED?: string;
-    // Claude監査合格のSlack合図 -> codex/development専用マージ。
-    // GitHub tokenはWorker secret。未設定・falseなら検知のみで停止する。
-    CODEX_AUTO_MERGE_ENABLED?: string;
-    CODEX_AUTO_MERGE_REPOSITORY?: string;
-    CODEX_AUTO_MERGE_GITHUB_TOKEN?: string;
-    CODEX_QUEUE_MAX_ATTEMPTS?: string;
-    CODEX_OFFICIAL_RECEIPT_GRACE_SECONDS?: string;
-    CODEX_MENTION_QUEUE?: Queue<CodexMentionQueueMessage>;
-  };
-  Variables: {
-    // 役割と読み取り専用は別の軸。middleware/auth.ts の AuthenticatedStaff と揃える。
-    staff: AuthenticatedStaff;
-    /** route固有の監査を残した場合、共通middlewareとの二重記録を防ぐ。 */
-    auditRecorded?: boolean;
-    /** 代理ログイン中（★V6 37-5）。middleware/impersonation.ts が入れる。 */
-    impersonation?: ImpersonationContext;
-    /** 段ごとの経過時間（V6R-CX-a）。lib/server-timing.ts が入れる。 */
-    serverTiming?: ServerTiming;
-  };
-};
+import { unhandledWorkerError } from './lib/unhandled-error.js';
+import { routeInboundEmail } from './services/inbound-email-router.js';
+
+import { classifyCodexMonitorError, markCodexMentionFailed, processCodexMentionMessage, shouldStopCodexQueueRetry } from './services/codex-cloud-monitor.js';
+import { type CodexMentionQueueMessage } from './services/codex-cloud-types.js';
+import { createQrImage, isQrDataAllowed, normalizeQrFormat, normalizeQrSize, qrResponseHeaders, QrInputError, QR_MAX_RESPONSE_BYTES } from './lib/qr-response.js';
+import { storedRedirectTarget } from './lib/safe-redirect.js';
+import { isLinkPreviewBot } from './lib/og-bot.js';
 
 export const app = new Hono<Env>();
 
@@ -423,81 +243,117 @@ export const ADMIN_REQUEST_HEADERS = [
   'Content-Type',
   'Authorization',
   'X-CSRF-Token',
+  'X-Line-Account-Id',
   'x-admin-api-key',
   'X-Filename',
   'Idempotency-Key',
   'X-Confirm-Irreversible',
+  'X-Line-Harness-Source',
+  'X-Impersonation-Reason',
   'x-step-up-token',
 ] as const;
 
-// CORS — credentialed cookie auth cannot use a wildcard origin. Reflect only
-// same-origin requests and origins on the ADMIN_ORIGIN allowlist; everything
-// else gets no Access-Control-Allow-Origin header (browser blocks it). Bearer
-// SDK/MCP callers send no Origin header and are unaffected.
-// 段ごとの経過時間を Server-Timing で返す（V6R-CX-a）。ログイン済みの職員への応答だけ。
+// Cookie 認証の CORS で任意の origin を許可しないよう、同一 origin と ADMIN_ORIGIN の許可先だけを反映する。ほかはヘッダを返さず、Origin のない SDK/MCP の Bearer 認証には影響させない。robots.txt と X-Robots-Tag で検索対象から外す。
+setHolidayCoverageWarningHandler(() => logger.warn('src_japanese_holidays_warn'));
 app.use('*', timingStart());
-app.use('*', cors({
+app.use('*', apiContractMiddleware);
+app.use('*', noindexHeaderMiddleware);
+// 認証や障害報告より先に、実行単位の外部送信境界を確立する。
+app.use('*', async (c, next) => {
+  if ((c.req.path === '/api/ops/staging-qa' || c.req.path.startsWith('/api/ops/staging-qa/')) && !qaEnabled(c.env)) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  const env = c.env;
+  c.env = qaSafeBindings(env);
+  return withQaOutboundBoundary(env, next);
+});
+app.get('/robots.txt', robotsTxtHandler);
+
+// 段とD1の待ちを、認証前の拒否・公開応答も含めて数値だけで返す。
+app.use('*', timingMiddleware('cors', cors({
   origin: (origin, c) => resolveCorsOrigin(c.env, origin, c.req.url),
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: [...ADMIN_REQUEST_HEADERS],
+  exposeHeaders: ['Content-Disposition', 'X-Exported-By', 'X-Exported-At', 'X-Csv-Total-Count', 'X-Csv-Returned-Count', 'X-Csv-Truncated', 'X-Request-ID', 'Server-Timing', 'Retry-After'],
   maxAge: 600,
-}));
+})));
 
-app.use('*', timingMark('cors'));
-// Rate limiting — runs before auth to block abuse early
-app.use('*', rateLimitMiddleware);
-app.use('*', timingMark('rate'));
+// 認証処理へ負荷を掛ける前に、不正な大量要求をレート制限で止める。
+app.use('*', htmlSecurityMiddleware);
+app.use('*', timingMiddleware('rate', rateLimitMiddleware));
 
-// LIFF/public routes skip staff auth. Apply their tenant wall before auth and
-// before any route handler can persist a form/booking/member write.
-app.use('/api/liff/*', tenantPublicBoundaryMiddleware);
+// LIFF・公開経路は staff 認証を通らないため、フォーム・予約・会員の書込より前に統括の境界を適用する。
+app.use('/api/liff/*', timingMiddleware('tenant', tenantPublicBoundaryMiddleware));
+app.use('/api/events/liff/*', timingMiddleware('tenant', tenantPublicBoundaryMiddleware));
 
-// Auth middleware — skips /webhook and /docs automatically
+// /webhook と /docs はスタッフ認証の対象外とする。
 app.use('*', authMiddleware);
-app.use('*', timingMark('auth'));
+app.use('*', timingMiddleware('rate', authenticatedRateLimitMiddleware));
+app.use('/api/*', timingMiddleware('audit', outputAuditMiddleware));
 
-// Tenant boundary — authenticated admin APIs may only select LINE accounts
-// that belong to the signed-in staff member's tenant.
-app.use('*', tenantScopeMiddleware);
-app.use('*', timingMark('tenant'));
+// 別の統括を選択できないよう、管理 API の LINE アカウントをログイン中のスタッフの統括へ限定する。
+app.use('*', timingMiddleware('tenant', tenantScopeMiddleware));
+// Account-limited members cannot access tenant-wide management endpoints.
+app.use('/api/hq/*', async (c, next) => {
+  const actor = c.get('staff');
+  if (actor.id === 'env-owner') return next();
+  const member = await getStaffById(c.env.DB, actor.id);
+  if (!member?.is_active || member.account_scope !== 'all') {
+    return c.json({ success: false, error: '統括の権限が必要です' }, 403);
+  }
+  return next();
+});
 // 代理ログイン中の個人情報の伏せ字。認証の後ろ、各ルートの前。
-app.use('/api/*', piiMaskMiddleware);
-app.use('/api/*', timingMark('pii'));
+app.use('/api/*', timingMiddleware('pii', piiMaskMiddleware));
+app.use('/api/*', timingMiddleware('pii', privateImageResponseMiddleware));
 
 // 認証済み管理APIの変更を共通監査へ残す。route固有の監査がある場合は重複させない。
-app.use('/api/*', businessAuditMiddleware);
-app.use('/api/*', timingMark('audit'));
+app.use('/api/*', timingMiddleware('audit', businessAuditMiddleware));
 
 // 機能設定は認証・tenant scope の後、各 route handler の前で強制する。
 // manifest と実 route の全件照合を必須テストにした上で、未分類も fail closed にする。
-app.use('/api/*', featureEnforcementMiddleware);
-app.use('/api/*', timingMark('feature'));
+app.use('/api/*', timingMiddleware('feature', featureEnforcementMiddleware));
+app.use('/api/*', timingMiddleware('sensitive', sensitiveOperationMiddleware));
 
-// Mount route groups — MVP & Round 2
+app.use('*', timingHandler());
+
+
 app.route('/', webhook);
+app.route('/', stagingQa);
 app.route('/', gettingStarted);
 app.route('/', recipes);
 app.route('/', hqTemplates);
+app.route('/', hqFormTests);
+app.route('/', hqBroadcasts);
 app.route('/', ops);
+app.route('/', opsApplications);
 app.route('/', manualLinks);
 app.route('/', errorMessages);
 app.route('/', accountHandovers);
 app.route('/', friendBulkRuns);
 app.route('/', friendMigrations);
-// NOTE: R393 — /api/friends/people 等の固定名は :id より先に載せる。
+// NOTE:  — /api/friends/people 等の固定名は :id より先に載せる。
 // duplicates（本人候補・統合ユーザー）は friends の GET /:id より先でないと
 // people を友だちIDと読んで404になる。broadcastApprovals と同じ考え方。
 app.route('/', duplicates);
 app.route('/', friends);
 app.route('/', tags);
 app.route('/', scenarios);
+app.route('/', scenarioDrafts);
 // NOTE: 承認の口（approval-threshold 等の固定名）は :id より先に載せる。
 // broadcasts の PUT /:id が先だと approval-threshold を id と読んで404になる。
 app.route('/', broadcastApprovals);
+app.route('/', broadcastAb);
+app.route('/', broadcastSimulation);
 app.route('/', broadcasts);
+app.route('/', customerDownloads);
+app.route('/', chatAttachments);
 app.route('/', broadcastMessageAssets);
+app.route('/', broadcastMediaDirect);
 app.route('/', users);
+app.route('/', lineAccountFolders);
+app.route('/', lineAccountTags);
 app.route('/', lineAccounts);
 app.route('/', brand);
 app.route('/', conversions);
@@ -507,10 +363,13 @@ app.route('/', usersGrouped);
 app.route('/', inbox);
 app.route('/', openapi);
 app.route('/', liffRoutes);
+app.route('/', liffNotificationPreferences);
 app.route('/', affiliateSelfRoutes);
 app.route('/', affiliatePayouts);
 
-// Mount route groups — Round 3
+app.use('*', timingHandler());
+
+
 app.route('/', webhooks);
 app.route('/', publicApi);
 app.route('/', calendar);
@@ -519,11 +378,29 @@ app.route('/', reminders);
 app.route('/', scoring);
 app.route('/', actionScoreRules);
 app.route('/', templates);
+app.route('/', inboxSla);
+app.route('/', lineSenders);
+app.route('/', aiDrafts);
+app.route('/', accountAiFeatures);
+app.route('/', customerSegments);
+app.route('/', memberRanks);
+app.route('/', bookingMonthly);
+app.route('/', bookingPassBilling);
+app.route('/', storeComparison);
+app.route('/', ecAutoLine);
+app.route('/', bookingPassPlans);
+app.route('/', bookingPassNotices);
+app.route('/', aiAnswerLogs);
+app.route('/', deliveryPurposePreview);
+app.route('/', mcpConnections);
+app.route('/', mcpRpc);
+app.route('/', operatorPush);
 app.route('/', chats);
+app.route('/', chatMessages);
 app.route('/', conversations);
 app.route('/', notificationCenter);
-// 運用者通知ルール(/api/notifications/rules)。2026-08-29 の下書き画面がこの経路を呼ぶが、
-// 2026-05 に外したまま mount されていなかった。
+// 通知ルールの画面が呼ぶ /api/notifications/rules を登録する。
+
 app.route('/', notifications);
 app.route('/', lineNotifications);
 app.route('/', stripe);
@@ -533,31 +410,48 @@ app.route('/', commonActions);
 app.route('/', richMenus);
 app.route('/', trackedLinks);
 app.route('/', entryRoutes);
+app.route('/', formDocuments);
+app.route('/', formRouting);
 app.route('/', forms);
+app.route('/', postalCode);
 app.route('/', adPlatforms);
 app.route('/', adCosts);
-// Web計測の公開口と計測サイトの管理(#819)。
+// Web計測の公開口と計測サイトの管理。
 app.route('/', webMeasurement);
 app.route('/', staff);
 app.route('/', access);
 app.route('/', capabilities);
 app.route('/', images);
 app.route('/', setup);
+app.route('/', autoReplyUnmatched);
 app.route('/', autoReplies);
 app.route('/', autoReplyRuns);
 app.route('/', adminAuth);
+app.route('/', adminPasskeysSelf);
+app.route('/', adminPasskeysLogin);
 app.route('/', trafficPools);
+app.route('/', bookingSeries);
 app.route('/', booking);
+app.route('/', bookingCalendarSettings);
+app.route('/', bookingGap3);
+app.route('/', bookingCancellation);
+app.route('/', bookingPayments);
+app.route('/', bookingStripeWebhook);
+app.route('/', bookingPaymentAdmin);
+app.route('/', bookingEntitlements);
+app.route('/', bookingPlus);
+app.route('/', bookingMakeup);
 app.route('/', events);
 app.route('/', accountSettings);
+app.route('/', companySettings);
 app.route('/', meetCallback);
 app.route('/', messageTemplates);
 app.route('/', dedupPreview);
 app.route('/', profileRefresh);
 app.route('/', richMenuGroups);
 app.route('/', webinarRoutes);
+app.route('/', research);
 app.route('/', instagramEngagement);
-// Instagram連携（Instagram直接ログイン）。設定→SNS連携のつなぎと同時投稿で使う。
 app.route('/', instagram);
 // LINE Messaging API 互換プロキシ — 外部エージェントの直接送信を messages_log に残す
 app.route('/', lineProxy);
@@ -585,14 +479,20 @@ app.route('/', fileScan);
 app.route('/', analytics);
 app.route('/', analyticsExports);
 app.route('/', dashboard);
+app.route('/', styles);
 app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
+app.route('/', visitStamps);
+app.route('/', restaurantExternalLinks);
 app.route('/', restaurantTest);
+app.route('/', restaurantCustomerBooking);
 app.route('/', restaurantGoogle);
 app.route('/', restaurantGoogleProfile);
 app.route('/', restaurantGooglePosts);
 app.route('/', restaurantGooglePerformance);
+app.route('/', restaurantDelivery);
 app.route('/', googleSheets);
+app.route('/', tiktokPnl);
 app.route('/', tenants);
 app.route('/', hqBanners);
 app.route('/', hqSupport);
@@ -610,20 +510,15 @@ app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);
 app.route('/', lineWebhookEvents);
 app.route('/', operations);
-app.route('/', tiktokPnl);
+app.route('/', securityAlerts);
 
-// Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
-// /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
-// before login to render the upgrade banner, and the returned hashes are
-// derivable from the deployed bundle. /admin/update/* (Task 18) layers
-// ADMIN_API_KEY middleware on subpaths.
+// ログイン前の更新案内でも使うため、配備済み bundle から導ける版情報は未認証で返す。更新操作の認証とは分ける。
 app.route('/admin', adminVersion);
-// Phase 5 Task 18 — self-update endpoints guarded by x-admin-api-key.
-// authMiddleware skips non-/api/ paths so this router owns its own auth gate.
+// HTTP 経由の自己更新は受け付けず、すべて404を返す。
 app.route('/admin/update', adminUpdate);
 
 // QR は Worker の中だけで作る。流入 ref や LIFF URL は計測の識別子で、
-// 第三者の生成サービスへ渡す理由がない。以前は data をそのまま
+// 流入識別子や LIFF URL を第三者へ漏らさないため、QR は Worker 内で生成する。
 // api.qrserver.com へ送っていたので、説明と実装が食い違っていた。
 export const qrHandler: (c: Context<Env>) => Promise<Response> = async (c) => {
   const data = c.req.query('data');
@@ -654,39 +549,23 @@ export const qrHandler: (c: Context<Env>) => Promise<Response> = async (c) => {
 
 app.get('/api/qr', qrHandler);
 
-// N-244: 停止した流入経路の公開URLは、active・停止・不存在の区別や
+// 停止した流入経路の公開URLは、active・停止・不存在の区別や
 // 転送先を漏らさない同一の終了応答で止める。ref の echo もしない。
 const ENTRY_ROUTE_STOPPED_HTML =
   '<!doctype html><html lang="ja"><meta charset="utf-8"><title>このページは利用できません</title><body><main><h1>このページは利用できません</h1><p>公開が終わっているか、アドレスが正しくありません。運用者へ、新しいリンクをご確認ください。</p></main></body></html>';
 
-// Short link: /r/:ref → universal landing page with LINE open button
-// Supports query params: ?form=FORM_ID (auto-push form after friend add)
-// Mobile: single CTA → LIFF URL (Universal Link). No UA detection.
-// Desktop: QR code encodes LIFF URL.
-// Stuck users opt into /r/:ref/help for Safari escape instructions.
+// 短縮 URL は端末共通の LIFF リンクへ案内する。PC では QR を出し、起動できない場合だけ /help で外部ブラウザへの手順を案内する。form は友だち追加後の案内へ引き継ぐ。
 app.get('/r/:ref', async (c) => {
   const ref = c.req.param('ref');
   const formId = c.req.query('form') || '';
 
-  // Resolve LIFF URL — priority:
-  //   1. entry_route.pool_id (if ref maps to a referral link)
-  //   2. URL query ?pool=
-  //   3. 'main' fallback
+  // 送信先は経路の pool_id、クエリの pool、main の順で選ぶ。
   let liffUrl = c.env.LIFF_URL;
   let pool: Awaited<ReturnType<typeof getTrafficPoolBySlug>> | null = null;
 
-  // 1. entry_route lookup. getTrafficPoolById (unlike getTrafficPoolBySlug)
-  // does not filter on is_active, so we ignore disabled pools explicitly to
-  // honor the operator's pause action.
-  //
-  // NOTE: we intentionally do NOT record a ref_tracking row here. The
-  // /auth/callback + /api/liff/link path already writes a tracking row when
-  // OAuth/LIFF completes, and writing a second landing-page row would
-  // double-count every successful click in getEntryRouteFunnel. Landing-page
-  // drop-off (clicks that never reach OAuth) is therefore not visible in the
-  // funnel; that limitation is intentional pending a dedicated click table.
+  // ID 取得は有効状態で絞らないため、停止中のプールを明示的に除く。流入記録は OAuth/LIFF 完了時に作るため、ここでは二重計上しない。ログイン前の離脱はこの集計に含まれない。
   const route = await getEntryRouteByRefCode(c.env.DB, ref);
-  // N-244: 停止した経路は active と同じ受付をしない。転送先があっても
+  // 停止した経路は active と同じ受付をしない。転送先があっても
   // 送らず、紹介リンクやプールの後段にも落とさず、同一の終了応答で止める。
   // ref が entry_routes の名前空間に属さないときだけ従来の後段へ進む。
   if (!route) {
@@ -695,26 +574,26 @@ app.get('/r/:ref', async (c) => {
       return c.html(ENTRY_ROUTE_STOPPED_HTML, 410);
     }
   }
-  // 転送先が設定された経路はそちらへ送る（#514 重大4）。保存はするのに
+  // クーポンの所属アカウントを固定する。main poolへ落とすと別の店へ着地する。
+  const couponRoute = route?.coupon_enabled === 1 && Boolean(route.coupon_asset_id);
+  if (couponRoute) {
+    const account = route?.line_account_id ? await getLineAccountById(c.env.DB, route.line_account_id) : null;
+    if (!account?.liff_id || !/^\d+-[A-Za-z0-9]+$/.test(account.liff_id)) return c.html('<!doctype html><html lang="ja"><meta charset="utf-8"><title>このリンクは現在利用できません</title><p>お店へお問い合わせください。</p></html>', 503);
+    liffUrl = `https://liff.line.me/${account.liff_id}`;
+  }
+  // 転送先が設定された経路はそちらへ送る（ 重大4）。保存はするのに
   // 読まないままだった。危険な形式は safe-redirect が弾き、そのときは
   // 従来どおり友だち追加の着地画面へ進む。
-  if (route?.redirect_url) {
-    const target = safeRedirectTarget(route.redirect_url);
+  if (!couponRoute && route?.redirect_url) {
+    const target = storedRedirectTarget(route.redirect_url);
     if (target) return c.redirect(target, 302);
   }
-  if (route?.pool_id) {
+  if (!couponRoute && route?.pool_id) {
     const candidate = await getTrafficPoolById(c.env.DB, route.pool_id);
     if (candidate?.is_active) pool = candidate;
   }
 
-  // 1b. affiliate_links fallback (ASP). Only when the ref is NOT a known
-  // entry_route: entry_routes owns the ref namespace, so an existing route
-  // (even one whose pool is paused) keeps its behavior unchanged. An affiliate
-  // ref resolves its LINE account directly (no pool) and lands on that
-  // account's LIFF. Stopped links do not redirect or count a new click.
-  // The click is counted here (the landing page hit), and `ref` still rides
-  // through to LIFF state below so the existing ref_tracking flow attributes
-  // the eventual friend-add via /auth/callback + /api/liff/link.
+  // 経路とアフィリエイトで ref が重なれば経路を優先する。アフィリエイトは所属アカウントの LIFF へ直接案内し、停止中なら移動もクリック計上もしない。ref はその後の友だち追加の帰属へ引き継ぐ。
   let affiliateResolved = false;
   if (!route) {
     const affiliateLink = await getAffiliateLinkByRefCode(c.env.DB, ref);
@@ -731,16 +610,14 @@ app.get('/r/:ref', async (c) => {
       affiliateResolved = true;
       if (affiliateLink.line_account_id) {
         const account = await getLineAccountById(c.env.DB, affiliateLink.line_account_id);
-        if (account?.liff_id) liffUrl = `https://liff.line.me/${account.liff_id}`;
+        if (account?.liff_id && /^\d+-[A-Za-z0-9]+$/.test(account.liff_id)) liffUrl = `https://liff.line.me/${account.liff_id}`;
       }
       // line_account_id === null → keep the default LIFF_URL (既定アカウント).
     }
   }
 
-  // 2 / 3. fallback to URL query or 'main'. Skipped for affiliate refs, whose
-  // account is already resolved above; falling through to the 'main' pool would
-  // override the affiliate's chosen account.
-  if (!pool && !affiliateResolved) {
+  // アフィリエイトの送信先を main プールで上書きしないよう、その場合は pool の代替解決を省く。
+  if (!pool && !affiliateResolved && !couponRoute) {
     const poolSlug = c.req.query('pool') || 'main';
     pool = await getTrafficPoolBySlug(c.env.DB, poolSlug);
   }
@@ -748,20 +625,21 @@ app.get('/r/:ref', async (c) => {
   if (pool) {
     const account = await getRandomPoolAccount(c.env.DB, pool.id);
     if (account) {
-      if (account.liff_id) liffUrl = `https://liff.line.me/${account.liff_id}`;
+      if (account.liff_id && /^\d+-[A-Za-z0-9]+$/.test(account.liff_id)) liffUrl = `https://liff.line.me/${account.liff_id}`;
     } else {
       const allAccounts = await getPoolAccounts(c.env.DB, pool.id);
       if (allAccounts.length === 0) {
-        if (pool.liff_id) liffUrl = `https://liff.line.me/${pool.liff_id}`;
+        if (pool.liff_id && /^\d+-[A-Za-z0-9]+$/.test(pool.liff_id)) liffUrl = `https://liff.line.me/${pool.liff_id}`;
       }
     }
   }
 
-  // Build LIFF URL with params (direct link for Universal Link)
+
   const liffIdMatch = liffUrl.match(/liff\.line\.me\/([0-9]+-[A-Za-z0-9]+)/);
   const liffParams = new URLSearchParams();
   if (liffIdMatch) liffParams.set('liffId', liffIdMatch[1]);
   if (ref) liffParams.set('ref', ref);
+  if (couponRoute) liffParams.set('couponRef', ref);
   if (formId) liffParams.set('form', formId);
   const gate = c.req.query('gate');
   if (gate) liffParams.set('gate', gate);
@@ -773,35 +651,33 @@ app.get('/r/:ref', async (c) => {
   if (iga) liffParams.set('iga', iga);
   const igan = c.req.query('igan');
   if (igan) liffParams.set('igan', igan);
-  // LIFF in-app navigation passthrough — OpenChat strips raw liff.line.me
-  // URLs, so we accept `page` / `id` here and forward them to the resolved
-  // LIFF target. Limited to pages whose client initializer enforces the
-  // friend-add gate (initSalonBooking, initEventBooking); page=book/form
-  // would bypass that gate and bypass ref-based attribution, so they are
-  // intentionally excluded until those initializers are unified.
-  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar']);
+  // OpenChat 内でも友だち追加と流入計測を保つため、page/id の転送は友だち追加判定を持つ salon-booking と event-booking に限る。判定を通らない book/form は許可しない。
+  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar', 'research', 'visit-stamps']);
   const page = c.req.query('page');
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
+  if (page === 'research' && c.req.query('researchId')) liffParams.set('researchId', c.req.query('researchId')!);
   const id = c.req.query('id');
   if (id) liffParams.set('id', id);
   const slug = c.req.query('slug');
   if (slug) liffParams.set('slug', slug);
+  if (page === 'salon-book') {
+    const menuId = c.req.query('menu_id');
+    if (menuId && /^[A-Za-z0-9_-]{1,128}$/.test(menuId)) liffParams.set('menu_id', menuId);
+    if (c.req.query('view') === 'history') liffParams.set('view', 'history');
+  }
+  if (page === 'visit-stamps') {
+    const card = c.req.query('card');
+    if (card && /^[A-Za-z0-9_-]{1,128}$/.test(card)) liffParams.set('card', card);
+  }
 
-  // Ad click IDs + UTM passthrough. /auth/line forwards its full query string
-  // to /r/:ref, but rebuilding liffParams here without these keys silently
-  // drops ad attribution for the primary mobile path. Keep this list in sync
-  // with the params /auth/line reads.
+  // モバイル経路でも広告の帰属を落とさないよう、auth/line が扱うクリック ID と UTM を LIFF のクエリへ引き継ぐ。
   for (const key of ['gclid', 'fbclid', 'twclid', 'ttclid', 'utm_source', 'utm_medium', 'utm_campaign']) {
     const value = c.req.query(key);
     if (value) liffParams.set(key, value);
   }
   const liffTarget = liffParams.toString() ? `${liffUrl}?${liffParams.toString()}` : liffUrl;
 
-  // Help link carries the *resolved* liff target as `t=` so the help page
-  // displays the exact URL the user should paste into a real browser. Without
-  // this, pooled refs would re-roll the random pool account on each /r/:ref
-  // visit and the help-page paste URL could end up at a different LINE
-  // account than the one originally chosen for this user.
+  // 再試行のたびにプールのアカウントを再抽選しないよう、解決済み LIFF URL を t で help へ渡す。
   const helpUrl = `/r/${encodeURIComponent(ref)}/help?t=${encodeURIComponent(liffTarget)}`;
 
   const ua = (c.req.header('user-agent') || '').toLowerCase();
@@ -810,27 +686,14 @@ app.get('/r/:ref', async (c) => {
   const isAndroid = /android/.test(ua);
 
   if (isMobile) {
-    // OS-aware mobile UI. Per-browser detection (X / IG / FB) intentionally avoided —
-    // we only branch on iOS vs Android because the recovery primitives differ:
-    //   iOS: long-press the link → iOS context menu shows "LINEで開く" even inside
-    //        WKWebView in-app browsers that block tap-driven Universal Links.
-    //   Android: intent:// URL launches LINE directly via Android's intent system,
-    //        which works even when in-app browsers swallow https links.
-    // The same liff.line.me URL still drives Universal Link on the iOS button —
-    // long-press is a recovery hint, not a replacement.
+    // アプリ内ブラウザで通常のリンクが開けない場合に備え、iOS はシステムの長押しメニュー、Android は intent を案内する。ブラウザごとの判別は行わない。
 
-    // Build Android intent URL — strips the https:// prefix and appends the intent
-    // metadata so Chrome / in-app browsers hand off to the LINE app package.
-    // L-Step uses the same shape: jp.naver.line.android with browsable category.
-    // S.browser_fallback_url makes Chrome fall back to plain HTTPS when LINE
-    // isn't installed or the WebView refuses the intent, so Android users
-    // never hit a dead end (they at least land on liff.line.me web).
+    // Android では intent で LINE を開き、未インストールや WebView の拒否時にも行き止まりにしないよう、HTTPS の代替 URL を設定する。
     const liffPath = liffTarget.replace(/^https:\/\//, '');
     const intentFallback = encodeURIComponent(liffTarget);
     const androidIntent = `intent://${liffPath}#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=jp.naver.line.android;S.browser_fallback_url=${intentFallback};end`;
     const buttonHref = isAndroid ? androidIntent : liffTarget;
-    // iOS shows long-press hint; Android relies on intent URL alone (long-press
-    // on Android opens "Open with…" which is noisier than the intent route).
+    // Android の長押しは選択肢が増えるため、長押し案内は iOS にだけ出し、Android は intent を使う。
     const longPressHint = isIOS
       ? '<p class="hint">※開かない場合はボタンを<strong>長押し</strong>して「LINEで開く」を選択</p>'
       : '';
@@ -862,7 +725,7 @@ body{font-family:'Hiragino Sans','Helvetica Neue',system-ui,sans-serif;backgroun
 <svg viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="#06C755"/><path d="M24 12C17.37 12 12 16.58 12 22.2c0 3.54 2.35 6.65 5.86 8.47-.2.74-.76 2.75-.87 3.17-.14.55.2.54.42.39.18-.12 2.84-1.88 4-2.65.84.13 1.7.22 2.59.22 6.63 0 12-4.58 12-10.2S30.63 12 24 12z" fill="#fff"/></svg>
 </div>
 <p class="msg">友達追加して始める</p>
-<a href="${buttonHref}" class="btn">LINEで開く</a>
+<a href="${escapeHtmlAttribute(buttonHref)}" class="btn">LINEで開く</a>
 ${longPressHint}
 <p class="help">うまく開けない方は <a href="${helpUrl}">こちら</a></p>
 </div>
@@ -906,16 +769,10 @@ body{font-family:'Hiragino Sans','Helvetica Neue',system-ui,sans-serif;backgroun
 </html>`);
 });
 
-// /r/:ref/help — opt-in recovery page when "LINEで開く" didn't launch the app.
-// Method 1 (long-press) is iOS's escape hatch — works inside X / IG / FB
-// in-app browsers because iOS's context menu is system-level UI floating
-// above the WKWebView, so it surfaces "LINEで開く" even when tap-driven
-// Universal Links are blocked. This is the L-Step approach.
-// Method 2 (URL copy → external browser) is the universal fallback.
-// No LINE-Login-web fallback exposed — friction kills conversion.
+// LINE が開かないときだけ、iOS の長押しまたは URL コピーと外部ブラウザを案内する。システムのメニューはアプリ内ブラウザのリンク制限を受けにくい。
 app.get('/r/:ref/help', async (c) => {
   const ref = c.req.param('ref');
-  // N-244: 停止した経路の回復ページも同じ終了応答で止める。直接開かれても
+  // 停止した経路の回復ページも同じ終了応答で止める。直接開かれても
   // 受付へ戻さない。属さない ref は従来どおり回復ページを出す。
   const helpRoute = await getEntryRouteByRefCode(c.env.DB, ref);
   if (!helpRoute) {
@@ -925,24 +782,19 @@ app.get('/r/:ref/help', async (c) => {
     }
   }
   const reqUrl = new URL(c.req.url);
-  // Prefer the resolved liff target passed by /r/:ref via ?t= so pooled refs
-  // do not re-roll on retry. Fall back to the short /r/:ref URL only when
-  // ?t= is missing (e.g. direct navigation to /help without coming from /r/).
-  // Reject anything that is not an https://liff.line.me/* URL — never trust
-  // user-supplied open redirects.
+  // プールの再抽選を防ぐため解決済みの t を優先する。任意サイトへの転送を防ぐため https://liff.line.me/ 配下だけを受け付け、t がない場合だけ短縮 URL に戻す。
   const tParam = c.req.query('t') || '';
   let displayUrl: string;
   if (tParam && /^https:\/\/liff\.line\.me\//.test(tParam)) {
     displayUrl = tParam;
   } else {
-    // Strip ?t= if it sneaks in unvalidated, but keep other query params
-    // (form, gate, xh, ig, pool) for the /r/:ref re-entry.
+    // 未検証の t は除き、再入場に必要な form/gate/xh/ig/pool などは保つ。
     const safeParams = new URLSearchParams(reqUrl.search);
     safeParams.delete('t');
     const qs = safeParams.toString();
     displayUrl = `${reqUrl.origin}/r/${encodeURIComponent(ref)}${qs ? '?' + qs : ''}`;
   }
-  // Escape URL for safe embedding in HTML attributes and a visible <code>-style block.
+  // HTML 属性や表示文へ URL を埋める前にエスケープする。
   const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   const urlForHtml = escapeHtml(displayUrl);
 
@@ -951,8 +803,7 @@ app.get('/r/:ref/help', async (c) => {
   const isAndroid = /android/.test(ua);
   const browserName = isIOS ? 'Safari' : isAndroid ? 'Chrome' : 'ブラウザ（iPhoneは Safari／Androidは Chrome）';
 
-  // Long-press recovery is iOS-only. On Android the intent:// URL on the
-  // main page already handles the equivalent recovery without help-page UI.
+  // Android は元の intent で回復できるため、長押しの手順は iOS にだけ表示する。
   const longPressBlock = isIOS ? `<div class="method">
 <div class="method-num">1</div>
 <div class="method-body">
@@ -1073,7 +924,7 @@ ${longPressBlock}
 // attribution を汚染する、という 2 つの問題があるため別ルートに分けている。
 // 仕様:
 // - クエリ: liffId (必須, `<digits>-<id>` 形式) / page / id
-// - page は `/r/:ref` と同じ allowlist (salon-book / event / event-me)
+// - page は `/r/:ref` と同じ allowlist (salon-book / event / event-me / webinar / visit-stamps)
 // - mobile UA は「LINEで開く」ボタン、desktop は QR を返す (`/r/:ref` 同等)
 app.get('/o', async (c) => {
   if (isLinkPreviewBot(c.req.header('user-agent') || '')) {
@@ -1082,19 +933,28 @@ app.get('/o', async (c) => {
 
   const liffId = c.req.query('liffId') || '';
   if (!/^[0-9]+-[A-Za-z0-9]+$/.test(liffId)) {
-    return c.text('Invalid liffId', 400);
+    return c.text(failureMessage('Invalid liffId'), 400);
   }
 
   const liffParams = new URLSearchParams();
   liffParams.set('liffId', liffId);
-  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar']);
+  const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar', 'research', 'visit-stamps']);
   const page = c.req.query('page');
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
+  if (page === 'research' && c.req.query('researchId')) liffParams.set('researchId', c.req.query('researchId')!);
   const id = c.req.query('id');
   if (id) liffParams.set('id', id);
   const slug = c.req.query('slug');
   if (slug) liffParams.set('slug', slug);
-  // N-396: 管理画面が発行する「予約履歴URL」は salon-book の view=history を
+  if (page === 'salon-book') {
+    const menuId = c.req.query('menu_id');
+    if (menuId && /^[A-Za-z0-9_-]{1,128}$/.test(menuId)) liffParams.set('menu_id', menuId);
+  }
+  if (page === 'visit-stamps') {
+    const card = c.req.query('card');
+    if (card && /^[A-Za-z0-9_-]{1,128}$/.test(card)) liffParams.set('card', card);
+  }
+  // 管理画面が発行する「予約履歴URL」は salon-book の view=history を
   // 指す。任意の view を通すと未定義画面へ誘導できてしまうので、履歴だけを通す。
   const view = c.req.query('view');
   if (page === 'salon-book' && view === 'history') liffParams.set('view', view);
@@ -1138,7 +998,7 @@ body{font-family:'Hiragino Sans','Helvetica Neue',system-ui,sans-serif;backgroun
 <svg viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="#06C755"/><path d="M24 12C17.37 12 12 16.58 12 22.2c0 3.54 2.35 6.65 5.86 8.47-.2.74-.76 2.75-.87 3.17-.14.55.2.54.42.39.18-.12 2.84-1.88 4-2.65.84.13 1.7.22 2.59.22 6.63 0 12-4.58 12-10.2S30.63 12 24 12z" fill="#fff"/></svg>
 </div>
 <p class="msg">LINE で開く</p>
-<a href="${buttonHref}" class="btn">LINEで開く</a>
+<a href="${escapeHtmlAttribute(buttonHref)}" class="btn">LINEで開く</a>
 ${longPressHint}
 </div>
 </body>
@@ -1178,118 +1038,16 @@ body{font-family:'Hiragino Sans','Helvetica Neue',system-ui,sans-serif;backgroun
 </html>`);
 });
 
-// Convenience redirect for /book path
+
 app.get('/book', (c) => c.redirect('/?page=book'));
 
-// URL（パス or クエリ）からイベント/フォーム等のレコードを引いて OGP HTML を組み立てる。
-// LIFF アプリの共有 URL は実際には `https://liff.line.me/<LIFF_ID>/?page=event&id=<id>`
-// 形式で、Worker に届くときは pathname が `/`、クエリに `page` `id` `liffId` が乗る。
-// 旧形式の `/events/:id` パスも残しているのでパスマッチも合わせて見る。
-async function buildOgForLiffPath(db: D1Database, url: URL): Promise<string> {
-  const pathname = url.pathname;
-  const liffIdFromQuery = url.searchParams.get('liffId');
-  const pageFromQuery = url.searchParams.get('page');
-  const idFromQuery = url.searchParams.get('id');
-  const absoluteUrl = url.toString();
-
-  const lookupAccountByLiff = async (liffId: string | null): Promise<any> => {
-    if (!liffId) return null;
-    return db
-      .prepare(`SELECT * FROM line_accounts WHERE liff_id = ?`)
-      .bind(liffId)
-      .first<any>();
-  };
-  const lookupAccountById = async (id: string | null): Promise<any> => {
-    if (!id) return null;
-    return db.prepare(`SELECT * FROM line_accounts WHERE id = ?`).bind(id).first<any>();
-  };
-
-  // event: パス `/events/:id` または クエリ `?page=event&id=`
-  let eventId: string | null = null;
-  const eventPathMatch = pathname.match(/^\/events\/([^/]+)(?:\/(?:confirm|done))?\/?$/);
-  if (eventPathMatch) eventId = eventPathMatch[1];
-  else if (pageFromQuery === 'event' && idFromQuery) eventId = idFromQuery;
-
-  if (eventId) {
-    // liffId クエリでアカウントが特定できる場合は /api/liff/events/:id と
-    // 同じ可視性条件（deleted_at IS NULL, is_published=1, target アカウント所属）
-    // で event を取得する。未公開・削除済みのイベント情報を bot プレビューに
-    // 漏らさない。liffId が無いか不一致なら、最低限の公開条件のみ適用。
-    let event: any = null;
-    let account: any = null;
-
-    if (liffIdFromQuery) {
-      account = await lookupAccountByLiff(liffIdFromQuery);
-      if (account) {
-        event = await db
-          .prepare(
-            `SELECT * FROM events
-              WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
-                (target_type = 'single' AND line_account_id = ?)
-                OR (target_type = 'multi-account-dedup'
-                    AND EXISTS (SELECT 1 FROM json_each(account_ids) WHERE value = ?))
-              )`,
-          )
-          .bind(eventId, account.id, account.id)
-          .first<any>();
-      }
-    }
-
-    if (!event && !liffIdFromQuery) {
-      // liffId 指定が URL に無い場合（旧 /events/:id パス等）のみ、event 単独
-      // lookup と event 所属 account からの branding を許可する。
-      //
-      // liffId 指定があるのに strict query が空ということは「URL の liffId
-      // アカウントに属さない event」なので、ここで event 単独 lookup に落とすと
-      // 他アカの event 詳細・branding が bot プレビューに漏れる。event=null の
-      // まま外側のアカウントデフォルト OG（liffId 由来 account）にフォールバック
-      // させて漏洩を防ぐ。
-      account = null;
-      event = await db
-        .prepare(
-          `SELECT * FROM events WHERE id = ? AND deleted_at IS NULL AND is_published = 1`,
-        )
-        .bind(eventId)
-        .first<any>();
-      if (event && event.target_type === 'single' && event.line_account_id) {
-        // multi-account-dedup のときは line_account_id が sentinel なので
-        // branding に使わない（og:site_name は 'LINE' フォールバック）。
-        account = await lookupAccountById(event.line_account_id);
-      }
-    }
-
-    if (event) {
-      const og = resolveOgForEvent(event, account, absoluteUrl);
-      return buildOgHtml(og);
-    }
-  }
-
-  // form: クエリ `?page=form&id=`
-  if (pageFromQuery === 'form' && idFromQuery) {
-    const form = await db
-      .prepare(`SELECT * FROM forms WHERE id = ?`)
-      .bind(idFromQuery)
-      .first<any>();
-    if (form) {
-      const account = await lookupAccountByLiff(liffIdFromQuery);
-      const og = resolveOgForForm(form, account, absoluteUrl);
-      return buildOgHtml(og);
-    }
-  }
-
-  // フォールバック: アカウントデフォルトのみ
-  const account = await lookupAccountByLiff(liffIdFromQuery);
-  const og = resolveOgForAccount(account, absoluteUrl);
-  return buildOgHtml(og);
-}
-
-// 404 fallback — API paths return JSON 404, everything else serves from static assets (LIFF/admin)
+// API の未検出は JSON の404、ほかは管理画面・LIFF の静的ファイルへ渡す。
 export async function notFoundHandler(
   c: import('hono').Context<Env>,
 ): Promise<Response> {
   const url = new URL(c.req.url);
   const path = url.pathname;
-  if (path.startsWith('/api/') || path === '/webhook' || path === '/docs' || path === '/openapi.json') {
+  if (path.startsWith('/api/') || path === '/webhook' || path.startsWith('/webhook/') || path === '/docs' || path === '/openapi.json') {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
 
@@ -1300,11 +1058,7 @@ export async function notFoundHandler(
     return c.html(html);
   }
 
-  // Serve static assets (admin dashboard, LIFF pages).
-  // ASSETS binding is missing when wrangler runs without a built `dist/client`
-  // (fresh clone, vitest, or a deploy where the assets directive was stripped).
-  // Without this guard every GET / surfaces as
-  // "TypeError: Cannot read properties of undefined (reading 'fetch')".
+  // 静的ファイルの binding がない開発・試験環境でも、未定義の fetch を呼んで GET 全体を失敗させないよう、先に存在を確認する。
   if (!c.env.ASSETS || typeof c.env.ASSETS.fetch !== 'function') {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -1323,1478 +1077,50 @@ export async function notFoundHandler(
   }
   return assetRes;
 }
-app.onError((error, c) => {
-  const incidentId = crypto.randomUUID();
-  const url = new URL(c.req.url);
-  console.error(JSON.stringify({
-    event: 'unhandled_worker_error',
-    incidentId,
-    method: c.req.method,
-    path: url.pathname,
-    error: String(error),
-  }));
-  const reportPromise = reportHarnessErrorToSlack(c.env, {
-    source: 'worker',
-    message: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : undefined,
-    path: `${c.req.method} ${url.pathname}`,
-  }).catch((reportError) => {
-    console.error(JSON.stringify({
-      event: 'unhandled_worker_error_slack_report_failed',
-      incidentId,
-      error: String(reportError),
-    }));
-  });
-  try {
-    c.executionCtx.waitUntil(reportPromise);
-  } catch {
-    void reportPromise;
-  }
-  return c.json({ success: false, error: 'Internal Server Error', incidentId }, 500);
-});
+app.onError(unhandledWorkerError);
 
 app.notFound(notFoundHandler);
 
-async function runFrequentHeavyJobs(
-  event: ScheduledEvent,
-  env: Env['Bindings'],
-): Promise<void> {
-  const dbAccounts = await getLineAccounts(env.DB);
-  const lineClients = new Map<string, LineClient>();
-  for (const account of dbAccounts) {
-    if (account.is_active) lineClients.set(account.id, new LineClient(account.channel_access_token));
-  }
-  const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
-  const jobs: ScheduledJob[] = [
-    {
-      // EC の再試行（上限つき）の回収。落ちた受信を保存済み payload から
-      // 同じ入口で回し直す。上限到達は dead letter へ倒す。安定キーと
-      // claim で二重実行なし。停止中は回さない。
-      name: 'ec event retry',
-      run: async () => {
-        const { processDueEcRetries } = await import('./services/ec-retry.js');
-        const result = await processDueEcRetries(env.DB, {
-          now: new Date(event.scheduledTime).toISOString(),
-          credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
-        });
-        if (result.processed + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'ec_event_retry', ...result }));
-        }
-      },
-    },
-    {
-      // 取消時の Calendar 削除の残り (retry_wait) を自動回収する。
-      // 初回 200 の後に残っても次の tick で直る。安定キーで二重実行なし。
-      name: 'booking calendar delete retry',
-      run: async () => {
-        const { processPendingCalendarDeleteOperations, removeBookingFromGoogle } = await import(
-          './services/booking-calendar-sync.js'
-        );
-        const result = await processPendingCalendarDeleteOperations(env.DB, {
-          now: new Date(event.scheduledTime),
-          remove: (bookingId) => removeBookingFromGoogle(env.DB, {
-            email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-            privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-          }, bookingId),
-        });
-        if (result.processed > 0) {
-          console.log(JSON.stringify({ event: 'booking_calendar_delete_retry', ...result }));
-        }
-      },
-    },
-    {
-      // 危険なファイルの検査の再試行。期限切れの pending を拾って回す。
-      // 検査が動かない時は pending のまま置き、clean に格上げしない。
-      name: 'file scan retry',
-      run: async () => {
-        const { processDueFileScans } = await import('./routes/file-scan.js');
-        const result = await processDueFileScans(env, 20);
-        if (result.processed > 0) {
-          console.log(JSON.stringify({ event: 'file_scan_retry', ...result }));
-        }
-      },
-    },
-    {
-      name: 'friend bulk runs',
-      run: async () => {
-        const result = await processDueFriendBulkRuns(env.DB, {
-          now: new Date(event.scheduledTime).toISOString(),
-          executorDependencies: { credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY },
-        });
-        if (result.items > 0) console.log(JSON.stringify({ event: 'friend_bulk_runs_cron', ...result }));
-      },
-    },
-    {
-      // 1対1トークの送信予約。lease付きclaimで二重起動を防ぎ、
-      // LINEへは予約のidempotency_keyをそのまま渡して二重pushを防ぐ。
-      name: 'scheduled chat sends',
-      run: async () => {
-        const { processDueScheduledChatSends } = await import(
-          './services/scheduled-chat-sends.js'
-        );
-        const result = await processDueScheduledChatSends(env, {
-          now: new Date(event.scheduledTime).toISOString(),
-        });
-        if (result.claimed > 0) {
-          console.log(JSON.stringify({ event: 'scheduled_chat_sends', ...result }));
-        }
-      },
-    },
-    {
-      // 運営からのお知らせの予約配信（★V6 37-7）。claim で 1 件ずつ sending にしてから送る。
-      name: 'platform announcements',
-      run: async () => {
-        const { processDueAnnouncements } = await import('./services/platform-announcements.js');
-        const result = await processDueAnnouncements(env, { now: new Date(event.scheduledTime + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00') });
-        if (result.sent > 0) console.log(JSON.stringify({ event: 'platform_announcements_cron', ...result }));
-      },
-    },
-    {
-      name: 'platform knowledge',
-      run: async () => {
-        const { processKnowledgeJob } = await import('./services/platform-knowledge.js');
-        await processKnowledgeJob(env);
-      },
-    },
-    {
-      name: 'mileage reward delivery retry',
-      run: async () => {
-        const result = await processDueMileageRewardDeliveries(env.DB, {
-          now: new Date(event.scheduledTime).toISOString(),
-          credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
-          limit: 50,
-        });
-        if (result.processed > 0) {
-          console.log(JSON.stringify({ event: 'mileage_reward_delivery_retry', ...result }));
-        }
-      },
-    },
-    {
-      name: 'analytics cross',
-      run: async () => {
-        const {
-          processPendingAnalyticsCrossRuns,
-          recoverStalledAnalyticsCrossRuns,
-        } = await import('@line-crm/db');
-        const recovered = await recoverStalledAnalyticsCrossRuns(
-          env.DB,
-          new Date(event.scheduledTime),
-        );
-        const result = await processPendingAnalyticsCrossRuns(env.DB, 1);
-        if (recovered + result.processed + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'analytics_cross_tick', recovered, ...result }));
-        }
-      },
-    },
-    {
-      name: 'mileage projection',
-      run: async () => {
-        const result = await processPendingMileageEvents(env.DB, { limit: 100 });
-        if (result.claimed > 0) {
-          console.log(
-            `[mileage-queue] processed=${result.processed} failed=${result.failed} granted=${result.granted}`,
-          );
-        }
-        // m22o: 付与ルールの「通知する」で予約された分だけ、付与の後に届ける。
-        // OFF のルールは予約自体が無い。公開URLが無い環境では送らず残す。
-        if (env.WORKER_PUBLIC_URL) {
-          const { deliverDueMileageGrantNotifications } = await import(
-            './services/mileage-grant-notification.js'
-          );
-          const { dispatchLineProxyLocally } = await import('./services/local-line-proxy.js');
-          const notified = await deliverDueMileageGrantNotifications(
-            {
-              db: env.DB,
-              workerPublicUrl: env.WORKER_PUBLIC_URL,
-              dispatch: (request) => dispatchLineProxyLocally(request, env),
-            },
-            { limit: 20 },
-          );
-          if (notified.delivered + notified.failed > 0) {
-            console.log(
-              `[mileage-grant-notify] delivered=${notified.delivered} failed=${notified.failed}`,
-            );
-          }
-        }
-      },
-    },
-    {
-      // マニュアル導線の週1回の点検（要件 v6-34 §8-4）。cron自体は
-      // 短い間隔で回るので、最終確認から7日を経るまで関数側で何もしない。
-      // 新たに broken になったリンクだけ、運営へ1回だけ知らせる。
-      name: 'manual link weekly check',
-      run: async () => {
-        const { runWeeklyManualLinkCheck, notifyBrokenManualLinks } = await import(
-          './services/manual-link-check.js'
-        );
-        const result = await runWeeklyManualLinkCheck(env.DB);
-        if (!result) return;
-        if (result.newlyBroken.length > 0) {
-          await notifyBrokenManualLinks(env.DB, env, result.newlyBroken);
-        }
-        console.log(JSON.stringify({
-          event: 'manual_link_weekly_check',
-          checked: result.checked,
-          broken: result.broken,
-          newlyBroken: result.newlyBroken.length,
-        }));
-      },
-    },
-    {
-      name: 'ad conversion outbox retry',
-      run: async () => {
-        const { drainAdConversionOutbox } = await import('./services/ad-conversion.js');
-        const result = await drainAdConversionOutbox(env.DB, {
-          limit: 50, credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
-        });
-        if (result.claimed > 0) {
-          console.log(JSON.stringify({ event: 'ad_conversion_outbox_tick', ...result }));
-        }
-      },
-    },
-    {
-      name: 'analytics url exposure projection',
-      run: async () => {
-        const { processPendingAnalyticsUrlExposures } = await import('@line-crm/db');
-        const result = await processPendingAnalyticsUrlExposures(env.DB, {
-          limit: 100,
-          now: new Date(event.scheduledTime).toISOString(),
-        });
-        if (result.claimed > 0) {
-          console.log(JSON.stringify({ event: 'analytics_url_exposure_queue', ...result }));
-        }
-      },
-    },
-    {
-      name: 'analytics projection',
-      run: async () => {
-        const { refreshRecentAnalyticsProjections } = await import('./services/analytics-projection.js');
-        const result = await refreshRecentAnalyticsProjections(
-          env.DB,
-          dbAccounts,
-          new Date(event.scheduledTime),
-        );
-        if (result.processed > 0) {
-          console.log(JSON.stringify({ event: 'analytics_projection_tick', ...result }));
-        }
-      },
-    },
-    {
-      name: 'analytics scheduled reports',
-      run: async () => {
-        const { processDueAnalyticsReports } = await import('./services/analytics-reports.js');
-        const result = await processDueAnalyticsReports(env, new Date(event.scheduledTime));
-        if (result.processed + result.failed + result.purged + result.reclaimed + result.repaired > 0) {
-          console.log(JSON.stringify({ event: 'analytics_report_tick', ...result }));
-        }
-      },
-    },
-    {
-      // #838 第1段: 日次の友だちCSV書き出し。その日分は run_date の
-      // 一意制約で1回しか作らない（6時間tickのどれか1回が生成する）。
-      name: 'scheduled exports',
-      run: async () => {
-        const { processDueScheduledExports } = await import('./services/scheduled-exports.js');
-        const result = await processDueScheduledExports(env, {
-          now: new Date(event.scheduledTime).toISOString(),
-        });
-        if (result.generated + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'scheduled_exports_tick', ...result }));
-        }
-      },
-    },
-    {
-      // #838 第2段: Google Sheets への日次同期。その日(JST)の scheduled
-      // 実行が済んでいる連携は飛ばし、未実行分だけ6時間tickのどれか1回が回す。
-      name: 'google sheets sync',
-      run: async () => {
-        const { processDueGoogleSheetsSyncs } = await import('./services/google-sheets.js');
-        const result = await processDueGoogleSheetsSyncs(env, {
-          now: new Date(event.scheduledTime).toISOString(),
-        });
-        if (result.synced + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'google_sheets_sync_tick', ...result }));
-        }
-      },
-    },
-    { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
-    {
-      name: 'broadcast insights',
-      run: async () => { await processInsightFetch(env.DB, lineClients, defaultLineClient); },
-    },
-    {
-      name: 'NEN rich menu jobs',
-      run: async () => {
-        const { processPendingNenRichMenuJobs } = await import('./services/nen-rich-menu.js');
-        const result = await processPendingNenRichMenuJobs(env);
-        if (result.processed > 0) console.log(JSON.stringify({ event: 'nen_rich_menu_job', ...result }));
-      },
-    },
-    {
-      // K(#822): リッチメニューの毎日の照合。公開中の group を1日1回だけ見る。
-      // 見つけたずれは直さず台帳に残す。直すのは運用者が K-2 画面で行う。
-      name: 'rich menu daily reconcile',
-      run: async () => {
-        const { processDailyRichMenuReconcile } = await import('./services/rich-menu-daily-reconcile.js');
-        const result = await processDailyRichMenuReconcile(env.DB, {
-          now: new Date(event.scheduledTime),
-        });
-        if (result.checked + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'rich_menu_daily_reconcile', ...result }));
-        }
-      },
-    },
-  ];
-
-  if (!env.XSERVER_RELAY_SECRET && env.XSERVER_MAIL_HOST && env.XSERVER_MAIL_USER && env.XSERVER_MAIL_PASSWORD) {
-    jobs.push({
-      name: 'support email sync',
-      run: async () => {
-        const { syncXServerSupportMailbox } = await import('./services/xserver-mail.js');
-        const result = await syncXServerSupportMailbox(env);
-        if (result.checked > 0) console.log(JSON.stringify({ event: 'support_email_sync', ...result }));
-      },
-    });
-  }
-
-  if (restaurantTestEnabled(env)) {
-    jobs.push({
-      // Googleビジネス第4段: 口コミ・投稿の再同期。重い処理用レーン（`1-56/5`。
-      // 通知レーンと1分ずらした5分間隔）で動くが、接続ごとの55分ゲートで実質1時間ごと。
-      // 読み取りAPIだけを呼び、書き込みAPIは呼ばない（手動syncと同じ関数を使う）。
-      name: 'google business resync',
-      run: async () => {
-        const { processGoogleBusinessHourlyResync } = await import('./services/google-business-resync.js');
-        const result = await processGoogleBusinessHourlyResync(env, {
-          now: new Date(event.scheduledTime).toISOString(),
-        });
-        if (result.reviewsSynced + result.postsSynced + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'google_business_resync_tick', ...result }));
-        }
-      },
-    });
-  }
-
-  const jstMinutes = toJstParts(new Date(event.scheduledTime)).minutes;
-
-  // 日本時間の各時01分に、友だち情報欄の日付から当日分のリマインダを立てる。
-  if (jstMinutes === 1) {
-    jobs.push({
-      name: 'friend field reminders',
-      run: async () => {
-        const result = await processFriendFieldReminders(env.DB);
-        if (result.enrolled > 0 || result.hasMore) {
-          console.log(
-            `[friend-field-reminders] enrolled=${result.enrolled} skipped=${result.skipped} scanned=${result.scanned} has_more=${result.hasMore}`,
-          );
-        }
-      },
-    });
-  }
-
-  // 通知cronから外した重い処理側で、各時11分に無反応スコアを再評価する。
-  if (jstMinutes === 11) {
-    jobs.push({
-      name: 'action score inactivity',
-      run: async () => {
-        const result = await processActionScoreInactivity(env.DB, {
-          now: new Date(event.scheduledTime).toISOString(),
-          limit: 200,
-        });
-        for (const transition of result.transitions) {
-          const account = dbAccounts.find((item) => item.id === transition.lineAccountId);
-          await dispatchActionScoreApplications(env.DB, {
-            ...transition,
-            lineAccessToken: account?.channel_access_token,
-          });
-        }
-        if (result.candidates > 0) {
-          console.log(JSON.stringify({
-            event: 'action_score_inactivity_tick',
-            candidates: result.candidates,
-            applied: result.applied,
-          }));
-        }
-      },
-    });
-  }
-
-  await runIsolatedScheduledJobs(jobs);
-}
-
-async function runSixHourlyHeavyJobs(
-  event: ScheduledEvent,
-  env: Env['Bindings'],
-): Promise<void> {
-  const jobs: ScheduledJob[] = [
-    {
-      name: 'NEN tag refresh',
-      run: async () => {
-        const { refreshAllNenTags } = await import('./services/nen-tag-sync.js');
-        const result = await refreshAllNenTags(env.DB, { allTenants: true }, 500, new Date());
-        if (result.added + result.removed > 0) console.log(JSON.stringify({ event: 'nen_tag_refresh', ...result }));
-      },
-    },
-    {
-      name: 'analytics retention purge',
-      run: async () => {
-        const { purgeExpiredAnalyticsReadData } = await import('@line-crm/db');
-        const purged = await purgeExpiredAnalyticsReadData(env.DB, new Date(event.scheduledTime));
-        if (
-          purged.events + purged.dailyMetrics + purged.reconciliationRuns
-          + purged.funnelRuns + purged.crossRuns + purged.savedSnapshots + purged.audiences > 0
-        ) {
-          console.log(JSON.stringify({ event: 'analytics_retention_purged', ...purged }));
-        }
-      },
-    },
-    {
-      // v6-25 §15: 明細90日・日別13か月。確定済みだけ畳んで消す。
-      name: 'automation retention purge',
-      run: async () => {
-        const { purgeExpiredAutomationRuns } = await import('@line-crm/db');
-        const purged = await purgeExpiredAutomationRuns(env.DB, new Date(event.scheduledTime));
-        if (purged.runs + purged.dailyExpired > 0) {
-          console.log(JSON.stringify({ event: 'automation_retention_purged', ...purged }));
-        }
-      },
-    },
-    {
-      name: 'friend snapshot',
-      run: async () => {
-        const { recordFriendSnapshot } = await import('@line-crm/db');
-        await recordFriendSnapshot(env.DB, null);
-      },
-    },
-    {
-      // 日常更新は各保存経路で原子的に行う。ここは欠損補修だけの経路。
-      name: 'media usage scan',
-      run: async () => {
-        const { scanMediaUsage } = await import('./services/media-usage-scan.js');
-        const scanStartedAt = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
-        const result = await scanMediaUsage(env.DB, scanStartedAt);
-        if (result.matched > 0 || result.pruned > 0) {
-          console.log(JSON.stringify({ event: 'media_usage_scan', ...result }));
-        }
-      },
-    },
-    {
-      name: 'following mileage',
-      run: async () => {
-        const result = await enqueueFollowingMileageMilestones(env.DB, { limitPerMilestone: 1000 });
-        if (result.eventsCreated + result.queued > 0) {
-          console.log(`[following-mileage] events=${result.eventsCreated} queued=${result.queued}`);
-        }
-      },
-    },
-    {
-      name: 'booking expirer',
-      run: async () => {
-        const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification });
-        console.log(
-          `[booking-expirer] expired=${result.expired} idempotency_purged=${result.idempotencyPurged}`,
-        );
-      },
-    },
-    {
-      name: 'event booking expirer',
-      run: async () => {
-        const result = await runEventBookingExpirer(env.DB, { now: new Date() });
-        console.log(
-          `[event-booking-expirer] expired=${result.expired} idempotency_purged=${result.idempotencyPurged}`,
-        );
-      },
-    },
-    {
-      // Q: 共通情報の期限の14日前・3日前に運用者へ知らせる。
-      name: 'common var expiry notices',
-      run: async () => {
-        const { sweepCommonVarExpiryNotices } = await import('./services/common-var-expiry-sweep.js');
-        const result = await sweepCommonVarExpiryNotices(env.DB, env, new Date());
-        if (result.notified > 0 || result.errors > 0) {
-          console.log(JSON.stringify({ event: 'common_var_expiry_sweep', ...result }));
-        }
-      },
-    },
-    {
-      name: 'billing invoice sync',
-      run: async () => {
-        const { syncBillingInvoicesDaily } = await import('./services/billing-invoices-sync.js');
-        const result = await syncBillingInvoicesDaily(env, new Date(event.scheduledTime));
-        if (result && (result.imported > 0 || result.failed > 0)) {
-          console.log(JSON.stringify({
-            event: 'billing_invoice_sync',
-            tenants: result.tenants,
-            imported: result.imported,
-            failed: result.failed,
-            completed: result.completed,
-          }));
-        }
-      },
-    },
-    {
-      // #818: 広告費の日次取り込み。媒体の数字は前日分までしか確定しないので
-      // 対象は常に昨日(JST)。実行台帳の媒体×日一意制約で、6時間ごとの
-      // 再実行は成功済みの分を取り直さない。
-      name: 'ad cost import',
-      run: async () => {
-        const { importAdCosts } = await import('./services/ad-cost-import.js');
-        const day = new Date(Date.now() + 9 * 3600_000 - 24 * 3600_000)
-          .toISOString().slice(0, 10);
-        const result = await importAdCosts(env.DB, {
-          day,
-          credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
-        });
-        if (result.imported + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'ad_cost_import', ...result }));
-        }
-      },
-    },
-    {
-      // TikTok利益計算: EC-CUBEの注文明細を取り込み、利益計算シートへ反映。
-      // 差分（sheet_dirty）だけ書くので6時間ごとの再実行は重くならない。
-      // 対象は tiktok_pnl_settings.enabled = 1 のアカウントだけ。管理画面の
-      // 手動同期を押すまで行ができないので、頼んでいないアカウントは動かない。
-      name: 'tiktok pnl sync',
-      run: async () => {
-        const { processTiktokPnlTick } = await import('./services/tiktok-pnl.js');
-        const result = await processTiktokPnlTick(env, {
-          now: new Date(event.scheduledTime).toISOString(),
-        });
-        if (result.createdSheets + result.importedOrders + result.wroteRows + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'tiktok_pnl_tick', ...result }));
-        }
-      },
-    },
-    {
-      // Googleビジネス: Googleから受け取った内容の保存期限（暦日30日）を守る掃除。
-      // 機能スイッチでゲートしない。機能をoffにした店舗の古いコピーが残り続けるほうが
-      // ポリシー違反になるため、スイッチと関係なく毎回走らせる。
-      name: 'google business content retention',
-      run: async () => {
-        const { purgeExpiredGoogleContent, totalRetentionActions } = await import(
-          './services/google-business-retention.js'
-        );
-        const result = await purgeExpiredGoogleContent(env, {
-          now: new Date(event.scheduledTime).toISOString(),
-        });
-        if (totalRetentionActions(result) > 0) {
-          console.log(JSON.stringify({ event: 'google_business_content_retention', ...result }));
-        }
-      },
-    },
-    {
-      // Instagram連携: つなぎ途中の一時データの掃除。認可の途中で使う状態キーは
-      // 期限切れを消し、受信メッセージの控えは90日で消す。Googleビジネスと同じく
-      // 機能スイッチでゲートしない（offにした店舗の古いコピーを残さないため）。
-      name: 'instagram transient data retention',
-      run: async () => {
-        const { purgeInstagramTransientData } = await import('./services/instagram.js');
-        await purgeInstagramTransientData(env.DB, new Date(event.scheduledTime));
-      },
-    },
-  ];
-
-  if (restaurantTestEnabled(env)) {
-    jobs.push({
-      name: 'restaurant raw mail retention',
-      run: async () => {
-        const result = await deleteExpiredRestaurantRawEmails(env);
-        if (result.deleted + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'restaurant_raw_mail_retention', ...result }));
-        }
-      },
-    });
-    jobs.push({
-      // Googleビジネス第4段: パフォーマンス指標の取り込み。JST日付でゲートし、
-      // 6時間tickのうち当日未実行の最初の1回（通常は深夜）だけ実際に回る。
-      name: 'google business metrics',
-      run: async () => {
-        const { processGoogleBusinessDailyMetrics } = await import('./services/google-business-resync.js');
-        const result = await processGoogleBusinessDailyMetrics(env, {
-          now: new Date(event.scheduledTime).toISOString(),
-        });
-        if (result.synced + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'google_business_metrics_tick', ...result }));
-        }
-      },
-    });
-    jobs.push({
-      // Googleビジネス: 認可を切らさないための先回り更新。再同期が回らない接続
-      // （場所未選択・機能off）のトークンも6時間ごとに使って、放置による失効を防ぐ。
-      name: 'google business token keepalive',
-      run: async () => {
-        const { processGoogleBusinessTokenKeepalive } = await import('./services/google-business-resync.js');
-        const result = await processGoogleBusinessTokenKeepalive(env, {
-          now: new Date(event.scheduledTime).toISOString(),
-        });
-        if (result.refreshed + result.failed > 0) {
-          console.log(JSON.stringify({ event: 'google_business_token_keepalive_tick', ...result }));
-        }
-      },
-    });
-  }
-
-  await runIsolatedScheduledJobs(jobs);
-}
-
-// Scheduled handler for cron triggers — runs for all active LINE accounts
-async function scheduled(
-  event: ScheduledEvent,
-  env: Env['Bindings'],
-  ctx: ExecutionContext,
-): Promise<void> {
-  // 通知・配信と、再実行できる重い集計・走査を別のCron invocationへ分ける。
-  // 重い処理は次の専用tickで処理単位ごとに再試行され、通知tickを占有しない。
-  const lane = scheduledLane(event.cron);
-  if (lane === 'frequentHeavy') {
-    await runFrequentHeavyJobs(event, env);
-    return;
-  }
-  if (lane === 'sixHourlyHeavy') {
-    await runSixHourlyHeavyJobs(event, env);
-    return;
-  }
-  if (lane !== 'delivery') return;
-
-  // 管理画面を開いていなくても、各LINEアカウントの確認項目を5分窓ごとに保存する。
-  // 各checkと各accountは独立しており、失敗しても配信ジョブを止めない。
-  try {
-    await runScheduledOperationHealthChecks(env.DB, {
-      r2: env.IMAGES,
-      queue: env.CODEX_MENTION_QUEUE,
-    });
-  } catch (error) {
-    console.error('operation health checks error:', error);
-  }
-
-  try {
-    await processOperationNotificationOutbox(env);
-  } catch (error) {
-    console.error('operation notification outbox error:', error);
-  }
-
-  try {
-    await processOperationAlertNotificationOutbox(env);
-  } catch (error) {
-    console.error('operation alert notification outbox error:', error);
-  }
-
-  // N-327 (#663): 公開済み運用者通知ルールの送り残しを回収する。
-  //
-  // 初回の送信は業務イベントの側で同期に行う。ここが拾うのは、そこで
-  // 落ちて retry_wait に入った行と、Worker が途中で止まって pending の
-  // まま残った行だけ。回収しないと「公開したのに届かない」が、繋がって
-  // いないからではなく溜まったままで起きる。
-  //
-  // 間隔をこの delivery レーン(5分)に載せた理由と件数の根拠は
-  // services/operator-notification-dispatch.ts の SWEEP 定数の説明にある。
-  // 1件の失敗で他のアカウントの回収を止めないよう、例外はここで止める。
-  try {
-    const result = await sweepOperatorNotifications(env.DB, env, {
-      limit: OPERATOR_NOTIFICATION_SWEEP_LIMIT,
-      now: new Date(event.scheduledTime),
-    });
-    if (result.swept > 0) {
-      console.log(JSON.stringify({
-        event: 'operator_notification_sweep',
-        swept: result.swept,
-        accepted: result.accepted,
-        excluded: result.excluded,
-        failed: result.failed,
-        pending: result.pending,
-      }));
-    }
-  } catch (error) {
-    console.error('operator notification sweep error:', error);
-  }
-
-  // N-369/N-370 (#938): 送信Webhookの送り残しを回収する。
-  //
-  // 初回の送信はイベント発火の側で同期に行う。ここが拾うのは、そこで
-  // 落ちて retry_wait に入った行と、Worker が途中で止まって
-  // pending/sending のまま残った行だけ。再送時刻は台帳の
-  // next_retry_at が持つので、5分のレーンで十分である。
-  // 1件の失敗で他の回収を止めないよう、例外はここで止める。
-  try {
-    const { sweepOutgoingWebhookDeliveries, OUTGOING_WEBHOOK_SWEEP_LIMIT } =
-      await import('./services/outgoing-webhook-delivery.js');
-    const result = await sweepOutgoingWebhookDeliveries(env.DB, {
-      limit: OUTGOING_WEBHOOK_SWEEP_LIMIT,
-      now: new Date(event.scheduledTime),
-    });
-    if (result.swept > 0) {
-      console.log(JSON.stringify({
-        event: 'outgoing_webhook_delivery_sweep',
-        swept: result.swept,
-        delivered: result.delivered,
-        failed: result.failed,
-        retryWait: result.retryWait,
-        skipped: result.skipped,
-      }));
-    }
-  } catch (error) {
-    console.error('outgoing webhook delivery sweep error:', error);
-  }
-
-  const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
-  const dispatchObservedAt = new Date(event.scheduledTime).toISOString();
-  const observeDispatch = <T>(jobName: string, run: () => Promise<T>) =>
-    observeOperationDispatcher(env.DB, jobName, run, dispatchObservedAt);
-
-  // 配信系は1回だけ実行（内部でfriendのline_account_idから正しいlineClientを動的解決）
-  // 以前はアカウントごとにループしていたが、アカウントフィルタなしのDBクエリで
-  // 全アカウントの配信が各ループで重複実行されていたバグを修正
-  // Phase 1: 復旧処理 (batch_offset=-1 → 0 にする軽量な UPDATE のみ) を queue 処理より
-  // 先に await 完了させる。これで stalled/stuck から復旧した配信が同じ cron tick の
-  // processQueuedBroadcasts に拾われ、復旧レイテンシが 1 tick 縮む。recover は inline 送信を
-  // 含まない高速処理なので、先に await しても他ジョブを starve させない。
-  const { recoverStalledBroadcasts, recoverStuckDeliveries } = await import('@line-crm/db');
-  await Promise.allSettled([
-    recoverStalledBroadcasts(env.DB),
-    recoverStuckDeliveries(env.DB),
-  ]);
-
-  // Booking / event-booking リマインドは時刻厳守 + 軽量 (数件/tick、上限100件) なので、
-  // 重い配信・insight ジョブより先に実行する。以前は最後に置かれていたため、
-  // 手前のジョブが invocation を止めると数時間分のリマインドが未送信のまま
-  // starts_at を過ぎ、「開始後は送らない」ガードで永久 pending になる事故が
-  // 発生した (2026-06-01 / 2026-06-15、計 10 件送り漏れ)。
-  // token refresh はリマインドより先に済ませる (失効直後トークンでの 401 送信を防ぐ。
-  // 旧順序では refresh が先だった invariant の維持)。
-  try {
-    await refreshLineAccessTokens(env.DB);
-  } catch (e) {
-    console.error('token refresh error:', e);
-  }
-
-  // V6オートメーションの日時指定を起動し、待機・一時失敗中の実行を再開する。
-  // 同じ5分Cronにまとめても、実行・処理ごとの冪等キーで二重実行を防ぐ。
-  try {
-    await observeDispatch('automation deliveries', async () => {
-      const now = new Date(event.scheduledTime).toISOString();
-      const executors = createAutomationActionExecutors({
-        credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
-      });
-      const scheduledResult = await processScheduledAutomationTriggers(env.DB, {
-        now, executors, limit: 100,
-      });
-      const overdueResults = await processOverdueSupportMarkTriggers(env.DB, {
-        now, executors, limit: 100,
-      });
-      for (const result of [...scheduledResult.results, ...overdueResults]) {
-        if (result.kind === 'configuration_error') {
-          console.error(JSON.stringify({
-            event: 'automation_v6_scheduled_trigger_failed',
-            automationId: result.automationId,
-            reason: result.error,
-          }));
-        }
-      }
-      const dueResult = await processDueAutomationRuns(env.DB, {
-        now, executors, limit: 100,
-      });
-      if (scheduledResult.results.length + overdueResults.length + dueResult.processed > 0) {
-        console.log(JSON.stringify({
-          event: 'automation_v6_cron',
-          scheduled: scheduledResult.results.length,
-          support_mark_overdue: overdueResults.length,
-          resumed: dueResult.processed,
-        }));
-      }
-    });
-  } catch (e) {
-    console.error('automation-v6 cron error:', e);
-  }
-
-  try {
-    await observeDispatch('booking reminders', async () => {
-      const result = await processDueReminders(env.DB, {
-        now: new Date(),
-        sender: sendBookingNotification,
-      });
-      if (result.sent + result.failed > 0) {
-        console.log(`[booking-reminders] sent=${result.sent} failed=${result.failed}`);
-      }
-    });
-  } catch (e) {
-    console.error('booking-reminders error:', e);
-  }
-
-  try {
-    await observeDispatch('event reminders', async () => {
-      const result = await processDueEventReminders(env.DB, {
-        now: new Date(),
-        sender: sendEventBookingNotification,
-      });
-      if (result.sent + result.failed > 0) {
-        console.log(`[event-booking-reminders] sent=${result.sent} failed=${result.failed}`);
-      }
-    });
-  } catch (e) {
-    console.error('event-booking-reminders error:', e);
-  }
-
-  // 取消・拒否・期限切れで空いた席を、同意が必要な24時間の保留として先頭へ案内する。
-  // LINE送信に失敗したjobは完了にせず、次のdelivery tickで再試行する。
-  try {
-    const result = await processEventWaitlistPromotionJobs(env.DB, {
-      now: new Date(event.scheduledTime),
-      sender: createEventWaitlistOfferSender(env.DB, { liffUrl: env.LIFF_URL }),
-    });
-    if (result.processed > 0) {
-      console.log(
-        `[event-waitlist] processed=${result.processed} promoted=${result.promoted} retried=${result.retried}`,
-      );
-    }
-  } catch (e) {
-    console.error('event-waitlist error:', e);
-  }
-
-  // 外部Google Calendarで確定したMeet個別相談。前日・1時間前のLINE通知を
-  // D1で管理し、送信は必ずLINE Harness Proxyを通す。
-  try {
-    await observeDispatch('meet consultation reminders', async () => {
-      const result = await processDueMeetConsultationReminders(env.DB, {
-        now: new Date(),
-        proxyBaseUrl:
-          env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
-        proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
-      });
-      if (result.sent + result.failed > 0) {
-        console.log(`[meet-consultation-reminders] sent=${result.sent} failed=${result.failed}`);
-      }
-    });
-  } catch (e) {
-    console.error('meet-consultation-reminders error:', e);
-  }
-
-  // ウェビナー予約リマインド (セッション選択メニュー)。時刻厳守・軽量なので
-  // booking 系リマインドと同じく重いジョブより先に実行する。
-  try {
-    await observeDispatch('webinar reminders', async () => {
-      const { processWebinarReminders } = await import('./services/webinar-reminders.js');
-      const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
-      const result = await processWebinarReminders(
-        env.DB,
-        {
-          proxyBaseUrl:
-            env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
-          defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
-          defaultLiffId: liffMatch?.[1] ?? null,
-          proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
-        },
-      );
-      if (result.sent + result.failed > 0) {
-        console.log(`[webinar-reminders] sent=${result.sent} failed=${result.failed}`);
-      }
-    });
-  } catch (e) {
-    console.error('webinar-reminders error:', e);
-  }
-
-  // V6で設定した複数時点の通知。既存の5分前通知とはDB上で排他的にし、
-  // 同じ申込へ二重送信しない。
-  try {
-    await observeDispatch('webinar notifications', async () => {
-      const { processWebinarNotificationJobs } = await import('./services/webinar-notifications.js');
-      const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
-      const result = await processWebinarNotificationJobs(env.DB, {
-        proxyBaseUrl:
-          env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
-        defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
-        defaultLiffId: liffMatch?.[1] ?? null,
-        proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
-      });
-      if (result.sent + result.failed + result.skipped > 0) {
-        console.log(`[webinar-notifications] sent=${result.sent} failed=${result.failed} skipped=${result.skipped}`);
-      }
-    });
-  } catch (e) {
-    console.error('webinar-notifications error:', e);
-  }
-
-  // NEN専用の購入後フォローと誕生日クーポン。自動配信なのでmanualヘッダーは付けない。
-  try {
-    await observeDispatch('NEN campaign deliveries', async () => {
-      const { processNenDeliveries, enqueueBirthdayCoupons } = await import('./services/nen-engagement.js');
-      const { dispatchOperatorEvent } = await import('./services/operator-notification-dispatch.js');
-      // EC側の発行に失敗しても残りの子と通常配信は止めない。失敗は
-      // 運用通知へ回し、次の日次走査で同じコードへ収束させる（部分成功を成功扱いしない）。
-      const birthday = await enqueueBirthdayCoupons(
-        env.DB,
-        new Date(),
-        env.NEN_EC_BASE_URL && env.ECCUBE_WEBHOOK_SECRET
-          ? { baseUrl: env.NEN_EC_BASE_URL, secret: env.ECCUBE_WEBHOOK_SECRET }
-          : undefined,
-        async (failure) => {
-          if (!failure.lineAccountId) return;
-          await dispatchOperatorEvent(env.DB, env, {
-            lineAccountId: failure.lineAccountId,
-            eventType: 'nen_birthday_coupon_failed',
-            sourceEventId: `nen_coupon_issue_failed:${failure.petId}:${failure.issueYear}`,
-            message: `誕生日クーポンの発行に失敗しました。次の日次処理でやり直します（コード: ${failure.couponCode || '未発行'}）`,
-            executionMode: 'automatic',
-          });
-        },
-      );
-      const result = await processNenDeliveries(env.DB, {
-        proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
-        defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
-        proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
-      });
-      /*
-       * PHOTO-06: 採用写真のポイント付与outboxの日次回収。
-       * 採用直後・手動の再試行で届かなかった分を、期限の来た順に届け直す。
-       * EC接続が未設定の環境では何もしない（行は「要対応」として一覧に残る）。
-       */
-      const { processDuePhotoRewards, ecPhotoPointClientFromEnv } = await import('./services/photo-reward-sync.js');
-      const photoRewards = await processDuePhotoRewards(
-        env.DB,
-        ecPhotoPointClientFromEnv(env),
-        { now: new Date() },
-      );
-      if (birthday.queued + birthday.failed + result.sent + result.failed + result.skipped
-        + result.deferred + photoRewards.synced + photoRewards.failed + photoRewards.skipped > 0) {
-        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, photoRewardSynced: photoRewards.synced, photoRewardFailed: photoRewards.failed, ...result }));
-      }
-    });
-  } catch (e) {
-    console.error('nen-campaign delivery error:', e);
-  }
-
-  // 共通情報の日付での切り替え。
-  //
-  // applied_at が NULL で、予約した日時を過ぎたものだけを反映する。
-  // 二度当たらないので、cron が重なっても値が飛ばない。
-  // 失敗しても他の処理は続ける。営業時間の表記が1周ぶん古いままなのと、
-  // 配信そのものが止まるのとでは、後者の方がはるかに重い。
-  try {
-    await observeDispatch('common variable schedules', async () => {
-      const { applyDueCommonVarSchedules } = await import('@line-crm/db');
-      const jstNowIso = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
-      const applied = await applyDueCommonVarSchedules(env.DB, jstNowIso);
-      if (applied > 0) console.log(JSON.stringify({ event: 'common_var_schedule_applied', applied }));
-    });
-  } catch (e) {
-    console.error('common-var schedule error:', e);
-  }
-
-  // E-08 (#621): 保存済みリッチメニュー公開予約を時刻到来時に実行する。
-  // 予約時のスナップショットを公開し、期間モードは終了時に元メニューへ戻す。
-  // 失敗しても他の処理は続ける。実LINE送信はここで行うが、DB配備は別工程。
-  try {
-    const { processDueRichMenuSchedules } = await import('./services/rich-menu-schedule-executor.js');
-    const {
-      getRichMenuGroupWithPages,
-      getLineAccountById,
-      getStaffById,
-      getTrackedLinkById,
-    } = await import('@line-crm/db');
-    const { canAccessAllLineAccounts } = await import('./services/account-access.js');
-    const {
-      createRichMenuShells,
-      switchRichMenuLive,
-      restorePreSwitchLive,
-      restorePreSwitchDefault,
-      deleteRichMenuShells,
-    } = await import('./lib/rich-menu-publisher.js');
-    const r2Adapter = {
-      async get(key: string) {
-        const obj = await env.IMAGES.get(key);
-        if (!obj) return null;
-        return { body: obj.body as ReadableStream };
-      },
-    };
-    // routes の createLineClient と同じ実装をここで再現する。
-    const createScheduleLineClient = (auth: string) => ({
-      async createRichMenu(payload: unknown) {
-        const res = await fetch('https://api.line.me/v2/bot/richmenu', {
-          method: 'POST',
-          headers: { Authorization: auth, 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error(`LINE createRichMenu failed: ${res.status} ${await res.text()}`);
-        return res.json() as Promise<{ richMenuId: string }>;
-      },
-      async validateRichMenu(payload: unknown) {
-        const res = await fetch('https://api.line.me/v2/bot/richmenu/validate', {
-          method: 'POST',
-          headers: { Authorization: auth, 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error(`LINE validateRichMenu failed: ${res.status} ${await res.text()}`);
-      },
-      async listRichMenus() {
-        const res = await fetch('https://api.line.me/v2/bot/richmenu/list', {
-          headers: { Authorization: auth },
-        });
-        if (!res.ok) throw new Error(`LINE listRichMenus failed: ${res.status}`);
-        const body = (await res.json()) as { richmenus?: Array<{ richMenuId?: string; name?: string }> };
-        return (body.richmenus ?? []).flatMap((menu) => (
-          typeof menu.richMenuId === 'string'
-            ? [{ richMenuId: menu.richMenuId, name: typeof menu.name === 'string' ? menu.name : null }]
-            : []
-        ));
-      },
-      async uploadRichMenuImage(richMenuId: string, image: Uint8Array, contentType: string) {
-        const res = await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
-          method: 'POST',
-          headers: { Authorization: auth, 'Content-Type': contentType },
-          body: image,
-        });
-        if (!res.ok) throw new Error(`LINE uploadRichMenuImage failed: ${res.status} ${await res.text()}`);
-      },
-      async deleteRichMenuAlias(aliasId: string) {
-        const res = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
-          method: 'DELETE',
-          headers: { Authorization: auth },
-        });
-        if (!res.ok && res.status !== 404) throw new Error(`LINE deleteRichMenuAlias failed: ${res.status}`);
-      },
-      async createRichMenuAlias(aliasId: string, richMenuId: string) {
-        const res = await fetch('https://api.line.me/v2/bot/richmenu/alias', {
-          method: 'POST',
-          headers: { Authorization: auth, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
-        });
-        if (!res.ok) throw new Error(`LINE createRichMenuAlias failed: ${res.status}`);
-      },
-      async upsertRichMenuAlias(aliasId: string, richMenuId: string) {
-        const res = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
-          method: 'POST',
-          headers: { Authorization: auth, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ richMenuId }),
-        });
-        if (res.ok) return;
-        if (res.status === 404) {
-          const createRes = await fetch('https://api.line.me/v2/bot/richmenu/alias', {
-            method: 'POST',
-            headers: { Authorization: auth, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
-          });
-          if (createRes.ok) return;
-          throw new Error(`LINE createRichMenuAlias failed: ${createRes.status}`);
-        }
-        throw new Error(`LINE updateRichMenuAlias failed: ${res.status}`);
-      },
-      async deleteRichMenu(richMenuId: string) {
-        const res = await fetch(`https://api.line.me/v2/bot/richmenu/${richMenuId}`, {
-          method: 'DELETE',
-          headers: { Authorization: auth },
-        });
-        if (!res.ok && res.status !== 404) throw new Error(`LINE deleteRichMenu failed: ${res.status}`);
-      },
-      async setDefaultRichMenu(richMenuId: string) {
-        const res = await fetch(`https://api.line.me/v2/bot/user/all/richmenu/${richMenuId}`, {
-          method: 'POST',
-          headers: { Authorization: auth },
-        });
-        if (!res.ok) throw new Error(`LINE setDefaultRichMenu failed: ${res.status}`);
-      },
-      async clearDefaultRichMenu() {
-        const res = await fetch('https://api.line.me/v2/bot/user/all/richmenu', {
-          method: 'DELETE',
-          headers: { Authorization: auth },
-        });
-        if (!res.ok && res.status !== 404) throw new Error(`LINE clearDefaultRichMenu failed: ${res.status}`);
-      },
-      async getCurrentDefaultRichMenuId() {
-        const res = await fetch('https://api.line.me/v2/bot/user/all/richmenu', {
-          method: 'GET',
-          headers: { Authorization: auth },
-        });
-        if (res.status === 404) return null;
-        if (!res.ok) throw new Error(`LINE getCurrentDefaultRichMenu failed: ${res.status}`);
-        const body = (await res.json()) as { richMenuId?: string };
-        return body.richMenuId ?? null;
-      },
-      async linkRichMenuBulk(richMenuId: string, userIds: string[]) {
-        const res = await fetch('https://api.line.me/v2/bot/richmenu/bulk/link', {
-          method: 'POST',
-          headers: { Authorization: auth, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ richMenuId, userIds }),
-        });
-        if (!res.ok) throw new Error(`LINE linkRichMenuBulk failed: ${res.status}`);
-      },
-    });
-    const buildGroupInput = async (snapshot: unknown, fallbackGroupId: string) => {
-      const record = snapshot as {
-        id?: string; size?: 'large' | 'compact'; chatBarText?: string;
-        isDefaultForAll?: boolean; pages?: Array<{
-          id: string; orderIndex: number; name: string;
-          imageR2Key: string | null; imageContentType: string | null;
-          lineRichmenuId: string | null;
-          areas: Array<{
-            id: string; boundsX: number; boundsY: number; boundsWidth: number; boundsHeight: number;
-            actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
-            actionData: Record<string, unknown>; intent: null | string;
-            label: string | null; tagIds: string[]; scoreChange: number | null;
-            templateId: string | null; formId: string | null; trackedLinkId: string | null;
-          }>;
-        }>;
-      };
-      const groupId = typeof record.id === 'string' ? record.id : fallbackGroupId;
-      const group = await getRichMenuGroupWithPages(env.DB, groupId);
-      const account = group ? await getLineAccountById(env.DB, group.account_id) : null;
-      const formBaseUrl = account && (account as { liff_id?: string | null }).liff_id
-        ? `https://liff.line.me/${(account as { liff_id: string }).liff_id}`
-        : (env.LIFF_URL ?? null);
-      const trackedUrls = new Map<string, string>();
-      for (const page of record.pages ?? []) {
-        for (const area of page.areas ?? []) {
-          if (area.trackedLinkId && !trackedUrls.has(area.trackedLinkId)) {
-            const link = await getTrackedLinkById(env.DB, area.trackedLinkId);
-            if (link) trackedUrls.set(area.trackedLinkId, `${formBaseUrl ?? ''}/t/${link.short_code ?? link.id}`);
-          }
-        }
-      }
-      return {
-        groupIdForDb: groupId,
-        account,
-        input: {
-          id: groupId,
-          size: record.size ?? 'large',
-          chatBarText: record.chatBarText ?? '',
-          isDefaultForAll: record.isDefaultForAll ?? false,
-          formBaseUrl,
-          pages: (record.pages ?? []).map((page) => ({
-            id: page.id,
-            orderIndex: page.orderIndex,
-            name: page.name,
-            imageR2Key: page.imageR2Key,
-            imageContentType: page.imageContentType,
-            lineRichMenuId: page.lineRichmenuId,
-            areas: (page.areas ?? []).map((area) => ({
-              id: area.id,
-              bounds: { x: area.boundsX, y: area.boundsY, width: area.boundsWidth, height: area.boundsHeight },
-              actionType: area.actionType,
-              actionData: area.actionData,
-              intent: area.intent as null,
-              label: area.label,
-              tagIds: area.tagIds,
-              scoreChange: area.scoreChange,
-              templateId: area.templateId,
-              formId: area.formId,
-              trackedLinkUrl: area.trackedLinkId ? (trackedUrls.get(area.trackedLinkId) ?? null) : null,
-            })),
-          })),
-        },
-      };
-    };
-    const result = await processDueRichMenuSchedules(env.DB, {
-      getGroupWithPages: (db, groupId) => getRichMenuGroupWithPages(db, groupId),
-      getLineAccount: async (db, accountId) => {
-        if (!await isLineAccountTenantActive(db, accountId)) return null;
-        return getLineAccountById(db, accountId) as Promise<{
-          id: string; channel_access_token: string | null; is_active: number; archived_at: string | null;
-        } | null>;
-      },
-      getRequestingStaff: async (db, staffId) => {
-        const staff = await getStaffById(db, staffId);
-        return staff as unknown as {
-          id: string; role: 'owner' | 'admin' | 'staff'; is_active: number; access_level: string | null;
-        } | null;
-      },
-      isStaffAllowedForAccount: async (db, staffId, accountId) => {
-        const staff = await getStaffById(db, staffId);
-        if (!staff) return false;
-        return canAccessAllLineAccounts(db, {
-          id: staff.id,
-          name: staff.name,
-          role: staff.role,
-          readOnly: staff.access_level === 'read_only',
-          tenantId: staff.tenant_id,
-        } as never, [accountId]);
-      },
-      createLineShells: async (snapshot, schedule, heartbeat) => {
-        // 第一段: 予約スナップショットから新規作成だけ行い、新IDを返す。
-        // alias/defaultは触らない。DB反映は実行役がjournal確定後に行う。
-        // ページ数ぶんの作成と画像uploadで時間がかかるため、1枚ごとに
-        // group と予約行の lease を実時刻で延ばす(heartbeat)。
-        const built = await buildGroupInput(snapshot, schedule.group_id);
-        if (!built.account) throw new Error('line account not found');
-        const line = createScheduleLineClient(`Bearer ${built.account.channel_access_token}`);
-        const { shells } = await createRichMenuShells(built.input as never, line, r2Adapter, heartbeat);
-        const oldByPageId = new Map(
-          (built.input.pages as Array<{ id: string; lineRichMenuId: string | null }>).map((page) => [page.id, page.lineRichMenuId]),
-        );
-        return shells.map((shell) => ({
-          pageId: shell.pageId,
-          orderIndex: shell.orderIndex,
-          newRichMenuId: shell.newRichMenuId,
-          oldLineRichMenuId: oldByPageId.get(shell.pageId) ?? null,
-        }));
-      },
-      createRestoreShells: async (restoreGroup, schedule, heartbeat) => {
-        // 明示の戻し先の現内容から新規作成だけ行う。alias/defaultは触らない。
-        const account = await getLineAccountById(env.DB, restoreGroup.account_id);
-        if (!account) throw new Error('line account not found');
-        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
-        const formBaseUrl = (account as { liff_id?: string | null }).liff_id
-          ? `https://liff.line.me/${(account as { liff_id: string }).liff_id}`
-          : (env.LIFF_URL ?? null);
-        const input = {
-          id: restoreGroup.id,
-          size: restoreGroup.size,
-          chatBarText: restoreGroup.chat_bar_text,
-          isDefaultForAll: restoreGroup.is_default_for_all === 1,
-          formBaseUrl,
-          pages: restoreGroup.pages.map((page) => ({
-            id: page.id,
-            orderIndex: page.order_index,
-            name: page.name,
-            imageR2Key: page.image_r2_key,
-            imageContentType: page.image_content_type,
-            lineRichMenuId: page.line_richmenu_id,
-            areas: page.areas.map((area) => ({
-              id: area.id,
-              bounds: { x: area.bounds_x, y: area.bounds_y, width: area.bounds_width, height: area.bounds_height },
-              actionType: area.action_type,
-              actionData: area.actionData,
-              intent: area.intent,
-              label: area.label,
-              tagIds: area.tagIds,
-              scoreChange: area.score_change,
-              templateId: area.template_id,
-              formId: area.form_id,
-              trackedLinkUrl: null,
-            })),
-          })),
-        };
-        const { shells } = await createRichMenuShells(input as never, line, r2Adapter, heartbeat);
-        const oldByPageId = new Map(
-          (input.pages as Array<{ id: string; lineRichMenuId: string | null }>).map((page) => [page.id, page.lineRichMenuId]),
-        );
-        return shells.map((shell) => ({
-          pageId: shell.pageId,
-          orderIndex: shell.orderIndex,
-          newRichMenuId: shell.newRichMenuId,
-          oldLineRichMenuId: oldByPageId.get(shell.pageId) ?? null,
-        }));
-      },
-      readCurrentDefaultId: async (schedule) => {
-        // 切替直前の実LINE defaultを読む。固定(pin)の材料にする。
-        const account = await getLineAccountById(env.DB, schedule.account_id);
-        if (!account?.channel_access_token) throw new Error('line account not found');
-        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
-        return line.getCurrentDefaultRichMenuId();
-      },
-      switchLiveTo: async ({ schedule, groupId, setDefault, shells, heartbeat }) => {
-        // 第二段: alias切替+default設定/解除。失敗時は投げるだけで補償しない。
-        const account = await getLineAccountById(env.DB, schedule.account_id);
-        if (!account) throw new Error('line account not found');
-        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
-        await switchRichMenuLive(line, {
-          id: groupId,
-          size: 'large',
-          chatBarText: '',
-          isDefaultForAll: setDefault,
-          pages: shells.map((shell) => ({
-            id: shell.pageId,
-            orderIndex: shell.orderIndex,
-            name: '',
-            imageR2Key: null,
-            imageContentType: null,
-            lineRichMenuId: shell.oldLineRichMenuId,
-            areas: [],
-          })),
-        } as never, shells.map((shell) => ({
-          pageId: shell.pageId,
-          orderIndex: shell.orderIndex,
-          newRichMenuId: shell.newRichMenuId,
-        })), heartbeat);
-      },
-      compensateSwitchToPrevious: async ({ schedule, groupId, prev, newIds }) => {
-        // 切替失敗の補償: journalを消した後に呼ばれ、旧へ戻す。決して投げない。
-        const account = await getLineAccountById(env.DB, schedule.account_id);
-        if (!account?.channel_access_token) {
-          // 補償手段がない。何も消さないよう全滅扱いで返す
-          // (defaultも読めないので retainedId は不明扱い)。
-          return {
-            unrestoredPageIds: new Set(prev.oldIds.map((old) => old.pageId)),
-            defaultRestore: { state: 'failed' as const, retainedId: null },
-          };
-        }
-        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
-        const unrestoredPageIds = await restorePreSwitchLive(line, groupId, prev);
-        const defaultRestore = await restorePreSwitchDefault(line, prev, newIds);
-        return { unrestoredPageIds, defaultRestore };
-      },
-      deleteLineShells: async (schedule, lineRichMenuIds) => {
-        // 作った分・旧分の後片付け。404許容で決して投げない。
-        const account = await getLineAccountById(env.DB, schedule.account_id);
-        if (!account?.channel_access_token) return;
-        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
-        await deleteRichMenuShells(line, lineRichMenuIds);
-      },
-      restoreCapturedDefault: async (schedule, lineId) => {
-        // 固定した切替前defaultへ戻す。すでに固定値なら何もしない。
-        // 固定メニューがLINEから消えていたら勝手に解除せず投げる(恒久失敗に残す)。
-        const account = await getLineAccountById(env.DB, schedule.account_id);
-        if (!account?.channel_access_token) throw new Error('line account not found');
-        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
-        const current = await line.getCurrentDefaultRichMenuId();
-        if (current === lineId) return;
-        try {
-          await line.setDefaultRichMenu(lineId);
-        } catch (error) {
-          if (error instanceof Error && /setDefaultRichMenu failed: 404/.test(error.message)) {
-            throw new Error(`no_restore_target: pinned default menu ${lineId} was deleted`);
-          }
-          throw error;
-        }
-      },
-      clearAccountDefault: async (schedule) => {
-        // no_default の明示解除。このgroupのものが現在defaultのときだけ外す。
-        // 別メニューのdefaultまで壊さない。何もなければ成功扱い。
-        const scheduled = await getRichMenuGroupWithPages(env.DB, schedule.group_id);
-        const account = await getLineAccountById(env.DB, schedule.account_id);
-        if (!scheduled || !account?.channel_access_token) throw new Error('schedule group not found');
-        const line = createScheduleLineClient(`Bearer ${account.channel_access_token}`);
-        const ownIds = new Set(
-          scheduled.pages.map((page) => page.line_richmenu_id).filter((id): id is string => !!id),
-        );
-        const current = await line.getCurrentDefaultRichMenuId();
-        if (current && ownIds.has(current)) {
-          await line.clearDefaultRichMenu();
-        }
-      },
-      unlinkIndividualLinks: async (schedule) => {
-        // 期限切れメニューを指す個別割当をLINE側で外し、既定へ戻す。
-        // 解除済み・対象なしは何もしない。D1行の削除より先に呼ぶ。
-        const { listScheduleGroupIndividualLinks } = await import('@line-crm/db');
-        const targets = await listScheduleGroupIndividualLinks(env.DB, schedule.account_id, schedule.group_id);
-        if (targets.length === 0) return 0;
-        const account = await getLineAccountById(env.DB, schedule.account_id);
-        if (!account) throw new Error('line account not found');
-        const auth = `Bearer ${account.channel_access_token}`;
-        let unlinked = 0;
-        for (const target of targets) {
-          const res = await fetch(
-            `https://api.line.me/v2/bot/user/${encodeURIComponent(target.lineUserId)}/richmenu`,
-            { method: 'DELETE', headers: { Authorization: auth } },
-          );
-          if (res.status === 404) continue;
-          if (!res.ok) throw new Error(`LINE unlinkRichMenu failed: ${res.status}`);
-          unlinked += 1;
-        }
-        return unlinked;
-      },
-    }, { now: new Date(event.scheduledTime) });
-    if (result.processed > 0) {
-      console.log(JSON.stringify({ event: 'rich_menu_schedule_tick', ...result }));
-    }
-  } catch (e) {
-    console.error('rich-menu schedule error:', e);
-  }
-
-  // 予約画面の未予約、予約後の未視聴、フォーム途中離脱、回答後の相談未予約を
-  // 段階別に自動追客する。対象は followup config で有効化したウェビナーだけ。
-  try {
-    await observeDispatch('webinar followups', async () => {
-      const { processWebinarFollowups } = await import('./services/webinar-followups.js');
-      const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
-      const result = await processWebinarFollowups(env.DB, {
-        proxyBaseUrl:
-          env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
-        defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
-        defaultLiffId: liffMatch?.[1] ?? null,
-        proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
-      });
-      if (result.sent + result.failed > 0) {
-        console.log(`[webinar-followups] sent=${result.sent} failed=${result.failed}`);
-      }
-    });
-  } catch (e) {
-    console.error('webinar-followups error:', e);
-  }
-
-  // Phase 2: 配信系と定期ジョブを並列実行する。processScheduledBroadcasts は tag/all の
-  // inline 送信を含み時間がかかり得るため、queue 処理と並列にして互いを block しない
-  // (barrier 化すると長い scheduled 送信が queue 処理を待たせる)。scheduled dedup は
-  // status='sending', batch_offset=0 に enqueue され、同 tick もしくは次 tick (最大5分、
-  // 5分 cron の粒度内) で processQueuedBroadcasts に拾われて分割送信される。
-  const jobs: Promise<unknown>[] = [];
-  jobs.push(
-    observeDispatch('scenario deliveries',
-      () => processStepDeliveries(env.DB, defaultLineClient, env.WORKER_URL)),
-    observeDispatch('broadcast deliveries', async () => {
-      await Promise.all([
-        processScheduledBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),
-        processQueuedBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),
-      ]);
-      // 送信後動作の取り残し回収（受理済みだが実行が終わっていない宛先）。
-      // 失敗・送達不明の宛先は対象外。送達自体は変えない。
-      try {
-        const { sweepBroadcastAfterActions } = await import('./services/broadcast-after-actions.js');
-        const swept = await sweepBroadcastAfterActions(env.DB);
-        if (swept.done + swept.failed > 0) {
-          console.log(JSON.stringify({ event: 'broadcast_after_actions_sweep', ...swept }));
-        }
-      } catch (sweepError) {
-        console.error('[broadcast] after-actions sweep failed', sweepError);
-      }
-    }),
-    observeDispatch('reminder deliveries',
-      () => processReminderDeliveries(env.DB, defaultLineClient)),
-  );
-
-  await Promise.allSettled(jobs);
-
-  // Cross-account duplicate detection — disabled.
-  // The cron used to materialize duplicates into the tag system but the 1k-subrequest
-  // budget can't drain a 1k+ candidate backlog, and a live SELECT against
-  // friends.picture_url / display_name / status_message gives the same answer
-  // on demand. Replacement: a /api/duplicates endpoint plus a dashboard view
-  // (planned alongside the multi-provider UI work). Keeping the service file
-  // (apps/worker/src/services/duplicate-detect.ts) and the existing
-  // `重複:` tag rows untouched until that replacement lands.
-}
-
 export default {
-  fetch: app.fetch,
-  scheduled,
+  fetch: (...args: Parameters<typeof app.fetch>) => withInvocation('http', () => app.fetch(...args)),
+  async scheduled(event: ScheduledEvent, env: Env['Bindings'], ctx: ExecutionContext): Promise<void> {
+    if (qaOutboundStopped(env)) return;
+    return withInvocation('cron', () => scheduled(event, env, ctx));
+  },
   async queue(
     batch: MessageBatch<CodexMentionQueueMessage>,
     env: Env['Bindings'],
   ): Promise<void> {
+    if (qaOutboundStopped(env)) {
+      for (const message of batch.messages) message.retry({ delaySeconds: 60 });
+      return;
+    }
     for (const message of batch.messages) {
-      try {
-        await processCodexMentionMessage(env, message.body);
-        message.ack();
-      } catch (error) {
-        const reason = classifyCodexMonitorError(error);
-        const stopped = shouldStopCodexQueueRetry(
-          message.attempts,
-          env.CODEX_QUEUE_MAX_ATTEMPTS,
-        );
-        console.error(JSON.stringify(createCodexQueueFailureLog({
-          kind: message.body.kind,
-          slackEventId: message.body.slackEventId,
-          reason,
-          attempts: message.attempts,
-          stopped,
-          error,
-        })));
-        if (stopped) {
-          try {
-            if (message.body.kind !== 'auto_merge') {
-              await markCodexMentionFailed(env.DB, message.body.slackEventId);
-            }
-          } catch {
-            console.error(JSON.stringify({
-              event: 'codex_cloud_monitor_queue_ledger_failed',
-              kind: message.body.kind,
-              slackEventId: message.body.slackEventId,
-              reason: 'db_error',
-            }));
-          }
+      await withInvocation('queue', () => resumeInvocation(message.body?.requestId, async () => {
+        try {
+          await processCodexMentionMessage(env, message.body);
           message.ack();
-        } else {
-          message.retry({ delaySeconds: 60 });
+        } catch (error) {
+          const reason = classifyCodexMonitorError(error);
+          const stopped = shouldStopCodexQueueRetry(
+            message.attempts,
+            env.CODEX_QUEUE_MAX_ATTEMPTS,
+          );
+          logger.error("src_index_failed");
+          if (stopped) {
+            try {
+              if (message.body.kind !== 'auto_merge') {
+                await markCodexMentionFailed(env.DB, message.body.slackEventId);
+              }
+            } catch {
+              logger.error("codex_cloud_monitor_queue_ledger_failed");
+            }
+            message.ack();
+          } else {
+            message.retry({ delaySeconds: 60 });
+          }
         }
-      }
+      }));
     }
   },
   async email(
@@ -2802,7 +1128,10 @@ export default {
     env: Env['Bindings'],
     _ctx: ExecutionContext,
   ): Promise<void> {
-    await routeInboundEmail(message, env);
+    if (qaOutboundStopped(env)) {
+      message.setReject('Staging QA outbound stop is active');
+      return;
+    }
+    await withInvocation('email', () => routeInboundEmail(message, env));
   },
 };
-// redeploy trigger

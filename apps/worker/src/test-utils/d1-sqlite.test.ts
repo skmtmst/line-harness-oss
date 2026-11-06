@@ -1,7 +1,7 @@
 /*
- * createTestD1 が組み立てるDBの「出来上がり」を固定する(#720)。
+ * createTestD1 が組み立てるDBの「出来上がり」を固定する。
  *
- * #720 で、ファイルDBの pragma を schema を流す**前**へ移した。速さのための
+ *  で、ファイルDBの pragma を schema を流す**前**へ移した。速さのための
  * 変更だが、出来上がりが変わっていないことを言えなければ意味がない。ここは
  * 所要を測らない(時間に依存する試験は間欠的に落ちる)。代わりに、
  * **bootstrap.sql をそのまま流しただけのDB**を正本に置き、createTestD1 が
@@ -136,3 +136,35 @@ describe('createTestD1 の出来上がり', () => {
     }
   })
 })
+
+// 受け取りボーナスの同時作成を、実D1と同じbatchの境界で検証できること。
+describe('createTestD1 のbatch', () => {
+  test('同時batchは割り込まず、SELECT・RETURNINGとchangesの結果を返す', async () => {
+    const { raw, db } = createTestD1();
+    try {
+      raw.exec('CREATE TABLE batch_probe(id TEXT PRIMARY KEY, n INTEGER)');
+      const write = (id: string) => db.batch([
+        db.prepare('INSERT INTO batch_probe(id,n) VALUES(?,1) RETURNING id').bind(id),
+        db.prepare('SELECT changes() AS n'),
+        db.prepare('SELECT COUNT(*) AS n FROM batch_probe'),
+      ]);
+      const [first, second] = await Promise.all([write('first'), write('second')]);
+      expect(first.map(x => x.results)).toEqual([[{ id: 'first' }], [{ n: 1 }], [{ n: 1 }]]);
+      expect(second.map(x => x.results)).toEqual([[{ id: 'second' }], [{ n: 1 }], [{ n: 2 }]]);
+    } finally { raw.close(); }
+  });
+  test('途中の失敗はbatch全体を戻す', async () => {
+    const { raw, db } = createTestD1();
+    try {
+      raw.exec('CREATE TABLE batch_probe(id TEXT PRIMARY KEY)');
+      await expect(db.batch([db.prepare("INSERT INTO batch_probe VALUES('same')"), db.prepare("INSERT INTO batch_probe VALUES('same')")])).rejects.toThrow();
+      expect(raw.prepare('SELECT COUNT(*) AS n FROM batch_probe').get()).toEqual({ n: 0 });
+    } finally { raw.close(); }
+  });
+});
+
+test('SCALE-03 D1と同じ100変数上限を全SQL試験で見張る', () => {
+ const f=createTestD1();
+ try {expect(()=>f.db.prepare('SELECT 1').bind(...Array(101).fill('synthetic'))).toThrow('D1 bind limit exceeded');}
+ finally{f.raw.close();}
+});

@@ -1,7 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
+import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const HERE = dirname(fileURLToPath(import.meta.url))
 
 /*
  * #976 デザイン統一の契約。
@@ -22,16 +25,21 @@ describe('#976 デザイン統一', () => {
   const layout = read('../../app/layout.tsx')
 
   it('U080: 書体の正本は --font-sans で、body は inline style ではなく font-sans を読む', () => {
-    expect(globals).toMatch(/--font-sans:\s*"Noto Sans JP",\s*"Hiragino Sans",\s*"Yu Gothic",\s*system-ui,\s*sans-serif;/)
+    // 英字と数字は Inter（先）、かなと漢字は Noto Sans JP。Noto を先に戻さない。
+    expect(globals).not.toMatch(/--font-sans:\s*var\(--font-noto-sans-jp\)/)
     expect(layout).toContain('font-sans')
     expect(layout).not.toContain('fontFamily')
-    // 友だち属性V2の画像比較用例外（SF系）は残す。統一対象から外す決定。
-    expect(globals).toMatch(/\.friend-attributes-v2-shell\s*{[^}]*font-family:\s*"SF Pro Text"/s)
+    // 文字のなめらか処理は既定のまま。body にも共通部品にも antialiased を付けない。
+    expect(layout).not.toMatch(/className="[^"]*\bantialiased\b/)
+    const sharedCss = readdirSync(HERE).filter((name) => name.endsWith('.css')).map((name) => read(`./${name}`)).join('\n')
+    expect(sharedCss).not.toMatch(/-webkit-font-smoothing:\s*antialiased/)
+    expect(sharedCss).not.toMatch(/font-family:\s*var\(--font-noto-sans-jp\)/)
+    expect(layout).toContain("from 'next/font/google'")
   })
 
   it('U077/U084: 危険操作は共通Buttonの danger 役割で $danger + 白文字', () => {
     expect(buttonTsx).toContain("'danger'")
-    expect(button).toMatch(/\.danger\s*{[^}]*background:\s*var\(--color-danger\)/s)
+    expect(button).toMatch(/\.danger\s*{[^}]*background:\s*var\(--color-danger-action\)/s)
     expect(button).toMatch(/\.danger\s*{[^}]*color:\s*var\(--color-on-accent\)/s)
   })
 

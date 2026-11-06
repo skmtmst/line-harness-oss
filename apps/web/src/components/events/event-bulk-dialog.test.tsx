@@ -13,7 +13,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { BulkSlotDialog } from './event-form'
+import { BulkSlotDialog } from '@/v8/events/edit-form'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -63,7 +63,7 @@ describe('R84 一括追加の窓は増えても操作できる', () => {
   it('時刻パターンを12件に増やしても操作ボタンが残り、Escape で閉じる', async () => {
     const { onClose } = await renderDialog()
     for (let i = 0; i < 11; i += 1) {
-      await act(async () => { button('＋ パターン追加').click() })
+      await act(async () => { button('＋ パターンを追加する').click() })
     }
     expect(document.querySelectorAll('[aria-label$="件目の開始"]')).toHaveLength(12)
     // 増えても操作は文書に残る（以前は画面外へ出た）。
@@ -100,5 +100,29 @@ describe('R84 一括追加の窓は増えても操作できる', () => {
     // もう一度押すと外れる
     await act(async () => { days[1].click() }) // 月を外す
     expect(days[1].getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('時間帯を同じ長さに分けると、既存の分割計算で全パターンを生成する', async () => {
+    const { onSubmit } = await renderDialog()
+    const checkbox = [...document.querySelectorAll<HTMLInputElement>('[role="switch"]')][0]
+    await act(async () => { checkbox.click() })
+    expect((checkbox.getAttribute('aria-checked') === 'true')).toBe(true)
+    await act(async () => { button('生成').click() })
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ time_patterns: [{ start: '14:00', end: '15:30' }, { start: '15:30', end: '17:00' }] }))
+  })
+
+  it('同じ描画の二度押しを1回にし、失敗後も入力を残して再試行できる', async () => {
+    let fail!: (error: unknown) => void
+    const onSubmit = vi.fn().mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject })).mockResolvedValue(undefined)
+    await renderDialog(vi.fn(), onSubmit)
+    const generate = button('生成')
+    await act(async () => { generate.click(); generate.click() })
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    const first = onSubmit.mock.calls[0][0]
+    await act(async () => { fail(new Error('通信が切れました')) })
+    expect(document.body.textContent).toContain('通信が切れました')
+    await act(async () => { button('生成').click() })
+    expect(onSubmit).toHaveBeenCalledTimes(2)
+    expect(onSubmit).toHaveBeenLastCalledWith(first)
   })
 })

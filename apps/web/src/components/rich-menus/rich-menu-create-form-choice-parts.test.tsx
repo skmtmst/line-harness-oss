@@ -12,10 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/shared/condition-builder', () => ({ default: () => null }))
 
-import RichMenuCreateForm, {
-  freshRichMenuCreateValue,
-  type RichMenuCreateValue,
-} from './rich-menu-create-form'
+import RichMenuCreateForm from './rich-menu-create-form'
+import { freshRichMenuCreateValue, type RichMenuCreateValue } from './rich-menu-create-model'
 
 let host: HTMLDivElement
 let root: Root
@@ -76,13 +74,11 @@ describe('m20j: 作成フォームの選ぶ部品', () => {
 
   it('既定メニューは押すたびに切り替わる', async () => {
     mount()
-    const hit = Array.from(host.querySelectorAll('input[type="checkbox"]')).find((el) =>
-      el.closest('label')?.textContent?.match(/既定メニューにする/),
-    )
-    if (!hit) throw new Error('既定メニューのチェックが見つかりません')
-    const box = hit as HTMLInputElement
-    expect(box.checked).toBe(current.isDefaultForAll)
-    await act(async () => { box.click() })
+    const label = Array.from(host.querySelectorAll('label')).find(el => /既定メニューにする/.test(el.textContent ?? ''))
+    const box = label?.control as HTMLButtonElement | null
+    expect(box).toBeTruthy()
+    expect(box!.getAttribute('aria-checked') === 'true').toBe(current.isDefaultForAll)
+    await act(async () => { box!.click() })
     expect(onChange).toHaveBeenCalled()
     expect(current.isDefaultForAll).toBe(true)
   })

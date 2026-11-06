@@ -1,4 +1,4 @@
-/** Test-only ownership of work that Vitest does not cancel on timeout. */
+/** タイムアウトで Vitest が止めない処理も、試験側で完了まで管理する。 */
 export class AsyncTestScope {
   private readonly pending = new Set<Promise<unknown>>();
   private readonly releases = new Set<() => void>();
@@ -14,7 +14,7 @@ export class AsyncTestScope {
     return this.track(Promise.resolve().then(body));
   }
 
-  /** A paused fake dependency must also be releasable by teardown. */
+  /** 停止中の偽依存は、後片付けからも解放できるようにする。 */
   gate<T>(fallback: () => T): { promise: Promise<T>; resolve: (value: T) => void } {
     let resolvePromise!: (value: T) => void;
     const promise = new Promise<T>(resolve => { resolvePromise = resolve; });
@@ -31,8 +31,7 @@ export class AsyncTestScope {
   async dispose(): Promise<void> {
     this.closing = true;
     for (const release of [...this.releases]) release();
-    // Include the test body itself, not only HTTP promises: assertions and
-    // finally blocks may still run after the HTTP response has resolved.
+    // HTTP 応答後も期待値や finally が続くため、要求の Promise だけでなく試験本文も完了待ちへ含める。
     while (this.pending.size) await Promise.allSettled([...this.pending]);
   }
 }

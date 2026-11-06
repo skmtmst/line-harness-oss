@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const mocks = vi.hoisted(() => ({
   getAutoReplies: vi.fn(),
@@ -139,6 +139,39 @@ describe('GET /api/auto-reply-runs', () => {
     expect(json.data.items[0].inputPreview).toBeNull();
   });
 
+  it.each([
+    ['failed', 'delayed_delivery_unknown', null, '届いたか分からないため要確認'],
+    ['skipped', null, 'partial_failure_requires_retry', '失敗した処理だけを再実行してください'],
+  ])('SEND-S03/S04: %sの不明・部分失敗を通常の見送りに隠さない', async (status, error_code, skip_reason, expected) => {
+    const original = await mocks.listAutoReplyEvaluationRuns();
+    mocks.listAutoReplyEvaluationRuns.mockResolvedValueOnce({ ...original, items: [{
+      ...original.items[0], status, error_code, skip_reason,
+      candidate_result: 'won', candidate_reason_codes: '["keyword_matched"]',
+      has_failed_action_run: error_code ? 1 : 0,
+    }] });
+    const response = await app().request('/api/auto-reply-runs', {}, { DB: db } as Env['Bindings']);
+    const json = await response.json() as { data: {items: Array<{status:string;detail:string;canRetry:boolean;errorCode:string|null}>} };
+    expect(json.data.items[0].status).toBe(status === 'failed' ? 'permanent_failed' : 'skipped');
+    expect(json.data.items[0].errorCode).toBe(error_code);
+    expect(json.data.items[0].detail).toContain(expected);
+    expect(json.data.items[0].canRetry).toBe(false);
+  });
+
+  it.each([
+    ['reply_failed', 'permanent_failed', 'LINEへの返信を受け付けてもらえませんでした'],
+    ['partial_failed', 'permanent_failed', '返信または一部の処理だけ完了しました'],
+    ['failed', 'permanent_failed', '自動応答を完了できませんでした'],
+    ['skipped', 'skipped', '条件に合わず何もしませんでした'],
+  ])('失敗と見送りを分ける: %s は %s として返す', async (status, expected, expectedDetail) => {
+    const original = await mocks.listAutoReplyEvaluationRuns();
+    mocks.listAutoReplyEvaluationRuns.mockResolvedValueOnce({ ...original, items: [{ ...original.items[0], status }] });
+    const response = await app().request('/api/auto-reply-runs', {}, { DB: db } as Env['Bindings']);
+    const json = await response.json() as { data: { items: Array<{ status: string; domainStatus: string; detail: string }> } };
+    expect(json.data.items[0].status).toBe(expected);
+    expect(json.data.items[0].domainStatus).toBe(status);
+    expect(json.data.items[0].detail).toBe(expectedDetail);
+  });
+
   it('受信本文はチャット閲覧権限がある担当者にだけ返す', async () => {
     const response = await app({ ...staff, permissionKeys: ['/chats'] }).request(
       '/api/auto-reply-runs?rule_id=rule-a',
@@ -163,6 +196,15 @@ describe('GET /api/auto-reply-runs', () => {
     const response = await app().request('/api/auto-reply-runs?ruleId=rule-b', {}, { DB: db } as Env['Bindings']);
     expect(response.status).toBe(404);
     expect(mocks.listAutoReplyEvaluationRuns).not.toHaveBeenCalled();
+  });
+
+  it('R530: 再実行はstaffに403を返す（読み取りは既存の試験どおりstaffに許す）', async () => {
+    const retry = await app().request('/api/auto-reply-runs/evaluation-1/retry', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    }, { DB: db } as Env['Bindings']);
+    expect(retry.status).toBe(403);
   });
 
   it('選択したルールを条件で見送り、後続ルールが動いても成功とは表示しない', async () => {
@@ -214,5 +256,19 @@ describe('GET /api/auto-reply-runs', () => {
       autoReplyId: 'rule-a',
       detail: '担当者が対応中のため何もしませんでした',
     });
+  });
+});
+
+describe('実行期間の契約', () => {
+  it('一覧・集計・内訳へ同じ日本時間の範囲を渡す', async () => {
+    const response = await app().request('/api/auto-reply-runs?from=2026-09-30&to=2026-09-30', {}, { DB: db });
+    expect(response.status).toBe(200);
+    for (const query of [mocks.listAutoReplyEvaluationRuns, mocks.getAutoReplyEvaluationSummary, mocks.getAutoReplyTriggerBreakdown]) {
+      expect(query).toHaveBeenCalledWith(db, expect.objectContaining({ from: '2026-09-30T00:00:00+09:00', until: '2026-10-01T00:00:00+09:00', lineAccountIds: ['account-a'] }));
+    }
+  });
+  it('不正日付はDBを読まず拒否する', async () => {
+    expect((await app().request('/api/auto-reply-runs?from=2026-02-30', {}, { DB: db })).status).toBe(400);
+    expect(mocks.listAutoReplyEvaluationRuns).not.toHaveBeenCalled();
   });
 });

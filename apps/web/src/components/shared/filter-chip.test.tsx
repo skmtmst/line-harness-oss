@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-/* 一覧の絞り込み札（★V7・m13i）。全画面で1つの形にそろえるための契約。 */
+/* 一覧の絞り込み札（★管理画面・m13i）。全画面で1つの形にそろえるための契約。 */
 import React from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
@@ -8,14 +8,26 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import FilterChip from './filter-chip'
 
-afterEach(() => cleanup())
-
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CSS = readFileSync(join(HERE, 'filter-chip.css'), 'utf8')
 /** 注釈を落とした宣言だけを見る（#639・#669 と同じやり方）。 */
 const CODE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
 
+afterEach(() => cleanup())
+
 describe('絞り込み札 FilterChip（m13i）', () => {
+  it('条件の選択と窓の開閉を別の属性で伝える', () => {
+    const onChange = vi.fn()
+    const {container, rerender} = render(<FilterChip selected={false} onChange={onChange} aria-haspopup="dialog" aria-expanded={false}>配信日</FilterChip>)
+    const button = container.querySelector('button')!
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+    expect(button.getAttribute('aria-haspopup')).toBe('dialog')
+    fireEvent.click(button)
+    expect(onChange).toHaveBeenCalledWith(true)
+    rerender(<FilterChip selected={false} onChange={onChange} aria-haspopup="dialog" aria-expanded>配信日</FilterChip>)
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+  })
   it('押せるボタンとして描き、選んでいない時は印を出さない', () => {
     const onChange = vi.fn()
     const { container } = render(
@@ -78,17 +90,27 @@ describe('絞り込み札 FilterChip（m13i）', () => {
     expect((container.querySelector('button') as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('見た目の決まりは CSS が持つ（高さ32・濃い緑の選択・タッチ44px）', () => {
-    // 高さ32（#639 の契約と同じ錨）。
-    expect(CODE).toMatch(/\.v6-filter-chip\s*\{[^}]*height:\s*32px/s)
-    // 選んだ札は濃い緑の地に白文字（#669 の有効状態。薄緑＋濃字に戻すと赤くなる）。
-    expect(CODE).toMatch(
-      /\.v6-filter-chip\[aria-pressed='true'\]\s*\{[^}]*background:\s*var\(--color-accent-deep\)/s,
-    )
-    expect(CODE).toMatch(/\.v6-filter-chip\[aria-pressed='true'\]\s*\{[^}]*color:\s*var\(--color-on-accent\)/s)
+  it('状態の札は印を省いても件数と選択状態を伝える', () => {
+    const { container } = render(<FilterChip selected showCheck={false} count={0} onChange={() => {}}>送信済み</FilterChip>)
+    const button = container.querySelector('button')!
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+    expect(button.textContent).toBe('送信済み 0')
+    expect(button.querySelector('svg')).toBeNull()
+  })
+
+  it('現在のV8の高さ36・タッチ44pxを保つ', () => {
+    expect(CODE).toMatch(/:root \.v6-filter-chip\s*\{[^}]*height:\s*(?:36px|var\(--control-h\))/s)
+    // 選択色の後勝ちと故障復元は実ブラウザのcomputed対照で守る。
     // タッチ端末は44px（#639 の契約と同じ錨）。
     expect(CODE).toMatch(
       /@media \(pointer: coarse\)\s*\{\s*\.v6-filter-chip\s*\{\s*min-height:\s*44px;/,
     )
+  })
+
+  it('押せない札から状態の変更を送らない', () => {
+    const change = vi.fn()
+    const { container } = render(<FilterChip selected={false} disabled onChange={change}>未対応</FilterChip>)
+    fireEvent.click(container.querySelector('button')!)
+    expect(change).not.toHaveBeenCalled()
   })
 })

@@ -1,15 +1,16 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * チェックボックス。Pencil ★V7 `gvjpx`。
+ * チェックボックス。Pencil ★V8 `dQCCN`・`S9U7v`「チェック/オン・オフ」。
  *
  *   四角   18×18  角丸 $radius-xxs(3)  枠 1.5px $ink-faint  地 $canvas
- *   選択   地・枠 $accent-deep、印 lucide check 14px $on-accent
- *   一部   地・枠 $accent-deep、印 lucide minus
+ *   選択   地 緑のグラデ（--gradient-choice-on）、印 ✓ 白。印は箱の真ん中（上下左右 0.5px 以内）
+ *   一部   地 緑のグラデ、印 －
  *   誤り   枠 2px $status-danger  地 $status-danger-soft、誤りの文 12px $status-danger
  *   無効   全体の不透明度 0.5
  *   文字   14px $ink、四角との間 8、補足 12px $ink-faint（上との間 4）
  *
- * 動き（Pencil ★V7「チェックボックス 動き」`HO3V6`）
+ * 動き（Pencil ★V8 の動きの表 `NF3uI`）
  *   選ぶ   四角の色 motion-fast、印を一筆で描く motion-base（どちらも motion-ease-out）
  *   外す   四角の色 motion-fast、印は motion-fast で薄くなって消える。描き戻さない
  *   動きを減らす設定では globals.css の決まりで一瞬になる
@@ -17,12 +18,13 @@
 
 .root {
   display: inline-flex;
-  flex-direction: column;
-  gap: 4px; /* gap: 4 */
+  flex-direction: column; /* gap: 4 */
+  vertical-align: top;
+  line-height: 0;
 }
 
 .root[data-disabled='true'] {
-  opacity: 0.5; /* opacity: 0.5 */
+  opacity: var(--polish-disabled-opacity); /* opacity: 0.5 */
 }
 
 .line {
@@ -30,6 +32,15 @@
   align-items: center;
   gap: 8px; /* gap: 8 */
   cursor: pointer;
+  /*
+   * 押せる範囲は札（label）自体を (24 − 18) / 2 ずつ広げて 24×24（WCAG 2.5.8、
+   * ★管理画面 修正方針 §4）。透明な input をはみ出させる方式だと、見えない
+   * はみ出しが表のセルの外側判定に載る（M3 報告・parity 1003-2106）。
+   * padding で広げ margin で戻すので、配置・見た目は変わらない。
+   * 札の押下で input が切り替わるのは label の既定の動き。
+   */
+  padding: calc((var(--polish-hit-min) - var(--choice-box-size, 18px)) / 2);
+  margin: calc((var(--polish-hit-min) - var(--choice-box-size, 18px)) / -2);
 }
 
 .root[data-disabled='true'] .line {
@@ -46,46 +57,41 @@
 
 /* 本物の input は四角の上に重ねて透明にする。押す・Space・読み上げはこれが受ける。 */
 /*
- * 押せる範囲は四角の外へ 3px ずつ広げて 24×24（WCAG 2.5.8、★V7 修正方針 §4）。
+ * input 自体は四角と同寸（18px）で箱からはみ出さない。
+ * 押せる 24px は札（.line）の padding が受ける（上記）。
  * 見た目の四角は 18px のまま。
  */
 .input {
   position: absolute;
-  inset: -3px;
-  width: 24px;
-  height: 24px;
+  inset: 0;
+  width: 18px;
+  height: 18px;
   margin: 0;
   opacity: 0;
   cursor: inherit;
 }
 
 .box {
+  /* 印は入力の上に描く。クリックは透明な本物の入力へ通す。 */
+  pointer-events: none;
   display: inline-flex;
   width: 100%;
   height: 100%;
   align-items: center;
-  justify-content: center;
-  border: 1.5px solid var(--color-ink-faint); /* stroke: $ink-faint */
-  border-radius: var(--radius-icon); /* cornerRadius: $radius-xxs */
+  justify-content: center; /* stroke: $ink-faint */ /* cornerRadius: $radius-xxs */
   background: var(--color-canvas); /* fill: $canvas */
   color: var(--color-on-accent); /* 印: $on-accent */
   position: relative;
-  transition:
-    background-color var(--motion-fast) var(--motion-ease-out),
-    border-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .mark {
   position: absolute;
-  inset: 0;
-  width: 14px; /* width: 14 */
-  height: 14px; /* height: 14 */
+  inset: 0; /* width: 14 */ /* height: 14 */
   margin: auto;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 3;
 }
 
 /*
@@ -104,8 +110,8 @@
 
 .input:checked + .box,
 .input:indeterminate + .box {
-  border-color: var(--color-accent-deep); /* stroke: $accent-deep */
-  background: var(--color-accent-deep); /* fill: $accent-deep */
+  border-color: var(--color-choice-on);
+  background: var(--color-choice-on);
 }
 
 .input:checked:not(:indeterminate) + .box .check path,
@@ -116,29 +122,105 @@
 }
 
 /* 入力中（キーボードで移った）`SN4Ch`。緑は「正常」の意味なので輪郭に使わない。 */
-.input:focus-visible + .box {
-  outline: 2px solid var(--color-action);
-  outline-offset: -2px;
-}
 
 /* 誤り（必須の同意）`DpG9o`。 */
-.input[aria-invalid='true']:not(:checked) + .box {
+.input[aria-invalid='true'] + .box {
   border: 2px solid var(--color-status-danger); /* stroke: $status-danger 2px */
   background: var(--color-status-danger-soft); /* fill: $status-danger-soft */
 }
 
 .label {
-  color: var(--color-ink); /* fill: $ink */
-  font-size: var(--text-body); /* fontSize: 14 */
+  color: var(--color-ink); /* fill: $ink */ /* fontSize: 14 */
 }
 
 .description {
+  line-height: var(--text-caption--line-height, 1.5);
   color: var(--color-ink-faint); /* fill: $ink-faint */
   font-size: 12px; /* fontSize: 12 */
 }
 
 .error {
+  line-height: var(--text-caption--line-height, 1.5);
   color: var(--color-status-danger); /* fill: $status-danger */
   font-size: 12px; /* fontSize: 12 */
 }
+
+/*
+ * ★V8「チェック」（dQCCN・S9U7v）：箱・印・色は 管理画面 と同じ。
+ * 違うのは文字（13px）と、オフの箱の枠色（choice-border）。
+ * 選んだ・誤りの枠色は details 度が高い規則が勝つので変わらない。
+ */
+:root .label {
+  font-size: var(--text-label);
 }
+
+:root .box {
+  border-color: var(--color-choice-border);
+}
+
+/*
+ * ★V8 仕上げ（M10-2）：箱の乗せた・押した動き。
+ * 乗せたときは選んでいない箱だけ地を少し沈め、押したときは
+ * ほんの少し縮む。印の一筆描き・消え方は今までどおり。
+ */
+:root .box {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    scale var(--motion-fast) var(--motion-ease-out);
+}
+
+:root .line:hover .input:not(:checked, :indeterminate) + .box {
+  background: var(--color-canvas-sunken);
+}
+
+:root .line:active .box {
+  scale: 0.92;
+}
+
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
+:root .label { line-height: 20px; font-weight: var(--font-weight-ui); font-family: var(--font-sans); }
+:root .box { border: 0; border-radius: var(--choice-checkbox-radius); outline: var(--polish-choice-ring) solid var(--polish-choice-border); outline-offset: calc(-1 * var(--polish-choice-ring)); }
+:root .box { box-shadow: var(--shadow-choice-off); }
+/* 選んだ・一部：主ボタンと同じ緑のグラデと上端の光。 */
+:root .input:checked + .box, :root .input:indeterminate + .box { outline-color: transparent; background: var(--gradient-choice-on); box-shadow: var(--shadow-choice-on); }
+:root .input[aria-invalid='true'] + .box { outline-color: var(--color-status-danger); }
+:root .input:focus-visible + .box { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+/* 誤り＋焦点は赤1本（青を重ねない）。 */
+:root .input[aria-invalid='true']:focus-visible + .box { outline: var(--polish-focus-width) solid var(--color-danger); outline-offset: var(--polish-focus-offset); }
+:root .mark { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-choice-mark-stroke); }
+
+:root .root { gap: 8px; }
+:root .box { gap: 0; }
+}
+
+/* ・・：10-10 に採用した共通の形。 */
+html:root .control, html:root .input { width: var(--choice-size); height: var(--choice-size); }
+/*  の差し戻し：16px のチェックは絵の四角（角4）へ。 */
+html:root .box { border-radius: var(--choice-checkbox-radius); }
+
+/* 設定の包みも文字の基準線から切り離す。 */
+.setting { display: inline-flex; vertical-align: top; line-height: 0; }
+
+/* チェックを直接置くセルでは、文字だけの行の高さに箱を引き上げさせない。 */
+:global(html:root) :is(:global(th), :global(td)):has(> .root.root) { line-height: var(--choice-size); }
+
+/* 権限の理由がある時だけ、選択の印を残した灰色にし、押下の動きを止める。 */
+:root .root:has(.input[data-permission-locked]) .box {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  outline-color: var(--polish-choice-border);
+  box-shadow: var(--shadow-choice-off);
+  scale: 1;
+}
+:root .root .input[data-permission-locked]:focus-visible + .box {
+  outline-color: var(--polish-focus);
+}
+
+/* 入力がそろわない場合は薄い緑と理由を使い、権限の灰色とは分ける。 */
+:root .root[data-incomplete] { opacity: 1; }
+:root .root[data-incomplete] .line { opacity: var(--polish-disabled-opacity); }
+:root .root[data-incomplete] .box { background: var(--color-accent-soft); color: var(--color-choice-on); outline-color: var(--color-choice-on); }
+
+:root .root[data-incomplete] .line:hover .input:not(:checked, :indeterminate) + .box { background: var(--color-accent-soft); }
+:root .root[data-incomplete] .line:active .box { scale: 1; }

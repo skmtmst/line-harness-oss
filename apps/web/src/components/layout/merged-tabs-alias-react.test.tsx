@@ -2,8 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import MergedTabs, { useMergedTab } from './merged-tabs'
-import { ANALYTICS_TABS as SEARCH_CONSOLE_TABS } from '@/app/search-console/analytics-tabs'
+import { useMergedTab } from './merged-tabs'
 
 /**
  * R75: Search Console の「URLクリック」タブが別の分析（友だちの増減）を
@@ -84,17 +83,7 @@ describe('useMergedTab の互換表', () => {
   })
 })
 
-describe('Search Console からの移動先', () => {
-  it('URLクリックのタブは /analytics?tab=url-clicks へ向かう', () => {
-    // 本物の Search Console のタブ定義を使う。キーがずれると行き先が変わる。
-    const host = render(
-      <MergedTabs basePath="/analytics" tabs={SEARCH_CONSOLE_TABS} active="search" />,
-    )
-    const button = [...host.querySelectorAll('button')].find(
-      (el) => el.textContent === 'URLクリック',
-    )
-    expect(button).toBeTruthy()
-    act(() => { button!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
-    expect(fixture.replaced).toEqual(['/analytics?tab=url-clicks'])
-  })
-})
+/*
+ * 2026-10-07：Search Console の分析タブの定義（app/search-console/analytics-tabs.ts）は画面が使わなく
+ * なった（どこからも読まれない）ので消した。それを使って URLクリックの行き先を見ていた試験も外した。
+ */

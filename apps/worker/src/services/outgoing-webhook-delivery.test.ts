@@ -139,7 +139,7 @@ describe('配送', () => {
     await deliverWebhook({ ...WEBHOOK, secret: 'a'.repeat(32) }, '{"a":1}', { sleep: noSleep, idempotencyKey: 'event-1', lookupHost: publicOnlyLookup });
     const call = vi.mocked(fetch).mock.calls[0];
     const headers = (call[1] as RequestInit).headers as Record<string, string>;
-    // N-372: 共通契約は X-Harness-Event-Id / X-Harness-Timestamp /
+    // 共通契約は X-Harness-Event-Id / X-Harness-Timestamp /
     // X-Harness-Signature(v1=…)。署名入力は「時刻.イベントID.本文」。
     expect(headers['X-Harness-Event-Id']).toBe('event-1');
     expect(headers['X-Harness-Timestamp']).toMatch(/^\d{10}$/);
@@ -713,15 +713,15 @@ describe('Retry-After の読み取り(N-374)', () => {
     expect(waits[0]).toBeLessThanOrEqual(3000);
   });
 
-  it('429 の過大な指定は安全上限まで待つ（回数は増やさない）', async () => {
+  it('429 の過大な指定は実行中に待たず台帳へ返す（回数は増やさない）', async () => {
     respond429Then200('3600');
     const waits: number[] = [];
     const res = await deliverWebhook({ ...WEBHOOK, max_retries: 1 }, '{}', {
       sleep: (ms: number) => { waits.push(ms); return Promise.resolve(); },
       lookupHost: publicOnlyLookup,
     });
-    expect(res).toMatchObject({ ok: true, attempts: 2 });
-    expect(waits).toEqual([WEBHOOK_RETRY_AFTER_MAX_MS]);
+    expect(res).toMatchObject({ ok: false, attempts: 1, retryAfterMs: 3600000 });
+    expect(waits).toEqual([]);
   });
 
   it('429 で指定がなければ従来どおり指数待ち', async () => {
@@ -767,7 +767,7 @@ describe('Retry-After の読み取り(N-374)', () => {
 });
 
 // =====================================================
-// #650 再審査: 暗号化済みsecretでも署名が必ず付く
+//  暗号化済みsecretでも署名が必ず付く
 // =====================================================
 
 describe('#650 暗号文で保存されたsecretでも署名する', () => {

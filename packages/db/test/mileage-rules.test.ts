@@ -18,9 +18,9 @@ import {
   postMileageAdjustment,
   postMileageEntry,
   updateMileageRule,
-} from '../src/mileage.js';
-import { addTagToFriend, enqueueHistoricTagMileage } from '../src/tags.js';
-import { updateFriendFollowStatus } from '../src/friends.js';
+} from '../src/mileage/index.js';
+import { addTagToFriend, enqueueHistoricTagMileage } from '../src/tags/index.js';
+import { updateFriendFollowStatus } from '../src/friends/index.js';
 import {
   getMileageManualAdjustmentPolicy,
   setMileageManualAdjustmentPolicy,
@@ -74,15 +74,41 @@ function asD1(sqlite: Database.Database): D1Database {
         bind(...params: unknown[]) {
           const statement = sqlite.prepare(sql);
           return {
+            sql,
+            params,
             async run() {
               const result = statement.run(...params);
               return { success: true, results: [], meta: { changes: result.changes } };
             },
             async first<T>() { return (statement.get(...params) as T) ?? null; },
             async all<T>() { return { success: true, results: statement.all(...params) as T[], meta: {} }; },
+            // 本物の D1 が持つ batch 用の同期実行口。postMileageAdjustment は
+            // 台帳と内訳を同じ batch で書くため、ここでも必須。
+            runSyncForBatch<T>() {
+              const result = statement.run(...params);
+              return { success: true, results: [], meta: { changes: result.changes } } as T;
+            },
           };
         },
       };
+    },
+    // 本物の D1 batch と同じく全部まとめて確定する。途中で落ちたら
+    // 巻き戻る（better-sqlite3 の transaction が保証する）。
+    // 本物の D1 が持つ batch 用の同期実行口 runSyncForBatch を優先し
+    // 読み取り文は同期で結果を返す。
+    // 両方を1つの transaction に保ち、原子性を守る。
+    async batch<T>(statements: D1PreparedStatement[]) {
+      const runBatch = sqlite.transaction((list: D1PreparedStatement[]) => list.map((item) => {
+        const sync = (item as unknown as { runSyncForBatch?: () => unknown }).runSyncForBatch;
+        if (sync) return sync();
+        const { sql, params } = item as unknown as { sql: string; params: unknown[] };
+        if (/^\s*(SELECT|WITH|PRAGMA)/i.test(sql)) {
+          return { success: true, results: sqlite.prepare(sql).all(...params), meta: {} };
+        }
+        const info = sqlite.prepare(sql).run(...params);
+        return { success: true, results: [], meta: { changes: info.changes } };
+      }));
+      return runBatch(statements) as unknown as T;
     },
   } as unknown as D1Database;
 }
@@ -402,8 +428,8 @@ describe('configurable mileage rules', () => {
     await processPendingMileageEvents(db, { now: '2026-08-10T10:05:00.000+09:00' });
     expect((await getMileageSummaryForFriend(db, 'friend-1')).available).toBe(35);
 
-    await updateFriendFollowStatus(db, 'U1', false);
-    await updateFriendFollowStatus(db, 'U1', true);
+    await updateFriendFollowStatus(db, 'U1', false, 'account-1');
+    await updateFriendFollowStatus(db, 'U1', true, 'account-1');
     const relationship = sqlite.prepare(
       `SELECT is_following, current_follow_started_at, unfollow_count
          FROM friends WHERE id = 'friend-1'`,

@@ -1,12 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   addDays,
+  formatDateLong,
+  formatDateTimeLong,
   formatJp,
+  formatHoldLeft,
+  formatJstDeadline,
   formatJstEventAt,
   formatJstEventSpan,
   formatMd,
   formatWeekday,
   jstStartsAtIso,
+  jstToday,
   utcToJstDisplay,
   utcToJstHm,
   utcToJstMd,
@@ -57,5 +62,44 @@ describe('イベントの日時の見せ方', () => {
     expect(formatJstEventSpan('2026-10-11T14:00:00Z', '2026-10-11T16:00:00Z')).toBe(
       '10月11日（日）23:00 〜 10月12日（月）01:00',
     );
+  });
+
+  it('取り消しの締め切りは始まりの何時間前かを JST の日時で出す（日をまたいで戻る）', () => {
+    // 始まり JST 10/11 10:00、16 時間前 → JST 10/10 18:00。
+    expect(formatJstDeadline('2026-10-11T10:00:00+09:00', 16)).toBe('10月10日 18:00');
+    expect(formatJstDeadline('2026-10-11T01:00:00Z', 0)).toBe('10月11日 10:00');
+  });
+
+  it('取っておく残り時間は時間と分、1時間未満は分だけ', () => {
+    expect(formatHoldLeft(23 * 3600 + 41 * 60 + 30)).toBe('23時間 41分');
+    expect(formatHoldLeft(41 * 60 + 59)).toBe('41分');
+  });
+});
+
+
+afterEach(() => vi.useRealTimers());
+it.each([
+  ['2026-09-30T15:00:00Z', '00:00'],
+  ['2026-09-30T23:59:59Z', '08:59'],
+  ['2026-10-01T00:00:00Z', '09:00'],
+])('LIFFも日本時間の朝は同じ日付・曜日を出す: %s', (at, time) => {
+  vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(at));
+  expect(jstToday()).toBe('2026-10-01');
+  expect(utcToJstMd(at)).toBe('10/1');
+  expect(utcToJstWeekday(at)).toBe('木');
+  expect(utcToJstHm(at)).toBe(time);
+  expect(jstStartsAtIso('2026-10-01', time)).toBe(`${at.slice(0, 16)}:00.000Z`);
+});
+
+describe('詳しい日時の書き方', () => {
+  it('締め切りや期限は年まで出し、秒は出さない（日本時間）', () => {
+    expect(formatDateTimeLong('2026-10-25T08:51:30Z')).toBe('2026年10月25日 17:51');
+    expect(formatDateTimeLong('2026-12-31T15:05:00Z')).toBe('2027年1月1日 00:05');
+    expect(formatDateLong('2026-10-25T08:51:30Z')).toBe('2026年10月25日');
+  });
+
+  it('店の時間帯を渡すとその時刻で出し、読めない値は空にする', () => {
+    expect(formatDateTimeLong('2026-10-25T08:51:00Z', 'America/New_York')).toBe('2026年10月25日 04:51');
+    expect(formatDateTimeLong('not a date')).toBe('');
   });
 });

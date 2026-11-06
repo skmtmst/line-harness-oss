@@ -1,9 +1,9 @@
 /*
- * 状態の写像が JS と SQL で一致すること(#731)。
+ * 状態の写像が JS と SQL で一致すること。
  *
  * 契約の状態は、いま2か所で判定している。
- *   - JS: `subscriptionState()`   … 1件を整形するとき
- *   - SQL: `subscriptionStateSql()` … 数えるとき・絞り込むとき・並べるとき
+ *   - JS: `subscriptionState`   … 1件を整形するとき
+ *   - SQL: `subscriptionStateSql` … 数えるとき・絞り込むとき・並べるとき
  *
  * **表(`SUBSCRIPTION_STATE_RULES`)は1か所だけ**にしてあるが、表を共有しても
  * **順序までは揃わない**。「解約」と「休止」の両方を含む文字列がどちらに倒れるかは、
@@ -12,7 +12,7 @@
  *
  * 基準は「**いまの JS 関数と同じ結果になること**」。EC 側が実際に何を返すかは
  * 手元では分からないので、実データに合わせるのではなく、**振る舞いを変えない**
- * ことを固定する(#731 の裁定)。
+ * ことを固定する( の裁定)。
  */
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, test } from 'vitest';

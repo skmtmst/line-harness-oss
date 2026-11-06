@@ -1,10 +1,11 @@
-import type { FeatureKey } from '@/lib/feature-settings'
+import type { FeatureKey } from '../../lib/feature-key'
 import type { Recipe as ApiRecipe } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 /**
- * レシピの正本。設計 ★V6 34-2「レシピ一覧」（`y0P0Qx`）の 3 本。
+ * レシピの正本。設計 ★管理画面 34-2「レシピ一覧」（`y0P0Qx`）の 3 本。
  *
- * **レシピは実行基盤を持たない静的な見本**（要件 v6-34 §7-1）。
+ * **レシピは実行基盤を持たない静的な見本**（要件 管理画面-34 §7-1）。
  * だから一覧の中身はサーバに置かず、ここを正本にする。
  * 変わるのは「必要な機能が入っているか」と「これまで何回作られたか」だけで、
  * 前者は機能設定から引ける。後者は数える口がまだ無い（→ 台帳 #134）。
@@ -13,7 +14,7 @@ import type { Recipe as ApiRecipe } from '@/lib/api'
 export interface RecipeRequirement {
   label: string
   /**
-   * 機能設定の鍵。**`null` は「切れない機能」**（友だち属性など）。
+   * 機能設定の鍵。**`null` は「切れない機能」**（タグなど）。
    * 鍵が無いことと、機能がオフなことを混ぜない。
    */
   feature: FeatureKey | null
@@ -41,7 +42,7 @@ export interface Recipe {
   /**
    * 作られるものの内訳。
    *
-   * **決まっていないものを埋めない。** 設計 ★V6 34-3（`D5UaX`）が
+   * **決まっていないものを埋めない。** 設計 ★管理画面 34-3（`D5UaX`）が
    * 内訳まで描いているのは「新規登録 7日間フォロー」だけで、
    * ほかは要件 §7-2 にある分までしか決まっていない。
    * 無いものは `null` にして、画面で「まだ決まっていません」と言う。
@@ -52,7 +53,7 @@ export interface Recipe {
   requirements: ReadonlyArray<RecipeRequirement>
 }
 
-const FRIEND_ATTRIBUTES: RecipeRequirement = { label: '友だち属性', feature: null }
+const FRIEND_ATTRIBUTES: RecipeRequirement = { label: 'タグ', feature: null }
 
 export const RECIPES: ReadonlyArray<Recipe> = [
   {
@@ -143,11 +144,11 @@ export function featureLabel(key: string): string {
   return FEATURE_LABELS[key] ?? key
 }
 
-/** 友だち属性は切れない機能なのでAPIの必要機能配列には入らない。 */
+/** タグは切れない機能なのでAPIの必要機能配列には入らない。 */
 export function apiRecipeRequirements(recipe: ApiRecipe): Array<{ key: string | null; label: string; on: boolean }> {
   const missing = new Set(recipe.missingFeatures)
   return [
-    { key: null, label: '友だち属性', on: true },
+    { key: null, label: 'タグ', on: true },
     ...recipe.requiredFeatures.map((key) => ({ key, label: featureLabel(key), on: !missing.has(key) })),
   ]
 }
@@ -258,7 +259,7 @@ export function featureSummary(recipe: Recipe, features: Record<string, boolean>
 
 /** 下の帯のボタンの文字。件数が決まっていないときは件数を言わない。 */
 export function createButtonLabel(recipe: Pick<Recipe, 'itemCount'>): string {
-  return recipe.itemCount != null ? `${recipe.itemCount}件を下書きで作る` : '下書きで作る'
+  return recipe.itemCount != null ? `${formatNumber(recipe.itemCount)}件を下書きで作る` : '下書きで作る'
 }
 
 /**

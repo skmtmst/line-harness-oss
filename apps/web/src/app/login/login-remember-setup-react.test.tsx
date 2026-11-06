@@ -25,6 +25,14 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, refresh() {}, back() {}, forward() {}, prefetch() {} }),
 }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: 'テスト統括' }) }))
+vi.mock('@/lib/auth-email', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/auth-email')>(),
+  TURNSTILE_SITE_KEY: 'fixture-public-site-key',
+}))
+vi.mock('@/components/auth/turnstile', () => ({ default: function VerifiedTurnstile({ onToken }: { onToken: (token: string) => void }) {
+  React.useEffect(() => { onToken('fixture-turnstile-token') }, [onToken])
+  return null
+} }))
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status, headers: { 'Content-Type': 'application/json' },
@@ -81,7 +89,7 @@ describe('N-434: 7日間ログインを保持する選択', () => {
     await render()
 
     expect(host.querySelector('[role="alert"]')?.textContent).toBe(
-      'LINEログインを完了できませんでした。もう一度お試しください。',
+      '失敗：LINEログインを完了できませんでした。もう一度お試しください。',
     )
   })
 
@@ -123,6 +131,29 @@ describe('N-434: 7日間ログインを保持する選択', () => {
 })
 
 describe('N-426: 二段階認証の初回設定へ進む', () => {
+  it('R507: twoFactor 応答なら合言葉とメール経路の印付きで /login/two-factor へ進む', async () => {
+    fixture.loginResponse = { success: true, data: { twoFactor: true, challengeToken: 'verify-tok-1' }, csrfToken: 'csrf-1' }
+    await render()
+    const email = field('#login-email') as HTMLInputElement
+    const password = field('#login-password') as HTMLInputElement
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+      setter.call(email, 'owner@example.com'); email.dispatchEvent(new Event('input', { bubbles: true }))
+      setter.call(password, 'Abcdefg1'); password.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const form = host.querySelector('form')!
+    await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+    await flush()
+    expect(window.location.pathname).toBe('/login/two-factor')
+    const params = new URLSearchParams(window.location.hash.slice(1))
+    expect(params.get('lh_2fa')).toBe('verify-tok-1')
+    expect(params.get('lh_method')).toBe('password')
+    expect(params.get('lh_nonce')).toMatch(/^[0-9a-f-]{36}$/)
+    expect(JSON.parse(sessionStorage.getItem('lh_login_handoff')!)).toMatchObject({
+      nonce: params.get('lh_nonce'), kind: 'challenge', path: '/login/two-factor',
+    })
+  })
+
   it('twoFactorSetup 応答なら /login/two-factor/setup へ合言葉付きで進む', async () => {
     await render()
     const email = field('#login-email') as HTMLInputElement
@@ -146,7 +177,10 @@ describe('N-426: 二段階認証の初回設定へ進む', () => {
     const buttons = [...host.querySelectorAll('button')] as HTMLButtonElement[]
     const lineButton = buttons.find((b) => b.textContent?.includes('LINE'))!
     await act(async () => { lineButton.click() })
-    expect(window.location.href).toBe('https://api.example.test/api/auth/line?remember=1')
+    const url = new URL(window.location.href)
+    expect(url.origin + url.pathname).toBe('https://api.example.test/api/auth/line')
+    expect(url.searchParams.get('remember')).toBe('1')
+    expect(url.searchParams.get('handoff')).toMatch(/^[0-9a-f-]{36}$/)
   })
 
   it('LINEログインで未選択なら remember は付かない', async () => {
@@ -154,6 +188,9 @@ describe('N-426: 二段階認証の初回設定へ進む', () => {
     const buttons = [...host.querySelectorAll('button')] as HTMLButtonElement[]
     const lineButton = buttons.find((b) => b.textContent?.includes('LINE'))!
     await act(async () => { lineButton.click() })
-    expect(window.location.href).toBe('https://api.example.test/api/auth/line')
+    const url = new URL(window.location.href)
+    expect(url.origin + url.pathname).toBe('https://api.example.test/api/auth/line')
+    expect(url.searchParams.has('remember')).toBe(false)
+    expect(url.searchParams.get('handoff')).toMatch(/^[0-9a-f-]{36}$/)
   })
 })

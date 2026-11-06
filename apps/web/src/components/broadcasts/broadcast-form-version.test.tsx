@@ -6,6 +6,7 @@
  *   2. 別編集で古くなった保存は409で止まり、「別の画面で更新されたため読み直しました」と
  *      案内して読み直し、古い内容を送り直さない（更新口は1回だけ）。
  */
+import { setTextControlValue } from '@/test-utils/text-control'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
@@ -89,18 +90,13 @@ function unmount() {
 }
 
 function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
-    'value',
-  )?.set
-  setter?.call(element, value)
-  element.dispatchEvent(new Event('input', { bubbles: true }))
+  setTextControlValue(element, value)
 }
 
 async function fillMinimum() {
   const title = container.querySelector('input[placeholder="例：8月キャンペーンのお知らせ"]') as HTMLInputElement | null
   expect(title).not.toBeNull()
-  const body = container.querySelector('textarea[placeholder="テキストを入力"]') as HTMLTextAreaElement | null
+  const body = container.querySelector('[role="textbox"][placeholder="テキストを入力"]') as HTMLTextAreaElement | null
   expect(body).not.toBeNull()
   await act(async () => {
     setNativeValue(title!, '検証配信用の題')
@@ -111,7 +107,7 @@ async function fillMinimum() {
 
 function saveButton(): HTMLButtonElement | undefined {
   const buttons = Array.from(container.querySelectorAll('button')).filter(
-    (button) => button.textContent === '下書き保存' && !button.disabled,
+    (button) => button.textContent === '下書きを保存する' && !button.disabled,
   )
   return buttons[buttons.length - 1]
 }
@@ -155,11 +151,15 @@ describe('作成画面の下書き保存の版(#772)', () => {
     try {
       await fillMinimum()
       await clickSave()
+      getApi.mockClear()
       await clickSave()
       await flush()
 
       expect(updateApi).toHaveBeenCalledTimes(1)
-      expect(container.textContent).toContain('別の画面で更新されたため読み直しました')
+      expect(container.textContent).toContain('ほかの担当者が先に配信を保存しました')
+      expect(getApi).not.toHaveBeenCalled()
+      await act(async () => { const compare = [...container.querySelectorAll('button')].find((button) => button.textContent?.includes('違いを比べる'))!; compare.click() })
+      await flush()
       // 読み直している（作成時以外の取得がある）。
       expect(getApi).toHaveBeenCalledWith('draft-1')
     } finally {

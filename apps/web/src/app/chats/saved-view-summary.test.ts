@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { savedViewSummary } from './saved-view-summary'
-import type { InboxSavedViewConditions } from './saved-view-types'
+import { savedViewSummary } from '@/v8/inbox-chat/saved-view-summary'
+import type { InboxSavedViewConditions } from '@/v8/inbox-chat/saved-view-types'
 
 function conditions(patch: Partial<InboxSavedViewConditions> = {}): InboxSavedViewConditions {
   return {

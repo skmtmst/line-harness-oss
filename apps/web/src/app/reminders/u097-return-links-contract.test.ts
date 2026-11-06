@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -18,14 +18,14 @@ const INFLOW_DETAIL = read('app/inflow-links/detail/page.tsx')
  * 操作を足す。
  */
 describe('一覧へ戻る操作を置く（#975 U097）', () => {
-  it('友だち属性の移行は、アカウント未選択と対象なしの両方で一覧へ戻れる', () => {
+  it('タグの移行は、アカウント未選択と対象なしの両方で一覧へ戻れる', () => {
     expect(TAGS_MIGRATE).toContain('href="/tags?tab=fields"')
     expect(TAGS_MIGRATE).toContain('友だち情報欄の一覧へ戻る')
     expect(TAGS_MIGRATE).toContain('移行元の項目が見つかりません')
   })
 
   it('回答を見る画面は、対象未指定と対象なしの両方で一覧へ戻れる', () => {
-    // 戻り先は ★V7 TargetMissing の backHref が持つ。
+    // 戻り先は ★管理画面 TargetMissing の backHref が持つ。
     expect(RESPONSES).toContain('backHref="/form-submissions"')
     expect(RESPONSES).toContain('回答フォーム一覧へ戻る')
     expect(RESPONSES).toContain('見る回答フォームが指定されていません')
@@ -47,7 +47,7 @@ describe('一覧へ戻る操作を置く（#975 U097）', () => {
   })
 
   it('流入リンク詳細は、表示できないとき一覧へ戻れる', () => {
-    expect(INFLOW_DETAIL).toContain('href="/inflow-links"')
+    expect(INFLOW_DETAIL).toContain('backHref="/inflow-links"')
     expect(INFLOW_DETAIL).toContain('流入経路の一覧へ戻る')
   })
 })

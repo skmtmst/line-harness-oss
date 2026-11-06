@@ -85,3 +85,24 @@ describe('FlexPreview の描画結果', () => {
     expect(card!.className).toContain('text-ink')
   })
 })
+
+it('親の直接の子にFlex比率を付ける（WEB279）', () => {
+  const bubble = { type: 'bubble', body: { type: 'box', contents: [{ type: 'box', layout: 'horizontal', contents: [{ type: 'text', text: '左', flex: 1 }, { type: 'text', text: '右', flex: 3 }] }] } }
+  const { getByText } = render(<FlexPreview content={JSON.stringify(bubble)} />)
+  expect((getByText('左').parentElement as HTMLElement).style.flexGrow).toBe('1')
+  expect((getByText('右').parentElement as HTMLElement).style.flexGrow).toBe('3')
+})
+it('textのcontentsのspanを順番に描く（WEB280）', () => {
+  const bubble = { type: 'bubble', body: { type: 'box', contents: [{ type: 'text', contents: [{ type: 'span', text: '通常' }, { type: 'span', text: '強調', weight: 'bold' }] }] } }
+  const { getByText, container } = render(<FlexPreview content={JSON.stringify(bubble)} />)
+  expect(container.textContent).toContain('通常強調')
+  expect((getByText('強調') as HTMLElement).style.fontWeight).toBe('700')
+})
+it('flex:0の子は中身の幅で固定し縦に崩さない（E29）', () => {
+  const bubble = { type: 'bubble', body: { type: 'box', contents: [{ type: 'box', layout: 'baseline', contents: [{ type: 'text', text: '期限', flex: 0 }, { type: 'text', text: '10月31日まで有効です' }] }] } }
+  const { getByText } = render(<FlexPreview content={JSON.stringify(bubble)} />)
+  const wrap = getByText('期限').parentElement as HTMLElement
+  // `flex: 0`（= 0 1 0%）のままだと基準幅0%から最小内容幅まで縮み、1字ずつ縦に割れる。
+  expect(wrap.style.flex).toBe('0 0 auto')
+  expect(wrap.style.maxWidth).toBe('100%')
+})

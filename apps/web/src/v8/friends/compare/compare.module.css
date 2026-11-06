@@ -1,0 +1,115 @@
+/* ★V8 重複候補を比べて決める（Pencil ・1152 は ）。値は globals.css の --tpl-fr-*。 */
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-fr-head-gap);
+  padding: var(--tpl-fr-head-pad);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.back { color: var(--color-action); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-fr-back-lh); }
+.back:hover { text-decoration: underline; }
+.title { margin: 0; color: var(--color-ink); font-size: var(--text-metric); font-weight: 700; line-height: var(--tpl-fr-title-lh); }
+.description { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-fr-desc-lh); }
+
+.body { display: flex; flex-direction: column; gap: var(--tpl-fr-area-gap); padding: var(--tpl-fr-area-pad); min-width: 0; }
+
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-fr-stack-gap); align-items: stretch; }
+
+.side { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 600; line-height: var(--tpl-fr-sub-lh); }
+.subjectName { margin: 0; color: var(--color-ink); font-size: var(--tpl-fr-cmp-name-size); font-weight: 700; line-height: var(--tpl-fr-cmp-name-lh); }
+.subjectSub { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-fr-desc-lh); }
+
+.attrs { margin: 0; }
+.attr { display: flex; align-items: center; gap: var(--tpl-fr-stack-gap); min-height: var(--tpl-fr-cmp-attr-h); }
+.attr dt { width: var(--tpl-fr-cmp-attr-label); flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.attr dd { margin: 0; }
+.attr dd.mono { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-family: var(--font-mono); font-size: var(--text-micro); }
+
+.pill { display: inline-flex; padding: var(--tpl-fr-status-pad); border-radius: var(--radius-pill); font-size: var(--text-micro); font-weight: 700; line-height: var(--tpl-fr-sub-lh); white-space: nowrap; }
+.pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.pillMuted { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
+
+.cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-fr-panel-title-size); font-weight: 700; line-height: var(--tpl-fr-panel-title-lh); }
+.cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-fr-sub-lh); }
+
+.lines { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+
+.line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-fr-stack-gap);
+  min-height: var(--tpl-fr-cmp-line-h);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-fr-desc-lh);
+}
+
+.strong { color: var(--color-accent-deep); font-weight: 700; white-space: nowrap; }
+.weak { color: var(--color-ink-faint); font-weight: 600; white-space: nowrap; }
+.lineValue { font-weight: 700; white-space: nowrap; }
+
+.panelTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-fr-cmp-panel-lh); }
+.radios { display: flex; align-items: center; gap: var(--tpl-fr-cmp-radio-gap); }
+
+.checks { display: flex; flex-direction: column; gap: var(--tpl-fr-cmp-check-gap); }
+.fieldLabel { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-fr-cmp-panel-lh); margin-bottom: calc(var(--tpl-fr-cmp-check-gap) - var(--tpl-fr-stack-gap)); }
+
+.note { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); }
+
+.historyLine {
+  display: grid;
+  grid-template-columns: var(--tpl-fr-cmp-history-date) minmax(0, 1fr);
+  gap: var(--tpl-fr-stack-gap);
+  align-items: center;
+  min-height: var(--tpl-fr-cmp-line-h);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-fr-back-lh);
+}
+
+.colItem { width: var(--tpl-fr-cmp-col-item); }
+.colUse { width: var(--tpl-fr-cmp-col-use); }
+
+:global(:root) .table thead tr { background: transparent; border-top: 0; }
+:global(:root) .table thead th.th {
+  height: var(--tpl-fr-dup-thead-h);
+  padding: var(--tpl-fr-dup-thead-pad);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-fr-desc-lh);
+  vertical-align: top;
+}
+:global(:root) .table thead th.th:first-child { padding-left: var(--tpl-fr-cell-inset); }
+:global(:root) .table thead th.th:last-child { padding-right: var(--tpl-fr-cell-inset); }
+:global(:root) .table td.td {
+  height: var(--tpl-fr-mu-row-h);
+  padding: 0 var(--tpl-fr-stack-gap) 0 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-fr-desc-lh);
+  vertical-align: middle;
+}
+:global(:root) .table tr.rowPlain td.td { height: var(--tpl-fr-dup-row-compact-h); }
+:global(:root) .table td.td:first-child { padding-left: var(--tpl-fr-cell-inset); }
+:global(:root) .table td.td:last-child { padding-right: var(--tpl-fr-cell-inset); }
+
+.itemName { font-weight: 600; }
+.faint { color: var(--color-ink-faint); }
+
+/* 下の帯：左に「別の人だった」、中央に保留・結び付ける（画面の下に追従）。 */
+/* 1152 の板：確認済みの札は値のすぐ後ろ。 */
+@container v8-page (max-width: 1000px) {
+  .attr { gap: var(--tpl-fr-area-gap); }
+  .attr dt { width: var(--tpl-fr-cmp-attr-label-n); }
+  .attr dd.mono { flex: 0 1 auto; }
+}
+
+/* 行（乗せたときの地の変化は共通の動きの速さ）。 */
+.row { transition: background-color var(--motion-fast) var(--motion-ease-out); }

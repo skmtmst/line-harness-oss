@@ -1,7 +1,7 @@
 'use client'
 
 import { Mail } from 'lucide-react'
-import Link from 'next/link'
+import TextLink from '@/components/shared/text-link'
 import { useCallback, useRef, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import Turnstile, { type TurnstileHandle } from '@/components/auth/turnstile'
@@ -9,9 +9,10 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { authRequest, emailError, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
+import styles from './forgot.module.css'
 
 /**
- * パスワードを忘れた。★V6 36-6-A（`fmDeV`、カード `dVI5v`）。
+ * パスワードを忘れた。★管理画面 36-6-A（`fmDeV`、カード `dVI5v`）。
  *
  * 登録済みかどうかは返事で分からない（本人にだけメールが届く）。
  * LINE だけの権限者もここからパスワードを持てる。
@@ -41,7 +42,7 @@ export default function PasswordForgotPage() {
     setError('')
     const res = await authRequest<{ sent: boolean }>('/api/auth/password/forgot', { email: email.trim(), turnstileToken })
     if (!res.ok) {
-      setError(res.error || '送信できませんでした')
+      setError(res.error || '送信できませんでした。時間をおいて、もう一度お試しください。')
       turnstileRef.current?.reset()
       setBusy(false)
       return
@@ -66,7 +67,7 @@ export default function PasswordForgotPage() {
           <Mail className="h-7 w-7 text-accent-deep" />
         </span>
         <p className="text-caption text-ink-secondary">届かないときは、迷惑メールフォルダと、入れたメールアドレスを確かめてください。</p>
-        <Button href="/login" className="w-full">
+        <Button fullWidth href="/login" className="w-full">
           ログインへ戻る
         </Button>
       </AuthCard>
@@ -80,7 +81,7 @@ export default function PasswordForgotPage() {
       title="パスワードを忘れた"
       description="登録しているメールアドレスを入れてください。パスワードを設定し直す URL をお送りします。"
     >
-      <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
+      <form onSubmit={(event) => void submit(event)} noValidate className={`flex w-full flex-col gap-4 ${styles.form}`}>
         {error ? (
           <Notice tone="danger" message={error} />
         ) : null}
@@ -98,15 +99,14 @@ export default function PasswordForgotPage() {
           />
         </AuthField>
         <Turnstile onToken={setTurnstileToken} handleRef={setTurnstileHandle} />
-        <Button type="submit" variant="primary" disabled={busy || !TURNSTILE_SITE_KEY} className="w-full">
-          {busy ? '送っています…' : '再設定メールを送る'}
+        <Button fullWidth type="submit" variant="primary" disabled={busy || !TURNSTILE_SITE_KEY} className="w-full" busy={busy} busyLabel="送っています…">再設定メールを送る
         </Button>
       </form>
       <p className="text-caption text-ink-faint">
         思い出した方は{' '}
-        <Link href="/login" className="font-semibold text-action hover:underline">
+        <TextLink inline href="/login">
           ログイン
-        </Link>
+        </TextLink>
       </p>
     </AuthCard>
   )

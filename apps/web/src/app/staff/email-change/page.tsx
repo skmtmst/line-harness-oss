@@ -1,9 +1,11 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
+import MusuboLogo from '@/components/shared/musubo-logo'
 import { api } from '@/lib/api'
 
 /*
@@ -44,15 +46,15 @@ export default function StaffEmailChangePage() {
       setToken('')
       setView('complete')
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'メールアドレスの変更を確定できませんでした。')
+      setError(describeApiFailure(caught, '保存'))
       setView('ready')
     }
   }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl items-center px-6 py-16">
-      <section className="w-full rounded-card border border-hairline bg-canvas p-8 shadow-sm">
-        <p className="text-sm font-semibold text-ink-secondary">musubo LINE管理システム</p>
+      <section className="w-full rounded-card border border-hairline bg-canvas p-8 shadow-card-surface">
+        <MusuboLogo size="staff" />
         <div role="heading" aria-level={1} className="mt-3 text-2xl font-bold text-ink">メールアドレスの変更</div>
 
         {view === 'reading' && <p className="mt-5 text-sm text-ink-secondary">確認内容を読み込んでいます…</p>}
@@ -72,8 +74,7 @@ export default function StaffEmailChangePage() {
             </p>
             {error && <Notice tone="danger" message={error} className="mt-4" />}
             <div className="mt-6">
-              <Button type="button" variant="primary" disabled={view === 'submitting'} onClick={() => void applyChange()}>
-                {view === 'submitting' ? '確定中…' : '変更を確定する'}
+              <Button type="button" variant="primary" disabled={view === 'submitting'} onClick={() => void applyChange()} busy={view === 'submitting'} busyLabel="確定中…">変更を確定する
               </Button>
             </div>
           </>

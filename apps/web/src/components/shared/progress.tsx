@@ -4,14 +4,15 @@ import { CircleCheck, LoaderCircle, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import Button from './button'
 import styles from './progress.module.css'
+import { CHECK_MARK_PATH } from './checkbox'
 
 export type ProgressState = 'preparing' | 'active' | 'done' | 'partial'
 
 /**
- * 処理の進み。Pencil ★V7 `xiHO8`「★V7 処理の進み」。
+ * 処理の進み。Pencil ★V8 `tydx2`「進みの棒」。
  *
  * 一斉配信の送信・CSV取り込み・一括操作で「押した後いま何が起きているか」を見せる。
- * 形の手本は kobra.systems の Progress（コードは写していない。docs/v7-reference-ui-adoption.md §5）。
+ * 形の手本は kobra.systems の Progress（コードは写していない）。
  *
  * - 数が分かる時は数と割合（active）、分からない時は段階の名前（preparing）
  * - 棒の伸びは幅ではなく `scaleX` で動かす（周りが揺れない）
@@ -95,7 +96,7 @@ export default function Progress({
         className={[styles.root, className].filter(Boolean).join(' ')}
       >
         <p className={styles.head}>
-          <CircleCheck aria-hidden="true" size={18} className={styles.doneIcon} />
+          <CircleCheck aria-hidden="true" size={20} className={styles.doneIcon} />
           <span className={styles.title}>{title}</span>
         </p>
         <div aria-hidden="true" className={styles.track}>
@@ -119,7 +120,7 @@ export default function Progress({
         className={[styles.root, className].filter(Boolean).join(' ')}
       >
         <p className={styles.head}>
-          <TriangleAlert aria-hidden="true" size={18} className={styles.partialIcon} />
+          <TriangleAlert aria-hidden="true" size={20} className={styles.partialIcon} />
           <span className={styles.title}>{title}</span>
         </p>
         <div aria-hidden="true" className={styles.track}>
@@ -167,5 +168,42 @@ export default function Progress({
       {/* 10% ごとにだけ読み上げる。毎回読むとうるさい。 */}
       <span role="status" className={styles.announcer}>{`${title} ${bucket}%`}</span>
     </div>
+  )
+}
+
+/** 段に区切って見せる上限。これより多い段・割合（max=100 など）は 1 本の棒で見せる。 */
+const MAX_SEGMENTS = 12
+
+/**
+ * V8 tydx2: bare progress track. Full Progress keeps its actions and announcements.
+ * `appearance="onboarding"` で段の数（max）が少ないときは、段の数に区切った緑で見せる
+ * （済んだ段は緑、まだの段は棒の地の色）。
+ */
+export function ProgressBar({ value, label, className, max = 100, appearance, tone, indeterminate = false, indeterminateVisual = 'slide' }: {
+  value: number; label: string; className?: string; max?: number
+  appearance?: 'onboarding' | 'quota'; tone?: 'danger' | 'warning'; indeterminate?: boolean
+  indeterminateVisual?: 'slide' | 'empty'
+}) {
+  const limit = Number.isFinite(max) && max > 0 ? max : 0
+  const clamped = Number.isFinite(value) ? Math.min(limit, Math.max(0, value)) : 0
+  const segmented = appearance === 'onboarding' && Number.isInteger(limit) && limit > 1 && limit <= MAX_SEGMENTS
+  return (
+    <div role="progressbar" aria-label={label} aria-valuemin={indeterminate ? undefined : 0} aria-valuemax={indeterminate ? undefined : limit} aria-valuenow={indeterminate ? undefined : clamped} aria-valuetext={indeterminate ? '対象人数を確認中' : undefined} data-appearance={appearance} data-tone={tone} data-segmented={!indeterminate && segmented || undefined} className={[styles.track, className].filter(Boolean).join(' ')}>
+      {indeterminate ? indeterminateVisual === 'slide' ? <div className={styles.indeterminate} /> : null : segmented
+        ? Array.from({ length: limit }, (_, index) => <span key={index} className={styles.segment} data-on={index < Math.floor(clamped) || undefined} />)
+        : <div className={styles.fill} style={{ transform: `scaleX(${limit > 0 ? clamped / limit : 0})` }} />}
+    </div>
+  )
+}
+
+/**
+ * 段の済み・まだの印。押せる形にしない丸（状態の印）。
+ * 済み＝緑の丸に白い ✓、まだ＝白い丸に共通の枠の色。選ぶ物はチェックボックス（四角）を使う。
+ */
+export function StepMark({ done, className }: { done: boolean; className?: string }) {
+  return (
+    <span aria-hidden="true" data-step-mark={done ? 'done' : 'todo'} className={[styles.stepMark, className].filter(Boolean).join(' ')}>
+      {done ? <svg className={styles.stepMarkIcon} viewBox="0 0 24 24"><path d={CHECK_MARK_PATH} /></svg> : null}
+    </span>
   )
 }

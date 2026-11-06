@@ -11,24 +11,27 @@ import LinePreview from './line-preview'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  delete document.documentElement.dataset.theme
+})
 
 /**
- * LINEプレビュー共通部品（B-6、★V7）。
+ * LINEでの見え方共通部品（、★管理画面）。
  *
  * ばらばらだった枠（青い地・緑の枠・濃い緑・白）を1つにそろえる。
  * 中身は各画面の描き方のまま、枠だけが共通。
  */
-describe('LINEプレビュー共通部品', () => {
-  it('題「LINEプレビュー」と中身を出す', () => {
+describe('LINEでの見え方共通部品', () => {
+  it('題「LINEでの見え方」と中身を出す', () => {
     const html = renderToStaticMarkup(
       <LinePreview>
         <p>こんにちは</p>
       </LinePreview>,
     )
-    expect(html).toContain('LINEプレビュー')
+    expect(html).toContain('LINEでの見え方')
     expect(html).toContain('こんにちは')
-    expect(html).toContain('aria-label="LINEプレビュー"')
+    expect(html).toContain('aria-label="LINEでの見え方"')
   })
 
   it('注の文は本文に出さず、題の横の？に入れる', () => {
@@ -39,7 +42,7 @@ describe('LINEプレビュー共通部品', () => {
     )
     // 閉じている？の中身は出さない（箱を高くしない）。
     expect(html).not.toContain('実際のLINE表示に近いプレビューです')
-    expect(html).toContain('LINEプレビューの説明')
+    expect(html).toContain('LINEでの見え方の説明')
   })
 
   it('？を開くと注の文が出る', () => {
@@ -48,7 +51,7 @@ describe('LINEプレビュー共通部品', () => {
         <p>こんにちは</p>
       </LinePreview>,
     )
-    fireEvent.click(screen.getByRole('button', { name: 'LINEプレビューの説明' }))
+    fireEvent.click(screen.getByRole('button', { name: 'LINEでの見え方の説明' }))
     expect(screen.getByRole('note').textContent).toContain('実際のLINE表示に近いプレビューです')
   })
 
@@ -69,12 +72,72 @@ describe('LINEプレビュー共通部品', () => {
     expect(html).not.toContain('こんにちは')
   })
 
+  it('旧テーマの指定でも現在の枠1つだけを描く', () => {
+    // 管理画面（未設定）ではパネルだけ。スマホの帯（9:41・メニュー）は出ない。
+    document.documentElement.dataset.theme = 'v7'
+    const legacyPreview = render(
+      <LinePreview>
+        <p>こんにちは</p>
+      </LinePreview>,
+    )
+    expect(legacyPreview.container.querySelectorAll('section[aria-label="LINEでの見え方"]')).toHaveLength(1)
+    expect(screen.getByText('9:41')).toBeTruthy()
+    legacyPreview.unmount()
+
+    // v8 ではスマホの枠だけ。中身はトークの中へ入る。
+    document.documentElement.dataset.theme = 'v8'
+    const v8 = render(
+      <LinePreview>
+        <p>こんにちは</p>
+      </LinePreview>,
+    )
+    expect(v8.container.querySelectorAll('section[aria-label="LINEでの見え方"]')).toHaveLength(1)
+    expect(screen.getByText('9:41')).toBeTruthy()
+    expect(screen.getByText('メニュー')).toBeTruthy()
+    expect(screen.getByText('こんにちは')).toBeTruthy()
+  })
+
+  it('V8は画面の題を使え、外側に題があるときはスマホの題だけを外せる', () => {
+    document.documentElement.dataset.theme = 'v8'
+    const view = render(<LinePreview title="届き方"><p>こんにちは</p></LinePreview>)
+    expect(screen.getByText('届き方')).toBeTruthy()
+    view.rerender(<LinePreview title={null}><p>こんにちは</p></LinePreview>)
+    expect(screen.queryByText('届き方')).toBeNull()
+    expect(screen.queryByText('LINEでの見え方')).toBeNull()
+    expect(screen.getByText('こんにちは')).toBeTruthy()
+    expect(screen.getByText('9:41')).toBeTruthy()
+  })
+
+  it('リッチメニューはトーク画面のいちばん下（入力の帯の位置）に出し、帯は1本だけ（gobhu）', () => {
+    document.documentElement.dataset.theme = 'v8'
+    const { container } = render(
+      <LinePreview chatBarText="会員メニュー" richMenu={<div data-testid="menu-image">メニューの画像</div>} />,
+    )
+    const screenEl = container.querySelector('[data-line-preview-part="talk"]')!.parentElement!
+    const parts = [...screenEl.children].map((el) => el.getAttribute('data-line-preview-part')).filter(Boolean)
+    /* 上からトーク → メニュー → 帯。メニューはトークの中に入れない（トークがその上で縮む）。 */
+    expect(parts).toEqual(['talk', 'rich-menu', 'menu-bar'])
+    expect(container.querySelector('[data-line-preview-part="talk"] [data-testid="menu-image"]')).toBeNull()
+    expect(container.querySelector('[data-line-preview-part="rich-menu"] [data-testid="menu-image"]')).toBeTruthy()
+    /* 帯は1本だけで、文字はトーク画面の下の文言。 */
+    expect(container.querySelectorAll('[data-line-preview-part="menu-bar"]')).toHaveLength(1)
+    expect(container.querySelector('[data-line-preview-part="menu-bar"]')?.textContent).toBe('会員メニュー')
+    /* リッチメニューの見本は日付の札を出さない（絵 gobhu）。 */
+    expect(screen.queryByText('今日')).toBeNull()
+  })
+
   it('枠の色は生の色値ではなくトークンで読む', () => {
     const tsx = read('line-preview.tsx')
     // トーク背景色のトークンを使い、#16進も素の Tailwind 色も書かない。
-    expect(tsx).toContain('bg-line-talk')
+    expect(tsx).toContain('styles.phone')
+    expect(read('line-preview.module.css')).toContain('var(--v8-line-screen)')
     expect(tsx).not.toMatch(/#[0-9a-fA-F]{3,8}/)
     expect(tsx).not.toMatch(/bg-(white|black|gray|slate|blue|green|red)-/)
-    expect(tsx).not.toContain('.module.css')
+    // ★V8 の枠だけモジュール CSS に切り出した（`cfVyj` の板の決まり）。
+    // モジュール内も値はトークンだけ。生の #16進・rgb を置かない。
+    const css = read('line-preview.module.css')
+    expect(css).toContain(":root")
+    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
+    expect(css).not.toMatch(/\brgba?\(/)
   })
 })

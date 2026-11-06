@@ -1,3 +1,4 @@
+import { LinePreviewFlex } from '@/components/shared/line-preview'
 import { MapPin } from 'lucide-react'
 
 import type { BroadcastBubble, BroadcastMessageButton } from '@/lib/api'
@@ -46,13 +47,13 @@ export default function BroadcastMessagePreview({
             </p>
           )}
           {item.type === 'text' ? (
-            <p className="whitespace-pre-wrap rounded-card rounded-tl-sm bg-canvas px-3 py-2 text-sm leading-6 text-ink shadow-sm">
+            <p className="whitespace-pre-wrap rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-sm leading-6 text-ink shadow-card">
               {item.text || 'テキストを入力すると表示されます'}
             </p>
-          ) : item.location ? (
-            <div className="rounded-card bg-canvas p-3 text-sm shadow-sm">
+          ) : item.type === 'flex' ? <LinePreviewFlex content={item.text} /> : item.location ? (
+            <div className="rounded-card bg-canvas p-3 text-sm shadow-card">
               <p className="flex items-center gap-1 font-bold text-ink">
-                <MapPin size={14} aria-hidden />
+                <MapPin size={16} aria-hidden />
                 {item.location.title}
               </p>
               {item.location.address && (
@@ -63,14 +64,14 @@ export default function BroadcastMessagePreview({
               </p>
             </div>
           ) : (
-            <p className="rounded-card bg-canvas px-3 py-2 text-sm text-ink shadow-sm">
+            <p className="rounded-card bg-canvas px-3 py-2 text-sm text-ink shadow-card">
               {contentExcerpt(item.type, item.text) || messageTypeLabel(item.type)}
             </p>
           )}
           {index === 0 && (buttons ?? []).map((button) => (
             <p
               key={`${button.label}-${button.value}`}
-              className="mt-1 truncate rounded-control bg-accent-deep px-3 py-2 text-center text-xs font-bold text-on-accent"
+              className="mt-1 truncate rounded-control bg-accent-deep px-3 py-2 text-center text-xs font-medium text-on-accent"
               title={button.value}
             >
               {button.label || 'ボタン'}
@@ -106,6 +107,7 @@ function bubbleView(key: string, bubble: BroadcastBubble): {
   location: LocationView | null
 } {
   const content = bubble.content as Record<string, unknown>
+  if (bubble.type === 'flex') return { key, type: bubble.type, text: typeof content.flexJson === 'string' ? content.flexJson : JSON.stringify(content), location: null }
   if (bubble.type === 'text') {
     return { key, type: bubble.type, text: String(content.text ?? ''), location: null }
   }

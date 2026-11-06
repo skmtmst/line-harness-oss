@@ -1,7 +1,7 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { IdentityCandidateDetail } from '@line-crm/shared'
@@ -169,7 +169,7 @@ describe('判定窓', () => {
       <IdentityDecisionDialog open candidate={CANDIDATE_WITH_PROFILES} busy={false} onCancel={() => {}} onSubmit={() => {}} />,
     )
     expect(html).toContain('統合プロフィールに採用する値')
-    expect(html).toContain('候補A：田中 はなこ')
+    expect(html).toContain('画面確認アカウント・田中 はなこ：田中 はなこ')
     expect(html).toContain('利用目的と同意・規約の確認')
     expect(html.match(/type="checkbox"/g)).toHaveLength(3)
   })
@@ -221,8 +221,10 @@ describe('2画面が同じ部品で組まれている', () => {
   const friend = read(FRIEND_SCREEN)
   const ec = read(EC_SCREEN)
 
-  it('候補部品・状態部品・判定窓を両方が使う', () => {
-    for (const source of [friend, ec]) {
+  it('V8は同じ判定の読み口・状態部品を使い、ECの候補部品は維持する', () => {
+    expect(friend).toContain('IdentityStateBlock')
+    expect(friend).toContain('useIdentityReview')
+    for (const source of [ec]) {
       expect(source).toContain('IdentityStateBlock')
       expect(source).toContain('IdentityDecisionDialog')
       expect(source).toContain('IdentityEvidenceList')
@@ -232,11 +234,6 @@ describe('2画面が同じ部品で組まれている', () => {
     }
   })
 
-  it('撮影の押し口を、文言ではなく印で持つ', () => {
-    expect(friend).toContain('data-qa-open="InCDe"')
-    expect(ec).toContain('data-qa-open="ELayY"')
-  })
-
   it('それぞれの種類だけを読む', () => {
     expect(friend).toContain("useIdentityReview('friend_duplicate')")
     expect(ec).toContain("useIdentityReview('ec_member', { lineAccountId: selectedAccountId })")
@@ -244,8 +241,28 @@ describe('2画面が同じ部品で組まれている', () => {
 
   it('中身は「通常」のときだけ描く', () => {
     // 失敗・権限不足のときに候補の名前やマスク値が断片で見えないこと。
-    for (const source of [friend, ec]) {
-      expect(source).toContain("review.state === 'ready'")
-    }
+    expect(friend).toContain("review.state === 'ready'")
+    expect(ec).toContain("review.state !== 'ready'")
+    expect(ec).toContain("if (pageState !== 'ready')")
+  })
+})
+
+describe('R600 運用集計の失敗でも会員候補を残す（ECのみ）', () => {
+  const ec = read(EC_SCREEN)
+
+  it('候補の有無は候補の読み口で決め、集計の失敗で画面を隠さない', () => {
+    // 全面の成否は候補の読み口が持つ。集計の失敗は集計欄だけに出す。
+    expect(ec).toContain("review.state !== 'ready'")
+    expect(ec).toContain('operationsReady')
+  })
+
+  it('集計欄に取得失敗と再試行を示し、読めていない数を0件と書かない', () => {
+    expect(ec).toContain('読み込めませんでした')
+    expect(ec).toContain("onRetry={operationsState === 'error' ? () => { void loadOperations() }")
+    expect(ec).toContain('結びついていない —')
+  })
+
+  it('集計の権限不足は再試行を出さず、候補は残す', () => {
+    expect(ec).toContain('表示する権限がありません')
   })
 })

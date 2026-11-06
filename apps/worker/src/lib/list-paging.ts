@@ -3,6 +3,7 @@ export const MAX_LIST_LIMIT = 200;
 export const LIST_CURSOR_MAX_LENGTH = 1024;
 
 export type ListSortDirection = 'asc' | 'desc';
+/** 並び順を公開していない既存一覧は、推測せず空配列で示す。 */
 export type ListSort = ReadonlyArray<Readonly<{
   field: string;
   direction: ListSortDirection;
@@ -13,6 +14,22 @@ export type ListPagingQuery = Readonly<Record<string, string | undefined>>;
 export type ListPagingOptions = Readonly<{
   defaultLimit?: number;
   maxLimit?: number;
+}>;
+
+/** 入口ごとの数値変換・不正値の扱いを、既存の契約のまま指定する。 */
+export type ListNumberPolicy = Readonly<{
+  format?: 'number' | 'integer-prefix';
+  fallback?: 'falsy' | 'integer' | 'nonnegative-integer' | 'finite';
+  minimum?: number;
+  maximum?: number;
+  truncate?: boolean;
+}>;
+
+export type OffsetPagingOptions = ListPagingOptions & Readonly<{
+  defaultOffset?: number;
+  limitPolicy?: ListNumberPolicy;
+  offsetPolicy?: ListNumberPolicy;
+  pagePolicy?: ListNumberPolicy;
 }>;
 
 export type OffsetPaging = Readonly<{
@@ -37,10 +54,73 @@ export class ListPagingError extends Error {
   }
 }
 
-function positiveInteger(raw: string | undefined, fallback: number): number {
+/** 丸め方と入力エラーの判定は入口の契約に従い、数値指定の読み取りをそろえる。 */
+export function listQueryNumber(
+  raw: string | undefined,
+  fallback: number | string,
+  options: Readonly<{ format?: 'number' | 'integer-prefix' }> = {},
+): number {
+  const value = raw === undefined ? fallback : raw;
+  return options.format === 'integer-prefix' ? Number.parseInt(String(value), 10) : Number(value);
+}
+
+function listInteger(raw: string | undefined, fallback: number): number {
+  const parsed = listQueryNumber(raw, fallback);
+  return Number.isSafeInteger(parsed) ? parsed : Number.NaN;
+}
+
+/** 不正な指定は既定値へ戻し、0以上の指定を上限内へ収める。 */
+export function boundedListInteger(raw: string | undefined, fallback: number, maximum: number): number {
+  const parsed = listQueryNumber(raw, Number.NaN);
+  return Number.isInteger(parsed) && parsed >= 0 ? Math.min(parsed, maximum) : fallback;
+}
+
+export function clampedListInteger(
+  raw: string | undefined, fallback: number, minimum: number, maximum = Number.POSITIVE_INFINITY,
+): number {
+  const parsed = listQueryNumber(raw, Number.NaN);
+  return Number.isInteger(parsed) ? Math.min(maximum, Math.max(minimum, parsed)) : fallback;
+}
+
+export function truncatedListLimit(raw: string | undefined, fallback: number, maximum: number): number {
+  const parsed = listQueryNumber(raw, Number.NaN);
+  return Number.isFinite(parsed) ? Math.min(maximum, Math.max(1, Math.trunc(parsed))) : fallback;
+}
+
+export function truncatedListOffset(raw: string | undefined): number {
+  const parsed = listQueryNumber(raw, Number.NaN);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 0;
+}
+
+/** 不正な指定を拒否する入口へ、空欄の既定値と範囲内の整数を返す。 */
+export function listIntegerInRange(
+  raw: string | undefined, fallback: number, minimum: number, maximum: number,
+): number | null {
+  if (raw === undefined || raw === '') return fallback;
+  const parsed = listQueryNumber(raw, Number.NaN);
+  return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : null;
+}
+
+function positiveInteger(raw: string | undefined, fallback: number, maximum = Number.MAX_SAFE_INTEGER): number {
   if (raw === undefined || raw.trim() === '') return fallback;
-  const parsed = Number(raw);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+  const parsed = listInteger(raw, fallback);
+  return parsed > 0 ? Math.min(parsed, maximum) : fallback;
+}
+
+/** 一覧ごとの既定件数と上限を保ち、不正な指定は既定件数へ戻す。 */
+export function listLimit(raw: string | undefined, fallback: number, maximum = MAX_LIST_LIMIT): number {
+  return positiveInteger(raw, fallback, maximum);
+}
+
+/** 不正な開始位置は先頭へ戻す。 */
+export function listOffset(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === '') return 0;
+  const parsed = listInteger(raw, 0);
+  return parsed >= 0 ? parsed : 0;
+}
+
+export function listPage(raw: string | undefined): number {
+  return positiveInteger(raw, 1);
 }
 
 function limits(options: ListPagingOptions): { defaultLimit: number; maxLimit: number } {
@@ -51,15 +131,33 @@ function limits(options: ListPagingOptions): { defaultLimit: number; maxLimit: n
 
 function parseLimit(raw: string | undefined, options: ListPagingOptions): number {
   const { defaultLimit, maxLimit } = limits(options);
-  return Math.min(positiveInteger(raw, defaultLimit), maxLimit);
+  return listLimit(raw, defaultLimit, maxLimit);
+}
+
+function parseListNumber(raw: string | undefined, fallback: number, policy: ListNumberPolicy): number {
+  let value = listQueryNumber(raw, fallback, policy);
+  if ((policy.fallback === 'falsy' && !value)
+    || (policy.fallback === 'integer' && !Number.isInteger(value))
+    || (policy.fallback === 'nonnegative-integer' && (!Number.isInteger(value) || value < 0))
+    || (policy.fallback === 'finite' && !Number.isFinite(value))) value = fallback;
+  if (policy.truncate) value = Math.trunc(value);
+  if (policy.minimum !== undefined) value = Math.max(policy.minimum, value);
+  if (policy.maximum !== undefined) value = Math.min(policy.maximum, value);
+  return value;
 }
 
 export function parseOffsetPaging(
   query: ListPagingQuery,
-  options: ListPagingOptions = {},
+  options: OffsetPagingOptions = {},
 ): OffsetPaging {
-  const page = positiveInteger(query.page, 1);
-  const limit = parseLimit(query.limit, options);
+  const page = options.pagePolicy ? parseListNumber(query.page, 1, options.pagePolicy) : listPage(query.page);
+  const limit = options.limitPolicy
+    ? parseListNumber(query.limit, options.defaultLimit ?? DEFAULT_LIST_LIMIT, options.limitPolicy)
+    : parseLimit(query.limit, options);
+  if (query.offset !== undefined) {
+    const offset = options.offsetPolicy ? parseListNumber(query.offset, options.defaultOffset ?? 0, options.offsetPolicy) : listOffset(query.offset);
+    return { page: Math.floor(offset / limit) + 1, limit, offset };
+  }
   return { page, limit, offset: (page - 1) * limit };
 }
 
@@ -83,34 +181,42 @@ export function offsetPageCount(total: number, limit: number): number {
   return Math.max(1, Math.ceil(safeTotal / safeLimit));
 }
 
-export function buildOffsetListResponse<T>({
+/** 集計・別名・ページ位置など、既存の読み手が使う項目も残す。 */
+export function buildOffsetListResponse<T, Details extends object = object>({
   items,
   total,
   paging,
   sort,
+  ...details
 }: {
   items: T[];
-  total: number;
-  paging: OffsetPaging;
+  total: number | null;
+  paging: Pick<OffsetPaging, 'limit'> & Partial<Pick<OffsetPaging, 'offset'>>;
   sort: ListSort;
-}) {
-  return { items, total, limit: paging.limit, sort };
+} & Details) {
+  return { ...details, items, total, limit: paging.limit, ...(paging.offset === undefined ? {} : { offset: paging.offset }), sort };
 }
 
-export function buildCursorListResponse<T>({
+type ListResponseCursor = string | null | Readonly<Record<string, string>>;
+
+export function buildCursorListResponse<T, Details extends object = object, Cursor extends ListResponseCursor = string | null>({
   items,
   nextCursor,
   paging,
   sort,
+  ...details
 }: {
   items: T[];
-  nextCursor?: string;
+  nextCursor?: Cursor;
   paging: CursorPaging;
   sort: ListSort;
-}) {
+} & Details) {
+  const continuation: { nextCursor?: Cursor } = {};
+  if (nextCursor || nextCursor === null) continuation.nextCursor = nextCursor;
   return {
+    ...details,
     items,
-    ...(nextCursor ? { nextCursor } : {}),
+    ...continuation,
     limit: paging.limit,
     sort,
   };

@@ -15,9 +15,9 @@ import {
 import { asD1 } from './d1-test-helper.js';
 
 /*
- * Issue #710: 保管済み(archived)タグの編集を止める。
+ * 保管済み(archived)タグの編集を止める。
  *
- * 司令塔裁定: タグには archived を active へ戻す口が無い（git grep で確認
+ * タグには archived を active へ戻す口が無い（git grep で確認
  * 済み）。戻せないので、表示名の訂正（name / description）だけは許し、
  * 挙動を決める設定（フォルダ・スター・手動付与可否・再付与方針・連動の
  * 有効無効・マイル・連動アクション）は変えられないようにする。
@@ -68,8 +68,8 @@ describe('archived タグは表示名の訂正だけ許す（Issue #710）', () 
       tagId: 'tag-1', lineAccountId: 'account-1', expectedVersion: archived.tag.version,
       name: '会員(改名)',
     });
-    expect(result.tag.name).toBe('会員(改名)');
-    expect(result.tag.status).toBe('archived');
+    expect(result.detail.tag.name).toBe('会員(改名)');
+    expect(result.detail.tag.status).toBe('archived');
   });
 
   it('description は変更できる', async () => {
@@ -78,7 +78,7 @@ describe('archived タグは表示名の訂正だけ許す（Issue #710）', () 
       tagId: 'tag-1', lineAccountId: 'account-1', expectedVersion: archived.tag.version,
       description: '説明改訂',
     });
-    expect(result.tag.description).toBe('説明改訂');
+    expect(result.detail.tag.description).toBe('説明改訂');
   });
 
   it.each([
@@ -109,7 +109,7 @@ describe('archived タグは表示名の訂正だけ許す（Issue #710）', () 
       reapplyPolicy: 'first_only', // 現在値と同じ
       name: '会員(名前だけ改訂)',
     });
-    expect(result.tag.name).toBe('会員(名前だけ改訂)');
+    expect(result.detail.tag.name).toBe('会員(名前だけ改訂)');
   });
 
   it('active なタグは今までどおり全列を変更できる（対照）', async () => {
@@ -118,8 +118,8 @@ describe('archived タグは表示名の訂正だけ許す（Issue #710）', () 
       isStarred: true, reapplyPolicy: 'every_time', linkedEnabled: true,
       mileage: { self: 10, referrer: 5, multiplier: null, priority: 0 },
     });
-    expect(result.tag.is_starred).toBe(1);
-    expect(result.tag.reapply_policy).toBe('every_time');
+    expect(result.detail.tag.is_starred).toBe(1);
+    expect(result.detail.tag.reapply_policy).toBe('every_time');
   });
 
   it('拒否のエラーは TagDefinitionError で code=archived_readonly', async () => {

@@ -6,6 +6,7 @@ import type {
   MergedPersonProfileUpdateMode,
   MergedPersonStatus,
 } from '@line-crm/shared'
+import { formatDateTime, formatDay } from '@/lib/format'
 
 /**
  * 統合ユーザー詳細（設計 `w8W4Eh` 3-3-A）が読む言い換えと判断。
@@ -120,11 +121,7 @@ export function dateText(value: string | null): string {
   if (!value) return NOT_AVAILABLE
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return NOT_AVAILABLE
-  return new Intl.DateTimeFormat('ja-JP', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-    timeZone: 'Asia/Tokyo',
-  }).format(date)
+  return formatDateTime(date)
 }
 
 /**
@@ -159,9 +156,7 @@ export function dayText(value: string | null): string {
   if (!value) return NOT_AVAILABLE
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return NOT_AVAILABLE
-  return new Intl.DateTimeFormat('ja-JP', {
-    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo',
-  }).format(date)
+  return formatDay(date)
 }
 
 export type MergedPersonFailure = {

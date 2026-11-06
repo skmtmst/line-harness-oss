@@ -8,6 +8,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
+import { isForbidden } from '@/components/shared/api-error-message'
 import { api } from '@/lib/api'
 import { resolveHqOpenTarget, type HqOpenTarget } from '@/lib/hq-navigation'
 
@@ -19,7 +20,7 @@ export default function HqOpenPage() {
   const [target, setTarget] = useState<HqOpenTarget | null>(null)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [failure, setFailure] = useState<unknown>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
@@ -40,8 +41,10 @@ export default function HqOpenPage() {
         if (!response.success) throw new Error(response.error)
         setAccounts(response.data as AccountWithStats[])
       })
-      .catch(() => {
-        if (!cancelled) setError('アカウント情報を読み込めませんでした。時間をおいてもう一度お試しください。')
+      .catch((caught) => {
+        // R608: 403は押しても直らない権限不足なので、捕まえた失敗をそのまま
+        // 残して描画側で言い分ける（文言をここで決めると503と混ざる）。
+        if (!cancelled) setFailure(caught)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -58,7 +61,7 @@ export default function HqOpenPage() {
   if (!target) {
     return (
       <div className="flex min-h-64 items-center justify-center" role="status" aria-label="移動先を確認中">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-hairline border-t-accent" />
+        <div className="h-8 w-8 animate-spin rounded-pill border-4 border-hairline border-t-accent" />
       </div>
     )
   }
@@ -75,36 +78,43 @@ export default function HqOpenPage() {
         <Button href="/hq" variant="secondary" className="shrink-0">アカウント管理へ戻る</Button>
       </header>
 
-      {error ? (
-        <Notice
-          tone="danger"
-          message={error}
-          action={
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => { setError(''); setLoading(true); setReloadKey((key) => key + 1) }}
-            >
-              再読み込み
-            </Button>
-          }
-        />
+      {failure ? (
+        isForbidden(failure) ? (
+          <Notice
+            tone="warn"
+            message="このアカウント一覧を見る権限がありません。見るには権限が要ります。オーナーか管理者に追加を依頼してください。"
+          />
+        ) : (
+          <Notice
+            tone="danger"
+            message="アカウント情報を読み込めませんでした。時間をおいてもう一度お試しください。"
+            action={
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => { setFailure(null); setLoading(true); setReloadKey((key) => key + 1) }}
+              >
+                再読み込み
+              </Button>
+            }
+          />
+        )
       ) : null}
-      {!error && loading ? (
+      {!failure && loading ? (
         <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-hairline border-t-accent" />
+          <div className="h-8 w-8 animate-spin rounded-pill border-4 border-hairline border-t-accent" />
         </div>
       ) : null}
-      {!error && !loading && accounts.length === 0 ? (
+      {!failure && !loading && accounts.length === 0 ? (
         <ListState
           kind="empty"
           data-design="Empty"
           title="まだアカウントがありません"
           description="最初のLINE公式アカウントを登録してください。"
-          action={<Button href="/accounts/new" variant="primary">＋LINEアカウントを新規登録</Button>}
+          action={<Button href="/accounts/new" variant="primary">＋LINEアカウントを登録する</Button>}
         />
       ) : null}
-      {!error && !loading && accounts.length > 0 ? (
+      {!failure && !loading && accounts.length > 0 ? (
         <HqAccountList accounts={accounts} onSelect={openStorePage} selectLabel="このアカウントを選ぶ" />
       ) : null}
     </div>

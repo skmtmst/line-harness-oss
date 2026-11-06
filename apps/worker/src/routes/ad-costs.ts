@@ -1,8 +1,11 @@
+import { jstDate as japanDate } from '@line-crm/shared';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   cancelAdCostEntry,
   getAdCostImportStatus,
   getAdCostSummary,
+  getConfirmedConversionCount,
   getAdPlatforms,
   getAdPlatformById,
   isValidCostDay,
@@ -10,14 +13,14 @@ import {
   normalizeCostCurrency,
   upsertAdCostEntry,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { importAdCostNow } from '../services/ad-cost-import.js';
 import { auditLog } from '../lib/audit-log.js';
-
+import { fail } from '../lib/fail.js';
 /**
- * 流入の広告費の台帳 (#818)。
+ * 流入の広告費の台帳。
  *
  * 費用は外部連携の暗号化された秘密で媒体から毎日取り込む分と、
  * 管理画面から手入力する分を同じ口で見せる。取り込めなかった日は
@@ -28,7 +31,7 @@ const adCosts = new Hono<Env>();
 const DEFAULT_RANGE_DAYS = 30;
 
 function jstDay(date: Date): string {
-  return new Date(date.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
+  return japanDate(date);
 }
 
 /** accountId 省略時は可視アカウントが1つのときだけ補う。 */
@@ -45,7 +48,7 @@ async function resolveAccountId(
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   return scope.allowedAccountIds.length === 1
     ? scope.allowedAccountIds[0]
-    : c.json({ success: false, error: 'accountId required' }, 400);
+    : fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
 }
 
 // GET /api/ad-costs — 流入元ごとの費用と取込状況
@@ -58,15 +61,16 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
     const to = c.req.query('to') ?? jstDay(today);
     const from = c.req.query('from')
       ?? jstDay(new Date(today.getTime() - DEFAULT_RANGE_DAYS * 24 * 3600_000));
-    if (!isValidCostDay(from) || !isValidCostDay(to)) {
+    if (!isValidCostDay(from) || !isValidCostDay(to) || from > to) {
       return c.json({ success: false, error: '期間は 2026-08-01 の形で指定してください' }, 400);
     }
 
-    const [rows, platforms, manualEntries] = await Promise.all([
+    const [rows, platforms, manualEntries, confirmedConversionCount] = await Promise.all([
       getAdCostSummary(c.env.DB, { lineAccountId: accountId, from, to }),
       getAdPlatforms(c.env.DB),
-      // R275: 手入力の記録は取消できるよう1行ずつ返す(取消済みも履歴として返す)。
+      // 手入力の記録は取消できるよう1行ずつ返す(取消済みも履歴として返す)。
       listManualAdCostEntries(c.env.DB, { lineAccountId: accountId, from, to }),
+      getConfirmedConversionCount(c.env.DB, { lineAccountId: accountId, from, to }),
     ]);
     const ownPlatforms = platforms.filter((p) => p.line_account_id === accountId && p.is_active === 1);
     const statusByPlatform = await getAdCostImportStatus(
@@ -74,9 +78,17 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
       ownPlatforms.map((p) => p.id),
     );
 
+    const totals = rows.flatMap(row => row.totals);
+    const jpyOnly = totals.length > 0 && totals.every(total => total.currency === 'JPY');
+    const conversionCost: import('@line-crm/shared').AdConversionCostSummary = {
+      from, to, confirmedConversionCount, currency: jpyOnly ? 'JPY' : null,
+      costPerConversionMinor: jpyOnly && confirmedConversionCount > 0
+        ? Math.round(totals.reduce((sum, total) => sum + total.amountMinor, 0) / confirmedConversionCount) : null,
+    };
     return c.json({
       success: true,
       data: {
+        conversionCost,
         rows: rows.map((row) => ({
           sourceLabel: row.sourceLabel,
           adPlatformId: row.adPlatformId,
@@ -116,8 +128,7 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
       },
     });
   } catch (err) {
-    console.error('GET /api/ad-costs error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -125,7 +136,7 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
 //
 // 媒体から取り込めない分(チラシ・看板など)を日ごとに足す。
 // 同じ流入元・同じ日が来たら上書きになる。
-adCosts.post('/api/ad-costs', requireRole('owner', 'admin'), async (c) => {
+adCosts.post('/api/ad-costs', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{
       lineAccountId?: unknown;
@@ -144,18 +155,18 @@ adCosts.post('/api/ad-costs', requireRole('owner', 'admin'), async (c) => {
 
     const sourceLabel = typeof body.sourceLabel === 'string' ? body.sourceLabel.trim() : '';
     if (!sourceLabel || sourceLabel.length > 100) {
-      return c.json({ success: false, error: '流入元の名前を100字以内で入れてください' }, 400);
+      return inputError(c, { success: false, error: '流入元の名前を100字以内で入れてください' }, 400, ["sourceLabel"]);
     }
     if (!isValidCostDay(body.day)) {
-      return c.json({ success: false, error: '日付は 2026-08-01 の形で指定してください' }, 400);
+      return inputError(c, { success: false, error: '日付は 2026-08-01 の形で指定してください' }, 400, ["day"]);
     }
     const amountMinor = body.amountMinor;
     if (typeof amountMinor !== 'number' || !Number.isInteger(amountMinor) || amountMinor < 0) {
-      return c.json({ success: false, error: '費用は0以上の整数で入れてください' }, 400);
+      return inputError(c, { success: false, error: '費用は0以上の整数で入れてください' }, 400, ["amountMinor"]);
     }
     const currency = body.currency == null ? 'JPY' : normalizeCostCurrency(body.currency);
     if (!currency) {
-      return c.json({ success: false, error: '通貨は JPY のような3文字のコードで指定してください' }, 400);
+      return inputError(c, { success: false, error: '通貨は JPY のような3文字のコードで指定してください' }, 400, ["currency"]);
     }
 
     let entryRouteId: string | null = null;
@@ -183,18 +194,17 @@ adCosts.post('/api/ad-costs', requireRole('owner', 'admin'), async (c) => {
     auditLog(c, 'ad_cost.manual_entry', { id: entry.id, kind: 'ad_cost' }, { lineAccountId: accountId });
     return c.json({ success: true, data: entry }, 201);
   } catch (err) {
-    console.error('POST /api/ad-costs error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 /**
- * POST /api/ad-costs/:id/cancel — 手入力の費用を取消する (R275)。
+ * POST /api/ad-costs/:id/cancel — 手入力の費用を取消する。
  *
  * 日付・名前・金額を間違えて入れた記録を集計から外す。行は消さず、
  * 取消した日時と理由を残す。取込分は媒体側の記録なので対象外。
  */
-adCosts.post('/api/ad-costs/:id/cancel', requireRole('owner', 'admin'), async (c) => {
+adCosts.post('/api/ad-costs/:id/cancel', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const entry = await c.env.DB
       .prepare(`SELECT id, line_account_id FROM ad_cost_entries WHERE id = ?`)
@@ -207,7 +217,7 @@ adCosts.post('/api/ad-costs/:id/cancel', requireRole('owner', 'admin'), async (c
     const body = await c.req.json<{ reason?: unknown }>().catch(() => ({}) as { reason?: unknown });
     const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
     if (!reason || reason.length > 200) {
-      return c.json({ success: false, error: '取り消す理由を200字以内で入れてください' }, 400);
+      return inputError(c, { success: false, error: '取り消す理由を200字以内で入れてください' }, 400, ["reason"]);
     }
 
     const result = await cancelAdCostEntry(c.env.DB, { entryId: entry.id, reason });
@@ -220,13 +230,12 @@ adCosts.post('/api/ad-costs/:id/cancel', requireRole('owner', 'admin'), async (c
     auditLog(c, 'ad_cost.cancel', { id: entry.id, kind: 'ad_cost' }, { lineAccountId: entry.line_account_id });
     return c.json({ success: true, data: { id: entry.id } });
   } catch (err) {
-    console.error('POST /api/ad-costs/:id/cancel error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/ad-platforms/:id/cost-import — その連携の前日分をいま取り直す
-adCosts.post('/api/ad-platforms/:id/cost-import', requireRole('owner', 'admin'), async (c) => {
+adCosts.post('/api/ad-platforms/:id/cost-import', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const platform = await getAdPlatformById(c.env.DB, c.req.param('id'));
     if (!platform || !platform.line_account_id
@@ -248,8 +257,7 @@ adCosts.post('/api/ad-platforms/:id/cost-import', requireRole('owner', 'admin'),
     }
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error('POST /api/ad-platforms/:id/cost-import error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

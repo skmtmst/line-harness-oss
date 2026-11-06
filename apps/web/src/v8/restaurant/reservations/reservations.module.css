@@ -1,0 +1,573 @@
+/*
+ * ★V8 予約台帳（Pencil l9NlC0 今日・xzCK6 1152・Z3FoM 一覧・ 電話の予約を入れる）。
+ * 値は globals.css の --tpl-rs-*（予約台帳だけの値は --tpl-rs-rsv-*）。
+ */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.headControls {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--tpl-rs-head-gap);
+  min-width: 0;
+}
+
+.headButtons {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rs-head-gap);
+  margin-left: auto;
+}
+
+/* 見方の切り替え（薄い地に白い札） */
+
+.dateBar {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rs-table-row-gap);
+  min-width: 0;
+}
+
+.dateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rs-rsv-date-size);
+  font-weight: 700;
+  line-height: var(--tpl-rs-rsv-date-lh);
+  white-space: nowrap;
+}
+
+.dateSpacer {
+  flex: 1 1 0;
+}
+
+.sourcePicker {
+  flex: 0 0 var(--tpl-rs-rsv-source-w);
+  width: var(--tpl-rs-rsv-source-w);
+}
+
+.sourcePicker :global(*) {
+  max-width: 100%;
+}
+
+/* 左に時間×卓、右に4枚。1152 では右の4枚が下へ */
+.todayColumns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--tpl-rs-body-gap);
+  min-width: 0;
+}
+
+.calendarWrap {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.nowLine {
+  position: absolute;
+  top: var(--tpl-rs-rsv-now-early);
+  left: var(--tpl-rs-rsv-cal-time-w);
+  z-index: 2;
+  width: var(--tpl-rs-rsv-now-w);
+  height: var(--tpl-rs-rsv-now-h);
+  background: var(--tpl-rs-occupied-line);
+  pointer-events: none;
+}
+
+.nowLabel {
+  position: absolute;
+  top: calc(var(--tpl-rs-rsv-now-early) + var(--tpl-rs-rsv-now-label-gap));
+  left: var(--tpl-rs-rsv-cal-time-pad-side);
+  color: var(--tpl-rs-occupied-line);
+  font-size: var(--text-nano);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-10);
+}
+
+.nowLine.nowLate {
+  top: var(--tpl-rs-rsv-now-late);
+}
+
+.nowLabel.nowLate {
+  top: calc(var(--tpl-rs-rsv-now-late) + var(--tpl-rs-rsv-now-label-gap));
+}
+
+/* 予約の箱（行をまたぐ。上下2・左右3 の内側） */
+
+.blockName,
+.holdName {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-11);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.holdName {
+  color: var(--tpl-rs-rsv-phone-line);
+}
+
+.blockMeta {
+  max-width: 100%;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-nano);
+  line-height: var(--tpl-rs-lh-10);
+}
+
+.holdTime {
+  white-space: nowrap;
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  line-height: var(--tpl-rs-lh-10);
+}
+
+.blockSource {
+  font-size: var(--text-nano);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-10);
+}
+
+.blockAlert {
+  color: var(--tpl-rs-occupied-line);
+  font-size: var(--text-nano);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-10);
+}
+
+.blockPendingText {
+  color: var(--color-warning);
+  font-size: var(--text-nano);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-10);
+}
+
+.srcLine { color: var(--color-accent-deep); }
+.srcMedia { color: var(--tpl-rs-occupied-line); }
+.srcPhone { color: var(--tpl-rs-rsv-phone-line); }
+.srcPending { color: var(--color-warning); }
+
+/* 空いている枠の「＋ 予約を入れる」。指を乗せたとき・選んだときだけ見せる */
+
+/* 右の4枚 */
+.side {
+  display: flex;
+  flex: 0 0 var(--tpl-board-side-w);
+  flex-direction: column;
+  gap: var(--tpl-rs-panel-head-gap);
+  min-width: var(--tpl-board-side-w);
+}
+
+.sideCard {
+  gap: var(--tpl-rs-table-row-gap);
+}
+
+.sideTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-14);
+}
+
+.sideText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.sideAlert {
+  color: var(--tpl-rs-occupied-line);
+}
+
+.nextBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-stat-gap);
+  padding: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.nextName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.nextMeta {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.nextFrom {
+  margin: 0;
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-11);
+}
+
+.nextActions {
+  display: flex;
+  gap: var(--tpl-rs-table-row-gap);
+}
+
+.nextActions > * {
+  flex: 1 1 0;
+}
+
+.breakRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tpl-rs-panel-head-gap);
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.breakRow strong {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.sideLink {
+  color: var(--color-accent-deep);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
+  text-decoration: none;
+}
+
+/* 一覧（Z3FoM） */
+.filterRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-rs-panel-head-gap);
+  min-width: 0;
+}
+
+.filterField {
+  display: flex;
+  flex: 0 0 var(--tpl-rs-rsv-filter-w);
+  flex-direction: column;
+  width: var(--tpl-rs-rsv-filter-w);
+}
+
+.filterField :global(*) {
+  max-width: 100%;
+}
+
+.lcTime { width: var(--tpl-rs-rsv-lc-time); }
+.lcSource { width: var(--tpl-rs-rsv-lc-source); }
+.lcCustomer { width: auto; }
+.lcGuests { width: var(--tpl-rs-rsv-lc-guests); }
+.lcTable { width: var(--tpl-rs-rsv-lc-table); }
+.lcCourse { width: var(--tpl-rs-rsv-lc-table); }
+.lcNote { width: var(--tpl-rs-rsv-lc-note); }
+.lcStatus { width: var(--tpl-rs-rsv-lc-status); }
+.lcOps { width: var(--tpl-rs-rsv-lc-ops); }
+
+.customerName {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-12);
+  text-overflow: ellipsis;
+}
+
+.customerSub {
+  margin: var(--tpl-rs-panel-head-text-gap) 0 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rs-lh-11);
+  text-overflow: ellipsis;
+}
+
+.clip {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alertText {
+  color: var(--tpl-rs-occupied-line);
+  font-weight: 600;
+}
+
+.mutedText {
+  color: var(--color-ink-faint);
+}
+
+/* R11: 帯の下の5つ目の短い1行。 */
+.fifthLine {
+  margin: var(--tpl-rs-panel-head-text-gap) 0 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.warnText {
+  color: var(--color-warning);
+}
+
+.rowActions {
+  display: inline-flex;
+  gap: var(--tpl-rs-row-actions-gap);
+}
+
+/* その日の臨時休業・貸切（提案 E-10）：琥珀の帯＋右に休業日・貸切への行き先 */
+
+.closureText {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
+}
+
+/* 顧客カルテ（3枚） */
+.karte {
+  display: flex;
+  gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-1);
+}
+
+.karteCard {
+  flex: 1 1 0;
+  gap: var(--tpl-rs-stat-gap);
+  min-width: 0;
+}
+
+.karteName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.karteContact {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rs-lh-11);
+}
+
+.karteRecent {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+/* 窓 */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-rs-pair-gap);
+}
+
+.dialogLeft {
+  margin-right: auto;
+}
+
+.dialogStrong {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-12);
+}
+
+/* 電話の予約を入れる */
+
+.phoneForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-body-gap);
+  min-width: 0;
+}
+
+.phoneCard {
+  gap: var(--tpl-rs-panel-head-gap);
+  min-width: 0;
+}
+
+.inlineControls { display: flex; align-self: flex-start; }
+
+.phoneCardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-panel-head-text-gap);
+}
+
+.phoneCardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rs-rsv-date-size);
+  font-weight: 700;
+  line-height: var(--tpl-rs-rsv-date-lh);
+}
+
+.phoneCardText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+/* 何を入れますか：2枚を横に並べる */
+.kindCards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-rs-table-row-gap);
+}
+
+.foundList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-stat-gap);
+}
+
+.timeBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-field-gap);
+}
+
+.timeLabel {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.timeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-rs-table-row-gap);
+}
+
+.phoneNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rs-lh-11);
+}
+
+.checkTitle {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-13);
+}
+
+.checkSub {
+  display: block;
+  margin-top: var(--tpl-rs-panel-head-text-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rs-lh-11);
+}
+
+.formError {
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+.phoneSide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-rsv-gap);
+  width: 100%;
+}
+
+.phoneSideCard {
+  gap: var(--tpl-rs-table-row-gap);
+}
+
+.phoneTables {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-rs-row-actions-gap);
+}
+
+.phoneLegend {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rs-lh-11);
+}
+
+.linePreview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-stat-gap);
+  padding: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+}
+
+.linePreviewTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-13);
+}
+
+.linePreviewBody {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.linePreviewStore {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rs-lh-11);
+}
+
+.noteCell { display: block; min-height: calc(var(--tpl-rs-lh-12) + var(--tpl-rs-lh-11) + var(--tpl-rs-panel-head-text-gap)); }
+
+.formError, .formErrorNoticePlacement { margin: 0; }
+@container (max-width: 1100px) { .todayColumns > .side { display:none; } }
+
+.sourcePicker{margin-left:auto;}
+
+/* 融合の台帳：★V8 の右の段。 */
+.sideCard{gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-2);}
+.sideText,.nextName,.nextMeta{font-size: var(--tpl-rest1-restaurant-reservations-reservations-font-size-1);line-height: var(--tpl-rest1-restaurant-reservations-reservations-line-height-1);}
+.nextName{font-size: var(--tpl-rest1-restaurant-reservations-reservations-font-size-2);line-height: var(--tpl-rest1-restaurant-reservations-reservations-line-height-2);}
+.nextBox{gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-3);}
+.nextActions{justify-content:flex-end;}.nextActions>*{flex:0 0 auto;}
+.sideLink{font-size: var(--tpl-rest1-restaurant-reservations-reservations-font-size-1);line-height: var(--tpl-rest1-restaurant-reservations-reservations-line-height-1);}
+.sourcePicker{flex-basis: var(--tpl-rest1-restaurant-reservations-reservations-flex-basis-1);width: var(--tpl-rest1-restaurant-reservations-reservations-width-1);}
+/* 軸に「月」が増えて段がちょうど満杯になり、印刷だけが2段目へ落ちていた。段を割る判定は細い幅で行い、余りがあれば元の幅まで伸ばす。 */
+.sourcePicker{flex: 1 1 calc(var(--tpl-rest1-restaurant-reservations-reservations-width-1) - var(--polish-space-section)); width: auto; max-width: var(--tpl-rest1-restaurant-reservations-reservations-width-1); min-width: 0;}
+
+.nextActions{align-items:center;justify-content:space-between;}.nextActions > *{flex:0 0 auto;}.nextBox{gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-4);}.sideCard{gap: var(--tpl-rest1-restaurant-reservations-reservations-gap-1);}.sideLink{font-size: var(--tpl-rest1-restaurant-reservations-reservations-font-size-1);line-height: var(--tpl-rest1-restaurant-reservations-reservations-line-height-1);}
+
+.filterField[data-filter='period'] { --tpl-rs-rsv-filter-w: var(--tpl-rs-rsv-period-w); }
+.filterField[data-filter='status'] { --tpl-rs-rsv-filter-w: var(--tpl-rs-rsv-status-w); }

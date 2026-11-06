@@ -1,7 +1,7 @@
 /**
  * D1 へ送る SQL を、wrangler と同じ切り方で文に割り、複合SELECTの項数を数える。
  *
- * なぜ要るか(#713)。
+ * なぜ要るか。
  * D1(workerd)の SQLite は `SQLITE_MAX_COMPOUND_SELECT` が **5** で、
  * 6 項以上の `UNION` / `INTERSECT` / `EXCEPT` を含む文は
  * `too many terms in compound SELECT` で落ちる。表の有無やデータに関係なく、

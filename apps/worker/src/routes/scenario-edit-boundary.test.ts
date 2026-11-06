@@ -1,5 +1,5 @@
 /*
- * シナリオ変更の共通境界(N-051)。
+ * シナリオ変更の共通境界。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物の scenarios ルートを当てる。
  * 改名・通常編集(PUT)・きっかけ(triggers)・公開(publish)を同じ権限契約へ揃える。
@@ -10,8 +10,8 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const { scenarios } = await import('./scenarios.js');
 
@@ -170,12 +170,10 @@ describe('シナリオ変更の共通境界(N-051)', () => {
     expect(hidden.status).toBe(404);
   });
 
-  test('公開は編集権ありstaffが自accountでできる', async () => {
+  test('公開は編集権だけのstaffでは自accountでもできない', async () => {
     const res = await postPublish('sc-1', editStaff);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: { scenarioId: string; versionNumber: number } };
-    expect(body.data.scenarioId).toBe('sc-1');
-    expect(body.data.versionNumber).toBe(1);
+    expect(res.status).toBe(403);
+    expect(sqlite.raw.prepare("SELECT COUNT(*) AS n FROM scenario_versions WHERE scenario_id = 'sc-1'").get()).toEqual({ n: 0 });
   });
 
   test('公開は権限なしstaffに403、担当外accountに404', async () => {
@@ -189,4 +187,30 @@ describe('シナリオ変更の共通境界(N-051)', () => {
     const res = await put('nope', { name: '書き換え' }, editStaff);
     expect(res.status).toBe(404);
   });
+});
+
+
+test('編集鍵のあるstaffも別シナリオの通をIDだけでは変えられない', async () => {
+  sqlite.raw.prepare(`INSERT INTO scenario_steps (id, scenario_id, step_order, delay_minutes, message_type, message_content)
+    VALUES ('foreign-step', 'sc-2', 1, 0, 'text', '他の通')`).run();
+  for (const [method, id] of [['DELETE', 'sc-1'], ['PUT', 'sc-1'], ['DELETE', 'missing']] as const) {
+    const res = await app(editStaff).request(`/api/scenarios/${id}/steps/foreign-step`, {
+      method, headers: { 'Content-Type': 'application/json' }, body: method === 'PUT' ? JSON.stringify({ delayMinutes: 30 }) : undefined,
+    });
+    expect(res.status).toBe(404);
+    expect(sqlite.raw.prepare("SELECT message_content FROM scenario_steps WHERE id='foreign-step'").get()).toEqual({ message_content: '他の通' });
+  }
+});
+
+
+test('編集できるstaffの一覧の並べ替えも、全件の担当範囲を確認してから保存する', async () => {
+  sqlite.raw.prepare("UPDATE scenarios SET display_order=9 WHERE id='sc-1'").run();
+  const reorder = (ids: string[], staff: AuthenticatedStaff) => app(staff).request('/api/scenarios/reorder', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
+  });
+  expect((await reorder(['sc-1', 'sc-2'], scopedEditStaff)).status).toBe(404);
+  expect(sqlite.raw.prepare("SELECT display_order FROM scenarios WHERE id='sc-1'").get()).toEqual({ display_order: 9 });
+  expect((await reorder(['sc-1', 'missing'], editStaff)).status).toBe(404);
+  expect((await reorder(['sc-1'], scopedEditStaff)).status).toBe(200);
+  expect(sqlite.raw.prepare("SELECT display_order FROM scenarios WHERE id='sc-1'").get()).toEqual({ display_order: 0 });
 });

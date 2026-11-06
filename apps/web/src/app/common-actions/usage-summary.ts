@@ -14,6 +14,31 @@ type BindingForSummary = {
   consumerType: string
 }
 
+type BindingForCount = {
+  runningCount?: number | null
+  waitingCount?: number | null
+  olderRunningCount?: number | null
+  olderWaitingCount?: number | null
+}
+
+/*
+ * 監査 R469: 実行中・待機中の合計。1か所でも未取得（null）があれば
+ * 合計は確定しないので null を返し、画面は「—」で出す。
+ * 未取得を 0 に混ぜて「処理なし」に見せない。利用先が無いときは 0。
+ */
+export function sumBindingCount(
+  bindings: BindingForCount[],
+  key: 'runningCount' | 'waitingCount' | 'olderRunningCount' | 'olderWaitingCount',
+): number | null {
+  let sum = 0
+  for (const binding of bindings) {
+    const value = binding[key]
+    if (value === null || value === undefined) return null
+    sum += value
+  }
+  return sum
+}
+
 /**
  * 「使われている場所」の副題。設計は件数だけでなく **何機能からか** を出す。
  *

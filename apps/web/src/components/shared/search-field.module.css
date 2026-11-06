@@ -1,14 +1,11 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .search {
   box-sizing: border-box;
   display: flex;
   min-width: 0;
   /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえる */
-  height: 40px;
   align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
 }
@@ -18,10 +15,7 @@
 }
 
 .searchIcon {
-  width: 17px;
-  height: 17px;
   flex: 0 0 17px;
-  color: var(--color-ink-faint);
 }
 
 .input {
@@ -32,13 +26,11 @@
   border: 0;
   background: transparent;
   color: var(--color-ink);
-  font-family: inherit;
   /* #976 U079: 検索欄の文字も入力欄と同じ14px（以前は12pxで最小だった） */
-  font-size: var(--text-body);
 }
 
 .input::placeholder {
-  color: var(--color-ink-faint);
+  color: var(--color-placeholder);
   opacity: 1;
 }
 
@@ -50,12 +42,11 @@
  * 色・太さ・余白は #804 と同じ（2px・action 色・offset 2px）。
  */
 .input:focus-visible {
-  outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }
 
 .clear:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -65,7 +56,7 @@
 
 .disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .clear {
@@ -90,7 +81,6 @@
 .loadingIcon {
   flex: 0 0 16px;
   color: var(--color-ink-faint);
-  animation: search-spin 900ms linear infinite;
 }
 
 @keyframes search-spin {
@@ -115,4 +105,66 @@
     animation: none;
   }
 }
+
+/*
+ * ★V8「探す欄」（TkVyB）：高さ36・余白 0 12・アイコンとの間 8・
+ * 文字は 13px（管理画面 の40px/14px から小さく引き締める）。
+ */
+:root .search {
+  height: var(--control-h);
+  gap: 8px;
+  padding: 0 12px;
+  border-color: var(--color-control-border);
+  box-shadow: var(--control-shadow);
+}/* 複合欄の焦点は外枠へ。内側の入力の輪郭を重ねない。 */
+
+:root .input:focus-visible { outline: 1px solid transparent; }
+
+:root .input {
+  font-size: var(--text-body);
 }
+
+/*
+ * 近道の印（例 ⌘K。TSV 実寸 19x17≒12px）。ふだんは隠し、v8 だけで
+ * 箱の右端に出す（中の入力が flex:1 で右へ寄せる）。互換経路は変えない。
+ */
+
+:root .shortcut {
+  display: inline-block;
+  flex-shrink: 0;
+  font-size: var(--text-caption);
+  line-height: var(--text-lh, 1.5);
+  color: var(--color-ink-faint);
+  font-family: inherit;
+}
+
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
+:root .search { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -1px; }
+:root .searchIcon { width: 14px; height: 14px; flex-basis: 14px; }
+:root .input { padding: 0; line-height: 20px; font-family: var(--font-sans); }
+
+:root .search:has(.input[aria-invalid='true']) { outline-color: var(--color-danger); }
+}
+/* ・仕上げ5 */
+:root .searchIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); color: var(--color-ink-secondary); }/* ・仕上げ7：輪は検索欄の外側だけに出す。 */
+
+
+html:root .disabled { opacity: var(--polish-disabled-opacity); }
+html:root .disabled .input:disabled { opacity: 1; }
+
+/* ・仕上げ8：検索の読み込みは aria-busy で伝え、回る印は保存ボタンだけにする。 */
+:root .loadingIcon { display: none; animation: none; }
+
+/*
+ * 探す欄も選ぶ欄（プルダウン）と同じ影と地で浮かせる。
+ * 細い線だけだと平らに見えて埋もれる。焦点の青い輪・誤りの赤は今の決まりのまま。
+ */
+:root .search { outline: 1px solid transparent; background: var(--color-canvas); box-shadow: var(--shadow-raised-control); }
+:root .search:has(.input[aria-invalid='true']) { outline-color: transparent; box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger); }
+/* 誤り＋焦点は赤1本（青を重ねない）。 */
+
+:root .input { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
+:root .searchIcon { flex-basis: var(--polish-icon-control); }
+
+/* 複合欄の地は外枠が持ち、入力部分だけに操作時の色を重ねない。 */
+html:root .search .input { background-image: none; }

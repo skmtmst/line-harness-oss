@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { cancelFriendReminder, cancelReminderRegistrant, enrollFriendInReminder, getFriendReminders, getFriendReminderStatus, getReminderRegistrantById, listReminderRegistrants, moveReminderRegistrantTargetDate, reopenCancelledDeliveryRuns, replayOrConflict, resumeReminderRegistrant } from './reminders/registrants.js';

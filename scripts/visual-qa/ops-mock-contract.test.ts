@@ -75,9 +75,12 @@ describe('運営コンソールの画面確認モック', () => {
     }
     /*
      * 本物と同じく、最初の本文は `messages` に入れない（画面で2回出る）。
+     * 統括からの続き（authorKind: 'tenant'）は入れてよいが、最初の本文と同じ文は入れない（絵 `OhguS`、2026-10-06）。
      * 運営の追記の名は `musubo 運営 ／ 名前` の形。
      */
-    expect(block).not.toContain("authorKind: 'tenant'");
+    const firstBody = /subject: 'LINE の Webhook が遅れる', body: '([^']+)'/.exec(block)?.[1];
+    expect(firstBody, '最初の本文が読めない').toBeTruthy();
+    expect(block.split(`body: '${firstBody}'`).length - 1, '最初の本文が messages にも入っている').toBe(1);
     expect(block).toContain('musubo 運営 ／');
   });
 

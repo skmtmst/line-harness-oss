@@ -1,3 +1,7 @@
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
+import { logger } from '@line-crm/shared/server';
+import { mfaConfiguration } from '../lib/mfa-config.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context, Next } from 'hono';
 import {
@@ -10,6 +14,7 @@ import {
   getOperationAlert,
   getOperationIncident,
   getOperationRequestReceipt,
+  hasOperationRequestReceiptForResource,
   inspectIncidentRestoreDrift,
   listOperationDeploymentEvents,
   listOperationAlerts,
@@ -23,7 +28,8 @@ import {
   type OperationCapability,
 } from '@line-crm/db';
 
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { sensitiveStepUpSatisfied } from '../lib/step-up.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
@@ -81,8 +87,7 @@ function parseCapabilities(raw: unknown): OperationCapability[] | null {
 }
 
 function historyLimit(raw: string | undefined): number {
-  const value = Number(raw ?? 100);
-  return Number.isInteger(value) ? Math.min(Math.max(value, 1), 200) : 100;
+  return parseOffsetPaging({ limit: raw }, { defaultLimit: 100, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 200 } }).limit;
 }
 
 const STEP_UP_PURPOSE = 'operations.control' as const;
@@ -107,9 +112,192 @@ async function queueOperationNotifications(
   try {
     return await enqueueOperationNotifications(c.env.DB, input);
   } catch (error) {
-    console.error(`operation ${input.eventKind} notification enqueue error:`, error);
+    logger.error("operations.queue_operation_notifications_failed");
     return { failed: ['line', 'email'] };
   }
+}
+
+function sameCapabilities(left: OperationCapability[], right: OperationCapability[]): boolean {
+  if (left.length !== right.length) return false;
+  const orderedLeft = [...left].sort();
+  const orderedRight = [...right].sort();
+  return orderedLeft.every((capability, index) => capability === orderedRight[index]);
+}
+
+function parseRestoreReport(raw: string | null): unknown {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/*
+ * 停止の状態確定後に receipt の保存だけ失敗したときの再送を補う。
+ *
+ * receipt が無い再送は停止処理へ進み、版が進んでいるため版競合になる。
+ * 置き去りの部分実行か、他人の確定済み要求との競合かは、動いている停止記録と
+ * receipt の有無で見分ける。同じ担当者・同じ内容の停止記録が動いたままで、
+ * 誰の receipt も結び付いていないときだけ、記録と通知準備を足して再送として
+ * 返す。記録がある対象・内容が違う要求は従来どおり競合にする。
+ */
+async function repairOrphanedStop(
+  c: Context<Env>,
+  input: {
+    accountId: string | null;
+    capabilities: OperationCapability[];
+    reason: string;
+    actorId: string;
+    idempotencyKey: string;
+    requestHash: string;
+  },
+): Promise<Response | null> {
+  const raced = await getOperationRequestReceipt(c.env.DB, 'stop', input.actorId, input.idempotencyKey);
+  if (raced) {
+    if (raced.requestHash !== input.requestHash) return null;
+    const racedIncident = await getOperationIncident(c.env.DB, raced.resourceId);
+    if (!racedIncident) return null;
+    const racedControl = await getOperationControlSet(c.env.DB, racedIncident.lineAccountId);
+    const racedNotifications = await queueOperationNotifications(c, {
+      incidentId: racedIncident.id,
+      eventKind: 'stopped',
+      payload: {
+        lineAccountId: racedIncident.lineAccountId,
+        capabilities: racedIncident.capabilities,
+        reason: racedIncident.reason,
+        actorId: input.actorId,
+      },
+    });
+    return c.json({
+      success: true,
+      duplicate: true,
+      data: { status: 'changed', control: racedControl, incident: racedIncident, notifications: racedNotifications },
+    });
+  }
+  const control = await getOperationControlSet(c.env.DB, input.accountId);
+  const incidentId = control.activeIncidentId;
+  if (!incidentId) return null;
+  const incident = await getOperationIncident(c.env.DB, incidentId);
+  if (!incident || incident.status !== 'stopped') return null;
+  if (incident.actorId !== input.actorId) return null;
+  if (incident.reason !== input.reason || !sameCapabilities(incident.capabilities, input.capabilities)) return null;
+  if (await hasOperationRequestReceiptForResource(c.env.DB, 'stop', incident.id)) return null;
+  await saveOperationRequestReceipt(c.env.DB, {
+    action: 'stop', actorId: input.actorId, idempotencyKey: input.idempotencyKey,
+    requestHash: input.requestHash, resourceId: incident.id,
+  });
+  const notifications = await queueOperationNotifications(c, {
+    incidentId: incident.id,
+    eventKind: 'stopped',
+    payload: {
+      lineAccountId: incident.lineAccountId,
+      capabilities: incident.capabilities,
+      reason: incident.reason,
+      actorId: input.actorId,
+    },
+  });
+  const fresh = await getOperationControlSet(c.env.DB, incident.lineAccountId);
+  return c.json({
+    success: true,
+    duplicate: true,
+    data: { status: 'changed', control: fresh, incident, notifications },
+  });
+}
+
+/*
+ * 復旧の状態確定後に receipt の保存だけ失敗したときの再送を補う。
+ *
+ * 復旧済みの再送は対象外(OPERATION_NOT_STOPPED)に、版だけ進んだ部分復旧の
+ * 再送は版競合になる。どちらも「自分が確定させた対象に誰の receipt も無い」
+ * ときだけ、記録と通知準備を足して再送として返す。他人が確定させた対象は
+ * 従来どおり競合・対象外にする。
+ */
+async function repairOrphanedRestore(
+  c: Context<Env>,
+  input: {
+    incidentId: string;
+    expectedVersion: number;
+    actorId: string;
+    idempotencyKey: string;
+    requestHash: string;
+  },
+): Promise<Response | null> {
+  const action = `restore:${input.incidentId}`;
+  const raced = await getOperationRequestReceipt(c.env.DB, action, input.actorId, input.idempotencyKey);
+  if (raced) {
+    if (raced.requestHash !== input.requestHash) return null;
+    const replayed = await getOperationIncident(c.env.DB, raced.resourceId);
+    if (!replayed) return null;
+    const racedControl = await getOperationControlSet(c.env.DB, replayed.lineAccountId);
+    const racedNotifications = await queueOperationNotifications(c, {
+      incidentId: replayed.id,
+      eventKind: 'restored',
+      payload: { lineAccountId: replayed.lineAccountId, actorId: input.actorId },
+    });
+    return c.json({
+      success: true,
+      duplicate: true,
+      data: {
+        status: replayed.status === 'resolved' ? 'restored' : 'partial',
+        control: racedControl,
+        incident: replayed,
+        report: parseRestoreReport(replayed.restoreReportJson),
+        notifications: racedNotifications,
+      },
+    });
+  }
+  const incident = await getOperationIncident(c.env.DB, input.incidentId);
+  if (!incident) return null;
+  if (await hasOperationRequestReceiptForResource(c.env.DB, action, incident.id)) return null;
+  const control = await getOperationControlSet(c.env.DB, incident.lineAccountId);
+  if (incident.status === 'resolved') {
+    if (incident.resolvedByActorId !== input.actorId) return null;
+    await saveOperationRequestReceipt(c.env.DB, {
+      action, actorId: input.actorId, idempotencyKey: input.idempotencyKey,
+      requestHash: input.requestHash, resourceId: incident.id,
+    });
+    const notifications = await queueOperationNotifications(c, {
+      incidentId: incident.id,
+      eventKind: 'restored',
+      payload: { lineAccountId: incident.lineAccountId, actorId: input.actorId },
+    });
+    return c.json({
+      success: true,
+      duplicate: true,
+      data: {
+        status: 'restored',
+        control,
+        incident,
+        report: parseRestoreReport(incident.restoreReportJson),
+        notifications,
+      },
+    });
+  }
+  if (incident.status !== 'stopped') return null;
+  if (control.activeIncidentId !== incident.id) return null;
+  if (control.actorId !== input.actorId) return null;
+  if (control.version <= input.expectedVersion) return null;
+  await saveOperationRequestReceipt(c.env.DB, {
+    action, actorId: input.actorId, idempotencyKey: input.idempotencyKey,
+    requestHash: input.requestHash, resourceId: incident.id,
+  });
+  const notifications = await queueOperationNotifications(c, {
+    incidentId: incident.id,
+    eventKind: 'restored',
+    payload: { lineAccountId: incident.lineAccountId, actorId: input.actorId },
+  });
+  return c.json({
+    success: true,
+    duplicate: true,
+    data: {
+      status: 'partial',
+      control,
+      incident,
+      report: parseRestoreReport(incident.restoreReportJson),
+      notifications,
+    },
+  });
 }
 
 function staleHealth(run: Awaited<ReturnType<typeof getLatestOperationHealthRun>>) {
@@ -135,18 +323,17 @@ operations.get('/api/operations/health', requireRole('owner', 'admin'), async (c
     return c.json({ success: false, error: 'このアカウントの運用状態を表示する権限がありません', code: 'EMERGENCY_SCOPE_FORBIDDEN' }, 403);
   }
   try {
-    return c.json({ success: true, data: staleHealth(await getLatestOperationHealthRun(c.env.DB, accountId)) });
+    return c.json({ success: true, data: { ...staleHealth(await getLatestOperationHealthRun(c.env.DB, accountId)), loginSecurity: mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY) } });
   } catch (error) {
-    console.error('GET /api/operations/health error:', error);
-    return c.json({ success: false, error: '運用状態を取得できませんでした' }, 500);
+    throw error;
   }
 });
 
-operations.post('/api/operations/health/runs', requireRole('owner', 'admin'), async (c) => {
+operations.post('/api/operations/health/runs', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{ lineAccountId?: unknown }>()
     .catch(() => ({} as { lineAccountId?: unknown }));
   if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()) {
-    return c.json({ success: false, error: 'LINEアカウントを指定してください' }, 400);
+    return inputError(c, { success: false, error: 'LINEアカウントを指定してください' }, 400, ["lineAccountId"]);
   }
   const accountId = body.lineAccountId.trim();
   if (!await canReadScope(c, accountId)) {
@@ -159,10 +346,9 @@ operations.post('/api/operations/health/runs', requireRole('owner', 'admin'), as
       actorId: c.get('staff')!.id,
       deps: { r2: c.env.IMAGES, queue: c.env.CODEX_MENTION_QUEUE },
     });
-    return c.json({ success: true, duplicate: checked.duplicate, data: staleHealth(checked.run) }, checked.duplicate ? 200 : 201);
+    return c.json({ success: true, duplicate: checked.duplicate, data: { ...staleHealth(checked.run), loginSecurity: mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY) } }, checked.duplicate ? 200 : 201);
   } catch (error) {
-    console.error('POST /api/operations/health/runs error:', error);
-    return c.json({ success: false, error: '運用状態を確認できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -181,18 +367,17 @@ operations.get('/api/operations/alerts', requireRole('owner', 'admin'), async (c
       }),
     });
   } catch (error) {
-    console.error('GET /api/operations/alerts error:', error);
-    return c.json({ success: false, error: '異常の一覧を取得できませんでした' }, 500);
+    throw error;
   }
 });
 
-operations.post('/api/operations/alerts/:id/acknowledge', requireRole('owner', 'admin'), async (c) => {
+operations.post('/api/operations/alerts/:id/acknowledge', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{ lineAccountId?: unknown; expectedVersion?: unknown; note?: unknown }>()
     .catch(() => ({} as { lineAccountId?: unknown; expectedVersion?: unknown; note?: unknown }));
   if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()
     || !Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1
     || (body.note !== undefined && typeof body.note !== 'string')) {
-    return c.json({ success: false, error: '受領内容を確認してから、もう一度読み直してください' }, 400);
+    return inputError(c, { success: false, error: '受領内容を確認してから、もう一度読み直してください' }, 400, ["lineAccountId","expectedVersion","note"]);
   }
   const accountId = body.lineAccountId.trim();
   if (!await canReadScope(c, accountId)) {
@@ -217,15 +402,14 @@ operations.post('/api/operations/alerts/:id/acknowledge', requireRole('owner', '
     });
     return c.json({ success: true, duplicate: saved.status === 'duplicate', data: saved.alert });
   } catch (error) {
-    console.error('POST /api/operations/alerts/:id/acknowledge error:', error);
-    return c.json({ success: false, error: '異常の受領を保存できませんでした' }, 500);
+    throw error;
   }
 });
 
-operations.post('/api/operations/alerts/:id/notifications/retry', requireRole('owner', 'admin'), async (c) => {
+operations.post('/api/operations/alerts/:id/notifications/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{ lineAccountId?: unknown }>().catch(() => ({} as { lineAccountId?: unknown }));
   if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()) {
-    return c.json({ success: false, error: 'LINEアカウントを指定してください' }, 400);
+    return inputError(c, { success: false, error: 'LINEアカウントを指定してください' }, 400, ["lineAccountId"]);
   }
   const accountId = body.lineAccountId.trim();
   if (!await canReadScope(c, accountId)) {
@@ -242,8 +426,7 @@ operations.post('/api/operations/alerts/:id/notifications/retry', requireRole('o
     });
     return c.json({ success: true, data: { retried } });
   } catch (error) {
-    console.error('POST /api/operations/alerts/:id/notifications/retry error:', error);
-    return c.json({ success: false, error: '通知の再送を受け付けられませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -255,8 +438,7 @@ operations.get('/api/operations/control', requireRole('owner', 'admin'), async (
   try {
     return c.json({ success: true, data: await getOperationControlSet(c.env.DB, accountId) });
   } catch (error) {
-    console.error('GET /api/operations/control error:', error);
-    return c.json({ success: false, error: '緊急停止状態を取得できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -281,11 +463,7 @@ operations.get('/api/operations/control/preview', requireRole('owner', 'admin'),
       auto_reply_dispatch: impact.auto_reply_dispatch.itemCount,
     };
     /*
-     * N-456: 読み取りGETでは監査記録を書かない。
-     *
-     * 以前はプレビューを表示するたびに 'previewed' が operation_audit へ
-     * 増え、停止・復旧の操作記録が見るだけの記録に埋もれていた。
-     * 記録するのは操作・判断を伴う更新(停止・復旧・受領・再送)だけにする。
+     * 停止・復旧などの判断の記録が閲覧で埋もれないよう、読み取り GET では監査を書かず、更新操作だけを記録する。
      */
     const calculatedAt = new Date().toISOString();
     const canControl = canControlEmergency(c);
@@ -295,7 +473,7 @@ operations.get('/api/operations/control/preview', requireRole('owner', 'admin'),
         control,
         counts,
         impact,
-        // N-453: 停止できない理由を画面が運用者向け文言へ変えるための機械コード。
+        // 停止できない理由を画面が運用者向け文言へ変えるための機械コード。
         // 権限があるときは null。文言そのものは画面側が持つ。
         permissions: {
           canControl,
@@ -305,13 +483,12 @@ operations.get('/api/operations/control/preview', requireRole('owner', 'admin'),
       },
     });
   } catch (error) {
-    console.error('GET /api/operations/control/preview error:', error);
-    return c.json({ success: false, error: '緊急停止の影響人数を取得できませんでした' }, 500);
+    throw error;
   }
 });
 
 /*
- * 送信経路の台帳 (#1050)。
+ * 送信経路の台帳。
  *
  * 「停止ボタンが見える」だけでは各経路が止まるか分からないため、実装が
  * 名乗った経路一覧と、いまの停止対象ごとの状態をそのまま返す。
@@ -347,8 +524,7 @@ operations.get('/api/operations/send-paths', requireRole('owner', 'admin'), asyn
       },
     });
   } catch (error) {
-    console.error('GET /api/operations/send-paths error:', error);
-    return c.json({ success: false, error: '送信経路の一覧を取得できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -390,10 +566,10 @@ operations.get('/api/operations/history', requireRole('owner', 'admin'), async (
         deployment,
       })),
     ].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).slice(0, limit);
-    return c.json({ success: true, data: history });
+    const responseItems = history;
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [] }));
   } catch (error) {
-    console.error('GET /api/operations/history error:', error);
-    return c.json({ success: false, error: '緊急操作の履歴を取得できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -406,8 +582,7 @@ operations.get('/api/operations/incidents/:id', requireRole('owner', 'admin'), a
     }
     return c.json({ success: true, data: incident });
   } catch (error) {
-    console.error('GET /api/operations/incidents/:id error:', error);
-    return c.json({ success: false, error: '緊急操作の記録を取得できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -416,16 +591,16 @@ operations.post(
   requireRole('owner', 'admin'),
   requireEmergencyControlPermission,
   requireIrreversibleConfirmation('operation-stop'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     let body: Record<string, unknown>;
     try {
       body = await c.req.json<Record<string, unknown>>();
     } catch {
-      return c.json({ success: false, error: '入力内容を読み取れませんでした' }, 400);
+      return inputError(c, { success: false, error: '入力内容を読み取れませんでした' }, 400, []);
     }
     if (!Object.hasOwn(body, 'lineAccountId')
       || (body.lineAccountId !== null && typeof body.lineAccountId !== 'string')) {
-      return c.json({ success: false, error: '停止する範囲を明示してください' }, 400);
+      return inputError(c, { success: false, error: '停止する範囲を明示してください' }, 400, ["lineAccountId"]);
     }
     const accountId = requestedAccountId(
       typeof body.lineAccountId === 'string' ? body.lineAccountId : null,
@@ -435,16 +610,16 @@ operations.post(
     }
     const capabilities = parseCapabilities(body.capabilities);
     if (!capabilities) {
-      return c.json({ success: false, error: '停止対象を1つ以上正しく指定してください' }, 400);
+      return inputError(c, { success: false, error: '停止対象を1つ以上正しく指定してください' }, 400, ["capabilities"]);
     }
     if (body.confirmation !== '停止') {
-      return c.json({ success: false, error: '確認のため「停止」と入力してください' }, 400);
+      return inputError(c, { success: false, error: '確認のため「停止」と入力してください' }, 400, ["confirmation"]);
     }
     if (typeof body.reason !== 'string' || !body.reason.trim() || body.reason.trim().length > 200) {
-      return c.json({ success: false, error: '停止理由を200文字以内で入力してください' }, 400);
+      return inputError(c, { success: false, error: '停止理由を200文字以内で入力してください' }, 400, ["reason"]);
     }
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
-      return c.json({ success: false, error: '最新の停止状態を読み直してください' }, 400);
+      return inputError(c, { success: false, error: '最新の停止状態を読み直してください' }, 400, ["expectedVersion"]);
     }
     const detail = typeof body.detail === 'string' && body.detail.trim()
       ? body.detail.trim().slice(0, 1_000)
@@ -452,7 +627,7 @@ operations.post(
 
     const idempotencyKey = requiredIdempotencyKey(c);
     if (!idempotencyKey) {
-      return c.json({ success: false, error: '再実行を安全にするキーを指定してください' }, 400);
+      return inputError(c, { success: false, error: '再実行を安全にするキーを指定してください' }, 400, []);
     }
     const actorId = c.get('staff')!.id;
     const requestHash = await sha256Hex(JSON.stringify({
@@ -478,7 +653,7 @@ operations.post(
       /*
        * 再認証grantの未所持・期限切れは、画面が6桁コードの入力からやり直せる
        * 通常の状態。管理画面の共通401処理（セッション喪失モーダル）に
-       * 取られないよう、機械コードを付けて区別する（#1058）。
+       * 取られないよう、機械コードを付けて区別する。
        * HTTPステータスは呼び出し側の既存分岐を壊さないよう401のまま。
        */
       return c.json({ success: false, error: '重要操作の再認証が必要です', code: 'STEP_UP_REQUIRED' }, 401);
@@ -494,6 +669,15 @@ operations.post(
         detail,
       });
       if (result.status === 'conflict') {
+        const repaired = await repairOrphanedStop(c, {
+          accountId,
+          capabilities,
+          reason: body.reason.trim(),
+          actorId,
+          idempotencyKey,
+          requestHash,
+        });
+        if (repaired) return repaired;
         return c.json({
           success: false,
           error: '別の管理者が先に変更しました。最新の状態を読み直してください。',
@@ -511,14 +695,13 @@ operations.post(
       });
       return c.json({ success: true, data: { ...result, notifications } }, 201);
     } catch (error) {
-      console.error('POST /api/operations/incidents error:', error);
-      return c.json({ success: false, error: '緊急停止状態を保存できませんでした' }, 500);
+      throw error;
     }
   },
 );
 
 /*
- * N-451: 復旧の前に、停止時snapshotと現在の定義のずれ（drift）を見せる口。
+ * 復旧の前に、停止時snapshotと現在の定義のずれ（drift）を見せる口。
  * 読み取り専用なので typed 確認・step-up・冪等キーは要らないが、
  * 範囲の権限は復旧と同じだけ要求する。
  */
@@ -526,7 +709,7 @@ operations.post(
   '/api/operations/incidents/:id/restore-preview',
   requireRole('owner', 'admin'),
   requireEmergencyControlPermission,
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const incident = await getOperationIncident(c.env.DB, c.req.param('id'));
       if (!incident) return c.json({ success: false, error: '緊急操作の記録が見つかりません' }, 404);
@@ -547,8 +730,7 @@ operations.post(
         },
       });
     } catch (error) {
-      console.error('POST /api/operations/incidents/:id/restore-preview error:', error);
-      return c.json({ success: false, error: '復旧前の検査に失敗しました' }, 500);
+      throw error;
     }
   },
 );
@@ -558,23 +740,23 @@ operations.post(
   requireRole('owner', 'admin'),
   requireEmergencyControlPermission,
   requireIrreversibleConfirmation('operation-restore'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     let body: Record<string, unknown>;
     try {
       body = await c.req.json<Record<string, unknown>>();
     } catch {
-      return c.json({ success: false, error: '入力内容を読み取れませんでした' }, 400);
+      return inputError(c, { success: false, error: '入力内容を読み取れませんでした' }, 400, []);
     }
     if (body.confirmation !== '復旧') {
-      return c.json({ success: false, error: '確認のため「復旧」と入力してください' }, 400);
+      return inputError(c, { success: false, error: '確認のため「復旧」と入力してください' }, 400, ["confirmation"]);
     }
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1) {
-      return c.json({ success: false, error: '最新の停止状態を読み直してください' }, 400);
+      return inputError(c, { success: false, error: '最新の停止状態を読み直してください' }, 400, ["expectedVersion"]);
     }
 
     const idempotencyKey = requiredIdempotencyKey(c);
     if (!idempotencyKey) {
-      return c.json({ success: false, error: '再実行を安全にするキーを指定してください' }, 400);
+      return inputError(c, { success: false, error: '再実行を安全にするキーを指定してください' }, 400, []);
     }
 
     try {
@@ -600,7 +782,7 @@ operations.post(
           payload: { lineAccountId: replayed.lineAccountId, actorId },
         });
         /*
-         * N-451: 同じキーでの再実行にも最初の検査結果を返す。
+         * 同じキーでの再実行にも最初の検査結果を返す。
          * 画面は report を見て「一部だけ復旧」を出し分けるので、
          * ここで落とすと成功表示へ誤認する。
          */
@@ -621,7 +803,7 @@ operations.post(
       }
       if (!await consumeOperationStepUp(c)) {
         // 停止側と同じく、再認証のやり直しは画面が自分で案内する通常の状態。
-        // セッション喪失モーダルと区別するため機械コードを付ける（#1058）。
+        // セッション喪失モーダルと区別するため機械コードを付ける。
         return c.json({ success: false, error: '重要操作の再認証が必要です', code: 'STEP_UP_REQUIRED' }, 401);
       }
       const result = await restoreOperationIncident(c.env.DB, {
@@ -630,9 +812,25 @@ operations.post(
         actorId,
       });
       if (result.status === 'not_found') {
+        const repaired = await repairOrphanedRestore(c, {
+          incidentId: incident.id,
+          expectedVersion: Number(body.expectedVersion),
+          actorId,
+          idempotencyKey,
+          requestHash,
+        });
+        if (repaired) return repaired;
         return c.json({ success: false, error: '復旧できる緊急停止ではありません', code: 'OPERATION_NOT_STOPPED' }, 409);
       }
       if (result.status === 'conflict') {
+        const repaired = await repairOrphanedRestore(c, {
+          incidentId: incident.id,
+          expectedVersion: Number(body.expectedVersion),
+          actorId,
+          idempotencyKey,
+          requestHash,
+        });
+        if (repaired) return repaired;
         return c.json({
           success: false,
           error: '別の管理者が先に変更しました。最新の状態を読み直してください。',
@@ -641,7 +839,7 @@ operations.post(
         }, 409);
       }
       /*
-       * N-451: 停止中の編集・追加・権限喪失がある能力は再開しない。
+       * 停止中の編集・追加・権限喪失がある能力は再開しない。
        * 1つも再開できなかったときは制御状態を変えず 409 で理由を返す。
        * 冪等キーの receipt は実際に再開したときだけ保存するので、
        * ずれを直したあと同じキーで試し直せる。
@@ -664,13 +862,12 @@ operations.post(
       });
       return c.json({ success: true, data: { ...result, notifications } });
     } catch (error) {
-      console.error('POST /api/operations/incidents/:id/restore error:', error);
-      return c.json({ success: false, error: '復旧後の状態を保存できませんでした' }, 500);
+      throw error;
     }
   },
 );
 
-operations.post('/api/internal/deployments/events', async (c) => {
+operations.post('/api/internal/deployments/events', inputJsonBoundary(), async (c) => {
   const secret = c.env.OPERATIONS_DEPLOYMENT_SIGNING_SECRET;
   if (!secret || secret.length < 32) {
     return c.json({ success: false, error: 'Deployment event receiver is not configured' }, 503);
@@ -686,7 +883,7 @@ operations.post('/api/internal/deployments/events', async (c) => {
   }
   let body: Record<string, unknown>;
   try { body = JSON.parse(rawBody) as Record<string, unknown>; } catch {
-    return c.json({ success: false, error: 'Invalid JSON' }, 400);
+    return inputError(c, { success: false, error: 'Invalid JSON' }, 400, []);
   }
   const phases = ['queued', 'deploying', 'verifying', 'succeeded', 'failed', 'rolled_back'] as const;
   if (
@@ -696,7 +893,7 @@ operations.post('/api/internal/deployments/events', async (c) => {
     || typeof body.occurredAt !== 'string' || !Number.isFinite(Date.parse(body.occurredAt))
     || typeof body.phase !== 'string' || !phases.includes(body.phase as typeof phases[number])
   ) {
-    return c.json({ success: false, error: 'Invalid deployment event' }, 400);
+    return inputError(c, { success: false, error: 'Invalid deployment event' }, 400, ["deploymentId","environment","actor","occurredAt","phase"]);
   }
   const migrations = Array.isArray(body.migrations)
     ? body.migrations.filter((value): value is string => typeof value === 'string').slice(0, 100)

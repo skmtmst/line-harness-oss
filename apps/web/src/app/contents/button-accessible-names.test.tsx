@@ -9,6 +9,8 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 import type { MediaItem } from '@line-crm/shared'
 
 import { buttonsWithoutAccessibleName } from '@/test-utils/accessible-name'
@@ -53,6 +55,7 @@ vi.mock('@/lib/api', () => {
         list: () => Promise.resolve({ success: true, data: [], unfiledCount: 0 }),
       },
       media: {
+        counts: () => Promise.resolve({ success: true, data: { total: 1, byKind: { image: 1, video: 0, audio: 0, file: 0 }, unused: 1, archived: 0 } }),
         list: () =>
           Promise.resolve({
             success: true,

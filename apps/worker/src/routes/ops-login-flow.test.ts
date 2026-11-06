@@ -1,13 +1,24 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
 import { hashPassword } from '../services/password-hash.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authEmail } from './auth-email.js';
 import { adminAuth } from './admin-auth.js';
 import { ops } from './ops.js';
+
+// トークンと設定の検証は実物を使い、Cloudflare の外部応答だけを差し替える。
+vi.mock('../services/turnstile.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../services/turnstile.js')>();
+  const verify: typeof actual.verifyTurnstile = (environment, token, ip) => actual.verifyTurnstile(environment, token, ip, async (url, init) => {
+    const sent = new URLSearchParams(String(init?.body ?? ''));
+    return Response.json({ success: String(url) === 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+      && init?.method === 'POST' && sent.get('secret') === 'fixture-turnstile-secret' && sent.get('response') === 'fixture-login-robot' });
+  });
+  return { ...actual, verifyTurnstile: verify };
+});
 
 const PAGES = 'https://nen-line-stg-admin.pages.dev';
 const WORKER = 'https://nen-line-stg.example.workers.dev';
@@ -19,6 +30,7 @@ let testDb: SqliteD1;
 function environment(): Env['Bindings'] {
   return {
     DB: testDb.db,
+    TURNSTILE_SECRET_KEY: 'fixture-turnstile-secret',
     ADMIN_ORIGIN: PAGES,
     ADMIN_PUBLIC_URL: PAGES,
     WORKER_URL: WORKER,
@@ -51,21 +63,23 @@ beforeEach(async () => {
   ).run();
 });
 
-/*
- * 二段階認証は一時解除中（利用者指示 2026-10-03）。運営ログインもパスワードが
- * 合えばその場でセッションが出る。再有効化したら合言葉→/api/auth/two-factor/verify
- * →セッションの順に戻す（`totpAtStep` と `SECRET` はそのために残している）。
- */
 describe('運営コンソールのメールログイン', () => {
   it('パスワードでsessionを受け取り、そのBearerでsession確認とops認可まで通る', async () => {
     const login = await app().request(`${WORKER}/api/auth/password/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: PAGES },
-      body: JSON.stringify({ email: 'ops-e2e@example.com', password: 'Abcdefg1', next: 'ops' }),
+      body: JSON.stringify({ email: 'ops-e2e@example.com', password: 'Abcdefg1', next: 'ops', turnstileToken: 'fixture-login-robot' }),
     }, environment());
     expect(login.status, await login.clone().text()).toBe(200);
-    const loginBody = await login.json() as { data: { twoFactor: boolean; sessionToken: string }; csrfToken: string };
-    expect(loginBody.data.twoFactor).toBe(false);
+    const challenge = await login.json() as { data: { twoFactor: boolean; challengeToken: string } };
+    expect(challenge.data.twoFactor).toBe(true);
+    expect(login.headers.get('set-cookie')).toBeNull();
+    const verified = await app().request(`${WORKER}/api/auth/two-factor/verify`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: PAGES },
+      body: JSON.stringify({ challengeToken: challenge.data.challengeToken, code: await totpAtStep(SECRET, Math.floor(Date.now()/30000)) }),
+    }, environment());
+    expect(verified.status).toBe(200);
+    const loginBody = await verified.json() as { data: { sessionToken: string }; csrfToken: string };
     expect(loginBody.data.sessionToken).toBeTruthy();
     expect(loginBody.csrfToken).toBeTruthy();
 

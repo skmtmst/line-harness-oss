@@ -1,0 +1,21 @@
+/*
+ * ★V8 バナー生成の小さな窓（・）の中身。枠（見出し・説明・区切り線・ボタン）は frame.tsx。
+  * 値は globals.css の `--tpl-hb-*`。
+ */
+
+
+.form { display: flex; flex-direction: column; gap: var(--tpl-hb-dialog-gap); }
+.field { display: flex; flex-direction: column; gap: var(--tpl-hb-field-gap); width: 100%; }
+.labelRow { display: flex; align-items: baseline; gap: var(--tpl-hb-field-gap); }
+.label { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-hb-label-lh); }
+.optional { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-hb-small-lh); }
+.full { width: 100%; min-width: 0; }
+.full :global(*) { max-width: 100%; }
+.textarea { min-height: var(--tpl-hb-textarea-h); }
+.icon { width: var(--tpl-hb-button-icon); height: var(--tpl-hb-button-icon); }
+
+
+/* 置き場は画像を入れる所（MediaSlot・Z7vd2）。下に選んだファイルの名前。 */
+.dropText { margin: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); }
+.note { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-hb-dialog-desc-lh); }
+.labelSmall { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-hb-stat-lh); }

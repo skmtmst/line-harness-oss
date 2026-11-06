@@ -10,7 +10,7 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import BookingCalendar, { slotAriaLabel, startOfWeek, type CalendarSlot } from './booking-calendar'
 import type { BookingRequest } from '@/lib/api'
 
@@ -33,7 +33,9 @@ const fixture = vi.hoisted(() => ({
   downloadLedgerCsv: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+// 業種読取はこの試験の対象外。元の予約状態・権限・再読込の条件を保つ。
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'standard' }, error: null, reload: vi.fn() }) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(nav.search),
   useRouter: () => ({ replace: nav.replace, push: nav.push }),
 }))
@@ -45,11 +47,12 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async () => ({
   api: {
     staff: { me: fixture.staffMe },
   },
   bookingApi: {
+    ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
     listRequests: fixture.listRequests,
     requestsSummary: fixture.requestsSummary,
     listMenus: fixture.listMenus,
@@ -130,13 +133,43 @@ afterEach(cleanup)
 describe('監査 R315: 選択状態を意味で伝える', () => {
   it('表示切替（今日・今週・今月・一覧）は押下状態を持つ', async () => {
     render(<BookingsPage />)
-    const listTab = await screen.findByRole('button', { name: '一覧' })
+    const listTab = (await screen.findAllByRole('button', { name: '一覧' }))[0]
     // 初期表示は「日」なので一覧は押されていない。
     expect(listTab.getAttribute('aria-pressed')).toBe('false')
     fireEvent.click(listTab)
-    expect(listTab.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: '一覧' }).getAttribute('aria-pressed')).toBe('true')
     // 既存操作は維持する。一覧へ切り替わり、検索欄が出る。
     expect(await screen.findByPlaceholderText('お客さま名で検索')).toBeTruthy()
+  })
+
+  it('状態と期間は共通の切り替えで一つを選び、期間を解除できる', async () => {
+    nav.search = 'view=list'
+    render(<BookingsPage />)
+    const done = await screen.findByRole('button', { name: '完了' })
+    const confirmed = screen.getByRole('button', { name: '確定' })
+    const today = screen.getByRole('button', { name: '今日' })
+    const week = screen.getByRole('button', { name: '今週' })
+    const statusGroup = screen.getByRole('group', { name: '予約の状態' })
+    const periodGroup = screen.getByRole('group', { name: '予約の期間' })
+    for (const control of [done, confirmed]) expect(control.closest('[data-segmented-control]')).toBe(statusGroup)
+    for (const control of [today, week]) expect(control.closest('[data-segmented-control]')).toBe(periodGroup)
+    for (const control of [done, confirmed, today, week]) expect(control.getAttribute('data-part')).not.toBe('filter-chip')
+    fireEvent.click(done)
+    expect(done.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(confirmed)
+    expect(confirmed.getAttribute('aria-pressed')).toBe('true')
+    expect(done.getAttribute('aria-pressed')).toBe('false')
+    expect(confirmed.querySelector('svg')).toBeNull()
+    fireEvent.click(today)
+    expect(today.getAttribute('aria-pressed')).toBe('true')
+    expect(today.querySelector('svg')).toBeNull()
+    fireEvent.click(week)
+    expect(week.getAttribute('aria-pressed')).toBe('true')
+    expect(today.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(week)
+    expect(week.getAttribute('aria-pressed')).toBe('false')
+    expect(within(periodGroup).getByRole('button', { name: 'すべて' }).getAttribute('aria-pressed')).toBe('true')
+    expect(confirmed.getAttribute('aria-pressed')).toBe('true')
   })
 
   it('状態と期間の絞り込みは押下状態を持つ', async () => {
@@ -222,7 +255,8 @@ describe('監査 R316: 集計の見出しは選んだ期間を名指しする', 
         availability={{ status: 'ready', slots: [] }}
       />,
     )
-    expect(screen.getByText(/今日（.*）の予約/)).toBeTruthy()
+    expect(screen.getByText('今日の予約')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '今日の予約の説明' })).toBeTruthy()
   })
 
   it('翌週の週表示では週の範囲を名指しする', () => {
@@ -241,13 +275,31 @@ describe('監査 R316: 集計の見出しは選んだ期間を名指しする', 
       />,
     )
     expect(start).toBe('2026-10-05')
-    expect(screen.getByText(/10\/5〜10\/11 の週.*の予約/)).toBeTruthy()
+    expect(screen.getByText(/10月5日〜10月11日 の週.*の予約/)).toBeTruthy()
     expect(screen.queryByText('今週の予約')).toBeNull()
     expect(screen.queryByText('今週 気をつけること')).toBeNull()
   })
 })
 
 describe('監査 R317: 条件と表示日をURLへ持ち、再読み込みで復元する', () => {
+  it('今月の表示で検索条件を変えても期間を保つ', async () => {
+    nav.search = 'view=month&status=confirmed&q=月の条件'
+    render(<BookingsPage />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^今月/ }).getAttribute('aria-pressed')).toBe('true')
+    })
+    const search = screen.getByPlaceholderText('お客さま名で検索') as HTMLInputElement
+    expect(search.value).toBe('月の条件')
+    fireEvent.change(search, { target: { value: '変更した条件' } })
+    await waitFor(() => {
+      expect(nav.replace.mock.calls.some(([url]) => String(url).includes('view=month') && new URL(String(url), 'http://localhost').searchParams.get('q') === '変更した条件')).toBe(true)
+    })
+    expect(screen.getByRole('button', { name: /^今月/ }).getAttribute('aria-pressed')).toBe('true')
+    expect((screen.getByPlaceholderText('お客さま名で検索') as HTMLInputElement).value).toBe('変更した条件')
+    const writes = nav.replace.mock.calls.map(([url]) => new URL(String(url), 'http://localhost'))
+    expect(writes.every(url => url.searchParams.get('view') === 'month')).toBe(true)
+  })
+
   it('URLの表示方法・絞り込み・検索語で一覧を開く', async () => {
     nav.search = 'view=list&status=completed&range=week&q=QA_R317'
     render(<BookingsPage />)
@@ -258,10 +310,27 @@ describe('監査 R317: 条件と表示日をURLへ持ち、再読み込みで復
     })
     // 検索欄にも戻り、運用者が条件を見失わない。
     expect((screen.getByPlaceholderText('お客さま名で検索') as HTMLInputElement).value).toBe('QA_R317')
+    expect(screen.getByRole('button', { name: '完了' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: '今週' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: '今日' }).getAttribute('aria-pressed')).toBe('false')
     // 状態をURLへ写す（再読み込みで同じになる）。
     await waitFor(() => {
       const writes = nav.replace.mock.calls.map((call) => String(call[0]))
       expect(writes.some((url) => url.includes('view=list') && url.includes('status=completed') && url.includes('q=QA_R317'))).toBe(true)
+    })
+  })
+
+  it('休業日のリンクで指定日の一覧を開き、日付の解除で全期間へ戻る', async () => {
+    nav.search = 'view=list&status=all&range=date&date=2026-10-26'
+    render(<BookingsPage />)
+    await waitFor(() => expect(fixture.listRequests).toHaveBeenCalledWith('account-a', 'all', expect.objectContaining({
+      from: '2026-10-25T15:00:00.000Z', to: '2026-10-26T15:00:00.000Z',
+    })))
+    fireEvent.click(screen.getByRole('button', { name: /10月26日（月）の予約/ }))
+    await waitFor(() => {
+      const last = fixture.listRequests.mock.calls.at(-1)?.[2]
+      expect(last?.from).toBeUndefined()
+      expect(last?.to).toBeUndefined()
     })
   })
 

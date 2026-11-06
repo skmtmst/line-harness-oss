@@ -1,10 +1,13 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { reconcileRestaurantInventory } from './restaurant-inventory-rules.js';
 import PostalMime from 'postal-mime';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dbFor } from './db-router.js';
-import { parserFor, type ParsedReservationEmail } from './parsers/index.js';
+import { parserFor } from './parsers/index.js';
+import { type ParsedReservationEmail } from './parsers/types.js';
 
 const MAX_PARSE_BYTES = 2 * 1024 * 1024;
-const DEFAULT_STAY_MINUTES = 120;
+export const DEFAULT_STAY_MINUTES = 120;
 const DEFAULT_HOLD_END_HOUR = 23;
 
 export type RestaurantMediaRow = {
@@ -84,7 +87,7 @@ function holdEndHour(env: Env['Bindings']): number {
 
 export function nextBusinessDayHoldExpiry(startsFrom: string, endHour = DEFAULT_HOLD_END_HOUR): string {
   const source = new Date(startsFrom);
-  const jstDate = new Date(source.getTime() + 9 * 60 * 60 * 1000);
+  const jstDate = japanCalendar(source);
   let year = jstDate.getUTCFullYear();
   let month = jstDate.getUTCMonth();
   let day = jstDate.getUTCDate();
@@ -123,6 +126,9 @@ async function markEvent(
   await dbFor(env, storeId).prepare(`UPDATE rt_sync_events
     SET status = ?, payload_json = json_patch(payload_json, ?), error_message = ?, processed_at = datetime('now')
     WHERE id = ?`).bind(status, JSON.stringify(payload), errorMessage, eventId).run();
+  await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails SET status = ?, quarantine_reason = ?
+    WHERE store_id = ? AND message_id = (SELECT external_event_id FROM rt_sync_events WHERE id = ? AND provider = 'email')`)
+    .bind(status === 'failed' ? 'quarantined' : 'received', errorMessage, storeId, eventId).run();
 }
 
 function endAt(startsAt: string, stayMinutes: number): string {
@@ -173,6 +179,7 @@ async function upsertReservation(
       parsed.mediaStoreCode ?? null, parsed.tableLabel ?? null, input.inboundEmailId,
       input.media.parser_key, parserVersion,
     ).run();
+  if(result.meta.changes) await reconcileRestaurantInventory(input.env,input.storeId);
   return result.meta.changes ? 'inserted_or_updated' : 'stale_ignored';
 }
 

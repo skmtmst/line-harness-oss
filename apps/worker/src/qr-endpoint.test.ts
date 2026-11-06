@@ -1,3 +1,4 @@
+import ts from 'typescript';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -18,7 +19,8 @@ vi.mock('@line-crm/db', () => ({
   recoverStuckDeliveries: vi.fn(),
 }));
 
-import { qrHandler, type Env } from './index.js';
+import { qrHandler } from './index.js';
+import { type Env } from './worker-env.js';
 
 const REF_LINK = 'https://worker.example.com/r/spring-campaign-2026';
 
@@ -195,10 +197,12 @@ const read = (relative: string) => readFileSync(path.join(repoRoot, relative), '
  * 頼む絵の大きさが固定であることが効いてくる。
  */
 const QR_CALL_SITES = [
-  { file: 'apps/web/src/app/inflow-links/referral-qr-modal.tsx', kind: 'bounded', fixedSize: '320x320' },
   { file: 'apps/web/src/components/dashboard/qr-dialog.tsx', kind: 'bounded', fixedSize: null },
+  // V8のQR小窓はDashboardQrDialogへ委譲し、URL生成とサイズ上限を共用する。
+  // ★V8 流入と計測の詳細の「QRを保存」。data は同じく「土台のURL + /r/ + 合言葉」。
+  { file: 'apps/web/src/v8/inflow-links/detail.tsx', kind: 'bounded', fixedSize: '320x320' },
   { file: 'apps/worker/src/index.ts', kind: 'passthrough', fixedSize: '240x240' },
-  { file: 'apps/worker/src/routes/liff.ts', kind: 'passthrough', fixedSize: '240x240' },
+  { file: 'apps/worker/src/routes/liff-oauth-start-handlers.ts', kind: 'passthrough', fixedSize: '240x240' },
 ] as const;
 
 function sourceFilesUnder(directory: string): string[] {
@@ -218,37 +222,43 @@ function sourceFilesUnder(directory: string): string[] {
   return found;
 }
 
+function hasQrEndpoint(source: string): boolean {
+  // 対象の文字もエスケープもなければ、構文を読んでも対象のURLにはならない。
+  // エスケープがある物はUnicodeやテンプレートも含めて従来どおり構文で調べる。
+  if (!source.includes('/api/qr?') && !source.includes('\\')) return false;
+  const tree=ts.createSourceFile('caller.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+  let found=false;
+  const visit=(node:ts.Node):void=>{
+    if((ts.isStringLiteralLike(node)||ts.isTemplateHead(node)||ts.isTemplateMiddle(node)||ts.isTemplateTail(node))&&node.text.includes('/api/qr?'))found=true;
+    ts.forEachChild(node,visit);
+  };
+  visit(tree);return found;
+}
+
 describe('/api/qr を呼ぶ側が渡せる大きさ', () => {
+  it('QRの実URLの式を拾い、説明のコメントは呼出し元に数えない',()=>{
+    expect(hasQrEndpoint("const qr='/api/qr?size=240x240' ")).toBe(true);
+    expect(hasQrEndpoint('const qr=`/api/qr?data=${value}`')).toBe(true);
+    expect(hasQrEndpoint('// /api/qr?size=240x240')).toBe(false);
+    expect(hasQrEndpoint(String.raw`const qr='\u002fapi/qr?data=x'`)).toBe(true);
+    expect(hasQrEndpoint('const qr=`/api/\\u0071r?data=${value}`')).toBe(true);
+    expect(hasQrEndpoint(String.raw`// /api/\u0071r?data=x`)).toBe(false);
+  });
   it('QRのURLを組み立てている箇所は数え上げたものだけ', () => {
     // 増えたらここに足して、その呼び出し元の上限も下の検査へ入れる。
     const builders = [...sourceFilesUnder('apps/web/src'), ...sourceFilesUnder('apps/worker/src')].filter((file) =>
-      read(file).includes('/api/qr?'),
+      hasQrEndpoint(read(file)),
     );
     expect(builders.sort()).toEqual(QR_CALL_SITES.map((site) => site.file).sort());
-  });
+  }, 30_000);
 
-  it('受け取ったクエリをそのまま載せる呼び出し元は、240x240のPNGしか頼まない', () => {
-    // ここは data を 2KiB まで伸ばせるので、絵の大きさと形式が固定であることが
-    // 1 要求あたりの重さの歯止めになっている。
-    for (const site of QR_CALL_SITES.filter((entry) => entry.kind === 'passthrough')) {
-      const source = read(site.file);
-      const urls = source.match(/\/api\/qr\?[^"'`]*/g) ?? [];
-      expect(urls.length).toBeGreaterThan(0);
-      for (const url of urls) {
-        expect(url).toContain(`size=${site.fixedSize}`);
-        expect(url).not.toContain('format=');
-      }
-    }
-  });
+  // 受け取ったクエリをそのまま載せる呼び出し元が 240x240 の PNG しか頼まないことは、
+  // 実際に返す画面の HTML で見る（qr-endpoint-callers.test.ts）。
 
   it('画素数や形式を選べる呼び出し元が渡すdataは200バイト未満', () => {
     // 選べる側が渡すのは「土台のURL + /r/ + 流入経路の合言葉」だけ。
-    // 合言葉の長さは経路を作るときの検査で決まる。
-    const entryRoutes = read('apps/worker/src/routes/entry-routes.ts');
-    const refCodeRule = /\/\^\[A-Za-z0-9_-\]\{1,(\d+)\}\$\//.exec(entryRoutes);
-    expect(refCodeRule).not.toBeNull();
-    const refCodeMax = Number((refCodeRule as RegExpExecArray)[1]);
-    expect(refCodeMax).toBe(64);
+    // 合言葉は経路を作るときに 64 文字までに断る（qr-endpoint-callers.test.ts が口を叩いて確かめる）。
+    const refCodeMax = 64;
 
     // 土台のURLは配備の設定で決まるので、実際に配っている値のうち長い方を使う。
     const bases = ['apps/worker/wrangler.toml', 'apps/worker/wrangler.staging.toml'].map((file) => {

@@ -27,7 +27,7 @@ function addMark(raw: Database.Database, id: string, accountId = 'account-1', te
   ).run(id, tenantId, accountId);
 }
 
-describe('対応マーク自動変更ルールのV6契約', () => {
+describe('対応マーク自動変更ルールの契約', () => {
   let testDb: SqliteD1;
   const scope = { tenantId: 'tenant-1', lineAccountId: 'account-1' };
 

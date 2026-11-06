@@ -1,0 +1,698 @@
+/*
+ * ★V8 マイル（Pencil ・・・・・・）。
+ * 枠・見出し・タブ・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
+ * 寸法は globals.css の --tpl-ml-*。
+ */
+
+/* 道具の段の先頭に置く帯（案内・失敗・保存待ち）。1行を取る。 */
+.fullRow {
+  order: -1;
+  flex-basis: 100%;
+
+}
+
+.chipGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+
+/* 表：共通の表の「列の並び」を使い、この板の寸法だけ当てる。 */
+.tableWrap {
+  min-width: 0;
+}
+.colEvent { width: var(--tpl-ml-col-event); min-width: 0; }
+.colMiles { width: calc(var(--tpl-ml-col-miles) + var(--tpl-ml-num-pad-end)); }
+.colValidity { width: var(--tpl-ml-col-validity); min-width: 0; }
+.colRecent { width: calc(var(--tpl-ml-col-recent) + var(--tpl-ml-num-pad-end)); }
+/* 使い道：必要なマイル 88・渡るもの 150・今月 92・状態 96・操作 160。 */
+.colNeed { width: calc(var(--tpl-ml-col-need) + var(--tpl-ml-num-pad-end)); }
+.colGives { width: var(--tpl-ml-col-gives); min-width: 0; }
+.colMonth { width: calc(var(--tpl-ml-col-month) + var(--tpl-ml-num-pad-end)); }
+.colStateWide { width: var(--tpl-ml-col-state-wide); }
+/* 友だちの残高：ランク 72・残高 76・増減 72・消える予定 76・最終行動 140・操作 150。 */
+.colRank { width: var(--tpl-ml-col-rank); min-width: 0; }
+.colBalance { width: calc(var(--tpl-ml-col-balance) + var(--tpl-ml-num-pad-end)); }
+.colChange { width: calc(var(--tpl-ml-col-change) + var(--tpl-ml-num-pad-end)); }
+.colLast { width: var(--tpl-ml-col-last); min-width: 0; }
+.colOpsBalance { width: calc(var(--tpl-ml-col-ops-balance) + var(--tpl-ml-col-gap)); }
+/* 履歴：増減 56・なぜ 180・残高 62・だれが 90・操作 140。 */
+.colDelta { width: calc(var(--tpl-ml-col-delta) + var(--tpl-ml-num-pad-end)); }
+.colWhy { width: var(--tpl-ml-col-why); min-width: 0; }
+.colAfter { width: calc(var(--tpl-ml-col-after) + var(--tpl-ml-num-pad-end)); }
+.colWho { width: var(--tpl-ml-col-who); min-width: 0; }
+.colOpsHistory { width: calc(var(--tpl-ml-col-ops-history) + var(--tpl-ml-col-gap) + var(--tpl-ml-ops-gap)); }
+/* 行動スコア：いまの点数 80・帯 80・30日間の変化 100・最後の反応 130・操作 150。行 54。 */
+.colScore { width: var(--tpl-ml-col-score); }
+.colBand { width: var(--tpl-ml-col-band); }
+.colTrend { width: var(--tpl-ml-col-trend); }
+.colReact { width: var(--tpl-ml-col-react); min-width: 0; }
+.colOpsMenu { width: var(--tpl-ml-col-ops-menu); }
+/* 右寄せの数の列（絵：右に 8 の余白）。 */
+.num { text-align: right; }
+.colState { width: var(--tpl-ml-col-state); }
+.colOps { width: calc(var(--tpl-ml-col-ops) + var(--tpl-ml-col-gap)); }
+
+.rowNameLine {
+  /* 名前の前のフォルダの丸と名前を1行に（「名の行」：丸 8・間 8）。 */
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+.dotIndent {
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
+  padding-inline-start: var(--tpl-folder-dot-indent);
+}
+.rowSub,
+.cellSub {
+  display: block;
+  margin-top: var(--tpl-row-sub-gap);
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-row-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cellMain {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  line-height: var(--tpl-text-sm-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 状態の札（点つき）。 */
+
+/* 行の右端：↑↓と「…」。メニューの位置の目印が行を1段増やさないよう横に並べる。 */
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ml-ops-gap);
+}
+.menuBox {
+  display: flex;
+  align-items: center;
+}
+/* 状態の文字と「？」：間 4・行の真ん中。 */
+.stateWithHelp {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--color-ink);
+  line-height: var(--tpl-text-sm-lh);
+  white-space: nowrap;
+}
+
+/* 表の下の案内。 */
+.footNote {
+  margin: 0;
+  padding: var(--tpl-ml-foot-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 道具の段の右：よく使う絞り込み（左に印）。 */
+
+/* 1152 の板：案内の帯 → 1段目 → 2段目。 */
+.narrowTools {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowFolder { width: var(--tpl-narrow-folder-w); }
+.narrowFolder :global(*) { max-width: 100%; }
+.narrowFolder :global(button) { width: 100%; }
+.narrowSearch { width: var(--tpl-ml-search-w); }
+.spacer { flex: 1 1 0; }
+
+/* 閲覧のみの帯（数の帯の上）。薄い青の地・目の印・枠なし。 */
+.viewerBand { margin: var(--tpl-ml-ro-before) var(--tpl-head-pad-side) var(--tpl-ml-ro-after); }
+
+/* テストの結果。 */
+.testList {
+  display: grid;
+  gap: var(--tpl-sub-gap);
+  margin: 0;
+  font-size: var(--text-caption);
+}
+.testList > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tpl-cell-gap-half);
+}
+.testList dt { color: var(--color-ink-secondary); }
+.testList dd { margin: 0; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+
+/* 表の下の別の表（要対応の交換など）。 */
+.subSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cell-gap-half);
+  padding: var(--tpl-ml-foot-pad);
+}
+.subTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+}
+.subDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-row-name-lh);
+}
+.subPager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-cell-gap-half);
+}
+
+/* 1行で切る（長い理由・名前で数の帯や行が伸びないように。全文は title）。 */
+.oneLine {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 名前（墨の 13/600）。友だちの残高の行。 */
+
+/* 承認待ちのマイル変更（黄の地・白い行）。 */
+.approval {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ml-approval-gap);
+  padding: var(--tpl-ml-approval-pad);
+  border-radius: var(--tpl-ml-approval-radius);
+  background: var(--color-notice-warning-bg);
+}
+.approvalTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-ml-approval-title-size);
+  font-weight: 700;
+  line-height: normal;
+}
+.approvalRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ml-col-gap);
+  padding: var(--tpl-ml-approval-row-pad);
+  border-radius: var(--tpl-ml-approval-row-radius);
+  background: var(--color-canvas);
+}
+.approvalText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+  min-width: 0;
+}
+.approvalName {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+}
+.approvalSub {
+  line-height: normal;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.approvalNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-ml-pill-lh);
+}
+
+/* 窓の中の欄。 */
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sub-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.textarea {
+  width: 100%;
+  padding: var(--tpl-kw-input-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-ui);
+  line-height: 1.6;
+  resize: vertical;
+}
+
+/* ページ送りの段（型の pagination 枠の中。枠が余白を持つので二重にしない）。 */
+.pagerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-toolbar-gap);
+}
+/* ページ送りの段と、その下の案内を縦に積む。 */
+.pagerStack {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+/* ページ送りの下の案内（枠の余白の中）。 */
+.footNoteFlush {
+  margin: var(--tpl-ml-foot-after-pager) 0 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+
+/* 行動スコアの点数（13/600）。30日間の変化は上がり緑・下がり赤。 */
+.scoreNum {
+  color: var(--color-ink);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+/* できごとの決めごとの道具（開け閉めの中）。 */
+.rulesTools {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  margin-bottom: var(--tpl-toolbar-gap);
+}
+
+/* 窓の中身（点数を手で直す ・点数の変化の明細 ）。縦に間 14 の1列。
+   共通の窓の見出しの下の余白（8＋24）を絵の 14 に寄せるため、上へ引き寄せる。 */
+.dlgBody {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  width: 100%;
+  gap: var(--tpl-ml-dlg-gap);
+  margin-top: var(--tpl-ml-dlg-pull);
+}
+.dlgGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-ml-dlg-label-gap);
+}
+.dlgGroup > input,
+.dlgGroup > textarea { align-self: stretch; }
+.dlgCaption {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.dlgFieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-ml-seg-lh);
+}
+.dlgPerson {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ml-person-gap);
+  padding: var(--tpl-ml-person-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+}
+.dlgAvatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-ml-avatar);
+  height: var(--tpl-ml-avatar);
+  border-radius: var(--radius-pill);
+  background: var(--color-status-info-soft);
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.dlgPersonText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+  min-width: 0;
+}
+.dlgPersonName {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.dlgPersonSub {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+}
+.dlgTextarea {
+  min-height: var(--tpl-ml-textarea-h);
+  padding: var(--tpl-ml-person-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  resize: vertical;
+}
+.dlgWarn {
+  margin: 0;
+  padding: var(--tpl-ml-person-pad);
+  border-radius: var(--radius-mini);
+  background: var(--color-status-warn-soft);
+  color: var(--color-ink);
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-ml-pill-lh);
+}
+.dlgWarn[data-tone='neutral'] {
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+}
+.seg {
+  display: inline-flex;
+  gap: var(--tpl-ml-seg-pad);
+  padding: var(--tpl-ml-seg-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+}
+.segButton {
+  padding: var(--tpl-ml-seg-btn-pad);
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-ml-seg-lh);
+  cursor: pointer;
+}
+.segButton[aria-pressed='true'] {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-card);
+}
+.dlgInput {
+  width: 100%;
+  min-height: var(--tpl-chip-h);
+  padding: var(--tpl-kw-input-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+/* 保存で落ちた欄。枠を危険の色にする。 */
+.dlgInput[aria-invalid='true'],
+.dlgTextarea[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+.delta3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  /* 枠は場所を取らない線（絵の outline と同じ）。 */
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  border-radius: var(--radius-control);
+}
+.deltaCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sub-gap);
+  min-width: 0;
+  padding: var(--tpl-ml-delta-pad);
+}
+.deltaCell + .deltaCell { border-left: 1px solid var(--color-hairline); }
+.deltaLabel {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-row-sub-size);
+}
+.deltaValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-ml-delta-size);
+  font-weight: 600;
+  line-height: var(--tpl-ml-delta-lh);
+  font-variant-numeric: tabular-nums;
+}
+.dlgFooterEnd {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  width: 100%;
+  padding: var(--tpl-af2-dlg-foot-pad);
+  border-top: 1px solid var(--color-hairline);
+}
+.miniTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.miniTable th,
+.miniTable .miniTh {
+  padding: var(--tpl-af2-mini-pad);
+  background: var(--color-table-head);
+  border-bottom: 1px solid var(--color-hairline);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+.miniTable td {
+  padding: var(--tpl-af2-mini-pad);
+  line-height: var(--tpl-af2-mini-lh);
+  vertical-align: middle;
+  border-bottom: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+.miniTable tr:last-child td { border-bottom: 0; }
+.historyBody { margin-bottom: var(--tpl-af2-hist-pull); }
+.adjustBody { margin-bottom: var(--tpl-af2-adjust-pull); }
+.dateGrid { margin-bottom: var(--tpl-af2-date-pull); }
+.miniTable th.miniNum,
+.miniNum { text-align: right; font-variant-numeric: tabular-nums; }
+.miniColWhen { width: var(--tpl-af2-mini-when-w); }
+.miniColNum { width: var(--tpl-af2-mini-num-w); }
+.miniOneLine { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* できごとの決めごとの開け閉め（行動スコアの表の下）。 */
+.rulesToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  width: 100%;
+  padding: var(--tpl-ml-person-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+.rulesToggleTitle {
+  flex: 1 1 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  text-align: left;
+}
+.rulesToggleHint {
+  font-size: var(--text-caption);
+}
+.rulesBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+}
+.rulesBody > .rulesTools { margin-bottom: 0; }
+
+/* 板の頭の右に並ぶボタン（絵：間 12）。 */
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+}
+
+/* 手で増やす・減らすの中身。 */
+.dlgSpaced { margin-top: var(--tpl-rule-row-gap); }
+.deltaValueSmall {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+.dlgGrid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-rule-row-gap);
+}
+.dlgGrid2 > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-ml-dlg-label-gap);
+  min-width: 0;
+}
+.policyRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-cell-gap-half);
+  margin-top: var(--tpl-cell-gap-half);
+}
+.dlgPersonName { margin: 0; }
+.dlgPersonSub { margin: 0; }
+
+/* 友だちのマイル詳細。 */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-ml-back-gap);
+  width: fit-content;
+  color: var(--color-action);
+  font-size: var(--text-label);
+  text-decoration: none;
+}
+.backLink:hover { text-decoration: underline; }
+.historyTools {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  padding: var(--polish-space-field) var(--tpl-list-inset);
+}
+.historySearch { width: var(--tpl-ml-detail-search-w); }
+.periodBox { width: var(--tpl-ml-period-w); }
+.periodBox :global(*) { max-width: 100%; }
+.periodBox :global(button) { width: 100%; }
+.historyEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  padding: var(--tpl-ml-card-pad);
+}
+.colWhen { width: var(--tpl-ml-col-when); }
+.colWhat { width: var(--tpl-ml-col-what); min-width: 0; }
+.colSource { width: var(--tpl-ml-col-source); min-width: 0; }
+.colKind { width: var(--tpl-ml-col-kind); }
+.colDeltaDetail { width: var(--tpl-ml-col-delta-detail); }
+.colMenu { width: var(--tpl-ml-col-menu); }
+.alignLeft { text-align: left; }
+.rowLink {
+  display: block;
+  overflow: hidden;
+  color: var(--color-action);
+  font-size: var(--text-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.historyPager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-toolbar-gap);
+  /* ページ送りが1ページで消えても段の高さは変えない（下の2枚が上下に動かない）。 */
+  min-height: var(--tpl-af2-ml-pager-h);
+  padding: var(--tpl-ml-detail-tools-pad);
+}
+.summaryRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-ml-col-gap);
+}
+.summaryBox {
+  gap: var(--tpl-sub-gap);
+  padding: var(--tpl-ml-card-pad);
+}
+.summaryTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-ml-card-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-ml-card-title-lh);
+}
+.summaryLine {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tpl-cell-gap-half);
+  padding: var(--tpl-ml-summary-line-pad);
+  box-shadow: var(--shadow-row-line);
+}
+.summaryKey {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.summaryValue {
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+.summaryFoot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--tpl-sub-gap);
+}
+
+
+/* 閲覧のみで隠した作るボタン（フォルダの列の上）の場所だけ空ける。 */
+
+/* 手で増やす・減らすの「友だちに知らせる」：スイッチと題・説明の2行。 */
+.notifyRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-af2-notify-gap);
+  padding: var(--tpl-af2-notify-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+}
+.labelRow { display: flex; align-items: center; gap: var(--tpl-ml-dlg-label-gap); }
+
+/* 名前の前のフォルダの丸の分だけ、補足を名前の頭にそろえる。 */
+.dotIndent {
+  padding-left: var(--tpl-folder-dot-indent);
+}
+
+.historyDelta[data-score-delta='positive'] { color: var(--color-accent-deep); }
+.historyDelta[data-score-delta='negative'] { color: var(--color-warning); }
+
+/* 使い道：操作は行末の「…」だけ。状態の列で右の余りを持つ。 */
+.colRewardState { width: var(--tpl-ml-col-state-reward); }
+.colRewardOps { width: var(--tpl-icon-btn-row-hit); }

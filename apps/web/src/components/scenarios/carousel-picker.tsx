@@ -1,5 +1,14 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
+import TextLink from '@/components/shared/text-link'
+import Select from '@/components/shared/select'
+import { scenarioReferenceData } from './scenario-reference-data'
+import Button from '@/components/shared/button'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+
 /*
  * カルーセルを選ぶ。
  *
@@ -9,11 +18,6 @@
  *
  * 1枚も無いときに選択欄だけ出しても進めないので、作りに行く導線を出す。
  */
-
-import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import Select from '@/components/shared/select'
-import { scenarioReferenceData } from './scenario-reference-data'
 
 interface SendableTemplateCandidate {
   accountId?: string | null
@@ -90,14 +94,19 @@ function summarize(content: string): { panels: number; firstTitle: string } {
 export default function CarouselPicker({ value, onChange, accountId }: CarouselPickerProps) {
   const [items, setItems] = useState<CarouselTemplate[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [retry, setRetry] = useState(0)
   const generationRef = useRef(createLoadGeneration())
 
   useEffect(() => {
     // 独立審査(指摘4): 持ち主の公開版だけを候補にし、古い応答は世代で捨てる。
     const generation = generationRef.current.next()
     setLoading(true)
+    setItems([])
+    setError(false)
     void scenarioReferenceData.templates(accountId ?? undefined).then((res) => {
       if (!generationRef.current.isCurrent(generation)) return
+      if (!res.success) { setError(true); return }
       if (res.success) {
         setItems(
           filterSendableTemplates(res.data, accountId)
@@ -110,13 +119,15 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
             })),
         )
       }
-      setLoading(false)
-    })
-  }, [accountId])
+    }).catch(() => { if (generationRef.current.isCurrent(generation)) setError(true) }).finally(() => { if (generationRef.current.isCurrent(generation)) setLoading(false) })
+    return () => { generationRef.current.next() }
+  }, [accountId, retry])
 
   if (loading) {
     return <p className="text-ink-faint py-6 text-center text-sm">読み込み中…</p>
   }
+
+  if (error) return <div role="alert">カルーセルを読み込めませんでした。<Button onClick={() => setRetry(value => value + 1)}>もう一度読み込む</Button></div>
 
   if (items.length === 0) {
     return (
@@ -125,12 +136,9 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
         <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
           パネルを並べて作る画面が別にあります。そこで作ると、ここから選べるようになります。
         </p>
-        <Link
-          href="/templates/carousel"
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control mt-3 inline-flex h-10 items-center border px-4 text-sm"
-        >
+        <Button variant="secondary" className="text-ink-secondary mt-3 items-center px-4 whitespace-normal" href="/templates/carousel">
           カルーセルを作りに行く
-        </Link>
+        </Button>
       </div>
     )
   }
@@ -141,7 +149,7 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
         <span className="text-ink-secondary mb-1 block text-xs font-medium">
           カルーセル <span className="text-danger">*</span>
         </span>
-        <Select
+        <SaveErrorField names={["value"]}><EntitySelect
           value={value}
           onChange={(next) => {
             const picked = items.find((t) => t.id === next) ?? null
@@ -150,20 +158,20 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
           aria-label="カルーセル"
           options={[
             { value: '', label: '選んでください' },
-            ...items.map((t) => ({
+            ...items.map((t) => ({ ...entityOptionMetadata(t),
               value: t.id,
               label: `${t.name}（${t.panels}枚${t.firstTitle ? `／${t.firstTitle}` : ''}）`,
             })),
           ]}
           size="full"
-        />
+        /></SaveErrorField>
       </label>
       <p className="text-ink-faint text-xs leading-relaxed">
         カルーセルを直すと、この通の中身も一緒に変わります。
       </p>
-      <Link href="/templates/carousel" className="text-info inline-block text-xs hover:underline">
+      <TextLink href="/templates/carousel">
         新しいカルーセルを作る
-      </Link>
+      </TextLink>
     </div>
   )
 }

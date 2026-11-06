@@ -94,17 +94,12 @@ describe('POST /api/integrations/eccube/columns の title 長さ検証（#711司
       slug: 'boundary-121', title: 'あ'.repeat(121), article_url: 'https://example.com/journal/boundary-121',
     });
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ success: false, error: 'title_invalid' });
+    expect(await response.json()).toMatchObject({ success: false, code: 'title_invalid' , fields: expect.any(Object), error: expect.any(String) });
     expect(state.insertBinds).toBeNull();
 
     expect(consoleError).toHaveBeenCalledTimes(1);
     const logged = JSON.parse(consoleError.mock.calls[0][0] as string);
-    expect(logged).toEqual({
-      event: 'nen_eccube_column_title_rejected',
-      slug: 'boundary-121',
-      titleLength: 121,
-      maxLength: 120,
-    });
+    expect(logged).toEqual({ code: 'nen_eccube_column_title_rejected', timestamp: expect.any(String), level: 'error', requestId: null, invocationId: null, source: 'background' });
     consoleError.mockRestore();
   });
 

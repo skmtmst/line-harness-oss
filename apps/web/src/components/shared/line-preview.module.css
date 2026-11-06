@@ -1,0 +1,296 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/*
+ * LINE プレビューの枠（Pencil ★V8 `cfVyj`）。
+ *
+ * 互換経路はトーク背景色のパネルだけ。V8 は白い板の中に置かれるので、
+ * 板の決まり（細い枠・radius-panel・board の薄い影）にそろえる。
+ * 吹き出し・カードなど中身の改修は各画面側で別途行う。
+ */
+
+
+/*
+ * 電話枠なしの平らなカード（ お客様にはこう届きます）。
+ * 白・内側12・間4。角丸は絵14にいちばん近い既存トークンを使う。
+ */
+.flat {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px; border-radius: var(--radius-card); background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+}
+}
+
+
+/* ------------------------------------------------------------------
+ * ★V8（夕15・cfVyj / specs/line-preview-real-phone.md）：本物のスマホ。
+ * LINE アプリの画面なのでテーマトークンではなく globals.css の
+ * `[data-theme="v8"]` に置いた `--v8-line-*` を読む（直値は globals に
+ * だけ書き、ここでは var で読む）。互換経路では部品がこの枠を描かない。
+ * ------------------------------------------------------------------ */
+
+.phoneRoot {
+  max-width: none;
+  margin-inline: auto;
+}
+
+/* 題「LINEでの見え方」はスマホの外の上。? は題の横。（PR 1482 で一緒に消えていたのを戻す・2026-10-06） */
+.phoneTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  color: var(--color-ink);
+}
+
+/* v8 のスマホに内の題は置かない（cfVyj・ どおり）。題は外が担う。 */
+
+/* 器 330×690・黒・縁 2px・内側 10・角丸 52・下への影。 */
+.phone {
+  display: flex;
+  flex-direction: column;
+  width: var(--v8-line-phone-width);
+  height: var(--v8-line-phone-height);
+  padding: 10px;
+  border-radius: var(--v8-line-shell-radius);
+  background: var(--v8-line-shell);
+  outline: 2px solid var(--v8-line-shell-edge);
+  outline-offset: -1px;
+  box-shadow: var(--v8-line-shell-shadow);
+}
+.phone[data-compact] { height: var(--v8-line-phone-compact-height); }
+
+/* 画面：LINE のトークの青い地・角丸 42・中身は画面の中に収める。 */
+.screen {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--v8-line-screen-radius);
+  background: var(--v8-line-screen);
+}
+
+/* 上の帯 44：時刻・黒い島・電波/Wi-Fi/電池。 */
+.statusBar {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  height: 44px;
+  padding: 14px 24px 0 32px;
+  background: var(--v8-line-chrome);
+}
+
+.clock {
+  font-family: var(--font-inter);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--v8-line-ink);
+}
+
+.island {
+  position: absolute;
+  top: 8px;
+  left: 97px;
+  width: 96px;
+  height: 28px;
+  background: var(--v8-line-ink);
+}
+
+.statusIcons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--v8-line-ink);
+}
+
+/* トークの頭 44：戻る・名・検索・電話・メニュー。 */
+.talkHead {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--v8-line-hairline);
+  background: var(--v8-line-chrome);
+  color: var(--v8-line-name);
+}
+
+.talkName {
+  flex: 1 1 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 21px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* トーク：中身はここだけが縦に送れる（スマホの大きさは変えない）。 */
+.talk {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+/* 日付の札。届く日時など caption はこの位置に出す。 */
+.dateChip {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: center;
+  margin: 0;
+}
+
+.dateChip > span {
+  padding: 2px 10px;
+  background: var(--v8-line-datechip);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  color: var(--v8-line-chrome);
+  white-space: nowrap;
+}
+
+/* 空のとき：トークの真ん中に薄い文。 */
+.emptyNote {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--v8-line-empty);
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+/* メニューの帯 30。 */
+/* リッチメニュー：トーク画面のいちばん下（入力の帯の位置）。画面の幅いっぱい・高さは画像の比（大 2500×1686・小 2500×843）。 */
+.richMenu {
+  flex-shrink: 0;
+  width: 100%;
+  background: var(--v8-line-chrome);
+}
+
+.menuBar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 30px;
+  border-top: 1px solid var(--v8-line-hairline);
+  background: var(--v8-line-chrome);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 17px;
+  color: var(--v8-line-menu);
+}
+
+/* ホームの線：帯 14・線 120×5。 */
+.homeBar {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: center;
+  height: 14px;
+  background: var(--v8-line-chrome);
+}
+
+.homeLine {
+  width: 120px;
+  height: 5px;
+  border-radius: var(--v8-line-homebar-radius);
+  background: var(--v8-line-homebar);
+}
+
+/* cfVyj の実測。既存の 管理画面 パネルには適用しない。 */
+:root .phoneRoot { font-family: var(--font-sans); font-weight: var(--font-weight-reading); } /* LINE の見え方は LINE と同じ太さ。管理画面の UI 文字の 500 は当てない */
+:root .statusBar { align-items: flex-start; }
+:root .statusIcons { flex-shrink: 0; }
+:root .talkHead svg { flex-shrink: 0; }
+:root .dateChip > span { display: flex; align-items: flex-start; }
+:root .messageRow { display: flex; align-items: flex-start; gap: 6px; flex-shrink: 0; width: 100%; }
+:root .senderAvatar { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 999px; background: var(--color-accent-deep); color: var(--color-canvas); font-size: 13px; font-weight: 700; line-height: 20px; }
+:root .senderBody { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex-shrink: 0; }
+:root .senderName { color: var(--v8-line-sender); font-size: 10px; font-weight: 400; line-height: 15px; }
+:root .bubbleRow { display: flex; align-items: flex-end; gap: 4px; }
+:root .bubble { position: relative; width: 176px; min-height: 94px; flex-shrink: 0; }
+:root .tail { position: absolute; left: -5px; top: 2px; width: 10px; height: 8px; color: var(--color-canvas); overflow: visible; }
+:root .bubbleBody { position: relative; z-index: 1; display: flex; align-items: flex-start; min-height: 94px; width: 176px; padding: 8px 10px; border-radius: 16px; background: var(--color-canvas); color: var(--color-ink); font-size: 11.5px; font-weight: 400; line-height: 18px; }
+:root .messageTime { font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 9px; font-weight: 400; line-height: 14px; color: var(--v8-line-time); white-space: nowrap; }
+:root .sampleNote { font-size: 9px; font-weight: 500; line-height: 14px; color: var(--v8-line-time); white-space: nowrap; }
+:root .cardRow { display: flex; flex-shrink: 0; align-items: flex-end; gap: 4px; width: 100%; padding-left: 40px; }
+:root .productCard { display: flex; flex-direction: column; flex-shrink: 0; width: 186px; border-radius: 16px; background: var(--color-canvas); overflow: hidden; }
+:root .productImage { width: 100%; height: 104px; flex-shrink: 0; background-position: center; background-size: cover; }
+:root .productCopy { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px 8px; }
+:root .productTitle { color: var(--color-ink); font-size: 12.5px; font-weight: 700; line-height: 19px; white-space: nowrap; }
+:root .productDescription { color: var(--v8-line-muted); font-size: 10.5px; font-weight: 400; line-height: 16px; white-space: nowrap; }
+:root .priceRow { display: flex; align-items: flex-end; gap: 4px; padding-top: 2px; }
+:root .price { font-family: var(--font-inter), Inter, system-ui, sans-serif; color: var(--color-ink); font-size: 14px; font-weight: 700; line-height: 21px; }
+:root .tax { color: var(--v8-line-muted); font-size: 9.5px; font-weight: 400; line-height: 14px; }
+:root .productAction { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 100%; height: 34px; padding: 0; border: 0; border-top: 1px solid var(--v8-line-hairline); background: transparent; color: var(--color-accent); font-family: inherit; font-size: 12px; font-weight: 700; line-height: 18px; cursor: pointer; }
+:root .secondaryAction { color: var(--color-action); }
+:root .productAction:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -3px; }
+/* カルーセル：カードを横に並べ、トークの右端を越えた分は横へ送る（見本の板では右が切れて見える）。 */
+:root .carouselTrack { display: flex; gap: 8px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+:root .carouselCard { width: 186px; }
+:root .carouselCard .productTitle, :root .carouselCard .productDescription { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+:root .island, :root .dateChip > span { border-radius: 999px; }
+:root .bubbleText { flex: 1; word-break: normal; }
+:root .clock { font-variant-numeric: var(--font-numeric); }
+
+/* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
+:root .phoneRoot { -webkit-font-smoothing: auto; }
+
+/* LINEの時刻は正本のInterと同じ比例幅。管理画面の等幅数字を継承しない。 */
+:root .messageTime { font-variant-numeric: var(--font-numeric); }
+
+/* ★V8 絵（「段の題 LINEでの見え方」）：題は右の列の幅いっぱいで左寄せ・15px/600/23・? との間6。スマホは下の真ん中。 */
+:root .phoneRoot { width: 100%; }
+:root .phoneTitle { justify-content: flex-start; font-size: var(--tpl-preview-title-size); font-weight: 600; line-height: var(--tpl-preview-title-lh); }
+:root .phone { margin-inline: auto; }
+:root .phoneRoot[data-fit] .phone { max-width: 100%; }
+
+/*
+ * ★V8 cfVyj（2026-10-08 描き直し・OVCot）：テキストの吹き出しは本物の LINE と同じく文字に合わせて伸び縮み。
+ * いちばん広くて186・文字13・行の高さ1.45・内側 8/12・角丸 左上6／ほか18・白・尾なし。
+ * 名前は吹き出しの上（10）、時刻は吹き出しの右下の外（9）。画像・カードの大きさは変えない（cfVyj）。
+ */
+:root .messageRow { min-width: 0; }
+:root .senderBody { flex: 0 1 auto; min-width: 0; }
+:root .bubbleRow { max-width: 100%; }
+/* 吹き出しは文の幅 186＋左右の余白 12（吹き出し 210）。 */
+:root .bubble { width: auto; min-height: 0; max-width: 210px; flex-shrink: 1; }
+:root .tail { display: none; }
+:root .bubbleBody { display: block; width: auto; min-height: 0; padding: 8px 12px; border-radius: var(--radius-mini) var(--radius-large) var(--radius-large) var(--radius-large); color: var(--color-ink); font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+:root .bubbleText { display: inline; }
+/* 行末の1〜3字だけが次の行へ落ちないよう、日本語は文節で折り、最後の数行の折り返しを整える（「は。」）。URL は .urlLine で1行。 */
+:root .bubbleBody, :root .bubbleBody .bubbleText, :root .outgoingBubble { text-wrap: pretty; word-break: auto-phrase; }
+:root .urlLine { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+
+/* 専用の受け口を使う画面だけ。トークの下で画像の高さを保つ。 */
+.richMenu { flex-shrink: 0; }
+
+/* 友だちが送った側のプレビュー。指定したメッセージだけ右・緑にする。 */
+:root .outgoingRow { display: flex; justify-content: flex-end; align-items: flex-end; gap: 4px; width: 100%; }
+:root .outgoingBubble { max-width: 186px; padding: 8px 12px; border-radius: var(--v8-line-bubble-out-radius); background: var(--v8-line-bubble-out); color: var(--color-ink); font-size: 11.5px; line-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+:root .messageRow[data-density='compact'] .bubble { max-width: var(--v8-line-bubble-preview-w); }
+:root .messageRow[data-density='compact'] .bubbleBody { font-size: 11.5px; line-height: 18px; }
+
+:root .phoneTitle {
+  font-size: var(--tpl-section-title-size);
+  font-weight: var(--tpl-section-title-weight);
+}
+
+/* LINE の見え方の中の緑は LINE の明るい緑のまま（管理画面の緑は深い緑）。 */
+:root .phoneRoot { --color-accent: var(--color-line-green); --color-accent-hover: var(--color-line-green-hover); }

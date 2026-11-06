@@ -113,7 +113,7 @@ export function registerAccountSummary(server: McpServer): void {
         // Get per-account friend counts
         const accountStats: AccountStat[] = [];
         for (const acc of accounts) {
-          // Use direct API call for per-account count (SDK count() has no params)
+          // Use direct API call for per-account count (SDK count has no params)
           const countData = await fetchHarnessJson<{ count: number }>(
             apiUrl,
             apiKey,
@@ -204,7 +204,7 @@ export function registerAccountSummary(server: McpServer): void {
             client.scenarios.list({ accountId }),
             client.broadcasts.list({ accountId }),
             client.tags.list(),
-            client.forms.list(),
+            client.forms.list({ accountId }),
           ]);
 
         const activeScenarios = scenarios.filter(

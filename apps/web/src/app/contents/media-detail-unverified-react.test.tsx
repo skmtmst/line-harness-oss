@@ -46,7 +46,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-vi.mock('./media-direct-upload', () => ({
+vi.mock('@/v8/contents/media-direct-upload', () => ({
   extractMediaMetadata: () => Promise.resolve({}),
   fileMatchesMediaKind: () => true,
   mediaAcceptForKind: () => 'image/png',
@@ -54,7 +54,7 @@ vi.mock('./media-direct-upload', () => ({
   validateMediaFile: () => null,
 }))
 
-const { default: MediaDetailDialog } = await import('./media-detail-dialog')
+const { default: MediaDetailDialog } = await import('@/v8/contents/media-detail-dialog')
 
 const ITEM: MediaItem = {
   id: 'media-a',
@@ -123,7 +123,7 @@ describe('使用箇所の未確認（R34、実React）', () => {
     expect(host.textContent).not.toContain('0か所')
     // 確かめた時刻と読み直しは出す。
     expect(host.textContent).toContain('時点')
-    expect(host.textContent).toContain('読み直す')
+    expect(host.textContent).toContain('もう一度読み込む')
   })
 
   it('確かめた未使用は従来どおり「どこでも使っていない」', async () => {

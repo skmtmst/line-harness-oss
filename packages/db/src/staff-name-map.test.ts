@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { getStaffNameMap } from './staff.js';
 
 /*
- * R35: メディアの「入れた人」が内部ID（UUID）で出る。
+ * メディアの「入れた人」が内部ID（UUID）で出る。
  * 内部IDのまま残し、画面に出す表示名をまとめて引く。
  */
 

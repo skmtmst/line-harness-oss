@@ -1,3 +1,5 @@
+> 文書：Security Policy｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # Security Policy
 
 LINE Harness handles LINE accounts, message delivery, customer records, API

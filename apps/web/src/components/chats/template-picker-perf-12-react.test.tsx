@@ -8,7 +8,7 @@
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   calls: [] as Array<Record<string, unknown>>,
@@ -60,11 +60,39 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   cleanup()
+  document.documentElement.removeAttribute('data-theme')
 })
 
-// 検索のデバウンス(250ms)を越えるための実時間待ち。
-const debounce = () => act(async () => { await new Promise((r) => setTimeout(r, 350)) })
+/*
+ * 検索のデバウンス(250ms)を越える。偽の時計で進める（本物の時間を待たない）。
+ * デバウンスは打った瞬間から数えるので、打つ前に fakeClock で替えておき、越えたら本物の時計へ戻す。
+ */
+const fakeClock = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+const debounce = async () => {
+  await act(async () => { await vi.advanceTimersByTimeAsync(300) })
+  await act(async () => { await vi.advanceTimersByTimeAsync(350) })
+  vi.useRealTimers()
+}
+
+test('WEB241: 追加読込中に分類を変えても新しい続きが読める', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  let resolveMore!: (response: unknown) => void
+  fixture.responder = (params) => params.page === 2
+    ? new Promise(resolve => { resolveMore = resolve }) as never
+    : { success: true, data: { items: [tpl(params.folderId ? 'new' : 'old')], total: 200, limit: 100 } }
+  const view = render(<TemplatePicker open onClose={() => {}} onPick={() => {}} />)
+  await waitFor(() => expect(screen.queryByText('old')).toBeTruthy())
+  fireEvent.click(screen.getByRole('button', { name: /さらに表示/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^案内/ }))
+  await waitFor(() => expect(screen.queryByText('new')).toBeTruthy())
+  expect(screen.getByRole('button', { name: /さらに表示/ }).hasAttribute('disabled')).toBe(false)
+  await act(async () => resolveMore({ success: true, data: { items: [tpl('stale')], total: 200, limit: 100 } }))
+  expect(screen.queryByText('stale')).toBeNull()
+  view.unmount()
+  document.documentElement.removeAttribute('data-theme')
+})
 
 describe('PERF-12 テンプレート選択の区画取得', () => {
   test('初回は1ページ目を取り、検索語はサーバーへ渡す', async () => {
@@ -85,12 +113,10 @@ describe('PERF-12 テンプレート選択の区画取得', () => {
     expect(fixture.calls[0].folderCounts).toBe(true)
     await waitFor(() => expect(screen.getAllByText('tp-1').length).toBeGreaterThan(0))
 
+    fakeClock()
     await act(async () => {
-      const input = screen.getByLabelText('テンプレート名・本文で検索')
-      // React が管理する input の値は setter 経由で入れる。
-      const setter = Object.getOwnPropertyDescriptor(globalThis.HTMLInputElement.prototype, 'value')!.set!
-      setter.call(input, 'あいさつ')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      const input = screen.getByLabelText('テンプレート名・本文で探す')
+      fireEvent.change(input, { target: { value: 'あいさつ' } })
     })
     await debounce()
     await waitFor(() => {
@@ -137,11 +163,8 @@ describe('PERF-12 テンプレート選択の区画取得', () => {
     render(<TemplatePicker open onClose={() => {}} onPick={() => {}} />)
     await waitFor(() => expect(fixture.calls.length).toBeGreaterThan(0))
     fixture.calls = []
-    // フォルダ欄を開いて「案内」を選ぶ。
-    const selectButton = document.body.querySelector('[aria-haspopup="listbox"]')!
-    await act(async () => { selectButton.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
-    const option = await screen.findByRole('option', { name: /案内/ })
-    await act(async () => { option.querySelector('button')!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    const folder = await screen.findByRole('button', { name: /案内/ })
+    await act(async () => { folder.click() })
     await waitFor(() => {
       expect(fixture.calls.some((c) => c.folderId === 'f1' && c.page === 1)).toBe(true)
     })
@@ -164,11 +187,10 @@ describe('PERF-12 テンプレート選択の区画取得', () => {
       }) as never
     }
     render(<TemplatePicker open onClose={() => {}} onPick={() => {}} />)
+    fakeClock()
     await act(async () => {
-      const input = screen.getByLabelText('テンプレート名・本文で検索')
-      const setter = Object.getOwnPropertyDescriptor(globalThis.HTMLInputElement.prototype, 'value')!.set!
-      setter.call(input, 'あいさつ')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      const input = screen.getByLabelText('テンプレート名・本文で探す')
+      fireEvent.change(input, { target: { value: 'あいさつ' } })
     })
     await debounce()
     await waitFor(() => expect(screen.getAllByText('あいさつ').length).toBeGreaterThan(0))

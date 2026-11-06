@@ -12,7 +12,7 @@ import { describeStepAudience, stepKindLabel, stepListTitle } from './scenario-s
   `rules.filter is not a function` で**通の一覧ごと落ちる。**
 
   言い方そのもの（「購読中の全員」「タグ：〜」「詳細条件 N件」）は
-  `scenario-detail-v6-feature5-contract.test.ts` が見ているので、ここでは
+  `scenario-detail-管理画面-feature5-contract.test.ts` が見ているので、ここでは
   **守りだけ**を見る。同じことを2か所で見張らない。
 */
 describe('配信対象の桁は、形が違う値で落ちない', () => {

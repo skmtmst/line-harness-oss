@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { getStaffByAdminSession } from '@line-crm/db';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
@@ -175,4 +175,30 @@ describe('POST /api/auth/sessions/revoke-others', () => {
     expect(audit?.risk_level).toBe('high');
     expect(audit?.actor_principal_id).toBe('staff-1');
   });
+});
+
+it('mixed Cookie/Bearer requests manage the same session selected by authentication', async () => {
+  await seedSession('cookie-session', 'staff-1');
+  await seedSession('bearer-session', 'staff-1');
+  const cookieHash = await sha256Hex('cookie-session');
+  const bearerHash = await sha256Hex('bearer-session');
+  const headers = { ...bearer('bearer-session'), Cookie: 'lh_admin_session=cookie-session', 'Content-Type': 'application/json' };
+  const listed = await app().request('/api/auth/sessions', { headers }, bindings());
+  expect(await listed.json()).toMatchObject({ data: { sessions: expect.arrayContaining([
+    expect.objectContaining({ id: bearerHash, current: true }),
+    expect.objectContaining({ id: cookieHash, current: false }),
+  ]) } });
+  const denied = await app().request(`/api/auth/sessions/${bearerHash}`, { method: 'DELETE', headers }, bindings());
+  expect(denied.status).toBe(409);
+  const revoked = await app().request('/api/auth/sessions/revoke-others', { method: 'POST', headers, body: '{}' }, bindings());
+  expect(revoked.status).toBe(200);
+  expect(testDb.raw.prepare('SELECT token_hash FROM admin_sessions').all()).toEqual([{ token_hash: bearerHash }]);
+});
+
+it('API-key authentication cannot treat an incidental Cookie as its current session', async () => {
+  await seedSession('cookie-session', 'staff-1');
+  const headers = { Authorization: 'Bearer fixture-api-key', Cookie: 'lh_admin_session=cookie-session', 'Content-Type': 'application/json' };
+  const response = await app().request('/api/auth/sessions/revoke-others', { method: 'POST', headers, body: '{}' }, bindings());
+  expect(await response.json()).toMatchObject({ data: { revoked: 0 } });
+  expect(testDb.raw.prepare('SELECT COUNT(*) n FROM admin_sessions').get()).toEqual({ n: 1 });
 });

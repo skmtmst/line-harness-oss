@@ -10,15 +10,19 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BroadcastAssetManager from './broadcast-asset-manager'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
+  useAccount: () => ({ selectedAccountId: scope.account, loading: false }),
 }))
 
-const { list, create, update } = vi.hoisted(() => ({
+const scope = vi.hoisted(() => ({ account: 'acc-1' }))
+const { list, create, update, upload, remove } = vi.hoisted(() => ({
   list: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
+  upload: vi.fn(),
+  remove: vi.fn(),
 }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<Record<string, unknown>>) => {
@@ -31,8 +35,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<Record<string, unknown
         list,
         create,
         update,
-        delete: async () => ({ success: true }),
-        upload: async () => ({ success: true, data: { url: 'https://example.com/a.png' } }),
+        delete: remove,
+        upload,
       },
     },
   }
@@ -50,6 +54,8 @@ const cardAsset = {
   createdAt: '2026-09-01T00:00:00Z',
   updatedAt: '2026-09-01T00:00:00Z',
 }
+
+;Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
 let container: HTMLDivElement
 let root: Root
@@ -76,12 +82,15 @@ function clickText(label: string) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  scope.account = 'acc-1'
+  upload.mockResolvedValue({ success: true, data: { url: 'https://example.com/a.png' } })
   list.mockImplementation(async ({ kind }: { kind: string }) => ({
     success: true,
     data: kind === 'card_message' ? [cardAsset] : [],
   }))
   create.mockImplementation(async () => ({ success: true, data: null }))
   update.mockImplementation(async () => ({ success: true, data: null }))
+  remove.mockResolvedValue({ success: true, data: null })
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -116,9 +125,9 @@ describe('「もっと見る」パネル', () => {
     await flush()
     clickText('カルーセルを作る')
 
-    const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement | null
+    const checkbox = container.querySelector('[role="switch"]') as HTMLInputElement | null
     if (!checkbox) throw new Error('checkbox not found')
-    expect(checkbox.checked).toBe(true)
+    expect((checkbox.getAttribute('aria-checked') === 'true')).toBe(true)
     act(() => {
       checkbox.click()
     })
@@ -137,7 +146,7 @@ describe('「もっと見る」パネル', () => {
     const titleInput = container.querySelector('input[placeholder="タイトル"]') as HTMLInputElement | null
     if (!titleInput) throw new Error('title input not found')
     setNativeValue(titleInput, 'パネル1')
-    clickText('保存')
+    clickText('保存する')
     await flush()
     expect(create).toHaveBeenCalled()
     const payload = (create.mock.calls[0][0] as { payload: { moreCard: boolean } }).payload
@@ -152,8 +161,48 @@ describe('「もっと見る」パネル', () => {
     renderKind('card_message')
     await flush()
     clickText('編集')
-    const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement | null
+    const checkbox = container.querySelector('[role="switch"]') as HTMLInputElement | null
     if (!checkbox) throw new Error('checkbox not found')
-    expect(checkbox.checked).toBe(false)
+    expect((checkbox.getAttribute('aria-checked') === 'true')).toBe(false)
   })
+})
+
+it('WEB254: 種類切替の遅い取得は前の素材を戻さず、失敗を空と表示しない', async () => {
+  let complete!: (v: unknown) => void
+  list.mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
+  renderKind('card_message'); await flush()
+  expect(container.textContent).not.toContain('まだカルーセルテンプレートがありません')
+  list.mockRejectedValueOnce(new Error('offline'))
+  renderKind('coupon'); await flush()
+  expect(container.textContent).toContain('読み込めませんでした')
+  await act(async () => complete({ success: true, data: [cardAsset] }))
+  expect(container.textContent).not.toContain('夏カルーセル')
+})
+it('WEB255: 画像待ち中に前のカードを削除しても、選んだカードへ画像を入れる', async () => {
+  const cards = ['A','B','C'].map(id => ({ ...cardAsset.payload.cards[0], id, title: id }))
+  list.mockResolvedValue({ success: true, data: [{ ...cardAsset, payload: { cards, moreCard: false } }] })
+  let complete!: (v: unknown) => void
+  upload.mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
+  renderKind('card_message'); await flush(); clickText('編集')
+  const file = container.querySelectorAll<HTMLInputElement>('input[type="file"]')[1]
+  Object.defineProperty(file, 'files', { value: [new File(['image'], 'b.png', { type: 'image/png' })] })
+  act(() => file.dispatchEvent(new Event('change', { bubbles: true })))
+  clickText('削除する')
+  await act(async () => complete({ success: true, data: { url: 'https://example.com/b.png' } }))
+  clickText('保存する'); await flush()
+  const result = update.mock.calls[0][1].payload.cards
+  expect(result.map((c: { id: string; imageUrl: string }) => [c.id, c.imageUrl])).toEqual([['B', 'https://example.com/b.png'], ['C', '']])
+})
+
+it('削除確認には素材のアカウントを示し、切替後の古い確定を拒む', async () => {
+  renderKind('card_message'); await flush(); clickText('削除する')
+  const dialog = document.querySelector('[role="alertdialog"]')!
+  expect(dialog.textContent).toContain('LINEアカウント')
+  const confirm = [...dialog.querySelectorAll('button')].find(b => b.textContent?.trim() === '削除する')!
+  const key = Object.keys(confirm).find(item => item.startsWith('__reactProps$'))!
+  const oldConfirm = (confirm as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+  scope.account = 'acc-2'; renderKind('card_message'); await flush()
+  scope.account = 'acc-1'; renderKind('card_message'); await flush()
+  await act(async () => oldConfirm({ preventDefault() {}, stopPropagation() {} }))
+  expect(remove).not.toHaveBeenCalled()
 })

@@ -6,9 +6,10 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const mockState = vi.hoisted(() => ({
+  role: 'owner' as string | null,
   revision: 5,
   previewRevisions: [] as Array<number | undefined>,
 }))
@@ -36,9 +37,12 @@ const baseDetail = () => ({
   },
 })
 
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => mockState.role }))
+
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
   api: {
+    staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
     savedSearches: {
       detail: () => Promise.resolve({ success: true, data: baseDetail() }),
       list: () => Promise.resolve({
@@ -91,6 +95,7 @@ vi.mock('@/lib/use-feature-visibility', () => ({
 }))
 
 beforeEach(() => {
+  mockState.role = 'owner'
   mockState.revision = 5
   mockState.previewRevisions = []
 })
@@ -104,7 +109,7 @@ describe('R179 保存直後の人数プレビュー', () => {
   test('説明だけの保存後に新しい版で数え直し、人数と時刻を正常表示する', async () => {
     const { default: SavedSearchEditPage } = await import('./page')
     render(<SavedSearchEditPage />)
-    const saveButton = await screen.findByRole('button', { name: '変更を保存' })
+    const saveButton = await screen.findByRole('button', { name: '保存する' })
 
     // 説明だけ変える（条件は触らない）。
     const description = screen.getByLabelText('説明')
@@ -120,4 +125,25 @@ describe('R179 保存直後の人数プレビュー', () => {
     expect(mockState.previewRevisions).not.toContain(5)
     expect(screen.queryByText('人数を計算できませんでした。条件を確かめて再計算してください。')).toBeNull()
   })
+})
+
+for (const role of [null, 'staff', 'viewer']) test(`権限${role}では条件の入力と保存・複製・削除を置かない`, async () => {
+  mockState.role = role
+  const { default: SavedSearchEditPage } = await import('./page')
+  await act(async () => { render(<SavedSearchEditPage />) })
+  expect(await screen.findByRole('link', { name: '一覧へ戻る' })).toBeTruthy()
+  expect(screen.queryByLabelText('条件名')).toBeNull()
+  for (const name of ['保存する', '複製して保存する', '削除する']) expect(screen.queryByRole('button', { name, exact: true })).toBeNull()
+  expect(mockState.previewRevisions).toHaveLength(0)
+})
+
+test('共有の「？」は、上限といまの件数と、共有すると何が起きるかを先に言う', async () => {
+  const { default: SavedSearchEditPage } = await import('./page')
+  await act(async () => { render(<SavedSearchEditPage />) })
+  const help = await screen.findByRole('button', { name: '共有の説明' })
+  await act(async () => { fireEvent.click(help) })
+  await waitFor(() => expect(help.getAttribute('aria-describedby')).toBeTruthy())
+  const note = document.getElementById(help.getAttribute('aria-describedby')!)!
+  expect(note.textContent).toContain('保存できるのは50件までです（いま1 件）。')
+  expect(note.textContent).toContain('一斉配信・オートメーションの対象条件からも呼び出せます')
 })

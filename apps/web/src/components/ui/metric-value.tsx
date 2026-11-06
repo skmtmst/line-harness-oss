@@ -1,4 +1,5 @@
 import React from 'react'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 指標カードの数字（監査6 #674「数字の見せ方統一」）。
@@ -63,7 +64,7 @@ export default function MetricValue({
   const metricState = state ?? (ready ? 'ready' : 'missing')
   // 失敗・未取得は値が残っていても「—」で出す（0 と区別するため）。
   const forcedMissing = state === 'missing' || state === 'error'
-  const shown = forcedMissing ? null : (text ?? (typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('ja-JP') : null))
+  const shown = forcedMissing ? null : (text ?? (typeof value === 'number' && Number.isFinite(value) ? formatNumber(value) : null))
   return (
     <span
       data-metric-state={metricState}
@@ -74,9 +75,9 @@ export default function MetricValue({
       ) : (
         <>
           {/* 前置きの後ろは実スペース。コピーや読み上げでも「平均 約1ヶ月」と取れるように。 */}
-          {prefix ? <span className="text-xs font-normal text-ink-faint">{prefix} </span> : null}
+          {prefix ? <span className="text-xs font-medium text-ink-faint">{prefix} </span> : null}
           {shown}
-          {unit ? <span className="ml-0.5 text-xs font-normal text-ink-faint">{unit}</span> : null}
+          {unit ? <span className="ml-0.5 text-xs font-medium text-ink-faint">{unit}</span> : null}
         </>
       )}
     </span>

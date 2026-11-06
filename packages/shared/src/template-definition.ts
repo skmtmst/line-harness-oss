@@ -1,0 +1,78 @@
+import type { HqMessageCard } from './hq-message-card';
+import type { BroadcastAssetKind, AssetPayloadInput } from './broadcast-asset-conversion';
+
+/** 店と統括で使うテンプレートの内容と、配布するメディアの共通契約。 */
+export type MessageTemplateMediaDefinition = Readonly<{
+  id: string;
+  kind: 'image' | 'video' | 'audio' | 'file';
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+  r2Key: string;
+  publicUrl: string | null;
+  versionId: string;
+  versionNo: number;
+  contentHash: string;
+}>;
+
+export type MessageTemplateDefinition = Readonly<{
+  card?: HqMessageCard;
+  /** Ordered LINE messages; the single template fields remain a compatibility summary. */
+  messageBubbles?: import('./broadcast-definition').BroadcastBubble[];
+  /** 店の素材と同じkind/payload。メッセージ・質問はtemplateを使う。 */
+  asset?: Readonly<{ kind: BroadcastAssetKind; payload: AssetPayloadInput }>;
+  schemaVersion: 1;
+  template: Readonly<{
+    id: string;
+    name: string;
+    category: string;
+    messageType: 'text' | 'image' | 'flex' | 'carousel' | 'imagemap';
+    messageContent: string;
+    carouselActionsJson: string | null;
+    carouselTapLimitMode: 'none' | 'once';
+    carouselTapLimitText: string | null;
+    questionJson: string | null;
+    questionStatus: 'draft' | 'published';
+  }>;
+  media: readonly MessageTemplateMediaDefinition[];
+}>;
+
+
+export const TEMPLATE_KINDS = ['message','carousel','rich_message','rich_video','question','coupon','research'] as const;
+export type TemplateKind = typeof TEMPLATE_KINDS[number];
+export function templateKind(definition: MessageTemplateDefinition): TemplateKind {
+  if (definition.messageBubbles) return 'message';
+  if (definition.asset) return definition.asset.kind==='card_message' ? 'carousel' : definition.asset.kind;
+  if (definition.template.messageType === 'imagemap') return 'rich_video';
+  if (definition.template.questionJson) return 'question';
+  return definition.template.messageType==='carousel' ? 'carousel' : 'message';
+}
+export type TemplateKindCounts = Record<TemplateKind,number>;
+
+export interface TemplateImagemapUpload { media: MessageTemplateMediaDefinition[]; payload: AssetPayloadInput }
+
+/** Same imagemap video shape used by store templates; URLs come from HQ upload receipts. */
+export interface HqRichVideoPayload {
+  altText: string;
+  baseUrl: string;
+  baseSize: { width: 1040; height: number };
+  actions: [];
+  video: {
+    originalContentUrl: string;
+    previewImageUrl: string;
+    area: { x: number; y: number; width: number; height: number };
+    externalLink?: { label: string; linkUri: string };
+  };
+}
+export interface HqMediaUploadSession {
+  id: string;
+  uploadUrl: string;
+  requiredHeaders: Record<string, string>;
+  expiresAt: string;
+}
+export interface HqAudioContent {
+  state: { audio: { originalContentUrl: string; duration: number; hqMediaKey: string } };
+}

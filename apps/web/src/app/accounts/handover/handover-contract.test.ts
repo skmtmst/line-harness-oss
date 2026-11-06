@@ -3,37 +3,34 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
-  DIFFERENT_PROVIDER_NOTE,
-  HANDOVER_STEPS,
+  DIFFERENT_PROVIDER_DETAIL,
+  HANDOVER_PILLS,
+  countsLine,
   MATCH_BUCKETS,
   totalsMatch,
-} from './handover-view'
+} from '@/v8/accounts-detail/handover-view'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(HERE, '../../../v8/accounts-detail/handover.tsx'), 'utf8')
 
 /**
- * LINEアカウントの乗り換え・引き継ぎ（設計 ★V6 33-4 `nx3XW`）。
+ * LINEアカウントの乗り換え・引き継ぎ（設計 ★管理画面 33-4 `nx3XW`）。
  *
  * 実 API の事前確認結果を読み、合計が一致した値だけを表示する。
+ * 画面の動き（口の呼び出し・確認窓・?id= なし・役割の出し分け）は
+ * `handover-v8.test.tsx` と `handover-viewer-gating-react.test.tsx` が描いて確かめる。
  */
-describe('V6 33-4 乗り換え・引き継ぎ', () => {
+describe("管理画面 33-4 乗り換え・引き継ぎ", () => {
   it('設計の5段を持つ', () => {
-    expect(HANDOVER_STEPS.map((s) => s.label)).toEqual([
-      '引き継ぎコードを出す',
-      '受け取り先で読む',
-      '事前確認',
-      '競合の判断',
-      '本実行と照合',
+    expect(HANDOVER_PILLS).toEqual([
+      '引き継ぎコード', '事前確認', '要確認を決める', '本実行',
     ])
   })
 
   it('事前確認の4区分を、設計の言葉で持つ', () => {
     expect(MATCH_BUCKETS.map((b) => b.label)).toEqual([
-      '自動で一致', '要確認', '一致しない', '別人の可能性',
+      '自動で同じ人', '要確認', '一致しない', '別人の可能性',
     ])
-    // 「要確認」は人が決める。**決めるまで本実行できない**ことを書く。
-    expect(PAGE).toContain('「要確認」を全部決めるまで本実行できません')
   })
 
   it('合計が元の友だち数と合わないとき、数を出さない', () => {
@@ -48,22 +45,8 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
     expect(totalsMatch(counts, null)).toBe(false)
   })
 
-  it('固定値を画面で作らず、APIの人数を合計確認して表示する', () => {
-    expect(PAGE).toContain('api.accountHandovers.listForAccount(id)')
-    expect(PAGE).toContain('api.accountHandovers.get(current.id)')
-    expect(PAGE).toContain('totalsMatch(handover.counts, handover.counts.sourceTotal)')
-    expect(PAGE).toContain("countsAreComplete ? `${handover.counts?.[bucket.key].toLocaleString('ja-JP')}人` : '—'")
-  })
-
-  it('事前確認では元のアカウントが変わらないと書く', () => {
-    // 押す前に、戻れるかどうかを読ませる。
-    expect(PAGE).toContain('ここで止めても、元のアカウントは何も変わりません')
-  })
-
-  it('事前確認をやり直す操作を実APIへつなぐ', () => {
-    expect(PAGE).toContain('api.accountHandovers.preview(handover.id')
-    expect(PAGE).toContain('事前確認をやり直す')
-    expect(PAGE).toContain('disabled={(handover.unresolvedReviews ?? 1) > 0')
+  it('人数の1行は 0 の区分を省いて言う', () => {
+    expect(countsLine({sourceTotal:2,auto:1,review:1,unmatched:0,lookalike:0})).toBe('元の友だち 2 人：自動で同じ人 1・要確認 1')
   })
 
   it('プロバイダーが違うときの断りを持つ', () => {
@@ -71,23 +54,12 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
       **同じ人でも別のIDになる。** これを書かずに進めると、事前確認で
       「一致しない」が大量に出た理由が分からない。
     */
-    expect(DIFFERENT_PROVIDER_NOTE).toContain('同じ人でも別のIDになります')
-    expect(DIFFERENT_PROVIDER_NOTE).toContain('対応表を取り込むか')
+    expect(DIFFERENT_PROVIDER_DETAIL).toContain('同じ人でも別のIDになる')
+    expect(DIFFERENT_PROVIDER_DETAIL).toContain('対応表を取り込むか')
   })
 
-  it('?id= なしで開いたとき、無限ローディングにせず一覧へ戻す', () => {
-    /*
-      `load()` は `!id` で何もせず帰るので、ガードがないと
-      「読み込んでいます」が消えない（監査 Issue #1058）。
-      対象未指定は失敗ではないので、再読み込みではなく一覧への口を出す。
-    */
-    expect(PAGE).toContain('if (!id)')
-    expect(PAGE).toContain('乗り換えるアカウントが指定されていません')
-    expect(PAGE).toContain('backHref="/accounts"')
-  })
-
-  it('動的セグメントを使わない', () => {
-    // 静的書き出しなので `[id]` は書き出せない。
-    expect(PAGE).toContain("search?.get('id')")
+  it('変更の可否を手元の保存値で決めない（R522）', () => {
+    // サーバの requireRole('owner', 'admin') と同じ境目を使う。役割ごとの出し分けは描画の試験で見る。
+    expect(PAGE).not.toContain("localStorage.getItem('lh_staff_role')")
   })
 })

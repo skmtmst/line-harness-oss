@@ -1,0 +1,137 @@
+import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
+import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
+import {acquireWorkflow} from './workflow-execution.js';
+import {workflowLineClient} from './workflow-line-client.js';
+import {getWorkflowStep} from '@line-crm/db';
+import type {LineClient} from '@line-crm/line-sdk';
+let item:SqliteD1;
+const ref={scopeId:'line:a',processKind:'line_event',subjectId:'event'};
+beforeEach(()=>{item=createTestD1();item.raw.exec('CREATE TABLE effects(n INTEGER);INSERT INTO effects VALUES(0)')});
+afterEach(()=>item.raw.close());
+describe('PKG67 shared workflow recovery',()=>{
+ it('replays a frozen read/write plan after interruption without repeating increments',async()=>{
+  const one=(await acquireWorkflow(item.db,ref))!;
+  await one.step('done',async()=>{await one.mutationDb('done').prepare('UPDATE effects SET n=n+1').run()});
+  let interrupted=true;
+  const work=async(execution:NonNullable<Awaited<ReturnType<typeof acquireWorkflow>>>)=>execution.step('partial',async()=>{
+    const db=execution.mutationDb('partial');
+    const before=await db.prepare('SELECT n FROM effects').first<{n:number}>();
+    if(before!.n===1)await db.prepare('UPDATE effects SET n=n+10').run();
+    if(interrupted){interrupted=false;throw new Error('crash after database mutation')}
+    await db.prepare('UPDATE effects SET n=n+100').run();
+  });
+  await expect(work(one)).rejects.toThrow();await one.fail();
+  const two=(await acquireWorkflow(item.db,ref))!;
+  const done=vi.fn();await two.step('done',done);await work(two);await two.complete();
+  expect(done).not.toHaveBeenCalled();expect(item.raw.prepare('SELECT n FROM effects').get()).toEqual({n:111});
+  expect((await getWorkflowStep(item.db,{...ref,stepKey:'__run'}))!.status).toBe('succeeded');
+ });
+ it('keeps an unacknowledged push unknown and never resends its frozen payload',async()=>{
+  const one=(await acquireWorkflow(item.db,ref))!;
+  const send=vi.fn().mockRejectedValue(new Error('lost response'));
+  const client=workflowLineClient({pushMessage:send} as unknown as LineClient,one);
+  await expect(client.pushMessage('U1',[{type:'text',text:'original'}])).rejects.toThrow();
+  const retry=workflowLineClient({pushMessage:send} as unknown as LineClient,one);
+  await expect(retry.pushMessage('U1',[{type:'text',text:'changed'}])).rejects.toThrow('delivery_unknown');
+  expect(send).toHaveBeenCalledOnce();
+  const rows=item.raw.prepare("SELECT * FROM workflow_steps WHERE step_key LIKE 'line:%'").all() as Array<{status:string;input_json:string}>;
+  expect(rows[0].status).toBe('unknown');expect(rows[0].input_json).toContain('original');expect(rows[0].input_json).not.toContain('changed');
+ });
+ it('does not replay an accepted push after its success checkpoint cannot be saved',async()=>{
+  const one=(await acquireWorkflow(item.db,ref))!;
+  const send=vi.fn().mockResolvedValue({requestId:'accepted-before-db-failure'});
+  item.raw.exec("CREATE TRIGGER fail_push_completion BEFORE UPDATE ON workflow_steps WHEN NEW.status='succeeded' AND NEW.step_key LIKE 'line:%' BEGIN SELECT RAISE(ABORT,'injected'); END");
+  await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one).pushMessage('U1',[{type:'text',text:'original'}])).rejects.toThrow();
+  item.raw.exec('DROP TRIGGER fail_push_completion');
+  await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one).pushMessage('U1',[{type:'text',text:'changed'}])).rejects.toThrow('delivery_unknown');
+  expect(send).toHaveBeenCalledOnce();
+  const checkpoint=item.raw.prepare("SELECT result_json,retry_key,status FROM workflow_steps WHERE step_key LIKE 'line:%'").get() as {result_json:string,status:string};
+  expect(checkpoint.status).toBe('unknown');
+  expect(JSON.parse(checkpoint.result_json)).toEqual({requestId:'accepted-before-db-failure'});
+ });
+ it('does not reclaim a started push after its lease expires',async()=>{
+  const one=(await acquireWorkflow(item.db,ref))!;
+  const send=vi.fn().mockResolvedValue(undefined);
+  await workflowLineClient({pushMessage:send} as unknown as LineClient,one).pushMessage('U1',[{type:'text',text:'original'}]);
+  item.raw.exec("UPDATE workflow_steps SET status='running',error_code='delivery_started',lease_owner='stopped-owner',lease_expires_at=0 WHERE step_key LIKE 'line:%'");
+  await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one).pushMessage('U1',[{type:'text',text:'changed'}])).rejects.toThrow('delivery_unknown');
+  expect(send).toHaveBeenCalledOnce();
+ });
+ it('limits old persisted LINE retry budgets to four physical requests',async()=>{
+  const one=(await acquireWorkflow(item.db,ref))!;
+  const send=vi.fn().mockRejectedValue(Object.assign(new Error('not accepted'),{status:429}));
+  for(let n=0;n<5;n++) {
+    await workflowLineClient({pushMessage:send} as unknown as LineClient,one).pushMessage('U1',[{type:'text',text:'original'}]).catch(()=>{});
+    item.raw.exec("UPDATE workflow_steps SET next_attempt_at=0,max_attempts=5 WHERE step_key LIKE 'line:%'");
+  }
+  expect(send).toHaveBeenCalledTimes(4);
+ });
+ it('never uses a reply token twice after a lost response and never stores the token',async()=>{
+  const one=(await acquireWorkflow(item.db,ref))!;
+  const send=vi.fn().mockRejectedValue(new Error('lost response'));
+  const client=workflowLineClient({replyMessage:send} as unknown as LineClient,one);
+  await expect(client.replyMessage('private-reply-token',[{type:'text',text:'answer'}])).rejects.toThrow();
+  const replay=workflowLineClient({replyMessage:send} as unknown as LineClient,one);
+  await expect(replay.replyMessage('new-private-token',[{type:'text',text:'answer'}])).rejects.toThrow('reply_unknown');
+  expect(send).toHaveBeenCalledOnce();
+  expect(JSON.stringify(item.raw.prepare('SELECT input_json,result_json FROM workflow_steps').all())).not.toContain('private');
+ });
+ it('rejects mutation RETURNING from an expired owner without changing domain data',async()=>{
+  const one=(await acquireWorkflow(item.db,ref))!;
+  item.raw.prepare("UPDATE workflow_steps SET lease_expires_at=0 WHERE step_key='__run'").run();
+  const two=(await acquireWorkflow(item.db,ref))!;
+  await expect(one.db.prepare('UPDATE effects SET n=n+1 RETURNING n').first()).rejects.toThrow();
+  expect(await two.db.prepare('UPDATE effects SET n=n+1 RETURNING n').first()).toEqual({n:1});
+ });
+ it('keeps a swallowed write failure retryable instead of completing its parent stage',async()=>{
+  item.raw.exec("CREATE TRIGGER interrupted_effect BEFORE UPDATE ON effects BEGIN SELECT RAISE(ABORT,'temporary storage failure');END");
+  const first=(await acquireWorkflow(item.db,ref))!;
+  const bestEffort=async(execution:NonNullable<Awaited<ReturnType<typeof acquireWorkflow>>>)=>execution.step('mileage',async()=>{
+    try{await execution.mutationDb('mileage').prepare('UPDATE effects SET n=n+1').run()}catch{/* Existing projection helpers swallow the error. */}
+  });
+  await expect(bestEffort(first)).rejects.toThrow('unfinished_step');await first.fail();
+  item.raw.exec('DROP TRIGGER interrupted_effect');
+  const resumed=(await acquireWorkflow(item.db,ref))!;await bestEffort(resumed);await resumed.complete();
+  expect(item.raw.prepare('SELECT n FROM effects').get()).toEqual({n:1});
+  expect((await getWorkflowStep(item.db,{...ref,stepKey:'__run'}))!.status).toBe('succeeded');
+ });
+ it('caps a repeatedly failing root instead of replaying forever',async()=>{
+  for(let n=0;n<2;n++){const e=(await acquireWorkflow(item.db,ref,{maxAttempts:2}))!;await e.fail()}
+  expect(await acquireWorkflow(item.db,ref,{maxAttempts:2})).toBeNull();
+  expect((await getWorkflowStep(item.db,{...ref,stepKey:'__run'}))!.status).toBe('exhausted');
+ });
+ it.each(['delivery_failed','processing_failed'])('holds ambiguous historical LINE failure %s without allocating a new key',async code=>{
+  const one=(await acquireWorkflow(item.db,ref))!;const send=vi.fn().mockResolvedValue({requestId:'accepted'});
+  const options={stepKey:'legacy_notification'};
+  await workflowLineClient({pushMessage:send} as unknown as LineClient,one,options).pushMessage('U1',[{type:'text',text:'original'}]);
+  item.raw.prepare("UPDATE workflow_steps SET status='failed',error_code=?,result_json=NULL,max_attempts=5 WHERE step_key='legacy_notification'").run(code);
+  const key=item.raw.prepare("SELECT retry_key FROM workflow_steps WHERE step_key='legacy_notification'").get();
+  await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one,options).pushMessage('U1',[{type:'text',text:'changed'}])).rejects.toThrow('delivery_unknown');
+  expect(send).toHaveBeenCalledOnce();expect(item.raw.prepare("SELECT retry_key FROM workflow_steps WHERE step_key='legacy_notification'").get()).toEqual(key);
+  expect(item.raw.prepare("SELECT status,error_code,attempt_count FROM workflow_steps WHERE step_key='legacy_notification'").get()).toEqual({status:'unknown',error_code:'delivery_unknown',attempt_count:1});
+ });
+
+});
+
+it('preserves the full provider deadline even when the LINE step exhausts its wait budget',async()=>{
+ const one=(await acquireWorkflow(item.db,ref))!;
+ const before=Date.now();
+ const send=vi.fn().mockRejectedValue(Object.assign(new Error('not accepted'),{status:429,retryAfter:'7200'}));
+ await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one).pushMessage('U1',[{type:'text',text:'original'}])).rejects.toThrow();
+ const row=item.raw.prepare("SELECT status,error_code,next_attempt_at FROM workflow_steps WHERE step_key LIKE 'line:%'").get() as {next_attempt_at:number};
+ expect(row).toMatchObject({status:'exhausted',error_code:'retry_after_exceeds_budget'});
+ expect(row.next_attempt_at).toBeGreaterThanOrEqual(before+7200_000);
+ await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one).pushMessage('U1',[{type:'text',text:'original'}])).rejects.toThrow();
+ expect(send).toHaveBeenCalledOnce();
+});
+
+it('preserves the stricter EC retry-key age fence without another wire request',async()=>{
+ const one=(await acquireWorkflow(item.db,ref))!;
+ const send=vi.fn().mockRejectedValue(Object.assign(new Error('not accepted'),{status:429}));
+ const options={stepKey:'customer_notification',retryKeyValidityMs:23*3600_000};
+ await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one,options).pushMessage('U1',[{type:'text',text:'original'}])).rejects.toThrow();
+ item.raw.prepare("UPDATE workflow_steps SET next_attempt_at=0,first_attempt_at=? WHERE step_key='customer_notification'").run(Date.now()-23*3600_000);
+ await expect(workflowLineClient({pushMessage:send} as unknown as LineClient,one,options).pushMessage('U1',[{type:'text',text:'changed'}])).rejects.toThrow('delivery_unknown');
+ expect(send).toHaveBeenCalledOnce();
+ expect(item.raw.prepare("SELECT status,error_code FROM workflow_steps WHERE step_key='customer_notification'").get()).toEqual({status:'unknown',error_code:'delivery_unknown'});
+});

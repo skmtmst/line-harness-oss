@@ -2,7 +2,7 @@ import { jstNow, toJstString } from './utils.js';
 import type { FriendAddCandidateSource } from './friend-add-events.js';
 
 /**
- * N-244 抑止台帳。停止した流入経路への試行(refは停止済み)を、友だち追加の
+ * 抑止台帳。停止した流入経路への試行(refは停止済み)を、友だち追加の
  * follow webhook へ引き継ぐための記録。候補・friends.ref_code が無い
  * 別followでも、同一利用者の直近の停止試行を見て自然流入扱いにしない。
  *

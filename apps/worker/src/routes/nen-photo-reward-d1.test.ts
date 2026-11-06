@@ -1,3 +1,4 @@
+import { seedCleanPhotoScans } from '../test-utils/photo-scans.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type Database from 'better-sqlite3';
@@ -5,7 +6,7 @@ import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqli
 import { nenMembers } from './nen-members.js';
 
 /*
- * PHOTO-06 (#1079): 止まったポイント手続きの復旧口（point-retry /
+ * 止まったポイント手続きの復旧口（point-retry /
  * point-reconcile）と、詳細応答の派生状態を実DBで確かめる。
  */
 
@@ -56,6 +57,7 @@ function insertPhoto(
        ON CONFLICT(friend_id) DO UPDATE SET customer_id = excluded.customer_id`,
     ).run(input.friendId ?? 'friend-a', input.customerId, NOW);
   }
+  seedCleanPhotoScans(raw);
 }
 
 function insertReward(

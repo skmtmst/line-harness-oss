@@ -1,9 +1,5 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
-.headRow {
-  height: 44px;
-  border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-surface-pearl);
-}
 
 .headRow[hidden],
 .cell[hidden] {
@@ -12,9 +8,9 @@
 
 .cell {
   padding: 0 12px;
-  color: var(--color-ink-faint);
+  color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  font-weight: 600;
+  font-weight: var(--polish-weight-label);
   white-space: nowrap;
   text-align: left;
   vertical-align: middle;
@@ -28,7 +24,13 @@
   text-align: center;
 }
 
-/* ★V7の見出し行（高さ40px・一段沈んだ地）。付けないときは44pxのまま。 */
+.dateCell {
+  color: var(--color-ink-secondary);
+  font-variant-numeric: var(--font-numeric);
+  white-space: nowrap;
+}
+
+/* ★管理画面の見出し行（高さ40px・一段沈んだ地）。付けないときは44pxのまま。 */
 .headComfortable {
   height: 40px;
   background: var(--color-canvas-sunken);
@@ -46,7 +48,7 @@
 }
 
 .sortButton:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -67,7 +69,7 @@
 .stateTitle {
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .stateDescription {
@@ -79,14 +81,95 @@
   margin-top: 4px;
   padding: 8px 16px;
   border-radius: var(--radius-control);
-  color: var(--color-accent-deep);
+  color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: underline;
 }
 
 .stateRetry:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
+
+/*
+ * ★V8「表の見出し」：高さ44・左右20・地 table-head・上下に細い線・
+ * 文字 12px/500 ink-secondary。互換経路は枠カード内の見出しだったが、
+ * V8 では白い板の中に直接置く（箱の中に箱を作らない）。
+ */
+:root .headRow {
+  /* 高さは中身で決まる（上下12＋中身16＝40）。固定で潰さない。 */
+  height: auto;
+  border-top: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-table-head);
 }
+
+:root .headRow .cell {
+  padding: var(--tpl-thead-pad-block) var(--tpl-thead-pad-side);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+}
+
+:root .headRow .cell { line-height: var(--tpl-thead-lh); }
+/* 見出しの行は高さ40（H1O0a）。選ぶ箱（押せる範囲24）があっても行を押し広げない。 */
+:root .headRow .cell { height: var(--tpl-thead-h); padding-block: 0; }
+:root .headRow[data-table-layout='columns'] {
+  display: flex; align-items: center; gap: 16px; height: var(--tpl-thead-h); padding: 0px var(--tpl-list-inset);
+}
+
+}
+/* ★V8 見出しの行も行と同じ横の余白（端24・欄の間16） */
+:root .headRow .cell { padding-inline: var(--tpl-cell-gap-half); }
+:root .headRow .cell:first-child { padding-left: var(--tpl-thead-pad-side); }
+:root .headRow .cell:last-child { padding-right: var(--tpl-thead-pad-side); }
+
+/* 列の余白は親が持つ。文字はtext-alignを保ち、親の中央揃えで上下を合わせる。 */
+:root .headRow[data-table-layout='columns'] .cell {
+  display: block;
+  height: auto;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+/* カード内の表はカードが外枠を持つ。指定された行だけ、地と端の余白を揃える。 */
+:root .headRow[data-presentation='embedded'] {
+  border: 0;
+  background: transparent;
+}
+:root .headRow[data-presentation='embedded'] .cell {
+  height: var(--tpl-ev-fr-head-h);
+  padding: 0 var(--tpl-cell-gap-half);
+  font-weight: var(--polish-weight-label);
+}
+/* 端の列は行の端の余白（--tpl-row-pad-side）にそろえる。見出しだけ内側にずれていた。 */
+:root .headRow[data-presentation='embedded'] .cell:first-child { padding-left: var(--tpl-row-pad-side); }
+:root .headRow[data-presentation='embedded'] .cell:last-child { padding-right: var(--tpl-row-pad-side); }
+.truncated {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ：画面の名前リンクも共通部品が色と1行を所有する。 */
+html:root .rowNameLink {
+  display: block; min-width: 0; max-width: 100%; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis; color: var(--color-ink); font-weight: 700;
+}
+
+html:root .headRow[data-table-layout='columns'] { padding-inline: var(--tpl-list-inset); }
+
+html:root button.rowNameLink { padding: 0; border: 0; background: none; font: inherit; color: var(--color-ink); font-weight: 700; text-align: left; cursor: pointer; }
+html:root button.rowNameLink:hover { text-decoration: underline; }
+/* 選んでいる行の色は行（Tr selected）が持つ。名前のボタンに選ぶ札（aria-pressed）の緑の枠を重ねない。 */
+html:root button.rowNameLink.rowNameLink[aria-pressed='true'] { background: none; border: 0; box-shadow: none; color: var(--color-ink); }
+
+html:root .person { display: flex; align-items: center; gap: var(--space-8); min-width: 0; width: 100%; flex-wrap: nowrap; }
+html:root .personName { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* 見出しは白い地と下線だけ。名前は本文より一段強くする。 */
+:root .headRow { border-top: 0; border-bottom: 1px solid var(--color-divider); background: var(--color-canvas); }
+:root .headRow .cell { font-size: var(--polish-text-support); font-weight: var(--polish-control-weight); }
+:root .name, html:root button.rowNameLink { font-weight: var(--polish-value-weight); }

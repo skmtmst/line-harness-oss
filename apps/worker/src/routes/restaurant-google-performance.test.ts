@@ -145,11 +145,12 @@ beforeEach(() => {
     { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
     { id: 'account-2', name: '渋谷店', is_active: 1, channel_access_token: 'token-2' },
   ];
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
+  testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`).run(TENANT);
   env = {
     DB: testDb.db,
     API_KEY: 'owner-key',
-    RESTAURANT_TEST_ENABLED: 'true',
+    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true', GOOGLE_BUSINESS_ENABLED: 'true',
     WORKER_URL: 'https://worker.example.test',
     LINE_CREDENTIAL_ENCRYPTION_KEY: ENC_KEY,
     GOOGLE_BUSINESS_OAUTH_CLIENT_ID: 'client-id',

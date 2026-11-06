@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn());
@@ -108,10 +108,7 @@ describe('運用者へのお知らせの送信と実行記録', () => {
   });
 
   /*
-   * 審査(2026-09-12)が見つけた形。画面が保存していた message_received は
-   * 公開が 200 で通り is_active=1 になるのに、dispatch は unknown_event_type
-   * で断るので通知は0件だった。**公開できて届かない**のが一番悪い。
-   * 公開の時点で断ることで、静かな失敗を見える失敗にする。
+   * 公開できても dispatch が処理できない通知を作らないよう、未対応のイベント種別は公開時点で拒む。
    */
   it('登録簿に無いきっかけは公開できず、停止のまま残る', async () => {
     const response = await app(testDb.db).request(
@@ -196,6 +193,13 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     });
   });
 
+  it('日本時間の朝も通知履歴の書出し名は今日の日付', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-09-30T15:09:00Z'));
+    const csv = await app(testDb.db).request('/api/notifications/operator-deliveries.csv?lineAccountId=account-1&reason=日付確認');
+    expect(csv.status).toBe(200);
+    expect(csv.headers.get('content-disposition')).toBe('attachment; filename="operator-notifications-2026-10-01.csv"');
+  });
+
   it('本人テスト送信を台帳へ分け、理由付きCSV出力を監査する', async () => {
     const tested = await app(testDb.db).request(
       '/api/notifications/operator-rules/rule-1/test',
@@ -242,25 +246,25 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     });
   });
 
-  it('登録簿の口から代表7件がすべて接続済みと分かる', async () => {
+  it('登録簿の口からG4-05: 代表9件がすべて接続済みと分かる', async () => {
     const response = await app(testDb.db).request(
       '/api/notifications/operator-event-types?lineAccountId=account-1',
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       data: {
-        summary: { total: 7, connected: 7, unconnected: 0 },
+        summary: { total: 9, connected: 9, unconnected: 0 },
       },
     });
     const body = await (await app(testDb.db).request(
       '/api/notifications/operator-event-types?lineAccountId=account-1',
     )).json() as { data: { items: Array<{ eventType: string; connected: boolean }> } };
     expect(body.data.items.map((item) => item.eventType).sort()).toEqual([
-      'booking_created', 'broadcast_completed', 'common_var_expiry', 'ec_order_received', 'form_submitted', 'manual_link_broken', 'nen_birthday_coupon_failed',
+      'booking_created', 'broadcast_completed', 'common_var_expiry', 'ec_order_received', 'form_submitted', 'inbox_assigned_reply', 'inbox_new_inquiry', 'manual_link_broken', 'nen_birthday_coupon_failed',
     ]);
     const connected = body.data.items.filter((item) => item.connected).map((item) => item.eventType).sort();
     expect(connected).toEqual([
-      'booking_created', 'broadcast_completed', 'common_var_expiry', 'ec_order_received', 'form_submitted', 'manual_link_broken', 'nen_birthday_coupon_failed',
+      'booking_created', 'broadcast_completed', 'common_var_expiry', 'ec_order_received', 'form_submitted', 'inbox_assigned_reply', 'inbox_new_inquiry', 'manual_link_broken', 'nen_birthday_coupon_failed',
     ]);
     const unconnected = body.data.items.filter((item) => !item.connected).map((item) => item.eventType).sort();
     expect(unconnected).toEqual([]);
@@ -388,14 +392,14 @@ describe('N-342 (#943): 正本名 /api/line-notifications 配下の運用者通�
     // 下書きは正本名の draft 口。公開・停止はここでは受け付けない。
     const drafted = await instance.request(
       `/api/line-notifications/operator-rules/${ruleId}/draft`,
-      patch({ lineAccountId: 'account-1', name: '新しい予約(正本・改)' }),
+      patch({ lineAccountId: 'account-1', expectedVersion: 1, name: '新しい予約(正本・改)' }),
     );
     expect(drafted.status).toBe(200);
     await expect(drafted.json()).resolves.toMatchObject({ data: { name: '新しい予約(正本・改)' } });
 
     const rejected = await instance.request(
       `/api/line-notifications/operator-rules/${ruleId}/draft`,
-      patch({ lineAccountId: 'account-1', isActive: true }),
+      patch({ lineAccountId: 'account-1', expectedVersion: 2, isActive: true }),
     );
     expect(rejected.status).toBe(409);
     await expect(rejected.json()).resolves.toMatchObject({ code: 'use_publish_or_stop' });
@@ -411,9 +415,57 @@ describe('N-342 (#943): 正本名 /api/line-notifications 配下の運用者通�
       json({ lineAccountId: 'account-1' }),
     );
     expect(rulePreview.status).toBe(200);
+    // m26e : 版なしの下書き保存は受け付けない（顧客通知の下書きとそろえる）。
+    const noVersion = await instance.request(
+      `/api/line-notifications/operator-rules/${ruleId}/draft`,
+      patch({ lineAccountId: 'account-1', name: '版なし保存' }),
+    );
+    expect(noVersion.status).toBe(400);
     // ルールの受け取る人(owner-1)だけを見る。全スタッフではない。
     await expect(rulePreview.json()).resolves.toMatchObject({
       data: { summary: { staff: 1, canReceive: 1 } },
+    });
+  });
+
+  it('m26e R565: 古い版の下書き保存は409で止め、先行内容を保って現在値を返す', async () => {
+    const instance = app(testDb.db);
+    // AとBが同じ版1を読む。
+    const read = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1?lineAccountId=account-1',
+    );
+    await expect(read.json()).resolves.toMatchObject({ data: { version: 1 } });
+    // Aが先に保存する。
+    const savedA = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1/draft',
+      patch({ lineAccountId: 'account-1', expectedVersion: 1, name: '新しい予約(A)' }),
+    );
+    expect(savedA.status).toBe(200);
+    await expect(savedA.json()).resolves.toMatchObject({ data: { name: '新しい予約(A)', version: 2 } });
+    // Bが古い版1で保存すると409。先行内容は保ち、比較用に現在値を返す。
+    const savedB = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1/draft',
+      patch({ lineAccountId: 'account-1', expectedVersion: 1, name: '新しい予約(B)' }),
+    );
+    expect(savedB.status).toBe(409);
+    await expect(savedB.json()).resolves.toMatchObject({
+      success: false,
+      code: 'version_conflict',
+      data: { current: { name: '新しい予約(A)', version: 2 } },
+    });
+    const reread = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1?lineAccountId=account-1',
+    );
+    await expect(reread.json()).resolves.toMatchObject({
+      data: { name: '新しい予約(A)', version: 2 },
+    });
+    // 開き直した版2では保存できる。
+    const retried = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1/draft',
+      patch({ lineAccountId: 'account-1', expectedVersion: 2, name: '新しい予約(B・再)' }),
+    );
+    expect(retried.status).toBe(200);
+    await expect(retried.json()).resolves.toMatchObject({
+      data: { name: '新しい予約(B・再)', version: 3 },
     });
   });
 
@@ -471,3 +523,5 @@ describe('N-342 (#943): 正本名 /api/line-notifications 配下の運用者通�
     await expect(stopped.json()).resolves.toMatchObject({ data: { isActive: false } });
   });
 });
+
+afterEach(() => vi.useRealTimers());

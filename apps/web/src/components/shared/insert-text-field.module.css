@@ -1,0 +1,117 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/*
+ * 差し込みを札で見せる本文の欄（絵 OVCot ①）。v8 のときだけ描く（互換経路は今の textarea）。
+ * 箱の大きさ・余白・枠は呼び出し側の className（今の textarea と同じもの）が決める。
+ * ここは「textarea と同じに見える」ための最小限と、札の見た目だけ。
+ */
+.editor {
+  display: block;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  cursor: text;
+  text-align: left;
+}
+.editor[aria-invalid='true'] { outline: 1px solid var(--color-danger); outline-offset: -1px; }
+
+
+.editor[aria-disabled='true'] { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
+
+/* 短い本文欄の任意の口。既定の欄と差し込み札の見た目は変えない。 */
+.editorCompact {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--tpl-nc-body-h);
+  min-height: var(--tpl-nc-body-h);
+  padding: var(--tpl-nc-body-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-nc-body-lh);
+  resize: vertical;
+}
+/* 本文の検証も TextField と同じく、入力中のフォーカスで赤い枠を消さない。 */
+
+
+/* 空のときの例文（textarea の placeholder と同じ色）。高さ0の段で、カーソルは行の頭に残す。 */
+.editor[data-empty]::before {
+  content: attr(placeholder);
+  display: block;
+  height: 0;
+  overflow: visible;
+  color: var(--color-ink-faint);
+  pointer-events: none;
+}
+
+/*
+ * 札：薄い緑の地・緑の字 13/600・角丸6・左に小さな印（11）。
+ * 文の行の高さを変えないよう、上下の余白は1だけ。
+ */
+.chip {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: calc(100% - 4px);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 2px;
+  padding: 1px 6px 1px 4px;
+  border-radius: var(--radius-mini);
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  vertical-align: baseline;
+  white-space: nowrap;
+  user-select: all;
+  cursor: default;
+}
+.chipIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); flex-shrink: 0; }
+.chipLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/*
+ * 下の「差し込む」の丸い枠のボタン（絵 OVCot ①の下の並び）。
+ * 枠 1px control-border・角丸いっぱい・内側 3/8・間4・印12・文字 12/600。
+ */
+.insertButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.insertButton svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--color-ink-secondary); }
+.insertButton:hover:not(:disabled) { background: var(--color-canvas-sunken); }
+.insertButton:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
+.insertButton:focus-visible { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: 1px; }
+.insertButton[aria-expanded='true'] { outline-color: var(--color-accent); background: var(--color-accent-soft); }
+}
+
+.insertButton[data-size='compact'] { min-height: var(--tpl-msg-composer-insert-h); height: var(--tpl-msg-composer-insert-h); padding: var(--tpl-msg-composer-insert-pad); }
+
+@layer components {
+:root .editor { box-shadow: var(--control-shadow); }
+}
+
+@layer components {
+.editorMessage { box-sizing: border-box; width: 100%; height: var(--tpl-te-body-h); min-height: var(--tpl-te-body-h); padding: var(--tpl-nc-body-pad); border: 0; outline: revert; background: transparent; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-body-lh); resize: vertical; }
+.editorCode { height: var(--tpl-te-flex-h); font-family: var(--font-mono, monospace); font-size: var(--text-caption); }
+}/* 単独の本文欄は青と赤で同じ輪を使う。MessageBody内は外枠が輪を持つ。 */

@@ -1,8 +1,11 @@
 'use client'
 
+import SharedButton from '@/components/shared/button'
+import { loadStaffIdentity } from '@/lib/staff-role'
 import Link from 'next/link'
+import TextLink from '@/components/shared/text-link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, api, fetchApi } from '@/lib/api'
+import { ApiError, fetchApi } from '@/lib/api'
 import Card, { CardHeader } from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -10,6 +13,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
 import Notice from '@/components/shared/notice'
+import { formatTime } from '@/lib/format'
 
 /**
  * 対応が必要な受信（設計 `V2 1-1 ダッシュボード` の `card 対応が必要な受信`）。
@@ -78,7 +82,7 @@ function elapsed(iso: string): string {
 function ChannelBadge({ channel }: { channel: InboxItem['channel'] }) {
   return (
     <span
-      className={`mr-2 rounded-pill px-1.5 py-0.5 text-[10px] font-medium ${
+      className={`mr-2 rounded-pill px-1.5 py-0.5 text-nano font-medium ${
         channel === 'email'
           ? 'bg-canvas-sunken text-ink-secondary'
           : 'bg-accent-soft text-accent-deep'
@@ -132,7 +136,7 @@ export default function PendingInboxCard({
    */
   useEffect(() => {
     let cancelled = false
-    void api.staff.me()
+    void loadStaffIdentity()
       .then((response) => {
         if (cancelled || !response.success) return
         staffIdRef.current = response.data.id
@@ -216,8 +220,7 @@ export default function PendingInboxCard({
           件数は小カードの1か所に集約し、見出しの横では繰り返さない（m22d）。
         */
         title="対応が必要な受信（全アカウント）"
-        action={<Link href="/chats" className="hover:underline">受信箱をすべて見る →</Link>}
-        actionTone="info"
+        action={<TextLink href="/chats">受信箱へ</TextLink>}
       />
 
       {/*
@@ -245,10 +248,10 @@ export default function PendingInboxCard({
       {loadFailure && summary ? (
         <Notice
           tone="warn"
-          action={<button type="button" onClick={() => void load()} className="font-medium underline">もう一度読み込む</button>}
+          action={<SharedButton variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void load()}>もう一度読み込む</SharedButton>}
         >
           最新の状態に更新できませんでした。
-          {lastSuccessAt ? `最終更新 ${lastSuccessAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} の内容を表示しています。` : ''}
+          {lastSuccessAt ? `最終更新 ${formatTime(lastSuccessAt)} の内容を表示しています。` : ''}
         </Notice>
       ) : null}
 
@@ -296,7 +299,7 @@ export default function PendingInboxCard({
                 {items.map((item) => (
                   // 行の高さ 61px は設計のまま（共通 Tr の既定 58px ではない）。
                   // Tailwind v4 は層（utilities）のため部品CSSに負ける。style で保つ。
-                  <Tr key={item.id} interactive className="h-[61px]" style={{ height: 61 }}>
+                  <Tr key={item.id} interactive className="h-[61px]" style={{ height: 61 }} href={inboxItemHref(item)}>
                     <Td className="overflow-hidden whitespace-nowrap">
                       <ChannelBadge channel={item.channel} />
                       <Link

@@ -1,0 +1,3 @@
+/* 古いWorker入口の中央寄せだけを解除し、Formの共通レイアウトに任せる。 */
+body.research-active { display: block; background: var(--color-ground); color: var(--color-ink); }
+body.research-active #app { max-width: none; padding: 0; }

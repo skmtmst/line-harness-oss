@@ -1,5 +1,5 @@
 /*
- * 本文の文字数（設計 `V6 5 kk8dz 1通目設定` の「52 / 5,000」）。
+ * 本文の文字数（設計 `管理画面 5 kk8dz 1通目設定` の「52 / 5,000」）。
  *
  * 上限を出すのは見た目のためではない。LINEのテキストメッセージは5,000字までで、
  * 超えたぶんは送信そのものが弾かれる。書いている途中に残りが見えないと、
@@ -10,6 +10,7 @@
  */
 
 import { TEMPLATE_TEXT_MAX_CHARACTERS } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /** LINEのテキストメッセージの上限。Workerと同じ正本を使う。 */
 export const LINE_TEXT_LIMIT = TEMPLATE_TEXT_MAX_CHARACTERS
@@ -21,7 +22,7 @@ export const LINE_TEXT_LIMIT = TEMPLATE_TEXT_MAX_CHARACTERS
  * 端末によって区切りが変わり、設計と突き合わせられない。
  */
 export function formatCharCount(length: number, limit: number = LINE_TEXT_LIMIT): string {
-  return `${length.toLocaleString('en-US')} / ${limit.toLocaleString('en-US')}`
+  return `${formatNumber(length)} / ${formatNumber(limit)}`
 }
 
 export function isOverCharLimit(length: number, limit: number = LINE_TEXT_LIMIT): boolean {

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { Env } from '../worker-env.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 
 const dbMocks = {
   getBroadcasts: vi.fn(),
@@ -43,7 +47,7 @@ const requestBody = {
   messageType: 'text',
   messageContent: '{{name}}さん、おはようございます',
   targetType: 'all',
-  scheduledAt: '2026-08-12T09:00:00.000+09:00',
+  scheduledAt: '2099-08-12T09:00:00.000+09:00',
   lineAccountId: 'account-1',
   trackLinks: true,
 };
@@ -69,6 +73,7 @@ const row = {
   track_links: 1,
   line_account_id: requestBody.lineAccountId,
   alt_text: null,
+  lock_version: 3,
 };
 
 function setupApp({
@@ -76,15 +81,15 @@ function setupApp({
   role = 'owner',
 }: { changes?: number; role?: 'owner' | 'admin' | 'staff' } = {}) {
   d1Prepare.mockImplementation(() => ({
-    bind: vi.fn(() => ({ run: vi.fn(async () => ({ success: true, meta: { changes } })) })),
+    bind: vi.fn(() => ({ first:vi.fn(async()=>null),run: vi.fn(async () => ({ success: true, meta: { changes } })) })),
   }));
-  const app = new Hono<{ Bindings: { DB: D1Database } }>();
+  const app = new Hono<Env>();
   app.use('*', async (c, next) => {
     c.env = {
       DB: {
         prepare: d1Prepare,
       } as unknown as D1Database,
-    };
+    } as Env['Bindings'];
     // 更新系はオーナー／管理者限定になった。ここで見たいのは本体の挙動なので、
     // 認証は通った状態にしてから渡す。権限の検証は role-guard.test.ts が持つ。
     (c as unknown as { set: (k: string, v: unknown) => void }).set('staff', {
@@ -96,6 +101,7 @@ function setupApp({
     await next();
   });
   app.route('/', broadcasts);
+  app.onError(unhandledWorkerError);
   return app;
 }
 
@@ -216,6 +222,7 @@ describe('PUT /api/broadcasts/:id', () => {
     dbMocks.getBroadcastById.mockResolvedValueOnce(draft);
     dbMocks.updateBroadcast.mockResolvedValueOnce({
       ...draft,
+      lock_version: draft.lock_version + 1,
       message_bubbles_json: '[{"type":"text"}]',
       segment_conditions: '{"operator":"AND","rules":[]}',
       stealth_spread_minutes: 45,
@@ -229,7 +236,7 @@ describe('PUT /api/broadcasts/:id', () => {
         targetType: 'segment',
         segmentConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] },
         stealthSpreadMinutes: 45,
-        // #772: 版を付けて更新する（版なしは400になる）。
+        // 版を付けて更新する（版なしは400になる）。
         expectedVersion: 3,
       }),
     });
@@ -248,7 +255,7 @@ describe('PUT /api/broadcasts/:id', () => {
     );
   });
 
-  // #772: 版なしPUTは400で止め、更新関数を呼ばない。
+  // 版なしPUTは400で止め、更新関数を呼ばない。
   test('版なしの更新は400で止める', async () => {
     dbMocks.getBroadcastById.mockResolvedValueOnce({ ...row, status: 'draft', scheduled_at: null });
     const response = await setupApp().request(`/api/broadcasts/${KEY}`, {
@@ -272,7 +279,7 @@ describe('PUT /api/broadcasts/:id', () => {
       body: JSON.stringify({
         targetType: 'segment',
         segmentConditions: { operator: 'AND', rules: [{ type: 'unknown_rule', value: true }] },
-        // #772: 版を付けて絞り込み検証まで進める（版なしだと手前で400になる）。
+        // 版を付けて絞り込み検証まで進める（版なしだと手前で400になる）。
         expectedVersion: 3,
       }),
     });
@@ -326,7 +333,7 @@ describe('POST /api/broadcasts/:id/cancel', () => {
     });
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ success: false, error: 'Broadcast not found' });
+    expect(await response.json()).toEqual({ success: false, code: 'BROADCAST_NOT_FOUND', error: '配信が見つかりません。一覧から開き直してください。' });
     expect(accountAccess.canAccessAllLineAccounts).not.toHaveBeenCalled();
     expect(d1Prepare).not.toHaveBeenCalled();
   });
@@ -382,7 +389,9 @@ describe('POST /api/broadcasts/:id/cancel', () => {
     });
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toMatchObject({ success: false });
+    const body = await response.json<{ incidentId: string }>();
+    expect(body).toMatchObject({ success: false, incidentId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
+    expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({ incidentId: body.incidentId }));
     expect(dbMocks.getBroadcastById).toHaveBeenCalledTimes(1);
   });
 
@@ -398,8 +407,10 @@ describe('POST /api/broadcasts/:id/cancel', () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
       success: false,
-      error: 'Broadcast not found after cancellation',
+      error: 'Internal Server Error',
+      incidentId: expect.stringMatching(/^[0-9a-f-]{36}$/),
     });
+    expect(report).toHaveBeenCalledTimes(1);
     expect(d1Prepare).toHaveBeenCalledTimes(1);
   });
 

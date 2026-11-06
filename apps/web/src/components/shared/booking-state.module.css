@@ -1,0 +1,115 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.surface {
+  --booking-bg: var(--color-canvas);
+  --booking-ink: var(--color-ink);
+  --booking-border: var(--color-control-border);
+  --booking-line: solid;
+  --booking-stroke: 1px;
+  background: var(--booking-bg);
+  color: var(--booking-ink);
+  border: var(--booking-stroke) var(--booking-line) var(--booking-border);
+}
+.surface[data-booking-state='active'] {
+  --booking-bg: var(--color-accent-deep);
+  --booking-ink: var(--color-on-accent);
+  --booking-border: var(--color-accent-deep);
+}
+.surface[data-booking-state='completed'], .surface[data-booking-state='closed'] {
+  --booking-bg: var(--color-shell);
+  --booking-ink: var(--color-ink-secondary);
+  --booking-border: transparent;
+}
+.surface[data-booking-state='hold'] { --booking-line: dashed; --booking-border: var(--color-ink-faint); }
+.surface[data-booking-state='pending'] { --booking-line: dashed; --booking-border: var(--color-danger); --booking-stroke: 2px; }
+.surface[data-booking-state='no_show'] {
+  --booking-bg: var(--color-status-danger-soft);
+  --booking-ink: var(--color-danger);
+  --booking-border: var(--color-danger);
+  --booking-line: solid;
+  --booking-stroke: 2px;
+}
+.surface[data-booking-state='warning'] {
+  --booking-bg: var(--color-status-warn-soft);
+  --booking-ink: var(--color-status-warn-deep);
+  --booking-border: var(--color-warning);
+}
+.surface[data-booking-state='closed'] {
+  background-image: repeating-linear-gradient(135deg, transparent, transparent 4px, var(--color-hairline) 4px, var(--color-hairline) 5px);
+}
+.label { display: inline-flex; align-items: center; padding: 0 var(--polish-space-row); border-radius: var(--radius-segment); font-size: var(--text-micro); white-space: nowrap; }
+.legend { display: flex; align-items: center; flex-wrap: wrap; gap: var(--polish-space-field); min-width: 0; font-size: var(--text-micro); color: var(--color-ink-secondary); }
+.legendItem { display: inline-flex; align-items: center; gap: var(--polish-space-row); white-space: nowrap; }
+.legendDense { gap: var(--space-6); }
+.legendDense .legendItem { gap: var(--space-4); }
+.sample { width: 12px; height: 12px; flex-shrink: 0; border-radius: var(--radius-mini); }
+.name, .time, .detail { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name { font-weight: 600; }
+.time { font-variant-numeric: var(--font-numeric); font-weight: var(--font-weight-ui); font-size: var(--text-micro); }
+.detail { font-size: var(--text-micro); }
+.summary { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; max-width: 100%; overflow: hidden; }
+[data-placement='timeline'] > .summary { flex-direction: column; align-items: flex-start; gap: 0; }
+[data-placement='timeline'] > .summary > .detail { flex: none; width: 100%; }
+.summary > .time { flex-shrink: 0; }
+.summary > .detail { flex: 1; }
+.gap { position: absolute; bottom: var(--polish-space-row); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; pointer-events: none; color: var(--color-ink-secondary); font-size: var(--text-micro); font-variant-numeric: var(--font-numeric); }
+.category { display: inline-flex; align-items: center; gap: var(--polish-space-row); min-width: 0; max-width: 100%; color: inherit; font-size: inherit; white-space: nowrap; }
+.categoryText { overflow: hidden; text-overflow: ellipsis; }
+.now { position: absolute; z-index: 3; pointer-events: none; color: var(--color-ink-faint); font-variant-numeric: var(--font-numeric); }
+.now[data-direction='vertical'] { inset-block: 0; border-inline-start: 1px solid var(--color-ink-faint); }
+.now[data-direction='horizontal'] { inset-inline: 0; border-block-start: 1px solid var(--color-ink-faint); }
+.now > span { position: absolute; padding: 0 var(--polish-space-row); border-radius: var(--radius-mini); background: var(--color-ink-faint); color: var(--color-on-accent); font-size: var(--text-micro); white-space: nowrap; }
+.now[data-direction='vertical'] > span { inset-block-start: 0; transform: translateX(-50%); }
+.now[data-direction='vertical'][data-label-position='above'] > span { inset-block-start: auto; inset-block-end: calc(100% + var(--space-4)); }
+.now[data-direction='horizontal'] > span { inset-inline-start: 0; transform: translateY(-50%); }
+}
+
+.surface[data-booking-state='attention'] { --booking-bg: var(--color-status-danger-soft); --booking-ink: var(--color-danger); --booking-border: var(--color-danger); --booking-line: dashed; --booking-stroke: 2px; }
+
+.cardHeading { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-row); width: 100%; min-width: 0; }
+.cardHeading > .name { flex: 1; }
+.cardHeading > .time { flex-shrink: 0; }
+.staffHeading { display: flex; align-items: center; justify-content: center; gap: var(--polish-space-row); min-width: 0; }
+.rest { display: flex; align-items: center; justify-content: center; min-height: var(--space-32); border: 0; border-radius: var(--radius-segment); box-shadow: none; background: repeating-linear-gradient(135deg, var(--color-shell), var(--color-shell) 4px, var(--color-hairline) 4px, var(--color-hairline) 5px); color: var(--color-ink-secondary); font-size: var(--text-micro); cursor: default; }
+
+.visibleLegend { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-field); min-width: 0; width: 100%; }
+.visibleLegendInline { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-field); flex: 1 1 auto; min-width: 0; width: auto; }
+.legendHelp { flex: none; }
+@media print { .legendHelp { display: none; } }
+
+.cardDetails { display: flex; align-items: center; gap: var(--space-4); width: 100%; min-width: 0; }
+.cardDetails > .detail { flex: 1 1 auto; min-width: min(2em, 25%); }
+.cardDetails > .detail:empty, .cardMeta:empty { display: none; }
+.cardMeta { display: flex; align-items: center; gap: var(--space-4); flex: 0 0 auto; min-width: 0; max-width: calc(100% - min(2em, 25%) - var(--space-4)); }
+.cardDetails > .detail:empty + .cardMeta { max-width: 100%; }
+.cardMeta > :not(.detail) { flex-shrink: 0; }
+.cardMeta > .label { flex-shrink: 1; min-width: 0; }
+.cardMeta > .detail { flex: 0 1 auto; min-width: 0; }
+.cardMeta > [data-booking-guests] { flex: 0 0 auto; }
+.statusText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 人数と注意は先頭で確保し、狭い箱では補足から省略する。全文は箱の説明に残す。 */
+[data-placement='timeline'] .cardMeta [data-booking-count-overflow], [data-placement='timeline'] .cardMeta [data-booking-warning-mark] { display: none; }
+[data-placement='timeline'] .cardMeta [data-booking-count] { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-placement='timeline'] .cardMeta > [data-booking-guests] { order: -2; }
+[data-placement='timeline'] .cardMeta > [data-booking-warning] { order: -1; }
+@container booking-card (max-width: 8rem) {
+  .cardHeading > .time { flex: 0 1 auto; min-width: 0; }
+  .cardMeta:has([data-booking-guests]) > [data-booking-source] { display: none; }
+}
+@container booking-card (max-width: 6rem) {
+  .cardMeta:has([data-booking-guests]) > .label { display: none; }
+}
+@container booking-card (max-width: 4rem) {
+  .cardHeading:has(+ .cardDetails [data-booking-guests]) { display: none; }
+  .cardDetails:has([data-booking-guests]) { display: block; }
+  .cardDetails:has([data-booking-guests]) > .detail { display: none; }
+  .cardMeta:has([data-booking-guests]) { flex-direction: column; align-items: stretch; gap: 0; width: 100%; max-width: 100%; }
+  .cardMeta:has([data-booking-guests]) > :not([data-booking-guests], [data-booking-warning]) { display: none; }
+  .cardMeta > [data-booking-guests], .cardMeta > [data-booking-warning] { width: 100%; text-align: center; }
+  .cardMeta [data-booking-count] { display: block; }
+  .cardMeta [data-booking-count][data-many], .cardMeta [data-booking-warning-text] { display: none; }
+  .cardMeta > [data-booking-guests], .cardMeta > [data-booking-warning] { display: flex; align-items: center; justify-content: center; min-height: var(--tpl-rs-lh-11); }
+  :root [data-placement='timeline'] .cardMeta svg:is([data-booking-count-overflow], [data-booking-warning-mark]) { display: block; width: var(--space-8); height: var(--space-8); flex: none; }
+  .cardMeta [data-booking-count-unit] { display: none; }
+}

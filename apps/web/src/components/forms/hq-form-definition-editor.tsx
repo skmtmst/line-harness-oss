@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { newBlockId, type FormBlock, type FormInputType, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared'
 import type { FormDefinition } from '@/lib/hq-templates-api'
@@ -14,7 +15,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Select from '@/components/shared/select'
+
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import {
   formJumpsInto,
@@ -29,6 +30,7 @@ import {
   hqFormPortableReferenceError,
   type HqFormEditorValue,
 } from './hq-form-definition-adapter'
+import { formatNumber } from '@/lib/format'
 
 const HEADER_TAB = -1
 
@@ -208,36 +210,36 @@ export default function HqFormDefinitionEditor({
 
   return <div>
     {(localError || error) && <Notice className="mb-4" tone="danger" message={localError || error} />}
-    <div className="mb-4 grid gap-4 rounded-card border border-hairline bg-canvas p-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="mb-4 grid gap-4 rounded-card border content-card bg-canvas p-4 sm:grid-cols-2 xl:grid-cols-4">
       <Field label="フォーム名" htmlFor="hq-form-name" required><TextInput id="hq-form-name" value={value.name} onChange={event => setValue(current => ({ ...current, name: event.target.value }))} /></Field>
       <Field label="公開状態"><p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-sm">配布先へ非公開の下書きとして保存</p></Field>
-      <Field label="回答したときに付けるタグ" htmlFor="hq-form-tag"><Select aria-label="回答したときに付けるタグ" id="hq-form-tag" value={value.onSubmitTagId} onChange={tagId => setValue(current => ({ ...current, onSubmitTagId: tagId }))} options={[{ value: '', label: '— 付けない —' }, ...portableRefs.tags.map(tag => ({ value: tag.id, label: tag.name }))]} /></Field>
+      <Field label="回答したときに付けるタグ" htmlFor="hq-form-tag"><EntitySelect kind="tag" aria-label="回答したときに付けるタグ" id="hq-form-tag" value={value.onSubmitTagId} onChange={tagId => setValue(current => ({ ...current, onSubmitTagId: tagId }))} options={[{ value: '', label: '— 付けない —' }, ...portableRefs.tags.map(tag => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))]} /></Field>
       <Field label="回答用URL"><p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-sm text-ink-faint">配布先で発行</p></Field>
     </div>
     <div className="grid gap-4 xl:grid-cols-3">
-      <section className="xl:sticky xl:top-4 xl:col-span-1 xl:self-start"><h2 className="mb-1 text-xs font-medium text-ink-secondary">お客さまに見える形</h2><FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} /></section>
+      <section className="xl:sticky xl:top-4 xl:col-span-1 xl:self-start"><h2 className="mb-1 text-xs font-semibold text-ink-secondary">お客さまに見える形</h2><FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} /></section>
       <section className="min-w-0 xl:col-span-2">
         <div className="flex flex-wrap items-center gap-1 border-b border-hairline pb-2">
           <button type="button" aria-pressed={tab === HEADER_TAB} onClick={() => setTab(HEADER_TAB)} className="rounded-control px-3 py-1.5 text-sm aria-pressed:bg-accent-soft aria-pressed:text-accent-deep">共通ヘッダ</button>
-          {layout.sections.map((section, index) => <span key={section.id} className="flex items-center"><button type="button" aria-pressed={tab === index} onClick={() => setTab(index)} onDoubleClick={() => renameSection(index)} className="rounded-control px-3 py-1.5 text-sm aria-pressed:bg-accent-soft aria-pressed:text-accent-deep">{section.name}</button>{tab === index && <><button type="button" onClick={() => duplicateSection(index)} className="px-1 text-xs text-ink-faint">複製</button>{layout.sections.length > 1 && <button type="button" onClick={() => requestRemoveSection(index)} className="px-1 text-xs text-danger">削除</button>}</>}</span>)}
+          {layout.sections.map((section, index) => <span key={section.id} className="flex items-center"><button type="button" aria-pressed={tab === index} onClick={() => setTab(index)} onDoubleClick={() => renameSection(index)} className="rounded-control px-3 py-1.5 text-sm aria-pressed:bg-accent-soft aria-pressed:text-accent-deep">{section.name}</button>{tab === index && <><button type="button" onClick={() => duplicateSection(index)} className="px-1 text-xs text-ink-faint">複製する</button>{layout.sections.length > 1 && <button type="button" onClick={() => requestRemoveSection(index)} className="px-1 text-xs text-danger">削除する</button>}</>}</span>)}
           <button type="button" onClick={addSection} className="rounded-control px-2 py-1.5 text-sm font-bold text-action">＋</button>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 py-2"><span className="text-sm font-bold">ブロック設定</span><div className="flex flex-wrap items-center gap-1">
           <button type="button" onClick={undo} className="rounded-control px-2 py-1 text-xs">元に戻す</button><button type="button" onClick={redo} className="rounded-control px-2 py-1 text-xs">やり直す</button>
-          <button type="button" onClick={() => moveBlock(-1)} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs disabled:opacity-40">上に移動</button><button type="button" onClick={() => moveBlock(1)} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs disabled:opacity-40">下に移動</button>
-          <button type="button" onClick={duplicateBlock} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs disabled:opacity-40">複製</button><button type="button" onClick={removeBlock} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs text-danger disabled:opacity-40">削除</button>
-          <div className="relative" ref={addMenuWrapRef}><Button type="button" variant="primary" aria-expanded={showAddMenu} aria-haspopup="menu" onClick={() => setShowAddMenu(open => !open)}>＋ ブロックを追加（12種）</Button><ActionMenu open={showAddMenu} ariaLabel="追加するブロック" onClose={() => setShowAddMenu(false)} anchorRef={addMenuWrapRef} items={['飾り', '入力'].flatMap(group => BLOCK_MENU.filter(menu => menu.group === group).map((menu, index) => ({ id: `${menu.kind}-${menu.type ?? ''}`, label: menu.label, sectionBefore: index === 0 ? group : undefined, onSelect: () => addBlock(menu.kind, menu.type) })))} /></div>
+          <button type="button" onClick={() => moveBlock(-1)} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs">上に移動</button><button type="button" onClick={() => moveBlock(1)} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs">下に移動</button>
+          <button type="button" onClick={duplicateBlock} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs">複製</button><button type="button" onClick={removeBlock} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs text-danger">削除する</button>
+          <div className="relative" ref={addMenuWrapRef}><Button type="button" variant="primary" aria-expanded={showAddMenu} aria-haspopup="menu" onClick={() => setShowAddMenu(open => !open)}>＋ ブロックを追加する（15種）</Button><ActionMenu open={showAddMenu} ariaLabel="追加するブロック" onClose={() => setShowAddMenu(false)} anchorRef={addMenuWrapRef} items={['飾り', '入力'].flatMap(group => BLOCK_MENU.filter(menu => menu.group === group).map((menu, index) => ({ id: `${menu.kind}-${menu.type ?? ''}`, label: menu.label, sectionBefore: index === 0 ? group : undefined, onSelect: () => addBlock(menu.kind, menu.type) })))} /></div>
           <Button type="button" onClick={() => setShowOptions(true)}>オプション設定</Button>
         </div></div>
         <div className="space-y-3">{blocks.length === 0 ? <p className="rounded-card border border-dashed border-hairline bg-canvas p-8 text-center text-sm text-ink-faint">「ブロックを追加」から作ってください</p> : blocks.map((block, index) => <BlockEditor key={block.id} block={block} index={index} sections={layout.sections} refs={portableRefs} inHeader={tab === HEADER_TAB} selected={block.id === selectedBlockId} onSelect={() => setSelectedBlockId(block.id)} onChange={patch => patchBlock(block.id, patch)} />)}</div>
-        <div className="mt-4 rounded-card border border-hairline bg-canvas p-4"><Field label="説明" htmlFor="hq-form-description"><TextArea id="hq-form-description" rows={2} value={value.description} onChange={event => setValue(current => ({ ...current, description: event.target.value }))} /></Field></div>
+        <div className="mt-4 rounded-card border content-card bg-canvas p-4"><Field label="説明" htmlFor="hq-form-description"><TextArea id="hq-form-description" rows={2} value={value.description} onChange={event => setValue(current => ({ ...current, description: event.target.value }))} /></Field></div>
       </section>
     </div>
-    <StickyBar actions={<div className="flex gap-2"><Button type="button" onClick={onCancel}>やめる</Button><Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '保存中...' : 'フォームを保存'}</Button></div>} />
+    <StickyBar actions={<div className="flex gap-2"><Button type="button" onClick={onCancel}>キャンセル</Button><Button type="button" variant="primary" disabled={saving} onClick={() => void save()} busy={saving} busyLabel="保存中…">フォームを保存する</Button></div>} />
     {showOptions && <OptionsDialog value={layout.options} refs={portableRefs} onChange={(options: FormOptions) => setLayout(previous => ({ ...previous, options }))} onClose={() => setShowOptions(false)} onSave={async () => { await save(); setShowOptions(false) }} />}
-    <ConfirmDialog open={renameSectionIndex !== null} title="ページの名前を変更" description="ページ名を入力してください。" confirmLabel="変更する" onCancel={() => { setRenameSectionIndex(null); setRenameSectionName('') }} onConfirm={applySectionName}>
+    <ConfirmDialog open={renameSectionIndex !== null} title="ページの名前を変更" description="ページ名を入力してください。" confirmLabel="保存する" onCancel={() => { setRenameSectionIndex(null); setRenameSectionName('') }} onConfirm={applySectionName}>
       <Field label="ページの名前" htmlFor="hq-form-section-name"><TextInput id="hq-form-section-name" value={renameSectionName} onChange={event => setRenameSectionName(event.target.value)} /></Field>
     </ConfirmDialog>
-    <ConfirmDialog open={removeSectionIndex !== null} title="ページを削除" description={removeSectionIndex === null ? '' : (() => { const target = layout.sections[removeSectionIndex]; if (!target) return ''; const branchCount = formJumpsInto(layout, target.id); return `ページ「${target.name}」のブロック${target.blocks.length}個を外します。${branchCount ? ` 分岐${branchCount}件は「次へ進む」に戻ります。` : ''} 元に戻すで復元できます。集まった回答は消えません。` })()} confirmLabel="削除する" onCancel={() => setRemoveSectionIndex(null)} onConfirm={() => { if (removeSectionIndex !== null) removeSectionNow(removeSectionIndex) }} />
+    <ConfirmDialog open={removeSectionIndex !== null} title="ページを削除" description={removeSectionIndex === null ? '' : (() => { const target = layout.sections[removeSectionIndex]; if (!target) return ''; const branchCount = formJumpsInto(layout, target.id); return `ページ「${target.name}」のブロック${formatNumber(target.blocks.length)}個を外します。${branchCount ? ` 分岐${formatNumber(branchCount)}件は「次へ進む」に戻ります。` : ''} 元に戻すで復元できます。集まった回答は消えません。` })()} confirmLabel="削除する" onCancel={() => setRemoveSectionIndex(null)} onConfirm={() => { if (removeSectionIndex !== null) removeSectionNow(removeSectionIndex) }} />
   </div>
 }

@@ -9,7 +9,7 @@
  * ここを通り抜けても期限切れの対象者は誰にも一致しない。
  */
 import type { D1Database } from '@cloudflare/workers-types';
-import type { SegmentCondition } from './segment-query.js';
+import type { SegmentCondition } from '@line-crm/shared';
 
 export type AnalyticsAudienceBlocker = 'audience_missing' | 'audience_expired';
 

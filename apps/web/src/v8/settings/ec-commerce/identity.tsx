@@ -1,0 +1,323 @@
+'use client'
+import { DetailContent } from '@/components/shared/detail-content'
+import { formatYen } from '@line-crm/shared';
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ArrowUpRight, Link2, Plug, Unlink, UserSearch } from 'lucide-react'
+import { ORDER_IMPACT_KEYS, REVENUE_IMPACT_KEYS, type IdentityCandidateImpactMetric } from '@line-crm/shared'
+import Button from '@/components/shared/button'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import Select from '@/components/shared/select'
+import ListRange from '@/components/ui/list-range'
+import Drawer from '@/components/shared/drawer'
+import { DialogActions } from '@/components/shared/dialog'
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
+import { IdentityEvidenceList, IdentityHistoryList, IdentityImpactList, IdentitySubjectCard } from '@/components/identity/identity-parts'
+import { IdentityStateBlock } from '@/components/identity/identity-state'
+import { useIdentityReview } from '@/components/identity/identity-review'
+import { confidenceText, impactText, NOT_AVAILABLE } from '@/components/identity/identity-view'
+import { useAccount } from '@/contexts/account-context'
+import { ApiError, api, type EcIdentityCandidateOperationsList } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { SbSettingsScreen } from '../sb-frame/settings-screen'
+import { EcTabsV8 } from './screen'
+import shared from './screen.module.css'
+import styles from './identity.module.css'
+import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { RowMenu } from '@/components/shared/row-actions'
+import { useRouter } from 'next/navigation'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B ：EC連携 会員のつき合わせ（/ec-commerce/identity-candidates）。
+ *
+ * 外側は取り込みの記録と同じ設定の板（narrow-nav）と中の切り替え。中身は絵の順：
+ * 数の帯（自動で結びついた・候補が見つかった・結びついていない・結びついていない注文の金額）→
+ * 自動で結びつく条件の帯 → 並び（と絞り込み）・注意 → 候補の表（「候補を見る」「決める」、候補なしは「友だちを探す」）。
+ * 動きは今の画面（app/ec-commerce/identity-candidates/page.tsx）と同じ：候補は本人照合の口、
+ * 件数と金額はEC運用の集計の口（アカウントの切り替えで古い応答を捨てる・集計だけの失敗は数の帯だけ）、
+ * 「候補を見る」で表の下に根拠・影響・両方の中身・これまでの判断、「決める」で判定の窓。
+ */
+
+type View = 'all' | 'candidate' | 'none' | 'conflict'
+type Sort = 'newest' | 'confidence'
+
+const isImpactMetric = (value: unknown): value is IdentityCandidateImpactMetric => {
+  if (!value || typeof value !== 'object') return false
+  const metric = value as { key?: unknown; value?: unknown; unit?: unknown }
+  return typeof metric.key === 'string' && (metric.value === null || typeof metric.value === 'number') && typeof metric.unit === 'string'
+}
+
+/** 「注文 3件 ¥18,600」。取れないときは null（推測した数を出さない）。 */
+function candidateImpact(value: unknown): string | null {
+  if (!Array.isArray(value)) return null
+  const metrics = value.filter(isImpactMetric)
+  const order = metrics.find((metric) => ORDER_IMPACT_KEYS.includes(metric.key))
+  const revenue = metrics.find((metric) => REVENUE_IMPACT_KEYS.includes(metric.key))
+  const parts = [order && order.value !== null ? `注文 ${impactText(order)}` : '', revenue && revenue.value !== null ? impactText(revenue) : ''].filter(Boolean)
+  return parts.length ? parts.join(' ') : null
+}
+
+const AUTO_LINK_NOTE = 'メールアドレスか電話番号が同じなら、自動で結びつきます。どちらも違うときに、ここへ並びます。名前だけが同じ人は、別人のこともあるので自動では結びつけません。'
+
+const VIEW_OPTIONS: Array<{ value: View; label: string }> = [
+  { value: 'all', label: 'すべて' },
+  { value: 'candidate', label: '候補あり' },
+  { value: 'none', label: '候補なし' },
+  { value: 'conflict', label: '同じ人が2人いる疑い' },
+]
+
+function confidenceTone(label: string): StatusBadgeTone {
+  if (label === 'very_high' || label === 'high') return 'success'
+  if (label === 'medium') return 'info'
+  return 'neutral'
+}
+
+export default function EcIdentityCandidatesScreen() {
+  const { selectedAccountId } = useAccount()
+  const role = useStaffRole()
+  const canEdit = canManageRole(role)
+  const review = useIdentityReview('ec_member', { lineAccountId: selectedAccountId })
+  const [candidateId, setCandidateId] = useDetailPanelUrl('candidate')
+  const router = useRouter()
+  useEffect(() => { if (candidateId && candidateId !== review.selectedId) review.select(candidateId) }, [candidateId, review.selectedId, review.select])
+  const detail = review.detail
+  const [operations, setOperations] = useState<EcIdentityCandidateOperationsList | null>(null)
+  const [operationsState, setOperationsState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
+  const [view, setView] = useListUrlValue<View>('view', 'all')
+  const [sort, setSort] = useListUrlValue<Sort>('sort', 'confidence')
+
+  /* アカウントを切り替えたら、前のアカウントの遅れた応答は採らない（R600）。 */
+  const operationsReqRef = useRef(0)
+  const selectedAccountRef = useRef(selectedAccountId)
+  selectedAccountRef.current = selectedAccountId
+
+  const loadOperations = useCallback(async () => {
+    if (!selectedAccountId) {
+      operationsReqRef.current += 1
+      setOperations(null)
+      setOperationsState('empty')
+      return
+    }
+    const account = selectedAccountId
+    const req = ++operationsReqRef.current
+    const isCurrent = () => req === operationsReqRef.current && selectedAccountRef.current === account
+    setOperationsState('loading')
+    try {
+      const response = await api.ecCommerce.operationIdentityCandidates({ lineAccountId: account, status: 'pending', limit: 100 })
+      if (!isCurrent()) return
+      if (!response.success || !Array.isArray(response.data?.items) || !response.data?.summary) throw new Error('invalid_identity_operations_response')
+      setOperations(response.data)
+      setOperationsState('ready')
+    } catch (error) {
+      if (!isCurrent()) return
+      setOperationsState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
+    }
+  }, [selectedAccountId])
+
+  useEffect(() => { void loadOperations() }, [loadOperations])
+
+  const operationsReady = operationsState === 'ready' && operations !== null
+  const candidateCount = operations?.summary.candidateExternalCustomers ?? 0
+  const noneCount = operations?.summary.withoutCandidates ?? null
+  const conflictCount = operations?.summary.duplicateSuspicions ?? 0
+  /* 集計が読めていないときは数を 0 と書かない。数の帯の下の行で理由を言う。 */
+  const operationsDetail = (normal: string): string => {
+    if (operationsReady) return normal
+    if (operationsState === 'loading') return '読み込んでいます'
+    if (operationsState === 'forbidden') return '表示する権限がありません'
+    if (operationsState === 'error') return '読み込めませんでした'
+    return normal
+  }
+  const impactByCandidate = useMemo(
+    () => new Map((operations?.items ?? []).map((item) => [item.id, candidateImpact(item.impact)] as const)),
+    [operations],
+  )
+  const viewCount: Record<View, number | null | undefined> = {
+    all: operationsReady ? operations?.summary.unmatched ?? 0 : undefined,
+    candidate: operationsReady ? candidateCount : undefined,
+    none: operationsReady ? noneCount : undefined,
+    conflict: operationsReady ? conflictCount : undefined,
+  }
+  const shown = useMemo(() => review.items
+    .filter((item) => {
+      if (view === 'candidate') return Boolean(item.right.label)
+      if (view === 'none') return !item.right.label
+      if (view === 'conflict') return item.confidence.label === 'medium'
+      return true
+    })
+    .toSorted((left, right) => sort === 'confidence'
+      ? right.confidence.score - left.confidence.score
+      : Date.parse(right.detectedAt) - Date.parse(left.detectedAt)), [review.items, sort, view])
+
+  const pageState = review.state !== 'ready'
+    ? review.state
+    : review.items.length === 0 || operationsState === 'empty'
+      ? 'empty'
+      : 'ready'
+
+  let body: ReactNode
+  if (pageState !== 'ready') {
+    body = (
+      <IdentityStateBlock
+        state={pageState}
+        failure={review.failure}
+        emptyTitle="つき合わせる会員はありません"
+        emptyDescription="メールアドレスか電話番号が同じなら自動で結び付きます。どちらも違うときだけ、ここへ並びます。"
+        onRetry={() => { void loadOperations(); review.reload() }}
+      />
+    )
+  } else {
+    body = (
+      <>
+        <KpiBand presentation="band">
+          <KpiCard presentation="band" icon={<Link2 size={16} aria-hidden="true" />} title="自動で結びついた" value={operationsReady ? (operations?.summary.linked ?? null) : null} unit="人" detail={operationsDetail('メールか電話番号が同じ')} loading={operationsState === 'loading'} onRetry={operationsState === 'error' ? () => { void loadOperations() } : undefined} />
+          <KpiCard presentation="band" icon={<UserSearch size={16} aria-hidden="true" />} title="候補が見つかった" value={operationsReady ? candidateCount : null} unit="人" detailLayout="single" detail={operationsReady ? `人が決める（${formatNumber(operations?.summary.unmatched ?? 0)} 件のうち）` : operationsDetail('人が決める')} loading={operationsState === 'loading'} />
+          <KpiCard presentation="band" icon={<Unlink size={16} aria-hidden="true" />} title="結びついていない" value={operationsReady ? noneCount : null} unit="人" detail={operationsDetail('候補なし')} loading={operationsState === 'loading'} />
+          <KpiCard
+            presentation="band"
+            icon={<ArrowUpRight size={16} aria-hidden="true" />}
+            title="結びついていない注文の金額"
+            value={null}
+            unit=""
+            valueText={operationsReady && operations?.summary.potentialRevenue != null ? `${formatYen(operations.summary.potentialRevenue)}` : undefined}
+            detail={operationsReady ? `候補 ${formatNumber(candidateCount)} 人の注文` : operationsDetail('分析にも入ります')}
+            loading={operationsState === 'loading'}
+          />
+        </KpiBand>
+        {/* 決まり2: 結び付け方の説明は帯にせず、題の横の「？」へ（explanation）。 */}
+        <div className={styles.toolbar}>
+          <span className={styles.sortBox}>
+            <SaveErrorField names={["sort"]}><ListToolbarSort aria-label="候補の並び順" value={sort} onChange={(value) => setSort(value as Sort)} options={[{ value: 'confidence', label: '確からしさが高い順' }, { value: 'newest', label: '注文が新しい順' }]} /></SaveErrorField>
+          </span>
+          {/* 絵に無い絞り込み（候補あり・候補なし・同じ人が2人いる疑い）は、並びの横に小さく残す。 */}
+          <span className={styles.sortBox}>
+            <SaveErrorField names={["view"]}><Select
+              aria-label="候補の絞り込み"
+              label="候補"
+              value={view}
+              onChange={(value) => setView(value as View)}
+              options={VIEW_OPTIONS.map((option) => ({ value: option.value, label: viewCount[option.value] == null ? option.label : `${option.label} ${formatNumber(viewCount[option.value] ?? 0)}` }))}
+            /></SaveErrorField>
+          </span>
+          <span className={shared.spacer} />
+          <span className={styles.note} title="結び付けても元の注文と LINE の友だちは残り、過去の LINE 送信は再送しません。">結び付けても元の注文と LINE の友だちは残り、過去の LINE 送信は再送しません。</span>
+        </div>
+
+        <DataTable density="compact" columns="var(--tpl-ecc-identity-columns)" label="会員のつき合わせの候補">
+          <thead><TableHeadRow>
+            <Th>ECの注文・会員</Th>
+            <Th>LINEの候補</Th>
+            <Th>似ているところ</Th>
+            <Th>確からしさ</Th>
+            <Th aria-label="操作" />
+          </TableHeadRow></thead>
+          <tbody>{shown.length === 0 ? (
+            <Tr><Td colSpan={5}>この絞り込みに当たる候補はありません</Td></Tr>
+          ) : shown.map((item) => {
+            const impact = impactByCandidate.get(item.id) ?? null
+            const leftSub = [item.left.detail, impact].filter(Boolean).join('・') || NOT_AVAILABLE
+            const hasCandidate = Boolean(item.right.label)
+            const selected = review.selectedId === item.id
+            return (
+              <Tr key={item.id} selected={selected} data-row-id={item.id}>
+                <Td><span className={shared.stack}>
+                  <span className={styles.name} ><TruncatedText value={String(item.left.label ?? '')} /></span>
+                  <span className={shared.sub} title={leftSub}>{leftSub}</span>
+                </span></Td>
+                <Td><span className={shared.stack}>
+                  <span className={styles.name}>{hasCandidate ? item.right.label : '結びついていない —'}</span>
+                  {hasCandidate ? <span className={shared.sub}>{item.right.detail ?? item.right.lineAccountName ?? NOT_AVAILABLE}</span> : null}
+                </span></Td>
+                <Td><span className={shared.text} title={item.evidenceSummary.join('・')}>
+                  {hasCandidate ? (item.evidenceSummary.length ? item.evidenceSummary.join('・') : NOT_AVAILABLE) : '候補なし'}
+                </span></Td>
+                <Td>
+                  {hasCandidate ? (
+                    <StatusBadge tone={confidenceTone(item.confidence.label)} size="compact">{confidenceText(item.confidence.label)}</StatusBadge>
+                  ) : emptyValue('unknown')}
+                </Td>
+                <ActionCell>
+                  {/* 行の右端は「…」1つ（B-253・絵 w1W8h）。候補を見る・決める・友だちを探すはその中。 */}
+                  <RowMenu
+                    triggerProps={{ 'data-qa-open': 'ELayY' }}
+                    label={`${item.left.label}の候補の操作`}
+                    items={hasCandidate ? [
+                      { id: 'view', label: '候補を見る', onSelect: () => { setCandidateId(item.id); review.select(item.id) } },
+                      ...(canEdit ? [{ id: 'decide', label: '決める', onSelect: () => review.openDialog(item.id) }] : []),
+                    ] : [
+                      { id: 'search', label: '友だちを探す', onSelect: () => router.push(`/friends?q=${encodeURIComponent(item.left.label)}`) },
+                    ]}
+                  />
+                </ActionCell>
+              </Tr>
+            )
+          })}</tbody>
+        </DataTable>
+
+        {review.hasMore ? (
+          <div className={styles.more}>
+            <Button type="button" onClick={review.loadMore} disabled={review.loadingMore} busy={review.loadingMore} busyLabel="読み込み中…">続きを読み込む</Button>
+          </div>
+        ) : null}
+
+        <p className={shared.foot}>
+          {operationsReady
+            ? <ListRange label="結びついていない" total={operations?.summary.unmatched ?? 0} first={shown.length === 0 ? 0 : 1} last={shown.length} />
+            : <span>結びついていない —</span>}
+        </p>
+
+        {detail ? (
+          <>
+          <Drawer heightMode="viewport" contentSpacing="sections" open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} actions={{ primary: (<Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button>),
+    secondary: <Button variant="secondary" onClick={() => setCandidateId(null)}>閉じる</Button>,
+    menuItems: [], primaryAllowed: canEdit }}>
+<DetailContent>
+            <div className={styles.detailPair}>
+              <IdentitySubjectCard side="ECの会員" subject={detail.left} />
+              <IdentitySubjectCard side="LINE の友だち" subject={detail.right} />
+            </div>
+            <div className={styles.detailPair}>
+              <IdentityEvidenceList evidence={detail.evidence} confidence={detail.confidence} />
+              <IdentityImpactList impact={detail.impact} />
+            </div>
+            <IdentityHistoryList history={detail.history} />
+
+</DetailContent>
+</Drawer>
+            <IdentityDecisionDialog
+              open={canEdit && review.dialogOpen}
+              candidate={detail}
+              busy={review.deciding}
+              error={review.decideError || undefined}
+              onCancel={review.closeDialog}
+              onSubmit={review.decide}
+            />
+          </>
+        ) : null}
+      </>
+    )
+  }
+
+  return (
+    <SbSettingsScreen
+      boardId="w1W8h"
+      layout="narrow-nav"
+      title="EC連携"
+      help="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
+      explanation={AUTO_LINK_NOTE}
+      actions={<Button href="/ec-commerce?tab=connector" variant="secondary"><Plug className={shared.btnIcon} aria-hidden="true" />つなぎ先の設定</Button>}
+    >
+      <EcTabsV8 accountId={selectedAccountId} active="identity" />
+      {body}
+    </SbSettingsScreen>
+  )
+}

@@ -1,15 +1,16 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
-import ImageDetailModal from './image-detail-modal'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { URL as NodeURL } from 'node:url'
+import { BannerImageDetailV8 } from '@/v8/hq-banners/image-detail'
+import dialogStyles from '@/components/shared/dialog.module.css'
+
+vi.mock('@/lib/api', () => ({ api: { lineAccounts: { list: async () => ({ success: true, data: [] }) }, lineAccountFolders: { list: async () => ({ success: true, data: { folders: [] } }) } } }))
+const dialogCss = readFileSync(new NodeURL('../../shared/dialog.module.css', import.meta.url), 'utf8')
 import type { BannerImage } from '@/lib/hq-banners'
 
-/*
- * R121: バナー画像詳細がスマートフォンで上にはみ出し、閉じるボタンが見えない。
- * 背の高い窓を `items-center` のまま `overflow` と重ねると、上が画面外へ切れて
- * 指では先頭へ戻れない。外は縦スクロール、窓は `my-auto` の安全な中央寄せにし、
- * 見出し（閉じるボタン）を上に固定する。
- */
+/* R121: 背の高い画像詳細でも見出し・閉じる操作に届くことを、現役の共通Dialogで守る。 */
 afterEach(cleanup)
 
 const image: BannerImage = {
@@ -27,45 +28,51 @@ const image: BannerImage = {
   deliveredAccountIds: [],
 }
 
-function open() {
+function open(onClose = vi.fn()) {
   render(
-    <ImageDetailModal
+    <BannerImageDetailV8
       image={image}
       presets={[]}
       accounts={[]}
-      projectName="秋の案内"
-      onClose={() => undefined}
+      canManage
+      onClose={onClose}
       onToggleFavorite={() => undefined}
-      onDeliver={async () => undefined}
-      onRemove={async () => undefined}
+      onDeliver={async () => true}
+      onRemove={async () => true}
     />,
   )
 }
 
 describe('R121 画像詳細モーダルの小画面対応', () => {
-  it('外枠は縦スクロール専用で、中央寄せを重ねない', () => {
+  it('窓は画面内に収まり、長い本文だけ縦にスクロールする', () => {
     open()
     const dialog = screen.getByRole('dialog', { name: /画像の詳細/ })
-    const overlay = dialog.parentElement?.parentElement as HTMLElement
-    expect(overlay.className).toContain('overflow-y-auto')
-    expect(overlay.className).not.toContain('items-center')
-    // 窓は余白があれば中央、無ければ上から読める。
-    expect(dialog.className).toContain('my-auto')
-    expect(dialog.parentElement?.className).toContain('min-h-full')
+    expect(dialog.classList.contains(dialogStyles.panel)).toBe(true)
+    expect(dialogCss).toMatch(/max-height:\s*calc\(100dvh - 32px\)/)
+    const contentRule = dialogCss.match(/\.content\s*\{([^}]+)\}/)![1]
+    expect(contentRule).toMatch(/min-height:\s*0/)
+    expect(contentRule).toMatch(/overflow-y:\s*auto/)
   })
 
-  it('見出しと閉じるボタンは上に固定される', () => {
-    open()
+  it('見出しと閉じるボタンはスクロールする本文の外に残る', () => {
+    const onClose = vi.fn()
+    open(onClose)
+    const dialog = screen.getByRole('dialog', { name: /画像の詳細/ })
     const close = screen.getByRole('button', { name: '閉じる' })
-    const header = close.closest('div') as HTMLElement
-    expect(header.className).toContain('sticky')
-    expect(header.className).toContain('top-0')
+    const header = dialog.querySelector('.' + dialogStyles.headerRow)!
+    const content = dialog.querySelector('.' + dialogStyles.content)!
+    expect(header.contains(close)).toBe(true)
+    expect(content.contains(close)).toBe(false)
+    expect(dialogCss.match(/\.headerRow\s*\{([^}]+)\}/)![1]).toMatch(/flex:\s*0 0 auto/)
+    fireEvent.click(close)
+    expect(onClose).toHaveBeenCalledOnce()
   })
 
   it('閉じる・画像・操作がすべて描画される', () => {
     open()
     expect(screen.getByRole('button', { name: '閉じる' })).toBeTruthy()
-    expect(screen.getByText('秋の案内')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /アカウントへ渡す/ })).toBeTruthy()
+    expect(screen.getByText('手持ちの画像を取り込んだもの')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'ダウンロード' }).getAttribute('href')).toBe(image.media.url)
+    expect((screen.getByRole('button', { name: '0アカウントへ配る' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

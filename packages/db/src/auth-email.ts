@@ -3,7 +3,7 @@ import type { StaffMember } from './staff.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 /**
- * メールで送る URL（会員登録の本登録・パスワード再設定）と、回数制限。★V6 36-4。
+ * メールで送る URL（会員登録の本登録・パスワード再設定）と、回数制限。★36-4。
  *
  * URL に入れた値は保存せず SHA-256 のハッシュだけを持つ（migration 292）。
  */
@@ -18,6 +18,7 @@ export interface AuthEmailToken {
   staff_id: string | null;
   ip_hash: string | null;
   device_marker: string | null;
+  application_id: string | null;
   expires_at: string;
   consumed_at: string | null;
   created_at: string;
@@ -30,6 +31,7 @@ export interface CreateAuthEmailTokenInput {
   staffId?: string | null;
   ipHash?: string | null;
   deviceMarker?: string | null;
+  applicationId?: string | null;
   expiresAt: string;
 }
 
@@ -37,8 +39,8 @@ export async function createAuthEmailToken(db: D1Database, input: CreateAuthEmai
   const id = crypto.randomUUID();
   await db
     .prepare(
-      `INSERT INTO auth_email_tokens (id, purpose, token_hash, email, staff_id, ip_hash, device_marker, expires_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO auth_email_tokens (id, purpose, token_hash, email, staff_id, ip_hash, device_marker, application_id, expires_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -48,6 +50,7 @@ export async function createAuthEmailToken(db: D1Database, input: CreateAuthEmai
       input.staffId ?? null,
       input.ipHash ?? null,
       input.deviceMarker ?? null,
+      input.applicationId ?? null,
       input.expiresAt,
       jstNow(),
     )
@@ -73,6 +76,13 @@ export async function consumeAuthEmailToken(db: D1Database, id: string): Promise
     .bind(jstNow(), id)
     .run();
   return (result.meta?.changes ?? 0) > 0;
+}
+
+/** 招待再送が届いた後、同じ申込の古い URL を無効化する。 */
+export async function consumeOtherSignupTokens(db: D1Database, applicationId: string, keepTokenId: string): Promise<void> {
+  await db.prepare(`UPDATE auth_email_tokens SET consumed_at = ?
+    WHERE purpose = 'signup' AND application_id = ? AND id <> ? AND consumed_at IS NULL`)
+    .bind(jstNow(), applicationId, keepTokenId).run();
 }
 
 /** 同じ用途で、ある時刻以降に作った件数（メール・接続元ごとの上限に使う）。 */
@@ -111,22 +121,16 @@ export async function deleteExpiredAuthEmailTokens(db: D1Database, before: Date)
 export async function bumpAuthThrottle(db: D1Database, key: string, windowMs: number, now = new Date()): Promise<number> {
   const nowText = toJstString(now);
   const windowStartCutoff = toJstString(new Date(now.getTime() - windowMs));
-  const existing = await db
-    .prepare('SELECT count, window_start FROM auth_throttles WHERE key = ?')
-    .bind(key)
-    .first<{ count: number; window_start: string }>();
-  if (!existing || existing.window_start < windowStartCutoff) {
-    await db
-      .prepare(
-        `INSERT INTO auth_throttles (key, count, window_start, updated_at) VALUES (?, 1, ?, ?)
-         ON CONFLICT(key) DO UPDATE SET count = 1, window_start = excluded.window_start, updated_at = excluded.updated_at`,
-      )
-      .bind(key, nowText, nowText)
-      .run();
-    return 1;
-  }
-  await db.prepare('UPDATE auth_throttles SET count = count + 1, updated_at = ? WHERE key = ?').bind(nowText, key).run();
-  return existing.count + 1;
+  const result = await db.prepare(`
+    INSERT INTO auth_throttles (key, count, window_start, updated_at) VALUES (?, 1, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET
+      count = CASE WHEN julianday(auth_throttles.window_start) < julianday(?) THEN 1 ELSE auth_throttles.count + 1 END,
+      window_start = CASE WHEN julianday(auth_throttles.window_start) < julianday(?) THEN excluded.window_start ELSE auth_throttles.window_start END,
+      updated_at = excluded.updated_at
+    RETURNING count
+  `).bind(key, nowText, nowText, windowStartCutoff, windowStartCutoff).first<{ count: number }>();
+  if (!result) throw new Error('auth_throttle_update_failed');
+  return result.count;
 }
 
 /** window 内の回数を読むだけ（増やさない）。 */

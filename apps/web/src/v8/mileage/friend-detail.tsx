@@ -1,0 +1,629 @@
+'use client'
+import TextLink from '@/components/shared/text-link'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { canManageRole, useStaffRole, isOwnerRole } from '@/lib/staff-role'
+import { mileageAssignee as assignee } from './display'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
+import { formatListDateTime } from '@/lib/format'
+
+import Card from '@/components/shared/card'
+
+import StatusBadge from '@/components/shared/status-badge'
+import { mileageStatusTone } from './parts'
+
+import { MILEAGE_TABLE_LAYOUT } from './frame'
+
+import { jstMonthStart } from '@/lib/jst-datetime'
+
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { CircleDot, Clock3, Inbox, MessageCircle, Minus, Plus, Undo2 } from 'lucide-react'
+import { DetailPage } from '@/components/templates'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
+import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import SegmentedControl from '@/components/shared/segmented'
+import { Field } from '@/components/shared/form-controls'
+import { TextArea } from '@/components/shared/text-field'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
+import TargetMissing from '@/components/shared/target-missing'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { useAccount } from '@/contexts/account-context'
+import {
+  api,
+  ApiError,
+  type FriendDetail,
+  type MileageConnectedAccount,
+  type MileageFriendV6,
+  type MileageHistoryItem,
+  type MileageSelfInsights,
+  type MileageSummary,
+} from '@/lib/api'
+import { formatDay, formatNumber } from '@/lib/format'
+import {
+  formatMileageChange,
+  formatMileageNumber,
+  friendHistoryItem,
+  mileageDetailHasSourceEvent,
+  mileageEntryTypeLabel,
+  mileagePaginationTotal,
+  mileageRankProgress,
+  mileageConnectedAccounts,
+  mileageRewardedActions,
+  mileageSourceNoteText,
+  mileageStatusLabel,
+  type MileageDetailHistoryItem,
+} from './display'
+import MileageAdjustDialog from './adjust-dialog'
+import styles from './mileage.module.css'
+import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/** 明細の取得範囲を示し、残高と一部の履歴を同じ集計として扱わない。 */
+
+type MileageDetail = {
+  summary: MileageSummary
+  history: MileageHistoryItem[]
+  insights: MileageSelfInsights
+  connections: MileageConnectedAccount[]
+}
+
+type Kind = 'earned' | 'spent' | 'voided'
+
+function kindOf(item: MileageDetailHistoryItem): Kind {
+  if (item.entryType === 'grant' || (item.entryType === 'adjustment' && item.amount > 0)) return 'earned'
+  if (item.entryType === 'spend') return 'spent'
+  return 'voided'
+}
+
+const KIND_PILL: Record<Kind, { text: string; tone: 'active' | 'neutral' | 'warn' }> = {
+  earned: { text: 'たまった', tone: 'active' },
+  spent: { text: '使った', tone: 'neutral' },
+  voided: { text: '取り消し', tone: 'warn' },
+}
+
+
+function FriendDetailInner() {
+  const searchParams = useSearchParams()
+  const friendId = searchParams.get('id') ?? ''
+  const openAdjustment = searchParams.get('adjust') === '1'
+  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const requestRef = useRef(0)
+  const [friend, setFriend] = useState<FriendDetail | null>(null)
+  const [mileage, setMileage] = useState<MileageDetail | null>(null)
+  const [v6Friend, setV6Friend] = useState<MileageFriendV6 | null>(null)
+  const [balanceSource, setBalanceSource] = useState<'ec' | 'musubo' | null>(null)
+  const [v6History, setV6History] = useState<MileageDetailHistoryItem[] | null>(null)
+  /* WEB075：口が数えた明細の全件数。読めた最新100件より多ければ、ここに出ているのは一部。 */
+  const [historyTotal, setHistoryTotal] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+  const [missing, setMissing] = useState(false)
+  const canAdjust = canManageRole(useStaffRole()) && balanceSource === 'musubo'
+  const canConfigureAdjustmentPolicy = isOwnerRole(useStaffRole())
+  const [adjustmentOpen, setAdjustmentOpen] = useState(false)
+  const [adjustMode, setAdjustMode] = useState<'increase' | 'decrease'>('increase')
+  const [pendingAction, setPendingAction] = useState<{ entryId: string; kind: 'confirm' | 'void'; label: string } | null>(null)
+  const [pendingReason, setPendingReason] = useState('')
+  const [pendingBusy, setPendingBusy] = useState(false)
+  const [pendingError, setPendingError] = useState('')
+  const [notificationRetryId, setNotificationRetryId] = useState<string | null>(null)
+  const [notificationRetryError, setNotificationRetryError] = useState('')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [kindFilter, setKindFilter] = useListUrlValue<'all' | Kind>('kindFilter', 'all')
+  const [period, setPeriod] = useListUrlValue('period', 'all')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [menuId, setMenuId] = useState<string | null>(null)
+  usePageTitle(friend?.displayName ? `${friend.displayName}のマイル明細` : null)
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'マイル', href: '/mileage?tab=balances' }])
+
+  const load = useCallback(async () => {
+    if (!selectedAccountId || !friendId) {
+      setFriend(null)
+      setMileage(null)
+      setV6Friend(null)
+      setV6History(null)
+      setLoadedAccountId(null)
+      setLoading(false)
+      return
+    }
+    const request = ++requestRef.current
+    setLoading(true)
+    setError(false)
+    setMissing(false)
+    try {
+      const friendResponse = await api.friends.get(friendId)
+      if (!friendResponse.success) throw new Error('load_failed')
+      const v6Response = await api.mileage.friendsV6({ accountId: selectedAccountId, friendId, limit: 1, offset: 0 }).catch(() => null)
+      if (request !== requestRef.current) return
+      if (!v6Response?.success || !['ec', 'musubo'].includes(v6Response.data?.balanceSource)) throw new Error('load_failed')
+      const selected = Array.isArray(v6Response.data.items) ? v6Response.data.items.find((item) => item.friendId === friendId) ?? null : null
+      if (v6Response.data.balanceSource === 'ec' && !selected) {
+        setMissing(true); setFriend(null); setMileage(null); setV6Friend(null)
+        return
+      }
+      setBalanceSource(v6Response.data.balanceSource)
+      setFriend(friendResponse.data)
+      setV6Friend(selected)
+      if (v6Response.data.balanceSource === 'ec') {
+        setMileage(null); setV6History(null); setHistoryTotal(null)
+        return
+      }
+      const [mileageResponse, historyResponse] = await Promise.all([
+        api.friends.mileage(friendId, { limit: 100, accountId: selectedAccountId }),
+        api.mileage.history({ accountId: selectedAccountId, friendId, limit: 100, offset: 0 }).catch(() => null),
+      ])
+      if (request !== requestRef.current) return
+      if (!mileageResponse.success) throw new Error('load_failed')
+      setMileage(mileageResponse.data)
+      setV6History(historyResponse?.success && Array.isArray(historyResponse.data?.items)
+        ? historyResponse.data.items.map(friendHistoryItem) : null)
+      setHistoryTotal(historyResponse?.success ? mileagePaginationTotal(historyResponse.data) : null)
+
+    } catch (caught) {
+      if (request !== requestRef.current) return
+      setFriend(null)
+      setMileage(null)
+      setV6Friend(null)
+      setBalanceSource(null)
+      setV6History(null)
+
+      if (caught instanceof ApiError && caught.status === 404) setMissing(true)
+      else setError(true)
+    } finally {
+      if (request === requestRef.current) { setLoadedAccountId(selectedAccountId); setLoading(false) }
+    }
+  }, [friendId, selectedAccountId])
+
+  useEffect(() => {
+    if (accountLoading) return
+    void load()
+  }, [accountLoading, load])
+
+  useEffect(() => {
+    if (openAdjustment && canAdjust && friend && mileage) {
+      setAdjustMode('increase')
+      setAdjustmentOpen(true)
+    }
+  }, [canAdjust, friend, mileage, openAdjustment])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setPage(1)
+      setSearch(searchInput.trim())
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [searchInput])
+
+  const retryNotification = async (entryId: string, entryAccountId: string) => {
+    setNotificationRetryId(entryId)
+    setNotificationRetryError('')
+    try {
+      const response = await api.mileage.retryMileageNotification(entryId, { accountId: entryAccountId })
+      if (!response.success) throw new ApiError(500, response.error || '通知を再送できませんでした。')
+      await load()
+    } catch (caught) {
+      setNotificationRetryError(describeApiFailure(caught, '通知の再送'))
+    } finally {
+      setNotificationRetryId(null)
+    }
+  }
+
+  const runPendingAction = async () => {
+    if (!pendingAction || !selectedAccountId) return
+    const reason = pendingReason.trim()
+    if (!reason) {
+      setPendingError('理由を入力してください')
+      return
+    }
+    setPendingBusy(true)
+    setPendingError('')
+    try {
+      const response = pendingAction.kind === 'confirm'
+        ? await api.mileage.confirmMileageEntry(pendingAction.entryId, { accountId: selectedAccountId, reason })
+        : await api.mileage.voidMileageEntry(pendingAction.entryId, { accountId: selectedAccountId, reason })
+      if (!response.success) throw new ApiError(500, response.error || '処理できませんでした。もう一度お試しください。')
+      setPendingAction(null)
+      setPendingReason('')
+      await load()
+    } catch (caught) {
+      setPendingError(describeApiFailure(caught, '処理'))
+    } finally {
+      setPendingBusy(false)
+    }
+  }
+
+  const displayedHistory: MileageDetailHistoryItem[] = useMemo(() => v6History ?? mileage?.history ?? [], [mileage, v6History])
+  const monthStart = useMemo(() => {
+    return jstMonthStart()
+  }, [])
+  const periodFrom = period === 'month' ? monthStart : undefined
+  const filtered = useMemo(() => {
+    const keyword = search.trim()
+    return displayedHistory.filter((item) => {
+      if (kindFilter !== 'all' && kindOf(item) !== kindFilter) return false
+      if (periodFrom && item.occurredAt.slice(0, 10) < periodFrom) return false
+      if (keyword && !(item.reason ?? '').includes(keyword)) return false
+      return true
+    })
+  }, [displayedHistory, kindFilter, periodFrom, search])
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const visible = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const counts = useMemo(() => ({
+    all: displayedHistory.length,
+    earned: displayedHistory.filter((item) => kindOf(item) === 'earned').length,
+    spent: displayedHistory.filter((item) => kindOf(item) === 'spent').length,
+    voided: displayedHistory.filter((item) => kindOf(item) === 'voided').length,
+  }), [displayedHistory])
+
+  if (accountLoading || loading || (friendId && selectedAccountId && loadedAccountId !== selectedAccountId)) {
+    return <div data-design-node="R6kIG"><DetailLoading label="マイル明細を読み込んでいます" /></div>
+  }
+  if (!friendId) {
+    return (
+      <div data-design-node="R6kIG">
+        <TargetMissing kind="unspecified" title="マイル明細を見る友だちが指定されていません" description="友だちの一覧から、明細を見る人を選び直してください。" backHref="/friends" backLabel="友だち一覧へ戻る" />
+      </div>
+    )
+  }
+  if (!selectedAccountId) {
+    return <div data-design-node="R6kIG"><ListState kind="empty" title="LINEアカウントを選択してください" description="共通トップバーでLINEアカウントを選ぶと、友だちのマイル明細を確認できます。" /></div>
+  }
+  if (missing || (!error && (!friend || (!mileage && balanceSource !== 'ec')))) {
+    return (
+      <div data-design-node="R6kIG">
+        <TargetMissing kind="not-found" title="この友だちは見つかりません" description="友だちが選択中のLINEアカウントにいるか確認して、一覧から選び直してください。" backHref="/friends" backLabel="友だち一覧へ戻る" />
+      </div>
+    )
+  }
+  if (error || !friend || (!mileage && balanceSource !== 'ec')) {
+    return (
+      <div data-design-node="R6kIG">
+        <TargetMissing kind="error" title="マイル明細を表示できませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} />
+      </div>
+    )
+  }
+
+  if (balanceSource === 'ec') {
+    return <DetailPage boardId="R6kIG" title={v6Friend?.displayName || friend.displayName || '名前未設定'} help="ECと同期">
+      <KpiBand><KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="使える残高" value={v6Friend?.available ?? null} unit="マイル" detail="ECと同期" /></KpiBand>
+      <Notice tone="info">会員ランク：{v6Friend?.rank ?? '未設定'}。残高とランクはECから受け取った情報です。</Notice>
+    </DetailPage>
+  }
+
+  if (!mileage) return <div data-design-node="R6kIG"><TargetMissing kind="error" title="マイル明細を表示できませんでした" description="もう一度読み込んでください。" onRetry={() => void load()} /></div>
+
+  const displayName = v6Friend?.displayName || friend.displayName || '名前未設定'
+  const rankLabel = v6Friend?.rank === 'gold'
+    ? 'ゴールド'
+    : v6Friend?.rank === 'silver'
+      ? 'シルバー'
+      : v6Friend?.rank === 'bronze'
+        ? 'ブロンズ'
+        : v6Friend?.rank ?? 'ランクなし'
+  const available = v6Friend?.available ?? mileage.summary.available
+  const rankProgress = mileageRankProgress({ rank: v6Friend?.rank, rankReason: v6Friend?.rankReason, nextRankLabel: v6Friend?.nextRank, milesToNextRank: v6Friend?.milesToNextRank })
+  const rankUnpublished = rankProgress.unpublished
+  const connectedAccounts = mileageConnectedAccounts(mileage.connections)
+  const connectionsText = connectedAccounts === null ? '接続先を確認できませんでした' : connectedAccounts.length === 0 ? '接続先はありません' : `本人確認済みの接続先：${connectedAccounts.map((connection) => connection.accountName).join('・')}`
+  const pendingMiles = v6Friend?.pending ?? mileage.summary.pending
+  const pendingItems = displayedHistory.filter((item) => item.status === 'pending')
+  /*
+   * WEB075：明細は新しい順に最新100件だけ読んでいる。全件より少ないときは「一部」。
+   * 今月の数は、読めた中のいちばん古い記録が今月より前なら全部入っている（数えてよい）。
+   * そうでなければ数え切れないので「—」にする。友だち別の集計は口に頼んでいる（Codex）。
+   */
+  const historyPartial = v6History !== null && historyTotal !== null && historyTotal > displayedHistory.length
+  const oldestLoaded = displayedHistory.length > 0 ? displayedHistory[displayedHistory.length - 1].occurredAt.slice(0, 10) : null
+  const monthComplete = !historyPartial || (oldestLoaded !== null && oldestLoaded < monthStart)
+  const thisMonth = displayedHistory.filter((item) => item.occurredAt.slice(0, 10) >= monthStart)
+  const earnedThisMonth = thisMonth.filter((item) => kindOf(item) === 'earned')
+  const earnedSum = earnedThisMonth.reduce((sum, item) => sum + Math.max(0, item.amount), 0)
+  const expiring = v6Friend?.expiringMiles30d
+  const expiringSub = v6Friend?.nextExpiringAt
+    ? `${formatDay(new Date(v6Friend.nextExpiringAt))} で消えます`
+    : expiring == null ? '記録を確認できませんでした' : '30日以内はなし'
+  const rewardedActions = mileageRewardedActions(mileage.insights)
+  const reasonSummary = displayedHistory.reduce<Array<{ reason: string; count: number; amount: number }>>((items, item) => {
+    const key = item.reason ?? '権限の外側にあるアカウントの記録'
+    const found = items.find((candidate) => candidate.reason === key)
+    if (found) { found.count += 1; found.amount += item.amount } else items.push({ reason: key, count: 1, amount: item.amount })
+    return items
+  /* 回数の多い順（絵  は 32回・4回・1回）。同じ回数なら新しく起きた順のまま。 */
+  }, []).sort((a, b) => b.count - a.count)
+  const earnedReasons = reasonSummary.filter((item) => item.amount >= 0).slice(0, 5)
+  const spentReasons = reasonSummary.filter((item) => item.amount < 0).slice(0, 5)
+  const lastSpend = displayedHistory.find((item) => kindOf(item) === 'spent')
+  const joinedAt = friend.createdAt ? formatDay(new Date(friend.createdAt)) : null
+  const lastActive = v6Friend?.lastChangedAt ? formatDay(new Date(v6Friend.lastChangedAt)) : null
+
+  const rowMenuOf = (item: MileageDetailHistoryItem): ActionMenuItem[] => {
+    const items: ActionMenuItem[] = []
+    if (canAdjust && item.status === 'pending' && !item.restricted) {
+      items.push({
+        id: 'confirm',
+        label: '確定する',
+        onSelect: () => { setPendingAction({ entryId: item.id, kind: 'confirm', label: item.reason ?? '' }); setPendingReason(''); setPendingError('') },
+      })
+      items.push({
+        id: 'void',
+        label: '取消す',
+        onSelect: () => { setPendingAction({ entryId: item.id, kind: 'void', label: item.reason ?? '' }); setPendingReason(''); setPendingError('') },
+      })
+    }
+    if (canAdjust && item.notificationStatus === 'failed' && !item.restricted) {
+      const retrying = notificationRetryId === item.id
+      items.push({
+        id: 'retry',
+        label: '通知を再送',
+        disabled: retrying,
+        disabledReason: '通知を送り直しています',
+        onSelect: () => void retryNotification(item.id, item.lineAccountId ?? selectedAccountId ?? ''),
+      })
+    }
+    return items
+  }
+
+  const chips: Array<{ key: 'all' | Kind; label: string; icon?: React.ReactNode }> = [
+    { key: 'all', label: 'すべて' },
+    { key: 'earned', label: 'たまった', icon: <CircleDot size={16} aria-hidden="true" /> },
+    { key: 'spent', label: '使った', icon: <Clock3 size={16} aria-hidden="true" /> },
+    { key: 'voided', label: '取り消し', icon: <Undo2 size={16} aria-hidden="true" /> },
+  ]
+
+  return (
+    <DetailPage
+      contentPadding="var(--polish-space-section)"
+      boardId="R6kIG"
+      title={displayName}
+      help={[joinedAt ? `友だちになった日 ${joinedAt}` : null, `会員ランク ${rankLabel}`, lastActive ? `最後に動いた日 ${lastActive}` : null].filter(Boolean).join('・')}
+      actions={<div className={styles.headActions}>
+        <Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={connectionsText}>
+          <MessageCircle size={16} aria-hidden="true" /> トークを開く
+        </Button>
+        {/* 増やす・減らすはオーナー・管理者だけ（ほかの人には出さない）。 */}
+        {canAdjust ? (
+          <>
+            <Button onClick={() => { setAdjustMode('decrease'); setAdjustmentOpen(true) }}>
+              <Minus size={16} aria-hidden="true" /> 減らす
+            </Button>
+            <Button variant="primary" onClick={() => { setAdjustMode('increase'); setAdjustmentOpen(true) }}>
+              <Plus size={16} aria-hidden="true" /> 増やす
+            </Button>
+          </>
+        ) : null}
+      </div>}
+    >
+        <KpiBand>
+          <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="使える残高" value={available} unit="マイル"
+            detail={<span title={[rankProgress.headline, rankProgress.detail].filter(Boolean).join('・')}>{v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${formatNumber(v6Friend.monthChange)}` : `生涯 ${formatNumber(mileage.summary.lifetimeEarned)}・使用 ${formatNumber(mileage.summary.spent)}`}</span>} />
+          <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="確定待ち" value={pendingMiles} unit="マイル"
+            detail={historyPartial
+              ? `最新${formatNumber(displayedHistory.length)} 件のうち ${formatNumber(pendingItems.length)} 件が確定待ち`
+              : pendingItems.length > 0 ? `${formatNumber(pendingItems.length)} 件が確定待ち`
+                : pendingMiles > 0 ? '確定待ちの残高があります。明細を確認してください' : '確定待ちはありません'} />
+          <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="今月たまった" value={monthComplete ? earnedSum : null} unit="マイル"
+            detail={<span title={rewardedActions === null ? '付与記録の回数は未取得' : `${formatNumber(rewardedActions)} 回の付与記録`}>{monthComplete
+              ? `できごと ${formatNumber(earnedThisMonth.length)} 回${rewardedActions === null ? '' : `・付与記録 ${formatNumber(rewardedActions)} 回`}`
+              : `最新${formatNumber(displayedHistory.length)} 件だけでは数えられません`}</span>} />
+          <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="期限が近い" value={expiring ?? null} unit="マイル" detail={expiringSub} />
+        </KpiBand>
+
+      {notificationRetryError ? <Notice tone="danger">{notificationRetryError}</Notice> : null}
+
+      <Card overflow="hidden" aria-label="マイルの明細">
+        <ListToolbarFrame><ListToolbarRow>
+
+            <SearchField
+              aria-label="内容で探す"
+              placeholder="内容で探す"
+              value={searchInput}
+              onChange={setSearchInput}
+              onClear={() => { setSearchInput(''); setSearch(''); setPage(1) }}
+            />
+
+          <SegmentedControl
+            aria-label="種類で絞り込む"
+            value={kindFilter}
+            onChange={(next) => { setPage(1); setKindFilter(next) }}
+            options={chips.map((chip) => ({
+              value: chip.key,
+              label: chip.label,
+              count: chip.key === 'all' ? counts.all : counts[chip.key],
+            }))}
+          />
+
+
+            <SaveErrorField names={["period","page"]}><Select
+              aria-label="期間"
+              label="期間"
+              value={period}
+              options={[{ value: 'all', label: 'すべて' }, { value: 'month', label: '今月' }]}
+              onChange={(value) => { setPage(1); setPeriod(value) }}
+            /></SaveErrorField>
+
+          <PageSizeSelect label={null} value={pageSize} onChange={(next) => { setPage(1); setPageSize(next) }} />
+        </ListToolbarRow></ListToolbarFrame>
+
+        {visible.length === 0 ? (
+          <ListState kind="empty"
+            title={displayedHistory.length === 0 ? 'マイルの履歴はありません' : '条件に合う履歴はありません'}
+            description={displayedHistory.length === 0 ? '付与や使用が記録されると、ここに理由と日時が表示されます。' : '検索や絞り込みを外すと、すべて出ます'}
+            action={displayedHistory.length > 0 ? (
+              <Button type="button" onClick={() => { setSearchInput(''); setSearch(''); setKindFilter('all'); setPeriod('all'); setPage(1) }}>
+                条件を外す
+              </Button>
+            ) : undefined}
+          />
+        ) : (
+          <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
+            <thead>
+              <TableHeadRow data-table-layout="columns">
+                <Th className={styles.colWhen}>日時</Th>
+                <Th className={styles.colWhat}>内容</Th>
+                <Th collapseAt="narrow" className={styles.colSource}>きっかけ・使い道</Th>
+                <Th className={styles.colKind}>種類</Th>
+                <Th grow>担当</Th>
+                <Th align="right" className={styles.colDeltaDetail}>増減</Th>
+                <Th className={styles.colMenu} aria-label="操作" />
+              </TableHeadRow>
+            </thead>
+            <tbody>
+              {visible.map((item) => {
+                const pill = KIND_PILL[kindOf(item)]
+                const menu = rowMenuOf(item)
+                const note = mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: mileageDetailHasSourceEvent(item) })
+                return (
+                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
+                    <Td className={styles.colWhen}>
+                      <time className={styles.cellSub} dateTime={item.occurredAt}>{formatListDateTime(item.occurredAt)}</time>
+                    </Td>
+                    <Td className={styles.colWhat}>
+                      {item.restricted || item.reason == null ? (
+                        <span className={styles.cellSub}>権限の外側にあるアカウントの記録</span>
+                      ) : (
+                        <span className={styles.rowLink} title={item.reason}>{item.reason}</span>
+                      )}
+                    </Td>
+                    <Td collapseAt="narrow" className={styles.colSource}>
+                      <span className={styles.cellMain} title={`${note}・${mileageStatusLabel(item.status)}`}>
+                        {item.ruleName ?? (note || mileageEntryTypeLabel(item.entryType))}
+                      </span>
+                    </Td>
+                    <Td className={styles.colKind}>
+                      <StatusBadge tone={mileageStatusTone(pill.tone)}>{pill.text}</StatusBadge>
+                    </Td>
+                    <Td grow><span className={styles.cellMain}>{assignee(item)}</span></Td>
+                    <Td align="right" className={styles.colDeltaDetail}>
+                      <span className={styles.cellMain} title={'balanceAfter' in item && typeof item.balanceAfter === 'number' ? `残高 ${formatNumber(item.balanceAfter)}` : undefined}>
+                        {formatMileageChange(item.amount)}
+                      </span>
+                    </Td>
+                    <Td className={styles.colMenu}>
+                      {menu.length > 0 ? (
+                        <div className={styles.menuBox}>
+                          <RowMenu
+                            label="明細の操作"
+                            items={menu}
+                            open={menuId === item.id}
+                            onOpenChange={(next) => setMenuId(next ? item.id : null)}
+                          />
+                        </div>
+                      ) : null}
+                    </Td>
+                  </Tr>
+                )
+              })}
+            </tbody>
+          </DataTable>
+        )}
+
+        {filtered.length > 0 ? (
+          <div className={styles.historyPager}>
+            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={<>
+              {historyPartial ? `最新${formatNumber(displayedHistory.length)}件（全${formatNumber(historyTotal ?? 0)}件）のうち ` : null}
+              {paginationSummary(filtered.length, (page - 1) * pageSize + 1, Math.min(page * pageSize, filtered.length))}
+            </>} />
+          </div>
+        ) : null}
+      </Card>
+
+      <div className={styles.summaryRow}>
+        <Card layout="vertical" gap="0" aria-label="この人がたまったきっかけ">
+          <h2 className={styles.summaryTitle}>この人がたまったきっかけ</h2>
+          {historyPartial ? <p className={styles.cellSub}>{`最新${formatNumber(displayedHistory.length)} 件から数えています`}</p> : null}
+          {earnedReasons.length === 0 ? (
+            <p className={styles.cellSub}>付与理由の記録はありません</p>
+          ) : earnedReasons.map((reason) => (
+            <div key={reason.reason} className={styles.summaryLine}>
+              <span className={styles.summaryKey} title={reason.reason}>{reason.reason}</span>
+              <span className={styles.summaryValue}>{`${formatNumber(reason.count)} 回・${formatMileageNumber(reason.amount)}`}</span>
+            </div>
+          ))}
+        </Card>
+        <Card layout="vertical" gap="0" aria-label="交換した使い道">
+          <h2 className={styles.summaryTitle}>交換した使い道</h2>
+          {spentReasons.length === 0 ? (
+            <p className={styles.cellSub}>交換の記録はありません</p>
+          ) : spentReasons.map((reason) => (
+            <div key={reason.reason} className={styles.summaryLine}>
+              <span className={styles.summaryKey} title={reason.reason}>{reason.reason}</span>
+              <span className={styles.summaryValue}>{`${formatNumber(reason.count)} 回・${formatMileageChange(reason.amount)}`}</span>
+            </div>
+          ))}
+          {lastSpend?.occurredAt ? (
+            <div className={styles.summaryLine}>
+              <span className={styles.summaryKey}>最後に交換した日</span>
+              <span className={styles.summaryValue}>{formatDay(new Date(lastSpend.occurredAt))}</span>
+            </div>
+          ) : null}
+          <div className={styles.summaryFoot}>
+            <TextLink inline href="/mileage?tab=rewards">{rankUnpublished ? '使い道・ランクを作る' : '使い道を見る'}</TextLink>
+          </div>
+        </Card>
+      </div>
+
+      {canAdjust && available != null ? (
+        <MileageAdjustDialog
+          key={adjustMode}
+          open={adjustmentOpen}
+          accountId={selectedAccountId ?? ''}
+          friendId={friend.id}
+          friendName={displayName}
+          friendRank={rankLabel === 'ランクなし' ? null : rankLabel}
+          currentBalance={available}
+          initialDirection={adjustMode}
+          onCancel={() => setAdjustmentOpen(false)}
+          onCompleted={load}
+          canConfigurePolicy={canConfigureAdjustmentPolicy}
+        />
+      ) : null}
+      <Dialog
+        open={pendingAction !== null}
+        title={pendingAction?.kind === 'void' ? 'この記録を取り消します' : '確定待ちを確定します'}
+        description={pendingAction?.kind === 'void' ? '元の記録は消さず、逆向きの記録を追加して残高を戻します。' : '確定すると利用可能な残高へ移ります。'}
+        tone={pendingAction?.kind === 'void' ? 'destructive' : 'default'}
+        busy={pendingBusy}
+        error={pendingError}
+        confirmLabel={pendingAction?.kind === 'void' ? 'この理由で取消す' : 'この理由で確定する'}
+        cancelLabel="キャンセル"
+        onConfirm={() => runPendingAction()}
+        onCancel={() => { if (!pendingBusy) { setPendingAction(null); setPendingReason(''); setPendingError('') } }}
+      >
+        <div className={styles.dlgBody}>
+          <div className={styles.dlgPerson}>
+            <div className={styles.dlgPersonText}>
+              <span className={styles.dlgPersonSub}>対象の記録</span>
+              <span className={styles.dlgPersonName}>{pendingAction?.label}</span>
+            </div>
+          </div>
+          <Field label="理由" htmlFor="mileage-pending-reason" required>
+            <SaveErrorField names={["pendingReason","pending_reason"]}><TextArea id="mileage-pending-reason" rows={3} value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} /></SaveErrorField>
+          </Field>
+          <Notice tone="info">理由は履歴に残り、あとから実行者と一緒に確認できます。</Notice>
+        </div>
+      </Dialog>
+    </DetailPage>
+  )
+}
+
+export default function FriendDetailV8() {
+  return (
+    <Suspense fallback={<div data-design-node="R6kIG"><DetailLoading label="マイル明細を読み込んでいます" /></div>}>
+      <FriendDetailInner />
+    </Suspense>
+  )
+}

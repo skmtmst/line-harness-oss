@@ -1,0 +1,543 @@
+/*
+ * ★V8 Googleビジネス（・・・・・・）。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-rt-*`。
+ */
+
+.stateBox {
+  padding: var(--tpl-rt-state-pad);
+  border-radius: var(--tpl-rt-card-radius);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: var(--card-shadow);
+}
+
+.noticeStack {
+  display: flow-root;
+  min-width: 0;
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.icon13 { width: var(--tpl-rt-icon-13); height: var(--tpl-rt-icon-13); flex-shrink: 0; }
+.icon15 { width: var(--tpl-rt-icon-15); height: var(--tpl-rt-icon-15); flex-shrink: 0; }
+.icon16 { width: var(--tpl-rt-icon-16); height: var(--tpl-rt-icon-16); flex-shrink: 0; }
+
+.spin {
+  animation: spin var(--motion-spin) linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+}
+
+.textLink {
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+/* 白い箱：余白16・段の間12・角12。 */
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+}
+
+/* 見出しと値の行：上下6・間12・下に細い線。見出しは幅160。 */
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-section-gap);
+  margin: 0;
+}
+
+.factRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-section-gap);
+  padding: var(--tpl-rt-fact-pad);
+  box-shadow: var(--tpl-rt-line-bottom);
+}
+
+.factKey {
+  flex: 0 0 var(--tpl-rt-fact-key-w);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+.factValue {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+/* 灰色の注：上下10・左右12・角8・11/17。 */
+.grayNote {
+  margin: 0;
+  padding: var(--tpl-rt-gray-note-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rt-rich-body-lh);
+}
+
+.connectionPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-section-gap);
+  min-width: 0;
+  padding-top: var(--tpl-rt-section-gap);
+  border-top: 1px solid var(--card-edge);
+}
+
+/* 口コミの一覧の下の注：上下10・左右14。 */
+.footNote {
+  margin: 0;
+  padding: var(--tpl-rt-notice-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.footCaption {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+}
+
+.buttonRowEnd {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-rt-chip-row-gap);
+}
+
+.fullButton {
+  width: 100%;
+}
+
+.buttonSpace {
+  height: var(--tpl-rt-control-h);
+}
+
+.reviewer {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.comment {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stars {
+  color: var(--tpl-rt-star);
+  font-size: var(--text-label);
+  line-height: normal;
+  letter-spacing: 0;
+}
+
+.starsLow {
+  color: var(--tpl-rt-return-color);
+}
+
+.starsSmall {
+  color: var(--tpl-rt-star-small);
+  font-size: var(--text-caption);
+}
+
+/* 返信を作る：左は残り・右は340、間16。 */
+.split {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-rt-half-gap);
+  min-width: 0;
+}
+
+.mainColumn {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-rt-half-gap);
+  min-width: 0;
+}
+
+.sideColumn {
+  flex: 0 0 var(--tpl-rt-side-w);
+}
+
+.reviewMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  margin: 0;
+}
+
+.reviewMetaName {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.reviewMetaDate {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+.reviewText,
+.preText {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: normal;
+  white-space: pre-wrap;
+}
+
+.repliedBox {
+  margin: 0;
+  padding: var(--tpl-rt-gray-note-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--color-table-head);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  white-space: pre-wrap;
+}
+
+.draftTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+}
+
+.count {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.countOver {
+  color: var(--color-danger);
+  font-size: var(--text-micro);
+  font-weight: 600;
+}
+
+.saved {
+  margin: 0;
+  color: var(--color-success);
+  font-size: var(--text-caption);
+}
+
+.checklist {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rt-draft-lh);
+  white-space: pre-line;
+}
+
+/* 投稿の一覧：行は上下8・間12、行の間に細い線。 */
+.postList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-section-gap);
+}
+
+.postRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-section-gap);
+  padding: var(--tpl-rt-post-row-pad);
+  box-shadow: var(--tpl-rt-line-bottom);
+  min-width: 0;
+}
+
+.postRow:last-child {
+  box-shadow: none;
+}
+
+.postTitle {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.postMeta {
+  flex: 0 0 auto;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.postBadge {
+  flex: 0 0 auto;
+}
+
+/* 行の「…」：メニューの位置の目印が行を1段増やさないよう、横並びの箱で包む。 */
+.menuBox {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+/* 投稿を作る。 */
+
+.fieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-section-gap);
+}
+
+.fieldPair {
+  display: flex;
+  gap: var(--tpl-rt-section-gap);
+  min-width: 0;
+}
+
+/* 投稿の画像は画像を入れる所（MediaSlot・Z7vd2）の小さい形。 */
+.imageSlot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-slot-gap);
+  width: var(--tpl-slot-w-compact);
+}
+
+/* ★V8-B `U1X7T2`（2026-10-07 承認）Instagram 同時投稿の区画 */
+.igBand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-ig-gap);
+  padding: var(--tpl-rt-ig-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--color-surface-pearl);
+  min-width: 0;
+}
+
+.igToggleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  min-width: 0;
+}
+
+.igToggleLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+}
+
+/* 注記は白地の小さな箱（11px） */
+.igNote {
+  margin: 0;
+  padding: var(--tpl-rt-gray-note-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rt-rich-body-lh);
+}
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-section-gap);
+  padding: var(--tpl-rt-gray-note-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.pickerHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+}
+
+.pickerGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-rt-chip-row-gap);
+}
+
+/* 投稿画像の区画だけの寸法。共通に無い値はここに閉じる（値は元のまま）。 */
+.platformImagePanel, .confirmImage {
+  --gimg-thumb-w: 192px; --gimg-thumb-h: 144px;
+  --gimg-confirm-w: 164px; --gimg-confirm-h: 126px;
+  --gimg-content-min-h: 166px;
+}
+.platformImagePanel { display: flex; flex-direction: column; gap: var(--space-12); padding: var(--space-16); border-radius: var(--tpl-rt-band-radius); background: var(--color-surface-pearl); min-width: 0; }
+.platformImageHead { display: flex; align-items: center; gap: var(--space-16); color: var(--color-ink); font-size: var(--text-caption); }
+.platformImageHead strong { font-weight: 700; }
+.optionalLabel { color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.requiredLabel { color: var(--color-danger); font-size: var(--text-micro); }
+.platformImageRatio { margin-left: auto; color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.platformImageContent { display: flex; align-items: center; gap: var(--space-16); min-height: var(--gimg-content-min-h); padding: var(--space-8) var(--space-16); border: 1px solid var(--color-hairline); border-radius: var(--tpl-rt-inner-radius); background: var(--color-canvas); }
+.platformThumb { display: grid; place-items: center; width: var(--gimg-thumb-w); height: var(--gimg-thumb-h); flex: 0 0 var(--gimg-thumb-w); border-radius: var(--radius-icon); overflow: hidden; background: var(--color-surface-pearl); }
+.platformThumb img { max-width: 100%; max-height: 100%; width: auto; height: 100%; object-fit: contain; }
+.platformThumbGoogle img { width: 100%; object-fit: cover; }
+.platformThumbInstagram img { aspect-ratio: 4 / 5; }
+.platformImageInfo { display: flex; flex-direction: column; gap: var(--space-12); min-width: 0; font-size: var(--text-caption); }
+.platformImageInfo strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.platformImageInfo span { color: var(--color-ink-secondary); }
+.platformImageInfo b { color: var(--color-action); font-size: var(--text-micro); }
+.platformImageEmpty { display: flex; flex-direction: column; gap: var(--space-16); color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.platformImageEmpty p { margin: 0; }
+.platformImageActions, .platformImageLinks { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-16); }
+.platformImageLinks button { padding: 0; border: 0; background: transparent; color: var(--color-action); font: inherit; font-size: var(--text-caption); font-weight: 600; cursor: pointer; }
+.platformImageLinks button:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
+.platformImageHelp { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.confirmImage { display: flex; align-items: center; gap: var(--space-16); min-width: 0; padding: var(--space-12); border: 1px solid var(--color-hairline); border-radius: var(--tpl-rt-inner-radius); background: var(--color-surface-pearl); }
+.confirmThumb { display: grid; place-items: center; width: var(--gimg-confirm-w); height: var(--gimg-confirm-h); flex: 0 0 var(--gimg-confirm-w); overflow: hidden; border-radius: var(--radius-icon); background: var(--color-canvas); }
+.confirmThumb img { width: auto; height: 100%; max-width: 100%; object-fit: contain; }
+.confirmThumbGoogle img { width: 100%; object-fit: cover; }
+.confirmThumbInstagram img { aspect-ratio: 4 / 5; }
+.confirmImage > div:last-child { display: flex; flex-direction: column; gap: var(--space-12); min-width: 0; }
+.confirmImage strong { font-size: var(--text-caption); }
+.confirmImage span { color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.confirmImageLinks { display: flex; gap: calc(var(--space-24) + var(--space-4)); }
+.confirmImageLinks button { padding: 0; border: 0; background: none; color: var(--color-action); font: inherit; font-size: var(--text-caption); font-weight: 600; cursor: pointer; }
+@media (max-width: 600px) { .platformImageContent { flex-direction: column; align-items: stretch; } .platformThumb { width: 100%; } }
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-rt-chip-row-gap);
+}
+
+/* パフォーマンス：期間の切り替え（灰の地に選んだ所だけ白）。 */
+
+/* 数のマス：角なし（絵の「数のマス」）。単位は 13/20。 */
+
+.chart {
+  display: block;
+  width: 100%;
+  height: var(--tpl-rt-chart-h);
+}
+
+.chartBar {
+  fill: var(--color-accent);
+}
+
+/* プロフィール。 */
+.todayHours {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rt-mini-title-size);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.inlinePanel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-rt-section-gap);
+  padding: var(--tpl-rt-inline-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  font-size: var(--text-caption);
+}
+
+.holidayList {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  gap: var(--tpl-rt-chip-row-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.holidayRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-rt-section-gap);
+}
+
+.diffList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-section-gap);
+  margin: 0;
+  padding: var(--tpl-rt-gray-note-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.diffItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-cell-gap);
+}
+
+.diffItem dd {
+  margin: 0;
+}
+
+.diffProposed {
+  color: var(--color-warning);
+  font-size: var(--text-caption);
+}
+
+/* 設定：店舗の候補。 */
+.radioList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-chip-row-gap);
+}
+
+/* 投稿の詳細はGoogle画像の下に全幅で置く。 */
+.postDetails { display: flex; flex-direction: column; gap: var(--tpl-rt-half-gap); min-width: 0; justify-self: stretch; }

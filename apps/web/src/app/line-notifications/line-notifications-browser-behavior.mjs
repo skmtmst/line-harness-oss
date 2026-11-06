@@ -12,7 +12,7 @@
  *      消えないこと（競合3）
  *
  * 【競合3について、確かめたことと確かめていないこと】
- * loadGeneration は load() の useEffect の中でしか進まない、という
+ * loadGeneration は load の useEffect の中でしか進まない、という
  * コードの作りそのものは、実装の詳細（Reactの副作用が「いつ」実行される
  * かはAPIとして保証されていない）に頼っている点で脆い。そこで、選択中
  * accountを描画の境界で同期反映する ref（selectedAccountRef）を作り、
@@ -20,10 +20,10 @@
  *
  * account照合の必要性そのものは、実物の LineNotificationsPage を
  * mountした試験（line-notifications-n678-contract.test.tsx の「実物の
- * LineNotificationsPageをmountし、layout境界（Bへコミット直後・load()の
+ * LineNotificationsPageをmountし、layout境界（Bへコミット直後・loadの
  * useEffect発火前）で…」）で確定的に固定している。account context の
- * 切替を act() を経由しない生の setState として起こし、同じ木に置いた
- * useLayoutEffect の探針で「Bへコミットした・load()の useEffect はまだ
+ * 切替を act を経由しない生の setState として起こし、同じ木に置いた
+ * useLayoutEffect の探針で「Bへコミットした・loadの useEffect はまだ
  * 一度も発火していない」瞬間を検出して、そこで旧Aの保存応答を解放する。
  * レイアウトeffectは同じコミット内の受動effectより必ず先に走るという
  * Reactの保証に基づくため、タイミングの偶然に頼っていない。
@@ -47,6 +47,8 @@ import { createServer } from 'node:http'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 import { chromium } from '@playwright/test'
+
+let lastPage
 
 const outDir = join(process.cwd(), 'apps/web/out')
 if (!existsSync(outDir)) {
@@ -177,6 +179,7 @@ async function openHarness(browser) {
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
   })
   const page = await context.newPage()
+  lastPage = page
   page.on('pageerror', (error) => console.error('browser page error:', error.message))
   page.on('console', (message) => {
     if (message.type() === 'error') console.error('browser console:', message.text())
@@ -209,9 +212,18 @@ async function openHarness(browser) {
     if (path === '/api/auth/session') {
       return json({ success: true, data: { name: 'owner利用者', role: 'owner', permissionKeys: [] }, csrfToken: 'test-csrf' })
     }
+    if (path === '/api/staff/me') {
+      return json({ success: true, data: { id: 'staff-me', name: 'owner利用者', role: 'owner', permissions: [], viewPermissions: [] } })
+    }
     if (path === '/api/line-accounts') return json({ success: true, data: accounts })
     if (path === '/api/settings/features') {
       return json({ success: true, data: { features: {}, sidebarOrder: null, sidebarItemOrder: null, parentChildMode: false, specializedFeatureKeys: [], version: 1 } })
+    }
+    if (path === '/api/dashboard/style') {
+      return json({ success: true, data: { style: 'ec', styleSelected: true, version: 1 } })
+    }
+    if (/^\/api\/line-accounts\/[^/]+\/follower-import$/.test(path)) {
+      return json({ success: true, data: { phase: 'completed' } })
     }
     if (path === '/api/line-notifications/operator-rules') {
       return json({ success: true, data: { items: state.operatorItems, summary: { total: 7, published: 7, stopped: 0, missingRecipients: 0, recipients: 3, acceptedToday: 0, excludedToday: 0 } } })
@@ -265,14 +277,26 @@ async function openHarness(browser) {
 
 async function openEditor(page) {
   await page.goto(`${baseUrl}/line-notifications`)
+  await reopenEditor(page)
+}
+
+async function reopenEditor(page) {
   const editRow = page.getByRole('button', { name: '内容を編集' })
   await editRow.first().waitFor({ timeout: 15_000 })
   await editRow.first().click()
-  await page.getByRole('button', { name: '下書きを保存' }).waitFor({ timeout: 15_000 })
+  await page.getByRole('textbox', { name: 'ご案内文', exact: true }).waitFor({ timeout: 15_000 })
 }
 
-const introBox = (page) => page.locator('label', { hasText: 'ご案内文' }).locator('textarea')
+const introBox = (page) => page.getByRole('textbox', { name: 'ご案内文', exact: true })
 const draftKey = (accountId) => `line-notifications:draft:v1:${accountId}:${EVENT_TYPE}`
+
+async function switchAccount(page, accountId) {
+  const account = accounts.find((item) => item.id === accountId)
+  assert.ok(account, '切り替えるアカウントを用意している')
+  await page.getByRole('button', { name: 'アカウントを切り替える', exact: true }).click()
+  await page.getByRole('menu', { name: 'LINEアカウントの切り替え', exact: true })
+    .getByRole('menuitemradio', { name: account.name, exact: true }).click()
+}
 
 const browser = await chromium.launch({ headless: true })
 try {
@@ -283,20 +307,28 @@ try {
      */
     const { context, page } = await openHarness(browser)
     await openEditor(page)
+    await introBox(page).fill('寸法検査用の下書き')
     const widths = [375, 390, 768, 1440, 1920]
     for (const width of widths) {
       await page.setViewportSize({ width, height: 812 })
       await page.waitForTimeout(150)
       const measured = await page.evaluate(() => {
-        const actions = document.querySelector('[data-design="editor-footer-actions"]')
-        const footer = document.querySelector('[data-design="editor-footer"]')
-        const main = document.querySelector('[data-design-node="Q55bb"]')
-        const buttons = [...actions.querySelectorAll('button')].map((button) => {
+        const actions = document.querySelector('[data-template-region="footer"] [data-sticky-actions]')
+        const footer = document.querySelector('[data-template-region="footer"]')
+        const footerStyle = getComputedStyle(footer)
+        const buttons = [...document.querySelector('[data-design-node="Q55bb"]').querySelectorAll('[data-dialog-actions] button, [data-sticky-actions] button')].map((button) => {
           const rect = button.getBoundingClientRect()
           const style = getComputedStyle(button)
           const probe = document.createElement('span')
           probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;left:-9999px;'
-          probe.style.font = style.font
+          // `style.font` は font-variant-numeric などが入ると空文字になり、本文の書体で
+          // 測ってしまう（ボタンの余白が戻った 2026-10-02 に、収まっている文字を誤検知）。
+          // 書体の値は1つずつ写す。
+          probe.style.fontFamily = style.fontFamily
+          probe.style.fontSize = style.fontSize
+          probe.style.fontWeight = style.fontWeight
+          probe.style.fontStyle = style.fontStyle
+          probe.style.fontVariantNumeric = style.fontVariantNumeric
           probe.style.letterSpacing = style.letterSpacing
           probe.textContent = button.textContent
           document.body.appendChild(probe)
@@ -304,27 +336,27 @@ try {
             + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
             + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
           probe.remove()
-          return { text: button.textContent.trim(), right: rect.right, width: rect.width, needs }
+          const overflows = button.scrollWidth > button.clientWidth
+          return { text: button.textContent.trim(), right: rect.right, width: rect.width, needs, overflows }
         })
         return {
           viewport: window.innerWidth,
           documentScrollWidth: document.documentElement.scrollWidth,
           actionsWidth: actions.getBoundingClientRect().width,
           footerHeight: footer.getBoundingClientRect().height,
-          mainPaddingBottom: parseFloat(getComputedStyle(main).paddingBottom),
+          footerPosition: footerStyle.position,
+          footerBottom: footerStyle.bottom,
           rows: new Set(buttons.map((button) => Math.round(button.right - button.width))).size,
           rightmost: Math.max(...buttons.map((button) => button.right)),
-          squeezed: buttons.filter((button) => button.needs > button.width + 1).map((button) => button.text),
+          squeezed: buttons.filter((button) => button.overflows || button.needs > button.width + 1).map((button) => button.text),
         }
       })
-      console.log(`  ${width}px 操作列 ${Math.round(measured.actionsWidth)}px / 右端 ${Math.round(measured.rightmost)}px / フッタ ${Math.round(measured.footerHeight)}px / 下余白 ${measured.mainPaddingBottom}px`)
+      console.log(`  ${width}px 操作列 ${Math.round(measured.actionsWidth)}px / 右端 ${Math.round(measured.rightmost)}px / フッタ ${Math.round(measured.footerHeight)}px / 追従 ${measured.footerPosition}`)
       assert.ok(measured.rightmost <= width + 1, `${width}px で主要操作が画面の外へ出ている（右端 ${Math.round(measured.rightmost)}px）`)
       assert.deepEqual(measured.squeezed, [], `${width}px でボタンの文字が枠に収まっていない`)
       assert.ok(measured.documentScrollWidth <= width + 1, `${width}px でページが横スクロールする`)
-      assert.ok(
-        measured.mainPaddingBottom >= measured.footerHeight,
-        `${width}px で固定フッター（${Math.round(measured.footerHeight)}px）が本文の下余白（${measured.mainPaddingBottom}px）を越えている`,
-      )
+      assert.equal(measured.footerPosition, 'sticky', `${width}px で保存帯が本文の共通の追従位置を失っている`)
+      assert.notEqual(measured.footerBottom, 'auto', `${width}px で保存帯の追従位置がない`)
     }
     await context.close()
     console.log('375px 寸法検査: PASS')
@@ -344,7 +376,7 @@ try {
 
     let releaseSave = () => {}
     state.holdSave = new Promise((resolve) => { releaseSave = resolve })
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
     await page.waitForFunction(() => document.body.innerText.includes('未保存の変更があります'))
 
     // 保存の応答を止めたまま書き足す。
@@ -388,25 +420,26 @@ try {
 
     let releaseSave = () => {}
     state.holdSave = new Promise((resolve) => { releaseSave = resolve })
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
     await page.waitForFunction(() => document.body.innerText.includes('未保存の変更があります'))
 
-    // 編集画面は開いたまま、見ているアカウントだけが替わる。
-    const accountSelect = page.getByLabel('LINEアカウント')
+    // 共通の店舗切替ゲートは編集画面を一度外す。切替後に同じ通知を開き直す。
     const introValue = () => page.evaluate(() => {
-      const box = document.querySelector('[data-design-node="Q55bb"] textarea')
+      const box = document.querySelector('#customer-notification-intro')
       return box ? box.value : null
     })
     const waitForIntro = async (expected) => {
       await page.waitForFunction((want) => {
-        const box = document.querySelector('[data-design-node="Q55bb"] textarea')
+        const box = document.querySelector('#customer-notification-intro')
         return Boolean(box) && box.value === want
       }, expected, { timeout: 15_000 })
     }
 
-    await accountSelect.selectOption('account-b')          // A → B
+    await switchAccount(page, 'account-b')          // A → B
+    await reopenEditor(page)
     await waitForIntro('B店の本文')
-    await accountSelect.selectOption('account-a')          // B → A
+    await switchAccount(page, 'account-a')          // B → A
+    await reopenEditor(page)
     // Aへ戻ると、端末に残した控えが復元される。
     await waitForIntro('Aで保存を押した時点の本文')
     assert.equal(await introValue(), 'Aで保存を押した時点の本文')
@@ -432,7 +465,7 @@ try {
     /*
      * 4. 競合3（司令塔の独立再審査REJECT、2026-09-09）。
      *
-     * loadGeneration は load() の useEffect の中でしか進まない。従来の
+     * loadGeneration は load の useEffect の中でしか進まない。従来の
      * 実ブラウザ試験（競合2）は、Bの読み込みが終わり、さらにAへ戻って
      * 再読み込みも終わったあとで旧Aの応答を解放していた——「Bを選んだ
      * 直後・Bの一覧がまだ何も出ていない」窓を一度も通していなかった。
@@ -451,14 +484,14 @@ try {
 
     let releaseA = () => {}
     state.holdSave = new Promise((resolve) => { releaseA = resolve })
-    await page.getByRole('button', { name: '下書きを保存' }).click()
+    await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
     await page.waitForFunction(() => document.body.innerText.includes('未保存の変更があります'))
 
     // Bの一覧読み込みを足止めする。切り替えても、Bの中身はまだ何も出ない。
     let releaseB = () => {}
     state.holdAccountLoad['account-b'] = new Promise((resolve) => { releaseB = resolve })
 
-    await page.getByLabel('LINEアカウント').selectOption('account-b')
+    await switchAccount(page, 'account-b')
     // Bへ切り替わった描画（アカウント選択欄）は済んでいるが、
     // 一覧はまだ「読み込み中」——ここが指摘された窓。見つからなければ
     // 窓を通せていないということなので、握り潰さず試験自体を落とす。
@@ -471,8 +504,9 @@ try {
 
     // Bの読み込みを再開させ、普通に終わらせる（隙間を通したことの裏取り）。
     releaseB()
+    await reopenEditor(page)
     await page.waitForFunction(() => {
-      const box = document.querySelector('[data-design-node="Q55bb"] textarea')
+      const box = document.querySelector('#customer-notification-intro')
       return Boolean(box) && box.value === 'B店の本文'
     }, undefined, { timeout: 15_000 })
 
@@ -481,9 +515,10 @@ try {
     assert.equal(JSON.parse(stored).introText, 'Aで保存を押した時点の本文', '控えの中身が変わっている')
 
     // Aへ戻ると、消されていない控えが復元され、未保存の印も戻る。
-    await page.getByLabel('LINEアカウント').selectOption('account-a')
+    await switchAccount(page, 'account-a')
+    await reopenEditor(page)
     await page.waitForFunction(() => {
-      const box = document.querySelector('[data-design-node="Q55bb"] textarea')
+      const box = document.querySelector('#customer-notification-intro')
       return Boolean(box) && box.value === 'Aで保存を押した時点の本文'
     }, undefined, { timeout: 15_000 })
     assert.ok(
@@ -524,12 +559,17 @@ try {
     await nameLink.waitFor({ timeout: 15_000 })
     // タブは #708 で role="tab" へ変わった（nav>button ではなく tablist/tab）。
     await page.getByRole('tab', { name: /顧客へのお知らせ/ }).first().click()
-    await page.waitForFunction(() => document.body.innerText.includes('注文受付'), undefined, { timeout: 15_000 })
+    const customerRow = page.getByRole('row').filter({ hasText: '注文が確定したとき' })
+    await customerRow.getByRole('button', { name: /の内容を編集$/ }).waitFor({ timeout: 15_000 })
     await context.close()
     console.log('NOTIFY-04（一覧の名前から編集画面へ戻る）: PASS')
   }
 
   console.log('line notifications browser behavior: PASS')
+} catch (error) {
+  console.error('browser current URL:', lastPage.url())
+  console.error('browser body:', (await lastPage.locator('body').innerText()).slice(0, 4000))
+  throw error
 } finally {
   await browser.close()
   await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))

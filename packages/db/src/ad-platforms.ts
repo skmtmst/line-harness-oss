@@ -1,3 +1,5 @@
+import { fingerprintMatches } from './ad-conversion-fingerprint.js';
+import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstNow, toJstString } from './utils.js';
 import { decryptCredential, encryptCredential } from './credential-crypto.js';
 
@@ -27,7 +29,7 @@ const AD_PLATFORM_COMMON_KEYS: readonly string[] = [
   'failed_count',
   'retry_success_count',
   'connection_error',
-  // 広告費の取込 (#818)。取込費用を帰属させる流入元。
+  // 広告費の取込。取込費用を帰属させる流入元。
   'entry_route_id',
 ];
 
@@ -191,7 +193,7 @@ export interface AdPlatformConfig {
   pixel_code?: string;
   /** 表示に使う通貨コード(JPYなど)。費用の換算はしない。 */
   currency?: string;
-  /** 費用取込に使う媒体側のアカウントID (#818) */
+  /** 費用取込に使う媒体側のアカウントID */
   ad_account_id?: string;
   account_id?: string;
   advertiser_id?: string;
@@ -340,10 +342,10 @@ export function adPlatformAccountCondition(
   scope: AdPlatformWriteScope,
 ): { clause: string; bindings: unknown[] } {
   if (scope.accountIds.length) {
-    const list = scope.accountIds.map(() => '?').join(',');
+    const list = sqlIdSet(scope.accountIds).sql;
     return scope.includeUnassigned
-      ? { clause: `(${column} IN (${list}) OR ${column} IS NULL)`, bindings: [...scope.accountIds] }
-      : { clause: `${column} IN (${list})`, bindings: [...scope.accountIds] };
+      ? { clause: `(${column} IN (${list}) OR ${column} IS NULL)`, bindings: scope.accountIds.length ? sqlIdSet(scope.accountIds).binds : [] }
+      : { clause: `${column} IN (${list})`, bindings: scope.accountIds.length ? sqlIdSet(scope.accountIds).binds : [] };
   }
   return scope.includeUnassigned
     ? { clause: `${column} IS NULL`, bindings: [] }
@@ -365,6 +367,7 @@ function updateFieldClauses(input: {
   if (input.configEncrypted !== undefined) { fields.push('config_encrypted = ?'); values.push(input.configEncrypted); }
   if (input.isActive !== undefined) { fields.push('is_active = ?'); values.push(input.isActive ? 1 : 0); }
   if (input.lineAccountId !== undefined) { fields.push('line_account_id = ?'); values.push(input.lineAccountId); }
+  if (input.config !== undefined || input.configEncrypted !== undefined || input.name !== undefined || input.lineAccountId !== undefined) fields.push('verified_at = NULL', 'is_active = 0');
   return { fields, values };
 }
 
@@ -514,21 +517,6 @@ export const AD_CONVERSION_PENDING_TAKEOVER_MS = 30 * 60 * 1000;
 
 function conversionFingerprint(input: { clickId: string; clickIdType: string; eventValue?: number | null; currency?: string | null }): string {
   return JSON.stringify({ c: `${input.clickIdType}:${input.clickId}`, v: input.eventValue ?? null, cur: (input.currency ?? 'JPY').toUpperCase() });
-}
-
-function fingerprintMatches(stored: string | null, expected: string): boolean {
-  // 指紋のない旧行は比較できないので、状態の判定に任せる。
-  if (stored == null || stored === '') return true;
-  if (stored === expected) return true;
-  // 通貨なしの旧形式は、cとvが合えば円として通す。通貨違いは別内容。
-  try {
-    const s = JSON.parse(stored) as { c?: unknown; v?: unknown; cur?: unknown };
-    const e = JSON.parse(expected) as { c?: unknown; v?: unknown; cur?: unknown };
-    if (typeof s !== 'object' || s === null || typeof e !== 'object' || e === null) return false;
-    return s.c === e.c && s.v === e.v && (s.cur ?? 'JPY') === (e.cur ?? 'JPY');
-  } catch {
-    return false;
-  }
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -695,7 +683,7 @@ export async function finishAdConversionSend(
 }
 
 /** 取り出し回数の上限。超えた行は failed のまま残し、人の手で送り直す。 */
-export const AD_CONVERSION_OUTBOX_MAX_ATTEMPTS = 5;
+export const AD_CONVERSION_OUTBOX_MAX_ATTEMPTS = 3;
 
 /** 失敗時の待ち時間の基準(分)。回数ごとに倍にし、12時間で頭打ちにする。 */
 export const AD_CONVERSION_OUTBOX_RETRY_BASE_MINUTES = 30;
@@ -814,6 +802,11 @@ export async function claimAdConversionOutboxDue(
   const staleBefore = toJstString(new Date(now.getTime() - (opts.staleMs ?? AD_CONVERSION_PENDING_TAKEOVER_MS)));
   const lease = crypto.randomUUID();
   const limit = Math.max(1, Math.min(opts.limit ?? 50, 200));
+  await db.prepare(`UPDATE ad_conversion_outbox SET status = 'failed', is_retryable = 0,
+    next_attempt_at = NULL, last_error = 'retry_limit_exceeded', updated_at = ?
+    WHERE is_retryable = 1 AND attempt_count >= ?
+      AND (status = 'failed' OR (status = 'sending' AND updated_at < ?))`)
+    .bind(nowStr, AD_CONVERSION_OUTBOX_MAX_ATTEMPTS, staleBefore).run();
   await db
     .prepare(
       `UPDATE ad_conversion_outbox SET status = 'sending', lease_token = ?, attempt_count = attempt_count + 1, updated_at = ?
@@ -827,7 +820,7 @@ export async function claimAdConversionOutboxDue(
          LIMIT ?
        )`,
     )
-    .bind(lease, nowStr, opts.maxAttempts ?? AD_CONVERSION_OUTBOX_MAX_ATTEMPTS, nowStr, staleBefore, limit)
+    .bind(lease, nowStr, Math.min(opts.maxAttempts ?? AD_CONVERSION_OUTBOX_MAX_ATTEMPTS, AD_CONVERSION_OUTBOX_MAX_ATTEMPTS), nowStr, staleBefore, limit)
     .run();
   const result = await db
     .prepare(`SELECT * FROM ad_conversion_outbox WHERE lease_token = ?`)
@@ -860,7 +853,7 @@ export async function takeAdConversionOutboxRow(db: D1Database, id: string): Pro
   const result = await db
     .prepare(
       `UPDATE ad_conversion_outbox SET status = 'sending', lease_token = ?, attempt_count = attempt_count + 1, updated_at = ?
-       WHERE id = ? AND is_retryable = 1 AND status IN ('pending', 'failed', 'sent')`,
+       WHERE id = ? AND is_retryable = 1 AND attempt_count < 3 AND status IN ('pending', 'failed', 'sent')`,
     )
     .bind(lease, jstNow(), id)
     .run<{ success: boolean; meta?: { changes?: number } }>();
@@ -903,7 +896,7 @@ export async function finishAdConversionOutbox(
     .bind(opts.id, opts.lease)
     .first<{ attempt_count: number }>();
   if (!row) return;
-  if (opts.retryable === false) {
+  if (opts.retryable === false || row.attempt_count >= 3) {
     await db
       .prepare(
         `UPDATE ad_conversion_outbox
@@ -941,4 +934,50 @@ export async function getAdConversionLogs(
     .bind(platformId, safeLimit)
     .all<AdConversionLog>();
   return result.results;
+}
+
+/** 確認中の設定変更・所属変更は接続を確定させない。 */
+export async function connectVerifiedAdPlatform(db: D1Database, platform: AdPlatform, at = jstNow()): Promise<boolean> {
+  const result = await db.prepare(`UPDATE ad_platforms SET verified_at = ?, is_active = 1, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND name = ? AND updated_at = ? AND config = ? AND config_encrypted IS ?`)
+    .bind(at,at,platform.id,platform.line_account_id,platform.name,platform.updated_at,platform.config,platform.config_encrypted).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
+/** 保存済みの送信と待ち行列を、同じ目印で結び付ける。 */
+export interface AdConversionRetrySource extends AdConversionOutboxRow {
+  log_id: string;
+  log_status: string;
+  log_provider_event_id: string | null;
+}
+export async function getAdConversionRetrySource(db: D1Database, logId: string): Promise<AdConversionRetrySource | null> {
+  return db.prepare(`SELECT o.*, l.id AS log_id, l.status AS log_status,
+      l.provider_event_id AS log_provider_event_id
+    FROM ad_conversion_logs l JOIN ad_conversion_outbox o
+      ON o.ad_platform_id = l.ad_platform_id AND o.friend_id = l.friend_id
+      AND o.event_name = l.event_name AND o.idempotency_key = l.idempotency_key
+      AND o.line_account_id = l.line_account_id
+    WHERE l.id = ?`).bind(logId).first<AdConversionRetrySource>();
+}
+
+/** 古い送信記録の created_at は再試行で変わるため、初回待ち行列の日時を期限の正本にする。 */
+export async function claimAdConversionRetry(
+  db: D1Database, row: AdConversionRetrySource, now: Date = new Date(),
+): Promise<string | null> {
+  const lease = crypto.randomUUID();
+  const result = await db.prepare(`UPDATE ad_conversion_outbox
+    SET status = 'sending', lease_token = ?, attempt_count = attempt_count + 1, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND created_at = ?
+      AND is_retryable = 1 AND attempt_count < 3 AND status IN ('pending', 'failed')
+      AND julianday(created_at) > julianday(?) - 90
+      AND provider_event_id = ?
+      AND EXISTS (SELECT 1 FROM ad_conversion_logs l
+        WHERE l.id = ? AND l.status = 'failed' AND l.line_account_id = ad_conversion_outbox.line_account_id
+          AND l.ad_platform_id = ad_conversion_outbox.ad_platform_id
+          AND l.friend_id = ad_conversion_outbox.friend_id AND l.event_name = ad_conversion_outbox.event_name
+          AND l.idempotency_key = ad_conversion_outbox.idempotency_key
+          AND l.provider_event_id = ad_conversion_outbox.provider_event_id)`)
+    .bind(lease, now.toISOString(), row.id, row.line_account_id, row.created_at,
+      now.toISOString(), row.provider_event_id, row.log_id).run();
+  return (result.meta?.changes ?? 0) === 1 ? lease : null;
 }

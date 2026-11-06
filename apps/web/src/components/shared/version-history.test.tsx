@@ -8,7 +8,7 @@ import VersionHistory, { type HistoryVersion } from './version-history'
 afterEach(() => cleanup())
 
 const VERSIONS: HistoryVersion[] = [
-  { versionNumber: 3, title: '第3版', status: 'in_use', statusNote: 'いま使っている', summary: '審査の決まりを追加', author: '佐藤', at: '9/10 11:02' },
+  { versionNumber: 3, title: '第3版', status: 'in_use', statusNote: 'いま使っている', summary: '審査の決まりを追加する', author: '佐藤', at: '9/10 11:02' },
   { versionNumber: 2, title: '第2版', status: 'past', summary: '最初の決まり' },
   { versionNumber: 1, title: '第1版', status: 'past' },
 ]

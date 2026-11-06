@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-// N-011: 流入経路一覧が選択中LINEアカウントと無関係に統括全体を返す。
+// 流入経路一覧が選択中LINEアカウントと無関係に統括全体を返す。
 // 実 route＋実SQLiteで確かめる。選択accountをAPIへ渡し、DBの行と共通境界で照合する。
 
 const { entryRoutes } = await import('./entry-routes.js');
@@ -69,6 +69,22 @@ describe('N-011 流入経路一覧のアカウント境界', () => {
     const body = await res.json() as { success: boolean; data: Array<{ id: string }> };
     expect(body.data.map((item) => item.id).sort()).toEqual(['route-1', 'route-2', 'route-free']);
   });
+});
+
+it('流入リンクは古い更新日時を409にし、同じ時刻の連続保存でも版を進める',async()=>{
+  const testDb=createTestD1();seed(testDb);
+  try {
+    const client=app(testDb,owner(DEFAULT_TENANT_ID));
+    const read=async()=>((await (await client.request('/api/entry-routes/route-1')).json()) as {data:{updatedAt:string;name:string}}).data;
+    const save=(name:string,expectedUpdatedAt:unknown)=>client.request('/api/entry-routes/route-1',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,expectedUpdatedAt})});
+    const before=await read();
+    expect((await save('保存A',before.updatedAt)).status).toBe(200);
+    expect((await save('上書きB',before.updatedAt)).status).toBe(409);
+    const after=await read();expect(after.name).toBe('保存A');expect(after.updatedAt).not.toBe(before.updatedAt);
+    expect((await save('保存C',after.updatedAt)).status).toBe(200);
+    expect((await save('不正',4)).status).toBe(400);
+    expect((await read()).name).toBe('保存C');
+  }finally{testDb.raw.close();}
 });
 
 describe('R39 選択中アカウントでの流入リンク作成', () => {

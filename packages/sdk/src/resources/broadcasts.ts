@@ -1,5 +1,5 @@
 import type { HttpClient } from '../http.js'
-import type { ApiResponse, Broadcast, CreateBroadcastInput, UpdateBroadcastInput, SegmentCondition } from '../types.js'
+import type { ApiResponse, Broadcast, CreateBroadcastInput, UpdateBroadcastInput, BroadcastSendOptions, SegmentCondition } from '../types.js'
 
 export class BroadcastsResource {
   constructor(
@@ -43,15 +43,20 @@ export class BroadcastsResource {
     await this.http.delete(`/api/broadcasts/${id}`)
   }
 
-  async send(id: string): Promise<Broadcast> {
-    const res = await this.http.post<ApiResponse<Broadcast>>(`/api/broadcasts/${id}/send`)
+  async send(id: string, options?: BroadcastSendOptions): Promise<Broadcast> {
+    const res = options
+      ? await this.http.post<ApiResponse<Broadcast>>(`/api/broadcasts/${id}/send`,
+          options.confirmedRecipientCount === undefined ? undefined : { confirmedRecipientCount: options.confirmedRecipientCount },
+          options.confirmIrreversible ? { 'X-Confirm-Irreversible': options.confirmIrreversible } : undefined)
+      : await this.http.post<ApiResponse<Broadcast>>(`/api/broadcasts/${id}/send`)
     return res.data
   }
 
-  async sendToSegment(id: string, conditions: SegmentCondition): Promise<Broadcast> {
+  async sendToSegment(id: string, conditions: SegmentCondition, options?: BroadcastSendOptions): Promise<Broadcast> {
     const res = await this.http.post<ApiResponse<Broadcast>>(
       `/api/broadcasts/${id}/send-segment`,
-      { conditions },
+      { conditions, ...(options?.confirmedRecipientCount === undefined ? {} : { confirmedRecipientCount: options.confirmedRecipientCount }) },
+      ...(options?.confirmIrreversible ? [{ 'X-Confirm-Irreversible': options.confirmIrreversible }] : []),
     )
     return res.data
   }

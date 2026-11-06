@@ -1,10 +1,11 @@
+import { logger } from '@line-crm/shared/server';
 import {
   getTemplateById,
   recordCarouselTap,
   hasCarouselTap,
 } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
-import { runActionRows, type ScenarioActionRow } from './scenario-actions.js';
+import { runActionRows, type ScenarioActionRow } from '../features/scenarios/scenario-actions/index.js';
 import { pickCarouselActions, type CarouselTapPostback } from '../lib/carousel-tap.js';
 import { logOutgoingMessage } from './event-bus.js';
 
@@ -62,7 +63,7 @@ export async function handleCarouselTap(
   lineClient: LineClient,
   friend: { id: string; line_user_id: string },
   tap: CarouselTapPostback,
-  options: { lineAccountId?: string | null; replyToken?: string },
+  options: { lineAccountId?: string | null; replyToken?: string; sourceEventId?: string },
 ): Promise<CarouselTapResult> {
   const template = await getTemplateById(db, tap.templateId);
   if (!template) return { kind: 'not_found' };
@@ -101,7 +102,7 @@ export async function handleCarouselTap(
             lineAccountId,
           });
         } catch (err) {
-          console.error('[carouselTap] failed to reply the limit message', err);
+          logger.error("carousel_tap.reply_limit_notice_failed");
         }
       }
       return { kind: 'blocked', replyTokenConsumed };
@@ -125,16 +126,16 @@ export async function handleCarouselTap(
       lineAccountId,
     });
   } catch (err) {
-    console.error('[carouselTap] failed to record the tap', err);
+    logger.error("carousel_tap.record_tap_failed");
   }
 
   if (rows.length === 0) return { kind: 'ran', executed: 0 };
 
   try {
-    const result = await runActionRows(db, rows, friend.id);
+    const result = await runActionRows(db, rows, friend.id, {accountId:lineAccountId,sourceEventId:options.sourceEventId,executorDependencies:{resolveLineAccessToken:async()=> 'existing-client',createLineClient:()=>lineClient}});
     return { kind: 'ran', executed: result.executed };
   } catch (err) {
-    console.error('[carouselTap] failed to run actions', err);
+    logger.error("carousel_tap.run_actions_failed");
     return { kind: 'ran', executed: 0 };
   }
 }

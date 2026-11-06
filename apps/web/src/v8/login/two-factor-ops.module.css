@@ -1,0 +1,163 @@
+/* ★V8-B 運営 ログイン 2段目（板 ）。寸法は globals.css の --tpl-ms-otp-*。 */
+
+.page {
+  display: flex;
+  min-height: 100svh;
+  align-items: center;
+  justify-content: center;
+  padding: var(--tpl-ms-otp-page-pad);
+  background: var(--color-canvas-sunken);
+}
+
+.card {
+  width: 100%;
+  max-width: var(--tpl-ms-otp-card-w);
+}
+
+
+.card > * {
+  margin: 0;
+}
+
+.title {
+  color: var(--color-ink);
+  font-size: var(--tpl-ms-otp-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-ms-otp-title-lh);
+}
+
+.desc {
+  width: 100%;
+  /* 絵は字の途中で折る（全体の言葉のまとまりで折る指定を外す）。 */
+  word-break: normal;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-ms-otp-desc-size);
+  line-height: var(--tpl-ms-otp-desc-lh);
+}
+
+
+
+.submit {
+  width: 100%;
+  height: var(--tpl-ms-otp-btn-h);
+}
+
+.icon {
+  width: var(--tpl-ms-otp-icon);
+  height: var(--tpl-ms-otp-icon);
+}
+
+/* 6 マスとその下の 1 行（違った・確かめ中・通った・案内）。 */
+.code {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.status {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--tpl-auth-status-lh);
+}
+
+.status[data-tone='danger'] { color: var(--color-status-danger); }
+.status[data-tone='success'] { color: var(--color-success); }
+
+/* カードの下：左に「コードが使えない場合」、右に「別のアカウントで入る」。 */
+.helpArea {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.footRow,
+.helpChoices {
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--tpl-ms-otp-label-lh);
+}
+
+.passkeyNotice {
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-control);
+  background: var(--tpl-ms-otp-passkey-status-bg);
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+.passkeyDescription,
+.passkeyHint {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  line-height: 1.6;
+}
+
+.passkeyHint { font-size: var(--text-caption); }
+
+.passkeyDivider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.passkeyDivider::before,
+.passkeyDivider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--tpl-ms-otp-passkey-divider);
+}
+
+.footRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.helpToggle,
+.helpLink {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--color-link);
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--tpl-ms-otp-label-lh);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.helpToggle:hover,
+.helpLink:hover {
+  text-decoration: underline;
+}
+
+.helpToggle:focus-visible,
+.helpLink:focus-visible {
+  outline: var(--polish-focus-width) solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
+  border-radius: var(--radius-control);
+}
+
+.helpToggle:disabled,
+.helpLink:disabled {
+  cursor: not-allowed;
+  opacity: var(--polish-disabled-opacity);
+}
+
+.helpChoices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-8) var(--space-16);
+}

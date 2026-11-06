@@ -1,5 +1,5 @@
-import { Hono } from 'hono';
-import type { Context } from 'hono';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { FolderAssignmentError, readFolderAssignment } from '@line-crm/db';
 import {
   createAffiliateOffer,
   createOfferVersion,
@@ -12,7 +12,11 @@ import {
   type AffiliateOffer,
   type AffiliateOfferVersion,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import { Hono } from 'hono';
+import type { Context } from 'hono';
+import { fail } from '../lib/fail.js';
+
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
@@ -20,13 +24,7 @@ import {
   getVisibleLineAccountScope,
 } from '../services/account-access.js';
 
-/**
- * Admin-side affiliate offer (案件) CRUD. Mounted under `/api/affiliate-offers`,
- * so it inherits admin auth from authMiddleware (only `/api/liff/*` is skipped).
- *
- * snake_case DB rows → camelCase responses via serializeOffer, mirroring
- * routes/affiliates.ts's serializeAffiliate.
- */
+/** /api/affiliate-offers は管理認証を継承し、DB の snake_case は serializeOffer で camelCase へ変換して応答形式をそろえる。 */
 const affiliateOffers = new Hono<Env>();
 
 async function requireVisibleAffiliateOffer(c: Context<Env>, next: () => Promise<void>) {
@@ -36,7 +34,7 @@ async function requireVisibleAffiliateOffer(c: Context<Env>, next: () => Promise
     c.get('staff'),
     [item.line_account_id ?? null],
   )) {
-    return c.json({ success: false, error: 'Offer not found' }, 404);
+    return fail(c, 404, 'OFFER_NOT_FOUND');
   }
   await next();
 }
@@ -44,6 +42,7 @@ async function requireVisibleAffiliateOffer(c: Context<Env>, next: () => Promise
 function serializeOffer(row: AffiliateOffer) {
   return {
     id: row.id,
+    folderId: row.folder_id ?? null,
     name: row.name,
     description: row.description,
     rewardAmount: row.reward_amount,
@@ -57,17 +56,17 @@ function serializeOffer(row: AffiliateOffer) {
   };
 }
 
-/** reward_amount must be a non-negative integer when supplied. */
+/** 報酬が指定された場合は、非負の整数だけを許可する。 */
 function isValidReward(v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 0;
 }
 
 /**
  * 案件に結ぶタグ・シナリオが、案件と同じLINEアカウントの有効なものか確かめる
- * （#554 点検#505中3）。他アカウントのものを結ぶと成果時の誤動作・
+ * （ 点検中3）。他アカウントのものを結ぶと成果時の誤動作・
  * 情報の混ざりになる。存在しない・見えないは区別せず400にする。
  * 保管済みタグ・停止中シナリオは承認時点で実行できないので、
- * ここで具体的な理由を添えて止める（監査 R193）。
+ * ここで具体的な理由を添えて止める。
  */
 async function offerReferenceError(
   db: D1Database,
@@ -124,8 +123,7 @@ affiliateOffers.get('/api/affiliate-offers', async (c) => {
     });
     return c.json({ success: true, data: items.map(serializeOffer) });
   } catch (err) {
-    console.error('GET /api/affiliate-offers error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -136,21 +134,21 @@ affiliateOffers.get('/api/affiliate-offers/:id', async (c) => {
   try {
     const item = await getAffiliateOfferById(c.env.DB, c.req.param('id'));
     if (!item) {
-      return c.json({ success: false, error: 'Offer not found' }, 404);
+      return fail(c, 404, 'OFFER_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeOffer(item) });
   } catch (err) {
-    console.error('GET /api/affiliate-offers/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/affiliate-offers - create
-affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), async (c) => {
+affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), inputJsonBoundary({folderId:['string','null']}), async (c) => {
   auditLog(c, 'affiliate.offer.create', { kind: 'affiliate_offer' });
   try {
     const body = await c.req
       .json<{
+        folderId?: string | null;
         name?: string;
         description?: string | null;
         rewardAmount?: number;
@@ -171,45 +169,33 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) {
-      return c.json({ success: false, error: 'name is required' }, 400);
+      return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
     }
-    // 安定した操作UUID（#686）。commit後に応答だけ失われて再送されても、
+    // 安定した操作UUID。commit後に応答だけ失われて再送されても、
     // packages/db 側が同じIDで既存行を回収するため二重登録にならない。
     const operationId = typeof body.operationId === 'string' ? body.operationId.trim() : '';
     if (operationId && (operationId.length < 8 || operationId.length > 200)) {
-      return c.json({ success: false, error: 'もう一度、最初からやり直してください' }, 400);
+      return inputError(c, { success: false, error: 'もう一度、最初からやり直してください' }, 400, ["operationId"]);
     }
     if (body.rewardAmount !== undefined && !isValidReward(body.rewardAmount)) {
-      return c.json(
-        { success: false, error: 'rewardAmount must be a non-negative integer' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'rewardAmount must be a non-negative integer' }, 400, ["rewardAmount"]);
     }
     if (body.rewardMiles !== undefined && !isValidReward(body.rewardMiles)) {
-      return c.json(
-        { success: false, error: 'rewardMiles must be a non-negative integer' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'rewardMiles must be a non-negative integer' }, 400, ["rewardMiles"]);
     }
     if (body.windowDays !== undefined && !isValidWindowDays(body.windowDays)) {
-      return c.json(
-        { success: false, error: 'windowDays must be an integer between 1 and 365' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'windowDays must be an integer between 1 and 365' }, 400, ["windowDays"]);
     }
     if (!isValidCap(body.capTotal) || !isValidCap(body.capMonthlyPerAffiliate)) {
-      return c.json(
-        { success: false, error: 'cap must be a positive integer or null' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'cap must be a positive integer or null' }, 400, ["capTotal","capMonthlyPerAffiliate"]);
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const lineAccountId = body.lineAccountId
       ?? (scope.allowedAccountIds.length === 1 ? scope.allowedAccountIds[0] : null);
     if (!lineAccountId) {
       // そのまま画面へ出す文言にする。複数アカウントのとき空欄で押すと
-      // ここに来る（#505 重大1）。画面側でも押す前に選ばせている。
-      return c.json({ success: false, error: 'LINEアカウントを選んでください' }, 400);
+      // ここに来る（ 重大1）。画面側でも押す前に選ばせている。
+      return inputError(c, { success: false, error: 'LINEアカウントを選んでください' }, 400, ["lineAccountId"]);
     }
     if (!scope.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -218,12 +204,13 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
       c.env.DB, { tagId: body.tagId, scenarioId: body.scenarioId }, lineAccountId,
     );
     if (refError) {
-      return c.json({ success: false, error: refError }, 400);
+      return inputError(c, { success: false, error: refError }, 400, ["tagId","scenarioId","lineAccountId"]);
     }
 
     const offer = await createAffiliateOffer(c.env.DB, {
       name,
       description: body.description ?? null,
+      folderId: body.folderId,
       rewardAmount: body.rewardAmount,
       rewardMiles: body.rewardMiles,
       lineAccountId,
@@ -232,33 +219,41 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
       isActive: body.isActive,
       operationId: operationId || undefined,
     });
-    // 作った案件の決まりを初版として残す(#823)。版が無いと期間30日・上限なしの
+    // 作った案件の決まりを初版として残す。版が無いと期間30日・上限なしの
     // 扱いになるため、値は今の案件と同じものを写す。
-    await createOfferVersion(c.env.DB, {
-      offerId: offer.id,
-      rewardAmount: body.rewardAmount,
-      rewardMiles: body.rewardMiles,
-      windowDays: body.windowDays,
-      capTotal: body.capTotal,
-      capMonthlyPerAffiliate: body.capMonthlyPerAffiliate,
-      receptionFrom: body.receptionFrom ?? null,
-      receptionTo: body.receptionTo ?? null,
-      createdBy: c.get('staff')?.id ?? null,
-    });
+    // 版がある再送（応答喪失・報酬編集後の古いPOST）では何も足さない。
+    // この確認で、修正前に作られた鍵なし初版を持つ案件の再送も守る。
+    // 版が無いときだけ初版を作る（版の保存だけ落ちた後の再送の回収）。
+    // 確認キーは案件ごとに固定し、同時再送の交差は1件に束ねる。
+    if (!(await getCurrentOfferVersion(c.env.DB, offer.id))) {
+      await createOfferVersion(c.env.DB, {
+        offerId: offer.id,
+        rewardAmount: body.rewardAmount,
+        rewardMiles: body.rewardMiles,
+        windowDays: body.windowDays,
+        capTotal: body.capTotal,
+        capMonthlyPerAffiliate: body.capMonthlyPerAffiliate,
+        receptionFrom: body.receptionFrom ?? null,
+        receptionTo: body.receptionTo ?? null,
+        createdBy: c.get('staff')?.id ?? null,
+        idempotencyKey: `offer-create:${offer.id}`,
+      });
+    }
     return c.json({ success: true, data: serializeOffer(offer) }, 201);
   } catch (err) {
-    console.error('POST /api/affiliate-offers error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
+    throw err;
   }
 });
 
 // PUT /api/affiliate-offers/:id - update
-affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), async (c) => {
+affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), inputJsonBoundary({folderId:['string','null']}), async (c) => {
   auditLog(c, 'affiliate.offer.update', { kind: 'affiliate_offer', id: c.req.param('id') });
   try {
     const id = c.req.param('id');
     const body = await c.req
       .json<{
+        folderId?: string | null;
         name?: string;
         description?: string | null;
         rewardAmount?: number;
@@ -276,34 +271,22 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
       .catch(() => ({}) as Record<string, never>);
 
     if (body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim())) {
-      return c.json({ success: false, error: 'name cannot be empty' }, 400);
+      return inputError(c, { success: false, error: 'name cannot be empty' }, 400, ["name"]);
     }
     if (body.rewardAmount !== undefined && !isValidReward(body.rewardAmount)) {
-      return c.json(
-        { success: false, error: 'rewardAmount must be a non-negative integer' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'rewardAmount must be a non-negative integer' }, 400, ["rewardAmount"]);
     }
     if (body.rewardMiles !== undefined && !isValidReward(body.rewardMiles)) {
-      return c.json(
-        { success: false, error: 'rewardMiles must be a non-negative integer' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'rewardMiles must be a non-negative integer' }, 400, ["rewardMiles"]);
     }
     if (body.windowDays !== undefined && !isValidWindowDays(body.windowDays)) {
-      return c.json(
-        { success: false, error: 'windowDays must be an integer between 1 and 365' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'windowDays must be an integer between 1 and 365' }, 400, ["windowDays"]);
     }
     if (!isValidCap(body.capTotal) || !isValidCap(body.capMonthlyPerAffiliate)) {
-      return c.json(
-        { success: false, error: 'cap must be a positive integer or null' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'cap must be a positive integer or null' }, 400, ["capTotal","capMonthlyPerAffiliate"]);
     }
     if (body.lineAccountId === null) {
-      return c.json({ success: false, error: 'lineAccountId cannot be empty' }, 400);
+      return inputError(c, { success: false, error: 'lineAccountId cannot be empty' }, 400, ["lineAccountId"]);
     }
     if (body.lineAccountId !== undefined
       && (!body.lineAccountId
@@ -313,11 +296,11 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
 
     const existing = await getAffiliateOfferById(c.env.DB, id);
     if (!existing) {
-      return c.json({ success: false, error: 'Offer not found' }, 404);
+      return fail(c, 404, 'OFFER_NOT_FOUND');
     }
     const effectiveAccountId = body.lineAccountId ?? existing.line_account_id;
     if ((body.tagId || body.scenarioId) && !effectiveAccountId) {
-      return c.json({ success: false, error: '案件のLINEアカウントを選んでください' }, 400);
+      return inputError(c, { success: false, error: '案件のLINEアカウントを選んでください' }, 400, ["tagId","scenarioId","lineAccountId"]);
     }
     const refError = effectiveAccountId
       ? await offerReferencesError(
@@ -327,10 +310,12 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
       )
       : null;
     if (refError) {
-      return c.json({ success: false, error: refError }, 400);
+      return inputError(c, { success: false, error: refError }, 400, ["lineAccountId","tagId","scenarioId"]);
     }
 
-    // 報酬・期間・上限・受付の変更は、決まりの新しい版として残す(#823)。
+    await readFolderAssignment(c.env.DB,'affiliate_offer',effectiveAccountId,body.folderId===undefined?existing.folder_id:body.folderId);
+
+    // 報酬・期間・上限・受付の変更は、決まりの新しい版として残す。
     // 版を先に作り、失敗したら案件の値も変えない。版が無い昔の案件は、
     // この保存で初版が生まれる。
     if (body.rewardAmount !== undefined || body.rewardMiles !== undefined
@@ -353,6 +338,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     const updated = await updateAffiliateOffer(c.env.DB, id, {
       name: body.name !== undefined ? body.name.trim() : undefined,
       description: body.description,
+      folder_id: body.folderId,
       reward_amount: body.rewardAmount,
       reward_miles: body.rewardMiles,
       line_account_id: body.lineAccountId,
@@ -362,12 +348,12 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     });
 
     if (!updated) {
-      return c.json({ success: false, error: 'Offer not found' }, 404);
+      return fail(c, 404, 'OFFER_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeOffer(updated) });
   } catch (err) {
-    console.error('PUT /api/affiliate-offers/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
+    throw err;
   }
 });
 
@@ -404,8 +390,7 @@ affiliateOffers.get('/api/affiliate-offers/:id/versions', async (c) => {
     const versions = await listOfferVersions(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: versions.map(serializeOfferVersion) });
   } catch (err) {
-    console.error('GET /api/affiliate-offers/:id/versions error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -431,13 +416,12 @@ affiliateOffers.get('/api/affiliate-offers/:id/cap-status', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/affiliate-offers/:id/cap-status error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/affiliate-offers/:id/versions - 決まりの新しい版を保存
-affiliateOffers.post('/api/affiliate-offers/:id/versions', requireRole('owner', 'admin'), async (c) => {
+affiliateOffers.post('/api/affiliate-offers/:id/versions', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   auditLog(c, 'affiliate.offer.version.create', { kind: 'affiliate_offer', id: c.req.param('id') });
   try {
     const body = await c.req
@@ -455,32 +439,20 @@ affiliateOffers.post('/api/affiliate-offers/:id/versions', requireRole('owner', 
       .catch(() => ({}) as Record<string, never>);
 
     if (body.rewardAmount !== undefined && !isValidReward(body.rewardAmount)) {
-      return c.json(
-        { success: false, error: 'rewardAmount must be a non-negative integer' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'rewardAmount must be a non-negative integer' }, 400, ["rewardAmount"]);
     }
     if (body.rewardMiles !== undefined && !isValidReward(body.rewardMiles)) {
-      return c.json(
-        { success: false, error: 'rewardMiles must be a non-negative integer' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'rewardMiles must be a non-negative integer' }, 400, ["rewardMiles"]);
     }
     if (body.windowDays !== undefined && !isValidWindowDays(body.windowDays)) {
-      return c.json(
-        { success: false, error: 'windowDays must be an integer between 1 and 365' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'windowDays must be an integer between 1 and 365' }, 400, ["windowDays"]);
     }
     if (!isValidCap(body.capTotal) || !isValidCap(body.capMonthlyPerAffiliate)) {
-      return c.json(
-        { success: false, error: 'cap must be a positive integer or null' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'cap must be a positive integer or null' }, 400, ["capTotal","capMonthlyPerAffiliate"]);
     }
     const idempotencyKey = typeof body.idempotencyKey === 'string' ? body.idempotencyKey.trim() : '';
     if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 200)) {
-      return c.json({ success: false, error: 'もう一度、最初からやり直してください' }, 400);
+      return inputError(c, { success: false, error: 'もう一度、最初からやり直してください' }, 400, []);
     }
 
     const version = await createOfferVersion(c.env.DB, {
@@ -499,13 +471,12 @@ affiliateOffers.post('/api/affiliate-offers/:id/versions', requireRole('owner', 
     return c.json({ success: true, data: serializeOfferVersion(version) }, 201);
   } catch (err) {
     if (err instanceof Error && err.message === 'offer not found') {
-      return c.json({ success: false, error: 'Offer not found' }, 404);
+      return fail(c, 404, 'OFFER_NOT_FOUND');
     }
     if (err instanceof Error && /windowDays|cap/.test(err.message)) {
-      return c.json({ success: false, error: err.message }, 400);
+      return inputError(c, { success: false, error: err.message }, 400, ["windowDays","cap"]);
     }
-    console.error('POST /api/affiliate-offers/:id/versions error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

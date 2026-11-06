@@ -1,7 +1,7 @@
-// PATCH /api/booking/admin/bookings/:id（予約変更 N-389）と
-// POST .../sync/retry（Google 再試行 N-392）、
-// POST .../notifications/:runId/retry（LINE 通知再試行 N-393）、
-// GET .../audit-logs（変更履歴 N-394）の route 試験。
+// PATCH /api/booking/admin/bookings/:id（予約変更）と
+// POST .../sync/retry（Google 再試行）、
+// POST .../notifications/:runId/retry（LINE 通知再試行）、
+// GET .../audit-logs（変更履歴）の route 試験。
 //
 // 実SQLite (bootstrap.sql) で動かし、ガードSQL・監査・台帳の実挙動を見る。
 
@@ -12,7 +12,8 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
+import { d1AssignmentSettingsStore } from '../features/booking/booking-assignment-settings.js';
 
 const availabilityMocks = vi.hoisted(() => ({
   computeSlots: vi.fn(() => [] as { start: string; end: string }[]),
@@ -48,8 +49,8 @@ const notifierMocks = vi.hoisted(() => ({
   sendBookingNotification: vi.fn(async () => undefined),
 }));
 // 送る側だけ差し替える。文面の組み立て（時刻・残り時間）は本物を使う。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   ...notifierMocks,
 }));
 
@@ -57,6 +58,12 @@ const accountAccessMocks = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(async () => true),
 }));
 vi.mock('../services/account-access.js', () => accountAccessMocks);
+
+const conflictHooks = vi.hoisted(() => ({ notifyBookingConflicts: vi.fn(async () => undefined) }));
+vi.mock('../features/booking/booking-channels.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-channels.js')>()),
+  ...conflictHooks,
+}));
 
 const { default: booking } = await import('./booking.js');
 
@@ -235,12 +242,171 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
 
   afterEach(() => sqlite.close());
 
+  test.each(['friend', 'phone', 'liff'] as const)('同じ人の上限は %s からの作成でも守り、完了・取消・他店は数えない', async (source) => {
+    insertBooking(sqlite, { id: 'existing', friend: source === 'phone' ? null : 'f1', customer: source === 'phone' ? 'customer-1' : null, startsAt: futureStartsAt(8) });
+    const { app, env } = makeApp(db);
+    if (source === 'liff') {
+      sqlite.prepare('UPDATE line_accounts SET liff_id=? WHERE id=?').run('test-liff', 'acc1');
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ sub: 'U1', iss: 'https://access.line.me', aud: 'channel-1', exp: 4102444800 }), { status: 200 })));
+    }
+    try {
+      const create = (key: string) => app.request(source === 'liff' ? '/api/liff/booking/requests?liffId=test-liff' : '/api/booking/admin/bookings?account_id=acc1', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key, Authorization: 'Bearer mocked_id_token' },
+        body: JSON.stringify({ ...(source === 'phone' ? { booking_customer_id: 'customer-1' } : { friend_id: 'f1' }), menu_id: 'm1', staff_id: 's1', starts_at: futureStartsAt(), send_line_confirmation: false }),
+      }, env as never, execCtx);
+      const result = await create('over-limit');
+      expect(result.status).toBe(422);
+      expect(await result.json()).toMatchObject({ error: 'booking_limit_reached', fields: { [source === 'phone' ? 'booking_customer_id' : 'friend_id']: expect.stringContaining('予約') } });
+      sqlite.prepare("UPDATE bookings SET status='cancelled' WHERE id='existing'").run();
+      expect((await create('after-cancel')).status).toBe(201);
+      expect((await create('after-cancel')).status).toBe(201);
+      expect(sqlite.prepare("SELECT count(*) n FROM bookings WHERE status IN ('requested','confirmed')").get()).toEqual({ n: 1 });
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  test('経路の設定は保存でき、権限なし・他店舗・不正値は拒否する', async () => {
+    const { app, env } = makeApp(db);
+    const request = (value: unknown) => app.request('/api/booking/admin/channels/settings?account_id=acc1',{ method:'PUT',headers:{ 'Content-Type':'application/json' },body:JSON.stringify({ autoAssign:value }) },env as never,execCtx);
+    expect((await request('true')).status).toBe(400);
+    expect((await request(true)).status).toBe(200);
+    const result = await app.request('/api/booking/admin/channels?account_id=acc1',{},env as never,execCtx);
+    expect((await result.json<{ data:{ autoAssign:boolean } }>()).data.autoAssign).toBe(true);
+    const denied = makeApp(db,'staff');
+    expect((await denied.app.request('/api/booking/admin/channels/settings?account_id=acc1',{ method:'PUT',headers:{ 'Content-Type':'application/json' },body:JSON.stringify({ autoAssign:true }) },denied.env as never,execCtx)).status).toBe(403);
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    expect((await app.request('/api/booking/admin/channels?account_id=acc2',{},env as never,execCtx)).status).toBe(403);
+  });
+
+  test('スタッフ移動は既存の空き照合・版・監査を使い、通知OFFを守る', async () => {
+    insertBooking(sqlite,{ id:'b1',friend:'f1' });
+    const { app, env } = makeApp(db);
+    const result = await app.request('/api/booking/admin/bookings/b1/reassign?account_id=acc1',{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify({ staffId:'s2',notifyCustomer:false }) },env as never,execCtx);
+    expect(result.status).toBe(200);
+    expect(sqlite.prepare('SELECT staff_id,lock_version FROM bookings WHERE id=?').get('b1')).toEqual({ staff_id:'s2',lock_version:1 });
+    expect(availabilityMocks.calls.some((call) => call.staffId==='s2' && call.excludeBookingId==='b1')).toBe(true);
+    expect(notifierMocks.sendBookingNotification).not.toHaveBeenCalled();
+    expect(conflictHooks.notifyBookingConflicts).toHaveBeenCalledWith(db,'acc1');
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM booking_audit_logs WHERE booking_id='b1' AND action='updated'").get()).toEqual({ n:1 });
+  });
+
+  test('スタッフ移動の顧客通知は指定ONで送り、送信停止中は止める', async () => {
+    insertBooking(sqlite,{ id:'b1',friend:'f1' });
+    const { app, env } = makeApp(db);
+    const move = (staffId: string) => app.request('/api/booking/admin/bookings/b1/reassign?account_id=acc1',{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify({ staffId,notifyCustomer:true }) },env as never,execCtx);
+    const moved = await move('s2');
+    expect(moved.status).toBe(200);
+    expect(await moved.json()).toMatchObject({ customerNotification: { channel: 'line', status: 'queued', guidance: null } });
+    expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1);
+    sqlite.prepare('INSERT INTO operation_control_sets (scope_key,version,states_json,updated_at) VALUES (?,?,?,?)').run('*',1,JSON.stringify({ broadcast_dispatch:'stopped' }),new Date().toISOString());
+    const stopped = await move('s1');
+    expect(stopped.status).toBe(200);
+    expect(await stopped.json()).toMatchObject({ change_notification:'not_applicable',change_notification_reason:'sending_stopped' });
+    expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1);
+  });
+
+  test('LINE未連携の移動は電話連絡を案内し、通知OFFなら案内も送信も行わない', async () => {
+    insertBooking(sqlite,{ id:'b1',customer:'customer-1' });
+    const { app, env } = makeApp(db);
+    const move = (staffId: string, notifyCustomer: boolean) => app.request('/api/booking/admin/bookings/b1/reassign?account_id=acc1', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({staffId,notifyCustomer}),
+    }, env as never, execCtx);
+    const moved = await move('s2', true);
+    expect(moved.status).toBe(200);
+    expect(await moved.json()).toMatchObject({ customerNotification: { channel:'phone',status:'action_required',guidance:expect.stringContaining('電話') } });
+    const silent = await move('s1', false);
+    expect(silent.status).toBe(200);
+    expect(await silent.json()).toMatchObject({ customerNotification: { channel:'phone',status:'not_requested',guidance:null } });
+    expect(notifierMocks.sendBookingNotification).not.toHaveBeenCalled();
+  });
+
+  test('予約管理の編集権限がないスタッフは移動も通知もできない', async () => {
+    insertBooking(sqlite,{ id:'b1',friend:'f1' });
+    const { app, env } = makeApp(db, 'staff');
+    const result = await app.request('/api/booking/admin/bookings/b1/reassign?account_id=acc1', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({staffId:'s2',notifyCustomer:true}),
+    }, env as never, execCtx);
+    expect(result.status).toBe(403);
+    expect(sqlite.prepare('SELECT staff_id,lock_version FROM bookings WHERE id=?').get('b1')).toEqual({staff_id:'s1',lock_version:0});
+    expect(notifierMocks.sendBookingNotification).not.toHaveBeenCalled();
+  });
+
+  test('移動先が埋まっていれば409で旧スタッフを保つ', async () => {
+    insertBooking(sqlite,{ id:'b1',friend:'f1' });
+    availabilityMocks.computeSlots.mockReturnValue([]);
+    const { app, env } = makeApp(db);
+    const result = await app.request('/api/booking/admin/bookings/b1/reassign?account_id=acc1',{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify({ staffId:'s2',notifyCustomer:true }) },env as never,execCtx);
+    expect(result.status).toBe(409);
+    expect(sqlite.prepare('SELECT staff_id,lock_version FROM bookings WHERE id=?').get('b1')).toEqual({ staff_id:'s1',lock_version:0 });
+  });
+
+  test('指名なしは設定OFFでは拒否、ONなら空いているスタッフに割り当てる', async () => {
+    const { app, env } = makeApp(db);
+    const create = (key: string) => app.request('/api/booking/admin/bookings?account_id=acc1',{ method:'POST',headers:{ 'Content-Type':'application/json','Idempotency-Key':key },body:JSON.stringify({ booking_customer_id:'customer-1',menu_id:'m1',starts_at:futureStartsAt(),send_line_confirmation:false }) },env as never,execCtx);
+    expect((await create('disabled')).status).toBe(409);
+    sqlite.prepare('INSERT INTO account_settings (id,line_account_id,key,value) VALUES (?,?,?,?)').run('auto','acc1','booking_auto_assign','true');
+    const result = await create('enabled');
+    expect(result.status).toBe(201);
+    expect(sqlite.prepare('SELECT staff_id FROM bookings').get()).toEqual({ staff_id:'s1' });
+    expect(conflictHooks.notifyBookingConflicts).toHaveBeenCalledWith(db,'acc1');
+    expect((await create('enabled')).status).toBe(201);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM bookings').get()).toEqual({ n:1 });
+  });
+
+  test('新方式は同じ枠の連続予約を交互に割り当て、優先順と上限もHTTP作成へ反映する', async () => {
+    sqlite.prepare('UPDATE menus SET concurrent_capacity=10 WHERE id=?').run('m1');
+    sqlite.prepare('INSERT INTO account_settings(id,line_account_id,key,value) VALUES(?,?,?,?)').run('auto','acc1','booking_auto_assign','true');
+    const settings = { method: 'balanced' as const, balancePeriod: 'day' as const, expectedVersion: 0,
+      resources: [{ resourceId: 's1', priority: 'preferred' as const, dailyLimit: 2, sortOrder: 0 },
+        { resourceId: 's2', priority: 'normal' as const, dailyLimit: null, sortOrder: 1 }] };
+    await d1AssignmentSettingsStore(db).save({kind:'staff',id:'acc1'}, settings);
+    const original = availabilityMocks.getAvailability.getMockImplementation()!;
+    availabilityMocks.getAvailability.mockImplementation(async (...args) => {
+      const result = await original(...args);
+      if (args[1].staffId) return result;
+      return { ...result, by_staff: [result.by_staff[0], { ...result.by_staff[0], staff_id: 's2' }] };
+    });
+    try {
+      const { app, env } = makeApp(db);
+      for (let i=0; i<4; i++) {
+        const customerId = `allocation-customer-${i}`;
+        sqlite.prepare(`INSERT INTO booking_customers(id,line_account_id,display_name,phone_normalized_hash,phone_encrypted,phone_last4)
+          VALUES(?,'acc1','予約者',?,'cipher','5678')`).run(customerId,`hash-${i}`);
+        if (i===2) await d1AssignmentSettingsStore(db).save({kind:'staff',id:'acc1'},{...settings, method:'priority',expectedVersion:1});
+        const result = await app.request('/api/booking/admin/bookings?account_id=acc1', {method:'POST',
+          headers:{'Content-Type':'application/json','Idempotency-Key':`allocation-${i}`},
+          body:JSON.stringify({booking_customer_id:customerId,menu_id:'m1',starts_at:futureStartsAt(),send_line_confirmation:false})}, env as never, execCtx);
+        expect(result.status, `request ${i}: ${await result.text()}`).toBe(201);
+      }
+      expect(sqlite.prepare('SELECT staff_id FROM bookings ORDER BY rowid').all()).toEqual([{staff_id:'s1'},{staff_id:'s2'},{staff_id:'s1'},{staff_id:'s2'}]);
+    } finally { availabilityMocks.getAvailability.mockImplementation(original); }
+  });
+
+  test('LINEの指名なし（未指定・指名なし行）は実スタッフに割り当て、空きなしなら拒否する', async () => {
+    sqlite.prepare('UPDATE line_accounts SET liff_id=? WHERE id=?').run('test-liff','acc1');
+    sqlite.prepare('INSERT INTO account_settings (id,line_account_id,key,value) VALUES (?,?,?,?)').run('auto','acc1','booking_auto_assign','true');
+    sqlite.prepare('INSERT INTO staff (id,line_account_id,name,display_name,is_designation_optional) VALUES (?,?,?,?,?)').run('optional','acc1','指名なし','指名なし',1);
+    vi.stubGlobal('fetch',vi.fn(async () => Response.json({ sub:'U1' })));
+    try {
+      const { app, env } = makeApp(db);
+      const create = (key: string, staffId?: string) => app.request('/api/liff/booking/requests?liffId=test-liff',{ method:'POST',headers:{ 'Content-Type':'application/json','Idempotency-Key':key,Authorization:'Bearer mocked_id_token' },body:JSON.stringify({ menu_id:'m1',staff_id:staffId,starts_at:futureStartsAt() }) },env as never,execCtx);
+      availabilityMocks.computeSlots.mockReturnValue([]);
+      expect((await create('unavailable')).status).toBe(409);
+      availabilityMocks.computeSlots.mockReturnValue([{ start:'11:00',end:'12:00' }]);
+      const result = await create('line-auto','optional');
+      expect(result.status).toBe(201);
+      expect(sqlite.prepare('SELECT staff_id FROM bookings').get()).toEqual({ staff_id:'s1' });
+      expect(conflictHooks.notifyBookingConflicts).toHaveBeenCalledWith(db,'acc1');
+      expect((await create('line-auto','optional')).status).toBe(201);
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM bookings').get()).toEqual({ n:1 });
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   test('lock_version 無しは400', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1' });
     const { app, env } = makeApp(db);
     const res = await patchBooking(app, env, 'B1', { customer_note: 'x' });
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ error: 'missing_lock_version' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'missing_lock_version' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('他アカウントの予約は404、版が古い予約は409', async () => {
@@ -361,7 +527,7 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
       notification_policy: { day_before: true },
     });
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: 'line_notification_unavailable' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'line_notification_unavailable' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('未連携の予約でもメモは変更でき、お知らせは作らない', async () => {
@@ -406,7 +572,7 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
       starts_at: new Date(Date.now() - 3600_000).toISOString(),
     });
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: 'past_datetime' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'past_datetime' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('別店舗のスタッフへは変えられない (404)', async () => {
@@ -531,7 +697,7 @@ describe('POST /api/booking/admin/bookings/:id/sync/retry (N-392)', () => {
     const { app, env } = makeApp(db);
     const res = await retry(app, env, 'B1');
     expect(res.status).toBe(200);
-    // 消す対象があるのに接続が無い場合は成功にしない (R328)。
+    // 消す対象があるのに接続が無い場合は成功にしない。
     // retry_wait のまま残して、再接続後の再送・cron で削除を再試行できる。
     await expect(res.json()).resolves.toEqual({ status: 'retry_wait' });
     expect(sqlite.prepare(`SELECT status, error_code FROM booking_operation_runs WHERE id = 'op-d'`).get())
@@ -606,7 +772,7 @@ describe('POST /api/booking/admin/bookings/:id/notifications/:runId/retry (N-393
 
     const phoneOnly = await retry(app, env, 'B2', 'op-x');
     expect(phoneOnly.status).toBe(422);
-    await expect(phoneOnly.json()).resolves.toEqual({ error: 'line_notification_unavailable' });
+    await expect(phoneOnly.json()).resolves.toMatchObject({ code: 'line_notification_unavailable' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('失敗した通知を同じ行のまま再送し、監査へ残す', async () => {
@@ -645,7 +811,7 @@ describe('POST /api/booking/admin/bookings/:id/notifications/:runId/retry (N-393
     await expect(res.json()).resolves.toMatchObject({
       status: 'failed',
       operation_status: 'permanent_failed',
-      error_code: 'Error',
+      error_code: 'delivery_unknown',
     });
   });
 });

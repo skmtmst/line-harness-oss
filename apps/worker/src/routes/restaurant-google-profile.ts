@@ -1,3 +1,7 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第2段：プロフィール・営業時間・変更履歴。
  * 設計正本：Googleビジネス正本.pen GB-10（R4a3qH）/ GB-11（N8Ipp4）/ GB-11-B（Ldvmo）/ GB-11-C（LbQ05）
@@ -15,7 +19,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { getMediaById } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
@@ -441,16 +445,16 @@ async function proposeSpecial(
   const today = todayIn(timeZone);
   const seen = new Set<string>();
   for (const d of days) {
-    if (seen.has(d.date)) return fail(c, 400, `同じ日付が2回あります（${d.date}）`, { code: 'invalid_request' });
+    if (seen.has(d.date)) return fail(c, 400, `同じ日付が2回あります（${d.date}）`, { code: 'invalid_request' }, []);
     seen.add(d.date);
     if (d.remove) {
-      if (!isValidDate(d.date)) return fail(c, 400, '日付の形式が正しくありません', { code: 'invalid_request' });
-      if (d.date < today) return fail(c, 400, `${fmtDate(d.date)}：過去の日付は変更できません`, { code: 'invalid_request' });
+      if (!isValidDate(d.date)) return fail(c, 400, '日付の形式が正しくありません', { code: 'invalid_request' }, []);
+      if (d.date < today) return fail(c, 400, `${fmtDate(d.date)}：過去の日付は変更できません`, { code: 'invalid_request' }, []);
       if (!profile.specialHours.some((sp) => sp.date === d.date)) return fail(c, 409, `${fmtDate(d.date)}には特別営業時間が登録されていません`, { code: 'unchanged' });
       continue;
     }
     const v = validateSpecialDay({ date: d.date, closed: d.closed, periods: d.periods }, today);
-    if (!v.ok) return fail(c, 400, `${fmtDate(d.date)}：${v.reason}`, { code: 'invalid_request' });
+    if (!v.ok) return fail(c, 400, `${fmtDate(d.date)}：${v.reason}`, { code: 'invalid_request' }, []);
   }
   // 「外す」日は戻り先（通常の営業時間）を periods に持たせて表示・予約影響に使う。
   const sorted: DayHours[] = [...days]
@@ -484,7 +488,7 @@ async function proposeRegular(
   inputText: string | null,
 ): Promise<ChangeRow | Response> {
   const v = validateWeekly(weekly);
-  if (!v.ok) return fail(c, 400, v.reason, { code: 'invalid_request' });
+  if (!v.ok) return fail(c, 400, v.reason, { code: 'invalid_request' }, []);
   const changed = WEEKDAYS.filter((d) => formatPeriods(weekly[d], '-') !== formatPeriods(profile.regularHours[d], '-'));
   if (changed.length === 0) return fail(c, 409, 'すでにその営業時間になっています', { code: 'unchanged' });
   const before: Partial<WeeklyHours> = {};
@@ -552,7 +556,7 @@ restaurantGoogleProfile.get('/api/restaurant-test/google/profile', async (c) => 
   return profileResponse(c, ctx.store, ctx.connection, false);
 });
 
-restaurantGoogleProfile.post('/api/restaurant-test/google/profile/sync', async (c) => {
+restaurantGoogleProfile.post('/api/restaurant-test/google/profile/sync', inputJsonBoundary(), async (c) => {
   const ctx = await requireConnectedStore(c);
   if (ctx instanceof Response) return ctx;
   return profileResponse(c, ctx.store, ctx.connection, true);
@@ -586,7 +590,7 @@ restaurantGoogleProfile.get('/api/restaurant-test/google/holidays', async (c) =>
  *  { source: 'weekly', weekly: { MONDAY: [...], ... } }
  * 応答: { success, change } または（文章があいまいなとき）{ success, question }
  */
-restaurantGoogleProfile.post('/api/restaurant-test/google/hours/propose', async (c) => {
+restaurantGoogleProfile.post('/api/restaurant-test/google/hours/propose', inputJsonBoundary(), async (c) => {
   const ctx = await requireOpenProfile(c);
   if (ctx instanceof Response) return ctx;
   const { store, profile, timeZone } = ctx;
@@ -600,27 +604,27 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/hours/propose', async 
     }
     if (body.shortcut === 'early_close_today') {
       const closeTime = typeof body.closeTime === 'string' ? body.closeTime : '';
-      if (!isValidTime(closeTime)) return fail(c, 400, '閉店時刻を選んでください', { code: 'invalid_request' });
+      if (!isValidTime(closeTime)) return fail(c, 400, '閉店時刻を選んでください', { code: 'invalid_request' }, ["closeTime"]);
       const current = effectiveHoursFor(profile, today);
       if (current.closed || current.periods.length === 0) return fail(c, 409, '今日は休業のため、閉店時刻の変更はできません', { code: 'closed_today' });
       const periods = current.periods.map((p) => ({ ...p }));
       const last = periods[periods.length - 1];
       const kept = periods.filter((p) => p !== last && p.close <= closeTime && p.close > p.open);
       const v = validatePeriods([...kept, { open: last.open, close: closeTime }]);
-      if (!v.ok || closeTime <= last.open) return fail(c, 400, '閉店時刻は最後の枠の開始より後にしてください', { code: 'invalid_request' });
+      if (!v.ok || closeTime <= last.open) return fail(c, 400, '閉店時刻は最後の枠の開始より後にしてください', { code: 'invalid_request' }, ["profile","timeZone","closeTime"]);
       const change = await proposeSpecial(c, store, profile, timeZone, 'shortcut', [{ date: today, closed: false, periods: [...kept, { open: last.open, close: closeTime }] }], null);
       return change instanceof Response ? change : c.json({ success: true, change: publicChange(change) });
     }
-    return fail(c, 400, 'shortcut が不正です', { code: 'invalid_request' });
+    return fail(c, 400, 'shortcut が不正です', { code: 'invalid_request' }, ["source"]);
   }
 
   if (body.source === 'calendar') {
-    if (!Array.isArray(body.days) || body.days.length === 0) return fail(c, 400, '日付を選んでください', { code: 'invalid_request' });
+    if (!Array.isArray(body.days) || body.days.length === 0) return fail(c, 400, '日付を選んでください', { code: 'invalid_request' }, ["days"]);
     const days: DayHours[] = [];
     for (const raw of body.days) {
       const d = raw as { date?: unknown; closed?: unknown; periods?: unknown; remove?: unknown };
       const periods = parsePeriods(d.periods ?? []);
-      if (typeof d.date !== 'string' || !isValidDate(d.date) || !periods) return fail(c, 400, '日付か時刻の形式が正しくありません', { code: 'invalid_request' });
+      if (typeof d.date !== 'string' || !isValidDate(d.date) || !periods) return fail(c, 400, '日付か時刻の形式が正しくありません', { code: 'invalid_request' }, []);
       days.push(d.remove === true ? { date: d.date, remove: true, closed: false, periods: [] } : { date: d.date, closed: d.closed === true, periods });
     }
     const change = await proposeSpecial(c, store, profile, timeZone, 'calendar', days, null);
@@ -629,15 +633,15 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/hours/propose', async 
 
   if (body.source === 'weekly') {
     const weekly = parseWeekly(body.weekly);
-    if (!weekly) return fail(c, 400, '曜日ごとの営業時間の形式が正しくありません', { code: 'invalid_request' });
+    if (!weekly) return fail(c, 400, '曜日ごとの営業時間の形式が正しくありません', { code: 'invalid_request' }, ["weekly"]);
     const change = await proposeRegular(c, store, profile, timeZone, 'weekly', weekly, null);
     return change instanceof Response ? change : c.json({ success: true, change: publicChange(change) });
   }
 
   if (body.source === 'text') {
     const text = typeof body.text === 'string' ? body.text.trim() : '';
-    if (!text) return fail(c, 400, '変更したい内容を入力してください', { code: 'invalid_request' });
-    if (text.length > TEXT_INPUT_MAX) return fail(c, 400, `入力は${TEXT_INPUT_MAX}文字までです`, { code: 'invalid_request' });
+    if (!text) return fail(c, 400, '変更したい内容を入力してください', { code: 'invalid_request' }, ["text"]);
+    if (text.length > TEXT_INPUT_MAX) return fail(c, 400, `入力は${TEXT_INPUT_MAX}文字までです`, { code: 'invalid_request' }, ["text"]);
     if (!c.env.AI) return fail(c, 503, 'かんたん入力はこの環境では使えません', { code: 'ai_unavailable' });
     const prompt = buildHoursParsePrompt({
       storeTitle: profile.title ?? store.name,
@@ -652,7 +656,7 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/hours/propose', async 
     try {
       raw = await runGoogleAi(c, prompt, { temperature: 0.1, maxTokens: 400 });
     } catch (error) {
-      console.error('[restaurant-google] hours parse failed', { code: error instanceof GoogleAiTimeout ? 'timeout' : 'provider_failure' });
+      logger.error("restaurant_google_profile.restaurant_test_google_hours_propose_create_failed");
       return fail(c, error instanceof GoogleAiTimeout ? 504 : 502, '読み取りに失敗しました。もう一度お試しください', { code: error instanceof GoogleAiTimeout ? 'ai_timeout' : 'ai_failed' });
     }
     const parsed = parseHoursResponse(raw);
@@ -674,7 +678,7 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/hours/propose', async 
     return change instanceof Response ? change : c.json({ success: true, change: publicChange(change) });
   }
 
-  return fail(c, 400, 'source が不正です', { code: 'invalid_request' });
+  return fail(c, 400, 'source が不正です', { code: 'invalid_request' }, []);
 });
 
 // ---------- プロフィール項目・写真の変更案 ----------
@@ -704,7 +708,7 @@ function addressText(a: ProfileAddress | null): string {
  *  { field: 'photo', action: 'add', mediaId }          … 登録メディア（GB-8）の画像を店舗写真に追加
  *  { field: 'photo', action: 'delete', mediaName }     … Google 上の写真を削除
  */
-restaurantGoogleProfile.post('/api/restaurant-test/google/profile/propose', async (c) => {
+restaurantGoogleProfile.post('/api/restaurant-test/google/profile/propose', inputJsonBoundary(), async (c) => {
   const ctx = await requireOpenProfile(c);
   if (ctx instanceof Response) return ctx;
   const { store, connection, profile } = ctx;
@@ -714,7 +718,7 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/profile/propose', asyn
   if (field === 'photo') {
     if (body.action === 'add') {
       const mediaId = typeof body.mediaId === 'string' ? body.mediaId : '';
-      if (!mediaId) return fail(c, 400, '写真を選んでください', { code: 'invalid_request' });
+      if (!mediaId) return fail(c, 400, '写真を選んでください', { code: 'invalid_request' }, ["mediaId"]);
       const media = await getMediaById(dbFor(c.env), mediaId, store.lineAccountId);
       if (!media || media.kind !== 'image' || media.archived_at) return fail(c, 404, '登録メディアに写真が見つかりません', { code: 'media_not_found' });
       const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
@@ -733,7 +737,7 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/profile/propose', asyn
     }
     if (body.action === 'delete') {
       const mediaName = typeof body.mediaName === 'string' ? body.mediaName : '';
-      if (!mediaName.startsWith(`${connection.location_name}/media/`)) return fail(c, 400, '削除する写真が正しくありません', { code: 'invalid_request' });
+      if (!mediaName.startsWith(`${connection.location_name}/media/`)) return fail(c, 400, '削除する写真が正しくありません', { code: 'invalid_request' }, ["connection","mediaName"]);
       const change = await insertChange(c, store, {
         kind: 'photo',
         source: 'photo',
@@ -746,37 +750,37 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/profile/propose', asyn
       });
       return c.json({ success: true, change: publicChange(change) });
     }
-    return fail(c, 400, 'action が不正です', { code: 'invalid_request' });
+    return fail(c, 400, 'action が不正です', { code: 'invalid_request' }, ["field"]);
   }
 
   let patch: ProfilePatch;
   let before: unknown;
   if (field === 'title') {
     const value = cleanText(body.value, TITLE_MAX);
-    if (!value) return fail(c, 400, `店舗名は1〜${TITLE_MAX}文字で入力してください`, { code: 'invalid_request' });
+    if (!value) return fail(c, 400, `店舗名は1〜${TITLE_MAX}文字で入力してください`, { code: 'invalid_request' }, ["value"]);
     patch = { field: 'title', value };
     before = profile.title;
   } else if (field === 'phone') {
     const value = cleanText(body.value, PHONE_MAX);
-    if (value === null || (value && !/^\+?[0-9][0-9 ()-]*$/.test(value))) return fail(c, 400, '電話番号は数字とハイフンで入力してください', { code: 'invalid_request' });
+    if (value === null || (value && !/^\+?[0-9][0-9 ()-]*$/.test(value))) return fail(c, 400, '電話番号は数字とハイフンで入力してください', { code: 'invalid_request' }, ["value"]);
     patch = { field: 'phone', value: value || null };
     before = profile.phone;
   } else if (field === 'websiteUri') {
     const value = cleanText(body.value, WEBSITE_MAX);
-    if (value === null) return fail(c, 400, 'ウェブサイトのURLが正しくありません', { code: 'invalid_request' });
+    if (value === null) return fail(c, 400, 'ウェブサイトのURLが正しくありません', { code: 'invalid_request' }, ["value"]);
     if (value) {
       try {
         const u = new URL(value);
         if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('scheme');
       } catch {
-        return fail(c, 400, 'ウェブサイトは https:// から始まるURLを入力してください', { code: 'invalid_request' });
+        return fail(c, 400, 'ウェブサイトは https:// から始まるURLを入力してください', { code: 'invalid_request' }, ["value"]);
       }
     }
     patch = { field: 'websiteUri', value: value || null };
     before = profile.websiteUri;
   } else if (field === 'description') {
     const value = cleanText(body.value, DESCRIPTION_MAX_LENGTH, true);
-    if (value === null) return fail(c, 400, `店舗紹介は${DESCRIPTION_MAX_LENGTH}文字までです`, { code: 'invalid_request' });
+    if (value === null) return fail(c, 400, `店舗紹介は${DESCRIPTION_MAX_LENGTH}文字までです`, { code: 'invalid_request' }, ["value"]);
     patch = { field: 'description', value: value || null };
     before = profile.description;
   } else if (field === 'address') {
@@ -785,14 +789,14 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/profile/propose', asyn
     const administrativeArea = cleanText(v.administrativeArea ?? '', 20);
     const locality = cleanText(v.locality ?? '', 40);
     const lines = Array.isArray(v.addressLines) ? v.addressLines.map((l) => cleanText(l, 80)) : null;
-    if (postalCode === null || !/^\d{3}-?\d{4}$/.test(postalCode)) return fail(c, 400, '郵便番号は 123-4567 の形で入力してください', { code: 'invalid_request' });
-    if (!administrativeArea || !locality) return fail(c, 400, '都道府県と市区町村を入力してください', { code: 'invalid_request' });
-    if (!lines || lines.length === 0 || lines.length > 3 || lines.some((l) => !l)) return fail(c, 400, '番地・建物名を1〜3行で入力してください', { code: 'invalid_request' });
+    if (postalCode === null || !/^\d{3}-?\d{4}$/.test(postalCode)) return fail(c, 400, '郵便番号は 123-4567 の形で入力してください', { code: 'invalid_request' }, ["value"]);
+    if (!administrativeArea || !locality) return fail(c, 400, '都道府県と市区町村を入力してください', { code: 'invalid_request' }, ["value"]);
+    if (!lines || lines.length === 0 || lines.length > 3 || lines.some((l) => !l)) return fail(c, 400, '番地・建物名を1〜3行で入力してください', { code: 'invalid_request' }, ["value"]);
     const value: ProfileAddress = { postalCode, administrativeArea, locality, addressLines: lines as string[] };
     patch = { field: 'address', value };
     before = profile.address;
   } else {
-    return fail(c, 400, 'field が不正です', { code: 'invalid_request' });
+    return fail(c, 400, 'field が不正です', { code: 'invalid_request' }, ["field"]);
   }
 
   const same = patch.field === 'address' ? addressText(patch.value) === addressText(profile.address) : (patch.value ?? '') === (before ?? '');
@@ -847,8 +851,7 @@ restaurantGoogleProfile.get('/api/restaurant-test/google/changes', async (c) => 
   const result = c.req.query('result') ?? 'all';
   const days = Math.min(365, Math.max(1, Number.parseInt(c.req.query('days') ?? '30', 10) || 30));
   const q = (c.req.query('q') ?? '').trim().toLowerCase();
-  const page = Math.max(1, Number.parseInt(c.req.query('page') ?? '1', 10) || 1);
-  const perPage = Math.min(HISTORY_LIMIT_MAX, Math.max(1, Number.parseInt(c.req.query('per_page') ?? '20', 10) || 20));
+  const { page, limit: perPage } = parseOffsetPaging({ limit: c.req.query('per_page'), page: c.req.query('page') }, { defaultLimit: 20, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: HISTORY_LIMIT_MAX }, pagePolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1 } });
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
   const db = dbFor(c.env, store.id);
 
@@ -907,7 +910,8 @@ restaurantGoogleProfile.get('/api/restaurant-test/google/changes', async (c) => 
     else if (e.kind === 'profile' || e.kind === 'photo') counts.profile += 1;
     else counts.review_reply += 1;
   }
-  return c.json({ success: true, changes: filtered.slice((page - 1) * perPage, page * perPage), total: filtered.length, page, perPage, counts, days });
+  const responseItems = filtered.slice((page - 1) * perPage, page * perPage);
+  return c.json(buildOffsetListResponse({ success: true, changes: responseItems, total: filtered.length, page, perPage, counts, days, items: responseItems, paging: { limit: perPage, offset: (page - 1) * perPage }, sort: [] }));
 });
 
 restaurantGoogleProfile.get('/api/restaurant-test/google/changes/:id', async (c) => {
@@ -926,7 +930,7 @@ restaurantGoogleProfile.get('/api/restaurant-test/google/changes/:id', async (c)
   });
 });
 
-restaurantGoogleProfile.post('/api/restaurant-test/google/changes/:id/cancel', async (c) => {
+restaurantGoogleProfile.post('/api/restaurant-test/google/changes/:id/cancel', inputJsonBoundary(), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const row = await changeFor(c, store.id, c.req.param('id'));
@@ -1035,14 +1039,14 @@ function buildSendPatch(latest: GoogleProfile, row: ChangeRow): ProfilePatch {
   }
 }
 
-restaurantGoogleProfile.post('/api/restaurant-test/google/changes/:id/send', requireRole('owner', 'admin'), async (c) => {
+restaurantGoogleProfile.post('/api/restaurant-test/google/changes/:id/send', requireRole('owner', 'admin'), inputJsonBoundary({"confirmed":["boolean"]}), async (c) => {
   const ctx = await requireConnectedStore(c);
   if (ctx instanceof Response) return ctx;
   const { store, connection } = ctx;
   const row = await changeFor(c, store.id, c.req.param('id'));
   if (!row) return fail(c, 404, '変更案が見つかりません');
   const body = await c.req.json<{ confirmed?: boolean }>().catch(() => ({}) as { confirmed?: boolean });
-  if (body.confirmed !== true) return fail(c, 400, '店舗・日付・時間の確認が必要です', { code: 'confirmation_required' });
+  if (body.confirmed !== true) return fail(c, 400, '店舗・日付・時間の確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
   if (!writeEnabled(c.env)) return fail(c, 403, 'この環境ではGoogleへ送信できません', { code: 'write_disabled' });
   if (row.status === 'applied' || row.status === 'accepted') return fail(c, 409, 'この変更はすでに送信済みです', { code: 'already_sent' });
   if (row.status === 'cancelled') return fail(c, 409, 'この変更は取り消されています', { code: 'cancelled' });
@@ -1110,8 +1114,40 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/changes/:id/send', req
       return fail(c, 400, `Googleに受け付けられない内容です${detail ? `（${detail}）` : ''}`, {
         code: 'invalid_request',
         change: publicChange((await changeFor(c, store.id, row.id))!),
-      });
+      }, []);
     }
     return googleErrorResponse(c, error);
   }
+});
+
+/** 写しから案だけを作る。Googleの再取得・公開は既存の確認/送信手順に任せる。 */
+restaurantGoogleProfile.post('/api/restaurant-test/google/hours/from-closure',requireRole('owner','admin','staff'),inputJsonBoundary({"closureId":["string"],"expectedVersion":["number"],"includePrivateEvent":["boolean"]}), async c=>{
+ const store=await storeFor(c);if(!store)return fail(c,404,'店舗がありません');
+ const body=await c.req.json<{closureId?:string;expectedVersion?:number;includePrivateEvent?:boolean}>().catch(()=>null);
+ if(!body||typeof body.closureId!=='string'||!Number.isSafeInteger(body.expectedVersion)||(body.expectedVersion??0)<1
+ ||(body.includePrivateEvent!==undefined&&typeof body.includePrivateEvent!=='boolean'))return fail(c, 400, '休業・貸切の番号と版を指定してください', {}, ["closureId","expectedVersion","includePrivateEvent"]);
+ const row=await dbFor(c.env,store.id).prepare('SELECT * FROM rt_closures WHERE id=? AND store_id=? AND archived_at IS NULL').bind(body.closureId,store.id).first<import('../services/restaurant-closures.js').ClosureRow>();
+ if(!row)return fail(c,404,'休業・貸切がありません');
+ if(row.version!==body.expectedVersion)return fail(c,409,'休業・貸切が変更されました。読み直してください',{code:'version_conflict'});
+ if(row.kind==='private_event'&&body.includePrivateEvent!==true)return fail(c,409,'貸切は通常Googleの営業時間を変更しません。変更する場合は明示的に選んでください',{code:'private_event_not_selected'});
+ if(JSON.parse(row.table_ids_json).length)return fail(c,409,'一部の卓の休業・貸切は店舗全体の営業時間にできません',{code:'partial_tables'});
+ const cached=await cachedProfile(c,store.id);
+ if(!cached)return fail(c,409,'先にGoogleの営業時間を読み込んでください',{code:'profile_not_loaded'});
+ if(storeClosed(cached.profile))return fail(c,409,'Google側で臨時休業または閉業になっています',{code:'store_closed'});
+ const timeZone=await storeTimeZone(c,store.id),days:DayHours[]=[];
+ const mins=(t:string)=>Number(t.slice(0,2))*60+Number(t.slice(3));
+ const time=(n:number)=>n===1440?'00:00':String(Math.floor(n/60)%24).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+ for(let date=row.start_date;date<=row.end_date;date=addDays(date,1)){
+  if(row.all_day){days.push({date,closed:true,periods:[]});continue;}
+  const current=effectiveHoursFor(cached.profile,date),periods:HoursPeriod[]=[];
+  const start=mins(row.start_time!),end=mins(row.end_time!);
+  // 深夜営業は翌日への持ち越しも編集対象にしないと誤案になるため、既存の暦日指定で確認してもらう。
+  if(current.periods.some(p=>mins(p.close)<mins(p.open)&&p.close!=='00:00'))return fail(c,409,'深夜営業をまたぐ時間帯はGoogleの営業時間で日ごとに確認してください',{code:'overnight_hours'});
+  for(const p of current.periods){const a=mins(p.open),z=p.close==='00:00'?1440:mins(p.close);
+   if(z<=start||a>=end)periods.push(p);
+   else {if(a<start)periods.push({open:p.open,close:time(start)});if(z>end)periods.push({open:time(end),close:p.close});}}
+  days.push({date,closed:periods.length===0,periods});
+ }
+ const change=await proposeSpecial(c,store,cached.profile,timeZone,'calendar',days,null);
+ return change instanceof Response?change:c.json({success:true,change:publicChange(change)});
 });

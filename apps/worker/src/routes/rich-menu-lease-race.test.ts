@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 /**
- * 実の停止API・公開APIを、別のD1接続からの割り込みと一緒に動かす試験(#621)。
+ * 実の停止API・公開APIを、別のD1接続からの割り込みと一緒に動かす試験。
  *
  * ここでは @line-crm/db を差し替えない。実装が本当に使っている lease の
  * 書込み条件を通す。試験の中に「理想の手順」を書き直すと、実装から fence を

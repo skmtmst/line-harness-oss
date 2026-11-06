@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { Env } from '../worker-env.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 
 const mocks = vi.hoisted(() => ({
   canAccess: vi.fn(),
@@ -49,9 +51,10 @@ function database(state: DbState): D1Database {
 }
 
 function app(state: DbState, role: 'owner' | 'admin' | 'staff' = 'owner') {
-  const instance = new Hono<{ Bindings: { DB: D1Database } }>();
+  const instance = new Hono<Env>();
+  instance.onError(unhandledWorkerError);
   instance.use('*', async (c, next) => {
-    c.env = { DB: database(state) };
+    c.env = { DB: database(state) } as Env['Bindings'];
     c.set('staff' as never, { id: 'staff-1', role, tenantId: 'tenant-a' } as never);
     await next();
   });
@@ -96,7 +99,8 @@ describe('POST /api/nen-campaigns/columns', () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({ success: true, data: { id: expect.any(String) } });
     expect(mocks.canAccess).toHaveBeenCalledWith(expect.anything(), expect.anything(), ['account-a']);
-    expect(state.preparedSql).toHaveLength(2);
+    expect(state.preparedSql.filter(sql => !sql.includes('audit_events'))).toHaveLength(2);
+    expect(state.preparedSql.some(sql => sql.includes('audit_events'))).toBe(true);
     expect(state.preparedSql[1]).toContain('delivery_status, delivery_at');
     expect(state.preparedSql[1]).toContain("VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     expect(state.insertBinds).toEqual([
@@ -135,7 +139,8 @@ describe('POST /api/nen-campaigns/columns', () => {
      * 走ると prepare が増える。SELECT slug + INSERT の2本だけが、
      * 「下書きを作っただけで配信を予約していない」ことの印。
      */
-    expect(state.preparedSql).toHaveLength(2);
+    expect(state.preparedSql.filter(sql => !sql.includes('audit_events'))).toHaveLength(2);
+    expect(state.preparedSql.some(sql => sql.includes('audit_events'))).toBe(true);
     // delivery_at のbind位置（published_at の次）に希望日時が入る。
     expect(state.insertBinds?.[9]).toBe('2099-05-01T01:30:00.000Z');
   });
@@ -188,7 +193,7 @@ describe('POST /api/nen-campaigns/columns', () => {
       createRequest({ ...VALID, body: '保存してはいけない本文' }),
     );
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ success: false, error: 'request_invalid' });
+    expect(await response.json()).toMatchObject({ success: false, code: 'request_invalid' , fields: expect.any(Object), error: expect.any(String) });
     expect(state.preparedSql).toEqual([]);
   });
 
@@ -224,8 +229,9 @@ describe('POST /api/nen-campaigns/columns', () => {
       createRequest(VALID),
     );
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ success: false, error: 'column_create_failed' });
-    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('failed to create NEN column draft'));
+    expect(await response.json()).toEqual({ success: false, error: 'Internal Server Error', incidentId: expect.any(String) });
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('unhandled_worker_error'));
+    expect(consoleError.mock.calls.flat().join(' ')).not.toContain('no such table');
     consoleError.mockRestore();
   });
 });

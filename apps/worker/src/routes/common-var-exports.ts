@@ -1,3 +1,6 @@
+import { logger } from '@line-crm/shared/server';
+import { csvRecordCount } from '../middleware/output-audit.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   COMMON_VAR_EXPORT_MAX_BYTES,
@@ -20,19 +23,15 @@ import {
   updateCommonVarExportProgress,
   type CommonVarExportJobMeta,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { fail } from '../lib/fail.js';
+import type { Env } from '../worker-env.js';
+import { requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 /**
- * 共通情報の監査付き非同期CSV出力（N-192）。
- *
- * 以前は画面に読み込めた最大200件を端末でCSV化していただけで、
- * 出力依頼・監査記録・期限つきダウンロードが無かった。ここでは
- * 依頼ごとに台帳行を作り、バックグラウンドで全件をページングして
- * 書き出す。成果物は出力時点の写しとして台帳行に保管し、
- * 7日間だけダウンロードできる。
+ * 全件を安全に出力するため、依頼ごとに台帳と監査を作り、バックグラウンドでページングして CSV を生成する。
+ * 成果物は出力時点の写しとして保存し、ダウンロード期限を7日間に制限する。
  */
 
 export const commonVarExports = new Hono<Env>();
@@ -45,6 +44,13 @@ const EXPORT_JOBS_LIST_LIMIT = 20;
  * （{{var.xxx}}）ではなく {名前} の形にそろえる。
  */
 const CSV_HEADER = '共通情報,差し込みキー,中身,使われている場所,更新,次の変更日時,次の中身';
+
+async function exportFolderAvailable(db: D1Database, accountId: string, folderId?: string): Promise<boolean> {
+  if (!folderId) return true;
+  const folder = await getFolderById(db, folderId);
+  return Boolean(folder && folder.kind === 'common_var'
+    && (folder.account_id === null || folder.account_id === accountId));
+}
 
 function exportJobJson(job: CommonVarExportJobMeta, nowIso = new Date().toISOString()) {
   const filter = parseCommonVarExportFilter(job.filter_json);
@@ -145,7 +151,7 @@ export async function runCommonVarExportJob(db: D1Database, jobId: string): Prom
       finishedAt: finishedAt(),
     });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'common_var_export_failed', jobId, error: String(error) }));
+    logger.error("common_vars.export_failed");
     await failCommonVarExport(db, jobId, '書き出しの途中で失敗しました', finishedAt());
   }
 }
@@ -163,39 +169,34 @@ async function accessibleExportJob(
 commonVarExports.get('/api/common-vars/exports', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
     const jobs = await listCommonVarExportJobs(c.env.DB, accountId, EXPORT_JOBS_LIST_LIMIT);
     return c.json({ success: true, data: jobs.map((job) => exportJobJson(job)) });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'common_var_exports_list_failed', error: String(error) }));
-    return c.json({ success: false, error: '書き出しの履歴を読み込めませんでした' }, 500);
+    throw error;
   }
 });
 
-commonVarExports.post('/api/common-vars/exports', requireRole('owner', 'admin'), async (c) => {
+commonVarExports.post('/api/common-vars/exports', requireDeliveryAccess('commonVars', 'export'), inputJsonBoundary({"accountId":["string"],"folderId":["null","string"],"ungrouped":["boolean"]}), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: string; folderId?: string | null; ungrouped?: boolean }>();
     const accountId = body.accountId?.trim();
     const folderId = typeof body.folderId === 'string' && body.folderId ? body.folderId : undefined;
     const ungrouped = body.ungrouped === true;
     if (!accountId) {
-      return c.json({ success: false, error: '対象アカウントを選んでください' }, 400);
+      return inputError(c, { success: false, error: '対象アカウントを選んでください' }, 400, ["accountId"]);
     }
     if (folderId && ungrouped) {
-      return c.json({ success: false, error: 'フォルダと未分類は同時に選べません' }, 400);
+      return inputError(c, { success: false, error: 'フォルダと未分類は同時に選べません' }, 400, ["folderId","ungrouped"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    if (folderId) {
-      const folder = await getFolderById(c.env.DB, folderId);
-      if (!folder || folder.kind !== 'common_var'
-        || (folder.account_id !== null && folder.account_id !== accountId)) {
-        return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
-      }
+    if (!await exportFolderAvailable(c.env.DB, accountId, folderId)) {
+      return inputError(c, { success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400, ["folderId","accountId"]);
     }
     const staff = c.get('staff');
     const now = new Date();
@@ -216,10 +217,10 @@ commonVarExports.post('/api/common-vars/exports', requireRole('owner', 'admin'),
       await task;
     }
     const fresh = await getCommonVarExportJob(c.env.DB, job.id);
+    c.set('outputAudit', { count: (fresh ?? job).row_count, accountId: accountId, targetId: job.id, phase: 'requested' });
     return c.json({ success: true, data: exportJobJson(fresh ?? job) }, 201);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'common_var_export_create_failed', error: String(error) }));
-    return c.json({ success: false, error: '書き出しを作れませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -234,12 +235,11 @@ commonVarExports.get('/api/common-vars/exports/:id', requireRole('owner', 'admin
     }
     return c.json({ success: true, data: exportJobJson(job) });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'common_var_export_status_failed', error: String(error) }));
-    return c.json({ success: false, error: '書き出しの状態を確認できませんでした' }, 500);
+    throw error;
   }
 });
 
-commonVarExports.get('/api/common-vars/exports/:id/download', requireRole('owner', 'admin'), async (c) => {
+commonVarExports.get('/api/common-vars/exports/:id/download', requireDeliveryAccess('commonVars', 'export'), async (c) => {
   const job = await accessibleExportJob(c.env.DB, c.get('staff'), c.req.param('id'));
   if (!job) {
     auditLog(c, 'common_var_export.download', { kind: 'common_var_export', id: c.req.param('id') }, { result: 'denied' });
@@ -262,6 +262,7 @@ commonVarExports.get('/api/common-vars/exports/:id/download', requireRole('owner
   }
   auditLog(c, 'common_var_export.download', { kind: 'common_var_export', id: job.id },
     { result: 'success', lineAccountId: job.line_account_id });
+  c.set('outputAudit', { count: csvRecordCount(fresh.csv_text), accountId: job.line_account_id, targetId: job.id });
   return new Response(`\uFEFF${fresh.csv_text}`, {
     headers: {
       'content-type': 'text/csv; charset=utf-8',
@@ -271,11 +272,20 @@ commonVarExports.get('/api/common-vars/exports/:id/download', requireRole('owner
   });
 });
 
-commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireRole('owner', 'admin'), async (c) => {
+commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireDeliveryAccess('commonVars', 'export'), inputJsonBoundary(), async (c) => {
   try {
     const job = await accessibleExportJob(c.env.DB, c.get('staff'), c.req.param('id'));
     if (!job) return c.json({ success: false, error: 'Not found' }, 404);
     const filter = parseCommonVarExportFilter(job.filter_json);
+    if (filter.accountId !== job.line_account_id) {
+      return inputError(c, { success: false, error: '前の書き出し条件を読み取れません。一覧の絞り込みから書き出してください' }, 400);
+    }
+    if (filter.folderId && filter.ungrouped) {
+      return inputError(c, { success: false, error: 'フォルダと未分類は同時に選べません' }, 400, ["folderId","ungrouped"]);
+    }
+    if (!await exportFolderAvailable(c.env.DB, job.line_account_id, filter.folderId)) {
+      return inputError(c, { success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400, ["folderId","accountId"]);
+    }
     const staff = c.get('staff');
     const now = new Date();
     const next = await createCommonVarExportJob(c.env.DB, {
@@ -294,9 +304,9 @@ commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireRole('ow
       await task;
     }
     const fresh = await getCommonVarExportJob(c.env.DB, next.id);
+    c.set('outputAudit', { count: (fresh ?? next).row_count, accountId: job.line_account_id, targetId: next.id, phase: 'requested' });
     return c.json({ success: true, data: exportJobJson(fresh ?? next) }, 201);
   } catch (error) {
-    console.error(JSON.stringify({ event: 'common_var_export_regenerate_failed', error: String(error) }));
-    return c.json({ success: false, error: 'もう一度書き出せませんでした' }, 500);
+    throw error;
   }
 });

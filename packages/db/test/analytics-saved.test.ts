@@ -14,7 +14,7 @@ import { asD1 } from './d1-test-helper.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-describe('V6 保存した分析', () => {
+describe('保存した分析', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 

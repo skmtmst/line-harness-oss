@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * スイッチ。Pencil V5 の機能設定（31-1）で43個並ぶ。
@@ -7,19 +8,19 @@
  */
 
 .toggle {
+  --toggle-hit-size: var(--space-24);
   position: relative;
   display: inline-block;
-  width: 36px; /* width: 36 */
-  height: 20px; /* height: 20 */
-  border-radius: var(--radius-pill); /* cornerRadius: $radius-full */
+  vertical-align: top;
+  line-height: 0;
+  width: var(--toggle-width); /* width: 36 */
+  height: var(--toggle-height); /* height: 20 */ /* cornerRadius: $radius-full */
   /*
-   * ★V7（2026-09-24、better-accessibility：部品の見分けは 3:1）。オフの地は $step-idle（#eef0f3）で
+   * ★管理画面（2026-09-24、better-accessibility：部品の見分けは 3:1）。オフの地は $step-idle（#eef0f3）で
    * 白い地と 1.1:1 しかなく、切替があること自体が見えなかった。ink-faint を 72% にして約 3.2:1。
    */
-  background: color-mix(in srgb, var(--color-ink-faint) 72%, var(--color-canvas));
   border: none;
   cursor: pointer;
-  transition: background-color var(--motion-fast) var(--motion-ease-out);
   flex: none;
 }
 
@@ -30,14 +31,24 @@
   left: 2px;
   width: 16px; /* つまみ 16 */
   height: 16px;
-  border-radius: var(--radius-pill);
   background: var(--color-canvas); /* fill: $canvas */
   transition: transform var(--motion-fast) var(--motion-ease-out);
 }
 
+/* 見える軌道は20pxのまま、周囲の透明な当たりを共通の最小寸法まで広げる。 */
+.toggle::before {
+  content: '';
+  position: absolute;
+  inset-inline: min(0px, calc((100% - var(--toggle-hit-size)) / 2));
+  inset-block: min(0px, calc((var(--toggle-height) - var(--toggle-hit-size)) / 2));
+}
+
+@media (pointer: coarse) {
+  .toggle { --toggle-hit-size: 44px; }
+}
+
 .on {
-  /* ★V7：明るい緑は白い地と 2.26:1。濃い緑で 5.44:1。 */
-  background: var(--color-accent-deep); /* fill: $accent-deep */
+  /* ★管理画面：明るい緑は白い地と 2.26:1。濃い緑で 5.44:1。 */ /* fill: $accent-deep */
 }
 
 .on::after {
@@ -45,8 +56,7 @@
 }
 
 /* 消せない項目。オンのまま押せない。 */
-.locked {
-  background: var(--color-hairline); /* fill: $hairline */
+.locked { /* fill: $hairline */
   cursor: not-allowed;
 }
 
@@ -55,7 +65,68 @@
 }
 
 .toggle:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
+
+/*
+ * ★V8「トグル」（bkjTv・LxHpj）：大きさ・つまみ・オンの緑は 管理画面 と同じ。
+ * オフの地は操作する部品の枠色（choice-border）に合わせる。
+ * 「消せない項目」はオフに見せてはいけないので髪線の灰のまま保つ。
+ */
+:root .toggle {
+  background: var(--color-choice-border);
+}
+
+:root .on {
+  background: var(--color-accent-deep);
+}
+
+:root .locked {
+  background: var(--color-toggle-locked);
+}
+
+/*
+ * ★V8 仕上げ（M10-2）：トグルの乗せた・押した動き。
+ * 乗せたときは地を少し濃く、押したときはほんの少し沈む（明るさで）。
+ * どちらも 120ms。押せない項目（locked）は動かさない。
+ */
+:root .toggle {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    filter var(--motion-fast) var(--motion-ease-out);
+}
+
+:root .toggle:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+:root .toggle:active:not(:disabled) {
+  filter: brightness(0.88);
+}
+
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
+:root .toggle { padding: 2px; background: var(--color-toggle-off); }
+:root .on { background: var(--gradient-choice-on) var(--color-accent-deep); box-shadow: var(--shadow-choice-on); }
+:root .locked { background: var(--color-toggle-locked); }
+:root .toggle::after { border-radius: 50%; box-shadow: var(--shadow-controls-toggle); }
+:root .toggle { gap: 0; border-radius: var(--polish-radius-pill); }
+}
+
+:root .toggle:disabled { opacity: var(--polish-disabled-opacity); cursor: not-allowed; }
+
+.field { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--space-12); min-width: 0; color: var(--color-ink); font-size: var(--text-body); line-height: var(--text-body--line-height); }
+.fieldBody { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.description { color: var(--color-ink-secondary); font-size: var(--text-caption); }
+
+.groupActions { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--space-8); min-width: 0; }
+
+/* 権限がない時も状態と焦点を保ち、灰色と共通の理由で伝える。 */
+html:root .toggle[data-permission-locked],
+html:root .toggle[data-permission-locked]:is(:hover, :active) {
+  background: var(--color-toggle-locked);
+  opacity: var(--polish-disabled-opacity);
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: none;
 }

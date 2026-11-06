@@ -1,0 +1,153 @@
+// @vitest-environment happy-dom
+import React, { act } from 'react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { api } from '@/lib/api'
+import type { BannerImage } from '@/lib/hq-banners'
+import HqBannersListV8 from '@/v8/hq-banners/list'
+import { flushListUrlState } from '@/components/shared/list-url-state'
+
+
+const nav = vi.hoisted(() => ({ query: '', push: vi.fn(), replace: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: nav.push, replace: nav.replace, prefetch: () => {} }), useSearchParams: () => new URLSearchParams(nav.query) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => ({ id: 'banner-test-staff' }), useStaffRole: () => 'owner', canManageRole: () => true }))
+
+type ImagePage = Awaited<ReturnType<typeof api.hqBanners.images.list>>
+
+function image(id: string): BannerImage {
+  return {
+    id, projectId: 'project', generationId: null, sequence: 1,
+    source: 'upload', parentImageId: null, isFavorite: false,
+    createdBy: null, createdAt: '2026-10-04T12:00:00+09:00',
+    media: {
+      id: `media-${id}`, filename: `${id}.png`, mimeType: 'image/png',
+      sizeBytes: 100, width: 100, height: 100, url: `https://example.test/${id}.png`,
+    },
+    generation: null, deliveredAccountIds: [],
+  }
+}
+
+function page(ids: string[], nextBefore: string | null = null): ImagePage {
+  return { success: true, data: ids.map(image), nextBefore }
+}
+
+let previousTheme: string | undefined
+
+beforeEach(() => {
+
+  flushListUrlState()
+  window.history.replaceState({}, '', '/hq/banners?tab=library')
+  nav.query = 'tab=library'
+  vi.spyOn(api.hqBanners, 'presets').mockResolvedValue({ success: true, data: {
+    presets: [], maxCount: 10, engineReady: true,
+    usage: { month: { used: 0, limit: 100, remaining: 100 }, today: { used: 0, limit: 10, remaining: 10 }, paused: false, pausedReason: null },
+  } })
+  vi.spyOn(api.hqBanners, 'stats').mockResolvedValue({ success: true, data: { projects: { active: 0, archived: 0 }, deliveredImages: 0, deliveredAccounts: 0 } })
+  vi.spyOn(api.lineAccounts, 'list').mockResolvedValue({ success: true, data: [] })
+  previousTheme = document.documentElement.dataset.theme
+  document.documentElement.dataset.theme = 'v8'
+  vi.spyOn(api.hqBanners.projects, 'list').mockResolvedValue({ success: true, data: [] })
+})
+
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+  if (previousTheme === undefined) delete document.documentElement.dataset.theme
+  else document.documentElement.dataset.theme = previousTheme
+})
+
+async function open() {
+  const view = render(<HqBannersListV8 />)
+  await screen.findByRole('button', { name: '次の 12 件' })
+  return view
+}
+
+async function chooseSize(size: number) {
+  fireEvent.click(screen.getByRole('button', { name: '画像の取得件数' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: `${size}枚`, exact: true }))
+  await waitFor(() => expect(document.querySelector('[data-list-state="loading"]')).toBeNull())
+}
+
+describe('画像ライブラリの取得枚数と続きの読み込み', () => {
+  it('V8は12枚で読み込み、件数から取得条件の説明を確認できる', async () => {
+    const list = vi.spyOn(api.hqBanners.images, 'list').mockResolvedValue(page(['first'], 'cursor-10'))
+    await open()
+    expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: 12, withCounts: true })
+    expect(screen.getByRole('button', { name: '次の 12 件' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '画像の取得件数' }))
+    expect(screen.getByText(/一度に読み込む画像の枚数です/)).toBeTruthy()
+  })
+
+  it.each([20, 50])('取得枚数を%d枚へ変えると一覧と次の読み込み位置を更新する', async (size) => {
+    const list = vi.spyOn(api.hqBanners.images, 'list').mockResolvedValue(page(['old'], 'old-cursor'))
+    const view = await open()
+    list.mockResolvedValue(page(['new'], 'new-cursor'))
+    await chooseSize(size)
+    await screen.findByRole('button', { name: `次の ${size} 件` })
+    expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: size, withCounts: true })
+    expect(view.container.querySelector('img')?.getAttribute('src')).toBe('https://example.test/new.png')
+
+    list.mockResolvedValue(page(['next']))
+    fireEvent.click(screen.getByRole('button', { name: `次の ${size} 件` }))
+    await screen.findByRole('button', { name: `前の ${size} 件` })
+    expect(list).toHaveBeenLastCalledWith({ favorite: false, before: 'new-cursor', limit: size, withCounts: true })
+  })
+
+  it('次のページで重複画像を除き、最後まで読んだら次の操作を閉じる', async () => {
+    const list = vi.spyOn(api.hqBanners.images, 'list').mockResolvedValue(page(['first'], 'cursor'))
+    const view = await open()
+    list.mockResolvedValue(page(['first', 'second', 'second']))
+    fireEvent.click(screen.getByRole('button', { name: '次の 12 件' }))
+    await screen.findByRole('button', { name: '前の 12 件' })
+    expect(view.container.querySelectorAll('img')).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: /次の .* 件/ })).toBeNull()
+  })
+
+  it('続きを待っている間に枚数を変えても、遅れて届いた古い画像を混ぜない', async () => {
+    const list = vi.spyOn(api.hqBanners.images, 'list').mockResolvedValue(page(['old'], 'old-cursor'))
+    const view = await open()
+    let finishOld!: (response: ImagePage) => void
+    list.mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve }))
+    fireEvent.click(screen.getByRole('button', { name: '次の 12 件' }))
+    list.mockResolvedValue(page(['new']))
+    await chooseSize(20)
+    await screen.findByRole('button', { name: '画像の取得件数' })
+    await act(async () => { finishOld(page(['late'], 'late-cursor')) })
+    expect(view.container.querySelectorAll('img')).toHaveLength(1)
+    expect(view.container.querySelector('img')?.getAttribute('src')).toBe('https://example.test/new.png')
+    expect(screen.queryByRole('button', { name: /次の .* 件/ })).toBeNull()
+  })
+
+  it('枚数の変更後に取得が失敗しても、選んだ枚数で再読み込みできる', async () => {
+    const list = vi.spyOn(api.hqBanners.images, 'list').mockResolvedValue(page(['first'], 'cursor'))
+    await open()
+    list.mockRejectedValue(new Error('通信失敗'))
+    await chooseSize(20)
+    await screen.findByText('一覧を読み込めませんでした')
+    list.mockResolvedValue(page(['retried']))
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    await screen.findByRole('button', { name: '画像の取得件数' })
+    expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: 20, withCounts: true })
+  })
+
+  it('旧テーマ指定が残っていてもV8の12枚と現在の選択へ固定する', async () => {
+    document.documentElement.dataset.theme = 'v7'
+    const list = vi.spyOn(api.hqBanners.images, 'list').mockResolvedValue(page(['first'], 'cursor'))
+    await open()
+    expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: 12, withCounts: true })
+    expect(screen.getByRole('button', { name: '次の 12 件' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '画像の取得件数' })).toBeTruthy()
+  })
+})
+
+it('検索・渡し済み条件をAPIへ送り、続きにも同じ条件を送る', async () => {
+  const list = vi.spyOn(api.hqBanners.images, 'list').mockResolvedValue(page(['first'], 'cursor'))
+  await open()
+  fireEvent.change(screen.getByRole('searchbox', { name: 'テキスト・指示で探す' }), { target: { value: '全件の検索' } })
+  await waitFor(() => expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: 12, q: '全件の検索', withCounts: true }))
+  fireEvent.click(screen.getByRole('button', { name: '配布済み' }))
+  await waitFor(() => expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: 12, q: '全件の検索', delivered: true, withCounts: true }))
+  fireEvent.click(await screen.findByRole('button', { name: '次の 12 件' }))
+  await waitFor(() => expect(list).toHaveBeenLastCalledWith({ favorite: false, before: 'cursor', limit: 12, q: '全件の検索', delivered: true, withCounts: true }))
+})

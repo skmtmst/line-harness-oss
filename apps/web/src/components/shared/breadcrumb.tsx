@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { Fragment } from 'react'
 import styles from './breadcrumb.module.css'
 
@@ -13,14 +13,14 @@ export interface Crumb {
  *
  * 最後の1つが「いま開いている場所」。ここにリンクを張らない。
  */
-export default function Breadcrumb({ items, className }: { items: Crumb[]; className?: string }) {
+export default function Breadcrumb({ items, className, appearance = 'default' }: { items: Crumb[]; className?: string; appearance?: 'default' | 'banner' }) {
   return (
-    <nav aria-label="現在の場所" className={[styles.list, className].filter(Boolean).join(' ')}>
+    <nav aria-label="現在の場所" className={[styles.list, className].filter(Boolean).join(' ')} data-appearance={appearance}>
       {items.map((item, index) => {
         const last = index === items.length - 1
         return (
           <Fragment key={`${item.label}-${index}`}>
-            {index > 0 ? <ChevronRight /> : null}
+            {index > 0 ? (appearance === 'banner' ? <span className={styles.separator} aria-hidden>›</span> : <ChevronRight />) : null}
             {item.href && !last ? (
               <Link href={item.href} className={styles.link}>
                 {item.label}
@@ -39,7 +39,7 @@ export default function Breadcrumb({ items, className }: { items: Crumb[]; class
 
 function ChevronRight() {
   return (
-    <svg className={styles.separator} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+    <svg className={styles.separator} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden>
       <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )

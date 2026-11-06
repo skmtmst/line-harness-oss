@@ -1,0 +1,100 @@
+/*
+ * ★V8 共通アクションの版と使われている場所（Pencil ）。
+ * 枠・見出しは型（DetailPage）が持つ。ここは数のマス・版の履歴・呼び出し元の表だけ。
+ */
+
+
+
+
+/* 枠・数の帯・頭・札・表の描画は型と共通部品が持つ。 */
+.cardLead {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-am-ver-lead-lh);
+}
+.versionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.versionRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--tpl-am-col-gap);
+  min-height: var(--tpl-am-ver-row-h);
+  flex-shrink: 0;
+  box-shadow: var(--shadow-row-line);
+}
+.versionName {
+  width: var(--tpl-am-ver-name-w);
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: normal;
+}
+.versionChain {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* 利用先の内容と列の幅。共通表の色・余白・行は上書きしない。 */
+.usage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+}
+.colPinned { width: var(--tpl-am-ver-col-pinned); flex-shrink: 0; }
+.colNum { width: var(--tpl-am-ver-col-num); flex-shrink: 0; }
+.colState { width: var(--tpl-am-ver-col-state); flex-shrink: 0; }
+.colOps { width: var(--tpl-am-ver-col-ops); flex-shrink: 0; }
+.whereSub {
+  display: block;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-row-sub-size);
+}
+.cell {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+.cellMuted {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+/* 利用先を更新する窓の中身。 */
+.compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-cell-gap-half);
+}
+.compareLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.compareValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+.changeList {
+  margin: 0;
+  padding-left: var(--tpl-rule-row-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}

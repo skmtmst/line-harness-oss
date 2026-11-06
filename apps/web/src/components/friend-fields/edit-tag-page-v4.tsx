@@ -1,17 +1,19 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError, type TagDefinition, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { useId, useRef, useState } from 'react'
+import type { Tag } from '@line-crm/shared'
+import { api, describeSaveFailure, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
-import TargetMissing from '@/components/shared/target-missing'
-import TagEditorV4, { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from './tag-editor-v4'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
+import { CreatePage } from '@/components/templates/create-page'
+import { Field, TextInput } from '@/components/shared/form-controls'
+import { TextArea } from '@/components/shared/text-field'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { notifyToast } from '@/components/shared/toast'
+import { formatNumber } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /**
  * 一覧の `DeleteTagDialog` (`tags-page-v4.tsx`) と同じ分け方。
@@ -32,10 +34,11 @@ function sumRefCounts(counts: TagDeleteImpactReferences, keys: Array<keyof TagDe
   return keys.reduce((total, key) => total + (counts[key] ?? 0), 0)
 }
 
-export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, onDelete, deleting, initialConfirmation = '' }: { tag: Tag; dependencies: TagDependencies | null; dependenciesStatus: 'loading' | 'ready' | 'error'; onCancel: () => void; onDelete: () => void; deleting: boolean; initialConfirmation?: string }) {
+export function DeleteDialog({ tag, accountId, dependencies, dependenciesStatus, onCancel, onDelete, deleting, initialConfirmation = '' }: { tag: Tag; accountId?: string | null; dependencies: TagDependencies | null; dependenciesStatus: 'loading' | 'ready' | 'error'; onCancel: () => void; onDelete: () => void; deleting: boolean; initialConfirmation?: string }) {
   const [confirmation, setConfirmation] = useState(initialConfirmation)
+  const confirmationId = useId()
   /*
-   * 参照件数は `load()` で取った実値を出す。取れていないときは `—`。
+   * 参照件数は `load` で取った実値を出す。取れていないときは `—`。
    * 0件と書くと「消しても大丈夫」と読み違える。**取れていないあいだは
    * 削除を押せなくする。** 失敗を「参照0件」と読み違えて使用中の
    * タグを消させないため(一覧の `DeleteTagDialog` と同じ作法)。
@@ -63,31 +66,27 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
       description="削除すると、このタグを使っている設定と友だちへの付与状態に影響します。"
       busy={deleting}
       onCancel={onCancel}
-      footer={(
-        <div className="flex items-center justify-end gap-2">
-          {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
+      footer={(<DialogActions leadingAction={blockedReason || undefined}>
           <Button onClick={onCancel} disabled={deleting}>キャンセル</Button>
           <Button
             variant="danger"
             onClick={onDelete}
-            disabled={deleting || blocked || confirmation !== tag.name}
-          >
-            {deleting ? '削除中…' : 'タグを削除'}
+            disabled={deleting || blocked || confirmation !== tag.name} busy={deleting} busyLabel="削除中…">タグを削除する
           </Button>
-        </div>
-      )}
+        </DialogActions>)}
     >
-      <div className="overflow-hidden rounded-control border border-hairline">
+      <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
+      <div className="w-full overflow-hidden rounded-control border border-hairline">
         <dl className="divide-y divide-hairline text-sm">
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-bold">{(dependencies?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人</dd></div>
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">配信・シナリオなどの参照</dt><dd className="font-bold">{manualRefs === null ? '—' : `${manualRefs}件`}</dd></div>
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動付与の参照</dt><dd className="font-bold">{autoRefs === null ? '—' : `${autoRefs}件`}</dd></div>
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">連動アクション</dt><dd className="font-bold">停止</dd></div>
-          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">すでに積んだマイル</dt><dd className="font-bold">そのまま残る</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-medium">{formatNumber((dependencies?.friendCount ?? tag.friendCount ?? 0))}人</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">配信・シナリオなどの参照</dt><dd className="font-medium">{manualRefs === null ? '—' : `${manualRefs}件`}</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動付与の参照</dt><dd className="font-medium">{autoRefs === null ? '—' : `${autoRefs}件`}</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">連動アクション</dt><dd className="font-medium">停止</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">すでに積んだマイル</dt><dd className="font-medium">そのまま残る</dd></div>
         </dl>
       </div>
-      <Notice tone="danger" className="mt-4">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</Notice>
-      <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため「{tag.name}」と入力してください</span><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked || deleting} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" /></label>
+      <Notice tone="warn" role="alert" className="mt-4">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</Notice>
+      <div className="mt-5"><Field label={`確認のため「${tag.name}」と入力してください`} htmlFor={confirmationId} required><SaveErrorField names={["confirmation"]}><TextInput id={confirmationId} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked || deleting} /></SaveErrorField></Field></div>
     </Dialog>
   )
 }
@@ -103,217 +102,56 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
  * タグには archived を active に戻す口が無い（司令塔裁定・Issue #710）。
  * 戻せないので、名前・説明の訂正だけは常に許す。
  */
-function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
+export function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
   tag: Tag
   accountId: string
   onCancel: () => void
   onSaved: (updated: Tag) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [name, setName] = useState(tag.name)
   const [description, setDescription] = useState(tag.description ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // M956: 応答消失後の再送用。同じ内容の再送は同じ要求キー、成功したら捨てる。
+  const saveKeysRef = useRef(new IdempotencyKeyStore())
 
   const save = async () => {
-    if (saving) return
+
     setSaving(true)
     setError('')
     try {
-      const result = await api.tags.updateArchivedNameAndDescription(tag.id, accountId, tag.version ?? 1, {
-        name, description: description || null,
-      })
+      const payload = { name, description: description || null }
+      const sig = JSON.stringify(payload)
+      const result = await api.tags.updateArchivedNameAndDescription(tag.id, accountId, tag.version ?? 1, payload, saveKeysRef.current.get(sig))
       if (!result.success) throw new Error(result.error)
-      notifyToast('保存しました。')
+      saveKeysRef.current.clear(sig)
+      notifyToast(result.data.replayed ? '保存済みでした。' : '保存しました。')
       onSaved(result.data.tag)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(reason)
+
+      // 500等は ApiError の内部文（API error: 500）を出さず、既存の保存失敗案内へ。
+      { if (!fieldFailure) setError(describeSaveFailure(reason)) }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="mx-auto max-w-[680px] space-y-4 p-6">
+    <SaveErrorScope errors={saveErrors}><CreatePage title="保管済みタグを直す" busy={saving} dirty={false}
+      footerActions={<>
+        <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
+        <Button variant="primary" onClick={() => save()} disabled={saving || !name.trim()} busy={saving}>保存する</Button>
+      </>}>
       <Notice tone="warn">
         <p className="font-bold">このタグは保管済みです</p>
         <p className="mt-1 text-xs leading-5">保管済みのタグは、あとから元に戻す機能がありません。誤字などの表示名の訂正だけできます。フォルダ・付与のしかた・マイル・連動アクションなどの設定は変更できません。</p>
       </Notice>
       {error && <Notice tone="danger">{error}</Notice>}
-      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名</span><input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></label>
-      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></label>
-      <div className="flex justify-end gap-2">
-        <Button onClick={onCancel}>キャンセル</Button>
-        <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()}>{saving ? '保存中…' : '保存'}</Button>
-      </div>
-    </div>
-  )
-}
-
-export default function EditTagPageV4() {
-  usePageTitle('タグを編集')
-  const router = useRouter()
-  const params = useSearchParams()
-  const { selectedAccountId, selectedAccount } = useAccount()
-  const tagId = params.get('id') ?? ''
-  const retroactiveReference = params.get('visualQa') === 'retroactive'
-  const [tag, setTag] = useState<Tag | null>(null)
-  const [definition, setDefinition] = useState<TagDefinition | null>(null)
-  const [groups, setGroups] = useState<TagGroup[]>([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
-  const [tagMissing, setTagMissing] = useState(false)
-  /*
-   * 削除確認に出す参照件数。`load()` で取った実値を `DeleteDialog` へ渡す。
-   * 取れていないのに開いたら、窓の中は `—` で削除は押せない。
-   */
-  const [dependencies, setDependencies] = useState<TagDependencies | null>(null)
-  const [dependenciesStatus, setDependenciesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-
-  const load = useCallback(async () => {
-    if (!tagId || !selectedAccountId) { setLoading(false); return }
-    setLoading(true)
-    setError('')
-    setTagMissing(false)
-    try {
-      const [detail, dependenciesResult, folders] = await Promise.all([
-        api.tags.definition(tagId, selectedAccountId),
-        api.tags.dependencies(tagId, selectedAccountId),
-        api.tagGroups.list(selectedAccountId),
-      ])
-      if (folders.success) setGroups(folders.data.filter((group) => group.accountId === selectedAccountId))
-      if (dependenciesResult.success) {
-        setDependencies(dependenciesResult.data)
-        setDependenciesStatus('ready')
-      } else {
-        setDependencies(null)
-        setDependenciesStatus('error')
-      }
-      if (!detail.success) throw new Error(detail.error)
-      setDefinition(detail.data)
-      setTag({ ...detail.data.tag, friendCount: dependenciesResult.success ? dependenciesResult.data.friendCount : detail.data.tag.friendCount })
-    } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 404) {
-        setTagMissing(true)
-      } else {
-        setError('読み込みに失敗しました。もう一度読み込んでください。')
-      }
-      // 参照だけ取れていたのに消すと、窓が「取れていない」扱いになる。
-      // 取れていた分は残し、まだ無いときだけ失敗にする。
-      setDependenciesStatus((prev) => (prev === 'ready' ? prev : 'error'))
-    } finally {
-      setLoading(false)
-    }
-  }, [tagId, selectedAccountId])
-
-  useEffect(() => { void load() }, [load])
-
-  const save = async (values: TagEditorValues, _andAnother: boolean, applyRetroactive: boolean, previewToken?: string) => {
-    if (!tag || !definition || !selectedAccountId || saving) return
-    setSaving(true)
-    setError('')
-    setNotice('')
-    try {
-      const update = await api.tags.updateDefinition(tag.id, selectedAccountId, tag.version ?? 1, {
-        name: values.name,
-        groupId: values.groupId || null,
-        isStarred: values.isStarred,
-        manualAssignmentAllowed: tag.manualAssignmentAllowed ?? true,
-        reapplyPolicy: values.reapplyPolicy,
-        linkedEnabled: values.linked,
-        mileage: { self: values.rewardMiles, referrer: values.referralRewardMiles, multiplier: values.multiplierBps, priority: values.multiplierPriority },
-        actions: definitionsForSave(values.actions),
-        applyToExisting: applyRetroactive && values.applyToExisting,
-        // 遡及は事前計算（確認窓）の結果と引き換え。ズレたらサーバーが止める。
-        ...(previewToken ? { previewToken } : {}),
-        automationId: definition.automation?.id ?? null,
-        automationDraftVersion: definition.automation?.draftVersion?.id ?? null,
-      })
-      if (!update.success) throw new Error(update.error)
-      setNotice(update.data.queued > 0 ? `保存しました。${update.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
-      await load()
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const remove = async () => {
-    if (!tag || deleting) return
-    setDeleting(true)
-    try {
-      const result = await api.tags.delete(tag.id)
-      if (!result.success) throw new Error(result.error)
-      router.push('/tags')
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。')
-      setDeleteOpen(false)
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  if (loading) return <p className="p-6 text-sm text-ink-faint">読み込み中…</p>
-  if (!tagId) {
-    return (
-      <TargetMissing
-        kind="unspecified"
-        title="編集するタグが指定されていません"
-        description="一覧から編集するタグを選び直してください。"
-        backHref="/tags"
-        backLabel="タグ一覧へ戻る"
-      />
-    )
-  }
-  if (!selectedAccountId) return <Notice tone="warn">LINE公式アカウントを選んでください。</Notice>
-  if ((!tag || !definition) && (tagMissing || !error)) {
-    return (
-      <TargetMissing
-        kind="not-found"
-        title="このタグは見つかりません"
-        description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
-        accountName={selectedAccount?.name}
-        backHref="/tags"
-        backLabel="タグ一覧へ戻る"
-      />
-    )
-  }
-  if (!tag || !definition) {
-    return (
-      <TargetMissing
-        kind="error"
-        title="タグを読み込めませんでした"
-        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
-        onRetry={() => void load()}
-      />
-    )
-  }
-
-  // 保管済み(archived)タグは、通常の編集フォームを出さない(#710)。
-  if (tag.status === 'archived') {
-    return (
-      <ArchivedTagEditor
-        tag={tag}
-        accountId={selectedAccountId}
-        onCancel={() => router.push('/tags')}
-        // load() は setLoading(true) を伴い、読み込み中画面がこのまま
-        // 一度アンマウントされて「保存しました。」が一瞬で消える
-        // （画面が全部作り直されるため）。保存直後は PATCH の戻り値で
-        // その場を更新するだけにする。
-        onSaved={(updated) => setTag((current) => (current ? { ...current, ...updated } : current))}
-      />
-    )
-  }
-
-  return (
-    <>
-      <TagEditorV4 key={`${tag.id}:${tag.version ?? 1}`} mode="edit" groups={groups} tag={tag} accountId={selectedAccountId} initialApplyToExisting={retroactiveReference} initialRetroactiveOpen={retroactiveReference} referenceRetroactiveState={retroactiveReference} initialValues={{ reapplyPolicy: tag.reapplyPolicy ?? 'first_only', actions: (definition.automation?.actions ?? []).map((action) => linkedActionFromDefinition(action, tag.linkedActions?.find((saved) => saved.id === action.id))) }} saving={saving} error={error} notice={notice} onCancel={() => router.push('/tags')} onSave={save} onDelete={() => setDeleteOpen(true)} />
-      {deleteOpen && <DeleteDialog tag={tag} dependencies={dependencies} dependenciesStatus={dependenciesStatus} deleting={deleting} onCancel={() => setDeleteOpen(false)} onDelete={() => void remove()} />}
-    </>
+      <Field label="タグ名" htmlFor="archived-tag-name"><SaveErrorField names={["name"]}><TextInput id="archived-tag-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} /></SaveErrorField></Field>
+      <Field label="説明" htmlFor="archived-tag-description"><SaveErrorField names={["description"]}><TextArea id="archived-tag-description" value={description} onChange={(event) => setDescription(event.target.value)} rows={3} /></SaveErrorField></Field>
+    </CreatePage></SaveErrorScope>
   )
 }

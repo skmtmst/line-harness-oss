@@ -1,5 +1,5 @@
 /*
- * マイペットの給与量（★V6 37-2「今日の目安」）。NRC／FEDIAF の式を固定する。
+ * マイペットの給与量（★37-2「今日の目安」）。NRC／FEDIAF の式を固定する。
  *  RER = 70 × 体重^0.75、MER = RER × 係数、g = MER ÷ 主食の kcal/100g × 100
  */
 import { describe, expect, it } from 'vitest';

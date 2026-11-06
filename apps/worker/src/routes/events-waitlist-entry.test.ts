@@ -1,5 +1,5 @@
 /*
- * 満席の申込がキャンセル待ちへ入ること (#747 / N-416)。
+ * 満席の申込がキャンセル待ちへ入ること。
  *
  * 満席には**2つの負け方**がある。
  *  1. 申し込む前から埋まっていた (申込前の空き確認で分かる)
@@ -15,7 +15,7 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 
 const accountAccessMocks = vi.hoisted(() => ({
@@ -66,6 +66,10 @@ function seed(raw: Raw, opts: { capacity: number | null; waitlist: 0 | 1 }): voi
         max_bookings_per_friend, waitlist_enabled)
      VALUES ('ev-1', 'account-1', '体験会', 'single', 1, 0, 3, ?)`,
   ).run(opts.waitlist);
+  // m26g: 本番では移行 492 が is_published=1 を lifecycle published へ
+  // 埋め直す。直 INSERT の DEFAULT(draft)のままでは公開中の想定が崩れる
+  // ため、試験の前提（公開中の体験会）どおりに状態も公開にする。
+  raw.prepare(`UPDATE events SET lifecycle_status = 'published' WHERE id = 'ev-1'`).run();
   raw.prepare(
     `INSERT INTO event_slots (id, event_id, starts_at, ends_at, capacity, is_active)
      VALUES ('slot-1', 'ev-1', ?, ?, ?, 1)`,
@@ -127,8 +131,17 @@ function pauseBefore(db: D1Database, matches: (sql: string) => boolean, method: 
   const released = new Promise<void>(resolve => { resume = resolve; });
   let intercepted = false;
   const prepare = db.prepare.bind(db);
+  const originals=new WeakMap<D1PreparedStatement,D1PreparedStatement>();
+  const targets=new WeakSet<D1PreparedStatement>();
+  const pause=async()=>{if(!intercepted){intercepted=true;reached();await released;}};
   const wrapped = {
     ...db,
+    async batch(statements:D1PreparedStatement[]) {
+      // 実D1の取引途中では別の取引を割り込ませられない。
+      // 先頭の書込みの直前、取引を開く前に順番を固定する。
+      if(method==='run'&&statements.some(statement=>targets.has(statement)))await pause();
+      return db.batch(statements.map(statement=>originals.get(statement)??statement));
+    },
     prepare(sql: string) {
       const statement = prepare(sql);
       if (!matches(sql)) return statement;
@@ -137,17 +150,14 @@ function pauseBefore(db: D1Database, matches: (sql: string) => boolean, method: 
         ...statement,
         bind(...args: unknown[]) {
           const bound = bind(...args);
-          return {
-            ...bound,
+          const proxy = Object.assign(Object.create(bound) as D1PreparedStatement, {
             async [method]() {
-              if (!intercepted) {
-                intercepted = true;
-                reached();
-                await released;
-              }
+              await pause();
               return bound[method]();
             },
-          };
+          });
+          originals.set(proxy,bound);targets.add(proxy);
+          return proxy;
         },
       };
     },
@@ -324,18 +334,22 @@ describe('繰上げと即時予約の席確保は原子的', () => {
     raw.prepare("UPDATE event_slots SET capacity = 2 WHERE id = 'slot-1'").run();
     const secondBefore = raw.prepare("SELECT * FROM event_waitlist WHERE friend_id = 'friend-2'").get();
     const candidateGate = pauseBefore(db, sql => /SELECT id, line_account_id, friend_id, party_size, version, created_at/.test(sql), 'first');
-    const versionGate = pauseBefore(db, sql => /UPDATE event_slots/.test(sql));
+    // 原子的な確保の途中へ別の書込みを差し込まない。確保を確定した後、
+    // 送信の直前で止めて、古い案内なし判定を持ったもう一人を再開する。
+    const deliveryGate = pauseBefore(db, sql => /UPDATE notification_deliveries/.test(sql) && /attempts/.test(sql));
     const { promoteEventWaitlist } = await import('../services/event-waitlist.js');
     const sender = vi.fn(async () => {});
     const staleReader = promoteEventWaitlist(candidateGate.db, { occurrenceId: 'slot-1', lineAccountId: 'account-1', sender });
     await candidateGate.ready;
-    const first = promoteEventWaitlist(versionGate.db, { occurrenceId: 'slot-1', lineAccountId: 'account-1', sender });
-    await versionGate.ready;
+    const first = promoteEventWaitlist(deliveryGate.db, { occurrenceId: 'slot-1', lineAccountId: 'account-1', sender });
+    await deliveryGate.ready;
     candidateGate.resume();
     expect(await staleReader).toMatchObject({ kind: 'noop', reason: 'offer_pending' });
-    versionGate.resume();
+    deliveryGate.resume();
     expect(await first).toMatchObject({ kind: 'promoted', promoted: { friendId: 'friend-1' } });
     expect(sender).toHaveBeenCalledTimes(1);
+    expect(raw.prepare("SELECT version FROM event_slots WHERE id='slot-1'").get()).toEqual({version:2});
+    expect(raw.prepare("SELECT COUNT(*) n FROM notification_deliveries").get()).toEqual({n:1});
     expect(raw.prepare("SELECT * FROM event_waitlist WHERE friend_id = 'friend-2'").get()).toEqual(secondBefore);
     raw.close();
   });
@@ -511,6 +525,7 @@ describe('同時申込で負けた申込', () => {
       VALUES ('friend-other', 'U-other', 'account-2', 1, 'shared-user')`).run();
     raw.prepare(`INSERT INTO events (id, line_account_id, name, target_type, is_published)
       VALUES ('ev-other', 'account-2', '別の催し', 'single', 1)`).run();
+    raw.prepare(`UPDATE events SET lifecycle_status = 'published' WHERE id = 'ev-other'`).run();
     raw.prepare(`INSERT INTO event_slots (id, event_id, starts_at, ends_at, capacity, is_active)
       VALUES ('slot-other', 'ev-other', ?, ?, 1, 1)`).run(FUTURE, FUTURE);
     raw.prepare(`INSERT INTO event_bookings

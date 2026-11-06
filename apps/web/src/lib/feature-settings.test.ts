@@ -50,8 +50,8 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
     expect(restaurant.id).toBe('restaurant-test')
     expect(restaurant.label).toBe('飲食店向け（テスト）')
     expect(restaurant.items.map((item) => item.label)).toEqual([
-      '店舗ダッシュボード', '組織・権限', '承認ワークフロー', '予約台帳', '座席・卓管理',
-      '予約枠・在庫', 'メニュー管理', 'Googleビジネス', 'LINE来店フォロー',
+      '予約台帳', '座席・卓管理',
+      '予約枠・在庫', 'メニュー管理', 'デリバリー受注', 'Googleビジネス', 'LINE来店フォロー',
     ])
   })
 
@@ -75,11 +75,18 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
   it('専門設計カタログにある項目だけを専用機能に出す', () => {
     const groups = visibleFeatureGroups({ specializedFeatureKeys: ['photo_review'] })
     const specialized = groups.find((group) => group.id === 'specialized')!
-    // 2026-09-16 採用: マイペット（★V6 37-3）と健康日記（★V6 37-4）は「投稿」と同じ photo_review の受け口。
+    // 2026-09-16 採用: マイペット（★管理画面 37-3）と健康日記（★管理画面 37-4）は「投稿」と同じ photo_review の受け口。
     expect(specialized.items.map((item) => item.id)).toEqual(['nen-pets', 'nen-health', 'photo-review'])
 
     const withoutDesign = visibleFeatureGroups({ specializedFeatureKeys: [] })
     expect(withoutDesign.some((group) => group.id === 'specialized')).toBe(false)
+  })
+
+  it('共通の機能設定からLINE通知を隠す', () => {
+    for (const keys of [[], ['line_notifications']]) {
+      const groups = visibleFeatureGroups({ specializedFeatureKeys: keys })
+      expect(groups.flatMap((group) => group.items).some((item) => item.id === 'line-notifications')).toBe(false)
+    }
   })
 
   it('画面のスイッチとサイドメニュー項目が対応している', () => {
@@ -97,7 +104,7 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
     // multi_store_hierarchy の受け口（#860）。off でメニューから消え、直URLは API が 403 で止める。
     expect(SIDEBAR_FEATURE_BY_HREF['/pools']).toBe('multi_store_hierarchy')
     expect(DEFAULT_FEATURES.multi_store_hierarchy).toBe(false)
-    // 友だち属性3機能（#861）。/tags はタグ自体が必須なのでメニューは隠さず、
+    // タグ3機能（#861）。/tags はタグ自体が必須なのでメニューは隠さず、
     // タブと子ページでキーごとに閉じる。サーバーの既定（defaultEnabled: true）と合わせる。
     expect(DEFAULT_FEATURES.friend_fields).toBe(true)
     expect(DEFAULT_FEATURES.support_marks).toBe(true)

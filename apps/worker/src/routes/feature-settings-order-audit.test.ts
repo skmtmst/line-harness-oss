@@ -1,5 +1,5 @@
 /*
- * N-441/N-444: 並び順の完全順序検査と、保存理由・前後差分の監査。
+ * 並び順の完全順序検査と、保存理由・前後差分の監査。
  *
  * 画面が組み立てる「完全な並び」と同じ約束をサーバーでも検査する:
  * 知らない区分・知らない項目・別区分の項目・欠落・余分は400。
@@ -12,8 +12,9 @@ import {
   DEFAULT_TENANT_ID,
   MENU_SECTION_LABELS,
   expectedMenuItemOrder,
+  expectedRestaurantMenuItemOrder,
 } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { featureSettings, NEN_SPECIALIZED_FEATURES } from './feature-settings.js';
 
@@ -22,7 +23,7 @@ vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: access.canAccess,
 }));
 
-const ENV = { RESTAURANT_TEST_ENABLED: 'true' } as Record<string, string>;
+const ENV = { DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Record<string, string>;
 const CATALOG_KEY = 'feature.specialized.catalog';
 const BUNDLE_KEY = 'feature.settings_bundle_v1';
 
@@ -69,6 +70,37 @@ beforeEach(() => {
 });
 
 describe('sidebarItemOrder の完全順序', () => {
+  it('飲食店の並び・お気に入り・個別表示を保存し、メインの非表示は拒否する', async () => {
+    const testDb = createTestD1();
+    try {
+      testDb.raw.exec("INSERT INTO account_styles(line_account_id,style,selection_mode,updated_at) VALUES('account-1','restaurant','configured','now')");
+      const response = await put(testDb.db, {
+        expectedVersion: 0,
+        reason: '飲食店の初期メニューを調整',
+        sidebarItemOrder: expectedRestaurantMenuItemOrder(new Set(NEN_SPECIALIZED_FEATURES)),
+        favoriteItemIds: ['restaurant-reservations', 'restaurant-google'],
+        restaurantHiddenItemIds: ['restaurant-tables'],
+      });
+      expect(response.status).toBe(200);
+      const loaded = await call(testDb.db, '/api/settings/features?account_id=account-1');
+      expect(await loaded.json()).toMatchObject({ data: {
+        favoriteItemIds: ['restaurant-reservations', 'restaurant-google'],
+        restaurantHiddenItemIds: ['restaurant-tables'],
+      } });
+      const visible = await call(testDb.db, '/api/settings/features/visibility?account_id=account-1');
+      expect(await visible.json()).toMatchObject({ data: {
+        favoriteItemIds: ['restaurant-reservations', 'restaurant-google'],
+        restaurantHiddenItemIds: ['restaurant-tables'],
+      } });
+      const invalid = await put(testDb.db, {
+        expectedVersion: 1, reason: 'メインを隠す', restaurantHiddenItemIds: ['restaurant-reservations'],
+      });
+      expect(invalid.status).toBe(400);
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
   it('知らない区分・知らない項目・別区分の項目・欠落・余分を400にする', async () => {
     const testDb = createTestD1();
     try {

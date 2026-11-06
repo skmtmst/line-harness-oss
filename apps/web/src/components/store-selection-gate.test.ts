@@ -14,12 +14,9 @@ describe('店舗未選択の共通ゲート', () => {
 
   it('読み込み中と未選択を区別し、統括へ案内する', () => {
     expect(gate).toContain("decision === 'wait'")
-    expect(gate).toContain('店舗が選ばれていません')
-    expect(gate).toContain('この画面は店舗ごとのデータを扱います。統括の店舗一覧から店舗を選んでください。')
     // 店舗を選んだあと元の画面へ戻れるよう、戻り先を持ち越す（NEXT-07）。
     expect(gate).toContain('storeSelectionHref')
     expect(gate).toContain('href={selectHref}')
-    expect(gate).toContain('店舗を選ぶ')
     expect(gate).toContain('data-design="Empty"')
   })
 

@@ -2,13 +2,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { friends } from './friends.js';
 
 /*
- * N-036: GET /api/friends/:id が一覧と同じ「first_tracked_link_id →
+ * GET /api/friends/:id が一覧と同じ「first_tracked_link_id →
  * tracked_links.name」基準で firstTrackedLinkName を返すかを確かめる。
  *
  * 一覧（?includeChatStatus=true）は LEFT JOIN で流入元名を出しているが、
@@ -101,7 +101,7 @@ describe('N-036 友だち詳細の流入元（firstTrackedLinkName）', () => {
   let target: ReturnType<typeof createApp>;
 
   beforeEach(() => {
-    testDb = createTestD1();
+    testDb = createTestD1({ loginPolicy: 'off' });
     seedFixture(testDb);
     target = createApp(testDb.db);
   });

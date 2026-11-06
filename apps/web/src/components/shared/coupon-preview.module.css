@@ -1,0 +1,15 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.preview { display: flex; flex-direction: column; gap: var(--polish-space-field); min-width: 0; }
+.card { flex-shrink: 0; overflow: hidden; border-radius: var(--radius-card); background: var(--color-canvas); }
+.body { display: flex; flex-direction: column; gap: var(--polish-space-field); padding: var(--polish-space-card); min-width: 0; }
+.image { display: block; width: 100%; height: auto; object-fit: contain; }
+.badges { display: flex; flex-wrap: wrap; gap: var(--polish-space-row); }
+.title, .text, .note, .label, .benefit, .guide { margin: 0; overflow-wrap: anywhere; }
+.title { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; }
+.benefit { color: var(--color-accent-deep); font-size: var(--polish-text-page); font-weight: var(--polish-weight-title); }
+.text { color: var(--color-ink); font-size: var(--text-label); }
+.note, .guide { color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.label { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; }
+.guide { white-space: pre-line; }
+}

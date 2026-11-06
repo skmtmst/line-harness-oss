@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
+import { fireEvent } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -23,7 +24,7 @@ vi.hoisted(() => {
 
 // #948 N-322: パネルが未保存ガード(useUnsavedGuard→useRouter)を持つため、
 // App Router の文脈が無い試験環境では useRouter を差し替える。
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }))
 
@@ -43,7 +44,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import { api } from '@/lib/api'
-import ConnectorPanel from './connector-panel'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
+import ConnectorPanel from '@/v8/settings/ec-commerce/connector'
 
 const mockConnector = api.ecCommerce.connector as unknown as ReturnType<typeof vi.fn>
 const mockUpdate = api.ecCommerce.updateConnector as unknown as ReturnType<typeof vi.fn>
@@ -84,6 +86,8 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  clearToastsForTest()
   mockConnector.mockReset()
   mockUpdate.mockReset()
   mockConnector.mockResolvedValue(ok(overview()))
@@ -93,6 +97,7 @@ beforeEach(() => {
 afterEach(async () => {
   if (root) await act(async () => { root!.unmount() })
   if (container) container.remove()
+  delete document.documentElement.dataset.theme
   root = null
   container = null
   document.body.innerHTML = ''
@@ -107,9 +112,9 @@ async function mountReady(): Promise<HTMLDivElement> {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
-  await act(async () => { root!.render(<ConnectorPanel accountId="account-a" />) })
+  await act(async () => { root!.render(<><ToastHost /><ConnectorPanel accountId="account-a" /></>) })
   await act(async () => { await drainMicrotasks() })
-  if (!container.textContent?.includes('設定を保存')) throw new Error('保存画面が出ませんでした')
+  if (!container.textContent?.includes('設定を保存する')) throw new Error('保存画面が出ませんでした')
   return container
 }
 
@@ -118,13 +123,13 @@ function checkboxes(el: HTMLDivElement): HTMLInputElement[] {
 }
 
 function saveButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '設定を保存')
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '設定を保存する')
   if (!button) throw new Error('「設定を保存」ボタンが見つかりません')
   return button as HTMLButtonElement
 }
 
 function dialogButton(label: string): HTMLButtonElement {
-  const button = Array.from(document.body.querySelectorAll('button')).find((node) => node.textContent?.includes(label))
+  const button = Array.from(document.body.querySelectorAll('[role="dialog"] button, [role="alertdialog"] button')).find((node) => node.textContent?.includes(label))
   if (!button) throw new Error(`ダイアログの「${label}」が見つかりません`)
   return button as HTMLButtonElement
 }
@@ -132,11 +137,13 @@ function dialogButton(label: string): HTMLButtonElement {
 describe('つなぎ先の全外し確認(#517 軽7)', () => {
   it('G1: 全部入りで保存すると、確認を挟まずそのまま保存する', async () => {
     const el = await mountReady()
+    expect(el.querySelector('[data-shared-part="sticky-bar"]')).toBeNull()
+    await act(async () => { fireEvent.change(el.querySelector('input[placeholder="nen-store.myshopify.com"]')!, { target: { value: 'updated.example.com' } }) })
     await act(async () => { saveButton(el).click() })
     await act(async () => { await drainMicrotasks() })
     expect(mockUpdate).toHaveBeenCalledTimes(1)
     expect(document.body.textContent).not.toContain('すべて止めますか？')
-    expect(el.textContent).toContain('つなぎ先の設定を保存しました。')
+    expect(document.body.textContent).toContain('つなぎ先の設定を保存しました。')
   })
 
   it('G2: 出来事を全部外して保存すると、確認が出てまだ保存しない', async () => {
@@ -161,7 +168,7 @@ describe('つなぎ先の全外し確認(#517 軽7)', () => {
     await act(async () => { await drainMicrotasks() })
     expect(mockUpdate).toHaveBeenCalledTimes(1)
     expect(mockUpdate.mock.calls[0][1]).toMatchObject({ eventTypes: [] })
-    expect(el.textContent).toContain('つなぎ先の設定を保存しました。')
+    expect(document.body.textContent).toContain('つなぎ先の設定を保存しました。')
   })
 
   it('G4: 確認でキャンセルすると、保存しない', async () => {

@@ -1,9 +1,15 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { jstDate as japanDate } from '@line-crm/shared';
+import { fetchQuota } from '../services/dashboard-quota.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   DASHBOARD_CARD_GROUPS as SHARED_DASHBOARD_CARD_GROUPS,
   DASHBOARD_TODAY_VISIBLE_LIMIT,
 } from '@line-crm/shared';
 import {
+  getDashboardActivity,
+  getDashboardComparisons,
   getDashboardOverview,
   getDashboardDefaultPreference,
   getDashboardPreference,
@@ -19,7 +25,8 @@ import {
   summarizeDashboardFreshness,
   type DashboardPeriod,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import { fail } from '../lib/fail.js';
+import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -34,7 +41,22 @@ import { auditLog } from '../lib/audit-log.js';
  */
 export const dashboard = new Hono<Env>();
 
-const PERIODS: DashboardPeriod[] = ['today', 'last7', 'last28'];
+dashboard.get('/api/dashboard/activity', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const access = await requireVisibleAccount(c);
+    if ('response' in access) return access.response;
+    const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 10, limitPolicy: {} }).limit;
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      return c.json({ success: false, error: 'limit は1〜100の整数を指定してください' }, 400);
+    }
+    const items = await getDashboardActivity(c.env.DB, access.accountId, limit);
+    return c.json({ success: true, data: buildOffsetListResponse({ items, total: null, paging: { limit, offset: 0 }, sort: [] }) });
+  } catch (error) {
+    throw error;
+  }
+});
+
+const PERIODS: DashboardPeriod[] = ['today', 'last7', 'last28', 'last30'];
 
 /*
  * 概要応答の中で送信枠の取得に使える時間（DASH-14）。
@@ -146,51 +168,6 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-interface QuotaResult {
-  limit: number | null;
-  used: number | null;
-  /** LINE 側が type=none を返した「上限なし」の契約。limit=null と取得失敗を分ける（DASH-08）。 */
-  unlimited: boolean;
-  failed: boolean;
-  reason: 'not_connected' | 'fetch_failed' | null;
-  asOf: string | null;
-}
-
-async function fetchQuota(
-  token: string | undefined,
-  timeoutMs = 10_000,
-): Promise<QuotaResult> {
-  if (!token) {
-    return { limit: null, used: null, unlimited: false, failed: false, reason: 'not_connected', asOf: null };
-  }
-  try {
-    const [quota, consumption] = await Promise.all([
-      fetch('https://api.line.me/v2/bot/message/quota', {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(timeoutMs),
-      }),
-      fetch('https://api.line.me/v2/bot/message/quota/consumption', {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(timeoutMs),
-      }),
-    ]);
-    if (!quota.ok || !consumption.ok) {
-      return { limit: null, used: null, unlimited: false, failed: true, reason: 'fetch_failed', asOf: null };
-    }
-    // type が 'none' のときは上限なし。数字が入らないので null のままにする。
-    const q = (await quota.json()) as { type?: string; value?: number };
-    const c = (await consumption.json()) as { totalUsage?: number };
-    const limit = q.type === 'limited' && typeof q.value === 'number' ? q.value : null;
-    const used = typeof c.totalUsage === 'number' ? c.totalUsage : null;
-    if ((q.type !== 'limited' && q.type !== 'none') || used === null || (q.type === 'limited' && limit === null)) {
-      return { limit: null, used: null, unlimited: false, failed: true, reason: 'fetch_failed', asOf: null };
-    }
-    return { limit, used, unlimited: q.type === 'none', failed: false, reason: null, asOf: new Date().toISOString() };
-  } catch {
-    return { limit: null, used: null, unlimited: false, failed: true, reason: 'fetch_failed', asOf: null };
-  }
-}
-
 dashboard.get('/api/dashboard/overview', async (c) => {
   try {
     const period = readPeriod(c.req.query('period'));
@@ -199,7 +176,7 @@ dashboard.get('/api/dashboard/overview', async (c) => {
     const { accountId } = access;
     const selectedAccount = await getLineAccountById(c.env.DB, accountId);
     if (!selectedAccount) {
-      return c.json({ success: false as const, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
 
     const statsScope = { allowedAccountIds: [accountId], includeUnassigned: false };
@@ -267,12 +244,11 @@ dashboard.get('/api/dashboard/overview', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/dashboard/overview error:', err);
-    return c.json({ success: false as const, error: 'ダッシュボードの数を取得できませんでした' }, 500);
+    throw err;
   }
 });
 
-/** Explicit owner-only tenant overview for operational monitoring. */
+/** 統括全体の運用情報は、明示的にオーナーだけへ許可する。 */
 dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), async (c) => {
   try {
     const period = readPeriod(c.req.query('period'));
@@ -359,8 +335,7 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
       },
     });
   } catch (err) {
-    console.error('GET /api/dashboard/organization-overview error:', err);
-    return c.json({ success: false as const, error: '全体の運用数を取得できませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -383,19 +358,18 @@ dashboard.get('/api/dashboard/preferences', async (c) => {
     }
     return c.json({ success: true as const, data: { source: 'builtin' as const, version: 0, cards: null, updatedAt: null } });
   } catch (err) {
-    console.error('GET /api/dashboard/preferences error:', err);
-    return c.json({ success: false as const, error: 'ダッシュボードの配置を取得できませんでした' }, 500);
+    throw err;
   }
 });
 
-dashboard.put('/api/dashboard/preferences', async (c) => {
+dashboard.put('/api/dashboard/preferences', inputJsonBoundary(), async (c) => {
   try {
     const access = await requireVisibleAccount(c);
     if ('response' in access) return access.response;
     const body = await c.req.json<{ version?: unknown; cards?: unknown }>();
     const cards = readDashboardCards(body.cards);
     if (!Number.isInteger(body.version) || Number(body.version) < 0 || !cards) {
-      return c.json({ success: false as const, error: '配置または版の指定が正しくありません' }, 400);
+      return inputError(c, { success: false as const, error: '配置または版の指定が正しくありません' }, 400, ["version","cards"]);
     }
     const saved = await saveDashboardPreference(c.env.DB, {
       staffId: c.get('staff').id,
@@ -409,8 +383,7 @@ dashboard.put('/api/dashboard/preferences', async (c) => {
     auditLog(c, 'dashboard.preference.update', { kind: 'line_account', id: access.accountId });
     return c.json({ success: true as const, data: { source: 'personal' as const, version: saved.row.version, cards, updatedAt: saved.row.updated_at } });
   } catch (err) {
-    console.error('PUT /api/dashboard/preferences error:', err);
-    return c.json({ success: false as const, error: 'ダッシュボードの配置を保存できませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -422,18 +395,17 @@ dashboard.delete('/api/dashboard/preferences', async (c) => {
     auditLog(c, 'dashboard.preference.reset', { kind: 'line_account', id: access.accountId });
     return c.json({ success: true as const, data: null });
   } catch (err) {
-    console.error('DELETE /api/dashboard/preferences error:', err);
-    return c.json({ success: false as const, error: 'ダッシュボードの配置を初期化できませんでした' }, 500);
+    throw err;
   }
 });
 
-dashboard.put('/api/dashboard/preferences/default', requireRole('owner'), async (c) => {
+dashboard.put('/api/dashboard/preferences/default', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const access = await requireVisibleAccount(c);
     if ('response' in access) return access.response;
     const body = await c.req.json<{ cards?: unknown }>();
     const cards = readDashboardCards(body.cards);
-    if (!cards) return c.json({ success: false as const, error: '配置の指定が正しくありません' }, 400);
+    if (!cards) return inputError(c, { success: false as const, error: '配置の指定が正しくありません' }, 400, ["cards"]);
     const saved = await saveDashboardDefaultPreference(c.env.DB, {
       lineAccountId: access.accountId,
       staffId: c.get('staff').id,
@@ -442,8 +414,7 @@ dashboard.put('/api/dashboard/preferences/default', requireRole('owner'), async 
     auditLog(c, 'dashboard.preference.default.update', { kind: 'line_account', id: access.accountId });
     return c.json({ success: true as const, data: { version: saved.version, cards, updatedAt: saved.updated_at } });
   } catch (err) {
-    console.error('PUT /api/dashboard/preferences/default error:', err);
-    return c.json({ success: false as const, error: '会社の既定配置を保存できませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -466,18 +437,34 @@ dashboard.get('/api/dashboard/upcoming', async (c) => {
     });
     return c.json({ success: true as const, data });
   } catch (err) {
-    console.error('GET /api/dashboard/upcoming error:', err);
-    return c.json({ success: false as const, error: '今後の予定を取得できませんでした' }, 500);
+    throw err;
+  }
+});
+
+/**
+ * 数の帯の比べる値（今日の数は先週の同じ曜日、今月の数は前の月の同じ日まで）。
+ *
+ * 最初の表示の口（overview）を遅くしないよう、画面が後から読む別の口にする。
+ * 前の記録が無い数・取れなかった数は null で返し、0 として比べさせない。
+ */
+dashboard.get('/api/dashboard/comparisons', async (c) => {
+  try {
+    const access = await requireVisibleAccount(c);
+    if ('response' in access) return access.response;
+    const data = await getDashboardComparisons(c.env.DB, { lineAccountId: access.accountId });
+    return c.json({ success: true as const, data });
+  } catch (err) {
+    throw err;
   }
 });
 
 /** 日本時間の今日 0:00。失敗の「今日ぶん」の既定の境目。 */
 function jstDayStart(now: Date): string {
-  return `${new Date(now.getTime() + 9 * 3_600_000).toISOString().slice(0, 10)}T00:00:00+09:00`;
+  return `${japanDate(now)}T00:00:00+09:00`;
 }
 
 /**
- * L (#824 数字の出どころ): 失敗の数を通知の送達台帳から出どころ別に数える。
+ * L ( 数字の出どころ): 失敗の数を通知の送達台帳から出どころ別に数える。
  *
  * 同じ失敗は通知1件として数え、送り直しは数えない。件数は台帳の件数と
  * 一致する。カードの「i」はこの応答の出どころと時点を見せる。
@@ -497,8 +484,7 @@ dashboard.get('/api/dashboard/delivery-failure-origins', async (c) => {
     });
     return c.json({ success: true as const, data });
   } catch (err) {
-    console.error('GET /api/dashboard/delivery-failure-origins error:', err);
-    return c.json({ success: false as const, error: '失敗の出どころを取得できませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -513,7 +499,7 @@ dashboard.get('/api/list-stats', async (c) => {
     const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const selectedAccountId = readAccountId(c);
     if (selectedAccountId && !accountScope.allowedAccountIds.includes(selectedAccountId)) {
-      return c.json({ success: false as const, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const scope = selectedAccountId
       ? { allowedAccountIds: [selectedAccountId], includeUnassigned: false }
@@ -523,7 +509,6 @@ dashboard.get('/api/list-stats', async (c) => {
         };
     return c.json({ success: true as const, data: await getListStats(c.env.DB, scope) });
   } catch (err) {
-    console.error('GET /api/list-stats error:', err);
-    return c.json({ success: false as const, error: '集計を取得できませんでした' }, 500);
+    throw err;
   }
 });

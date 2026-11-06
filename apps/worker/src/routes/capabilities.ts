@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // リリースのたびに root の package.json と一緒に上げる。
 // 0.12.0 のまま長く放置されていて、/admin/version と食い違っていた。

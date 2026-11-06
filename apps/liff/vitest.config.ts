@@ -4,6 +4,9 @@ import { defineConfig } from 'vitest/config';
 // 実際に描いて確かめる (試験ファイル先頭の1行で happy-dom へ切り替える)。
 export default defineConfig({
   test: {
+    maxWorkers: 4,
+    // Vitest 4 restoreAllMocks no longer clears standalone vi.fn call history.
+    clearMocks: true,
     environment: 'node',
     globals: false,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],

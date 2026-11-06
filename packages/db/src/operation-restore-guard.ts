@@ -1,10 +1,8 @@
-import type {
-  OperationCapability,
-  OperationIncident,
-} from './operations.js';
+import { sqlIdSet } from './id-queries.js';
+import type { OperationCapability, OperationIncident } from './operation-types.js';
 
 /*
- * N-451: 緊急停止の「復旧前検査」。
+ * 緊急停止の「復旧前検査」。
  *
  * 停止した瞬間に、止めた対象（予約配信・シナリオ・リマインダ・
  * オートメーション・自動応答）の定義の版と期限を incident へ保存する。
@@ -185,7 +183,7 @@ async function getDefinitionsByIds(
 ): Promise<Map<string, DefinitionRow>> {
   const found = new Map<string, DefinitionRow>();
   if (ids.length === 0) return found;
-  const placeholders = ids.map(() => '?').join(',');
+  const placeholders = sqlIdSet(ids).sql;
   let sql: string;
   switch (capability) {
     case 'broadcast_dispatch':
@@ -212,7 +210,7 @@ async function getDefinitionsByIds(
     default:
       return found;
   }
-  const result = await db.prepare(sql).bind(...ids).all<DefinitionRow>();
+  const result = await db.prepare(sql).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<DefinitionRow>();
   for (const row of result.results ?? []) found.set(row.id, row);
   return found;
 }

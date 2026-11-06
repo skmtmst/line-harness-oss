@@ -1,4 +1,8 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /*
  * SCENARIO-01〜05 の回帰試験（1通目画面）。
  *
@@ -25,6 +29,19 @@ const m = vi.hoisted(() => ({
   params: new URLSearchParams('id=sc-a'),
 }))
 
+const kindFlags = vi.hoisted(() => ({ introHasReason: true }))
+vi.mock('@/components/scenarios/message-type-tabs', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/scenarios/message-type-tabs')>()
+  return {
+    ...actual,
+    get STEP_MESSAGE_KINDS() {
+      return actual.STEP_MESSAGE_KINDS.map(item => item.value === 'intro' && !kindFlags.introHasReason
+        ? { ...item, disabledReason: undefined }
+        : item)
+    },
+  }
+})
+
 vi.mock('next/navigation', () => ({
   useSearchParams: () => m.params,
   useRouter: () => ({ push: m.push }),
@@ -36,8 +53,9 @@ vi.mock('next/link', () => ({
     </a>
   ),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {}, usePageTitle: () => {} }))
+vi.mock('@/lib/api', async importOriginal => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
   ApiError: class ApiError extends Error {
     status: number
     constructor(status: number, message?: string) {
@@ -71,7 +89,9 @@ vi.mock('@/components/shared/image-uploader', () => ({
     <div data-testid="image-value">{JSON.stringify(value)}</div>
   ),
 }))
-vi.mock('@/components/scenarios/insert-toolbar', () => ({ default: () => null }))
+vi.mock('@/components/scenarios/insert-toolbar', () => ({
+  default: ({ count }: { count?: string }) => <span data-testid="body-count">{count}</span>,
+}))
 vi.mock('@/components/scenarios/step-preview', () => ({
   default: (p: Record<string, unknown>) => <pre data-testid="preview">{JSON.stringify(p)}</pre>,
 }))
@@ -85,6 +105,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 import FirstStep from '@/app/scenarios/first-step/page'
+import { LINE_TEXT_LIMIT } from '@/components/scenarios/char-counter'
 
 const ok = (data: unknown) => ({ success: true as const, data })
 const fail = { success: false as const, error: '検証用エラー' }
@@ -134,6 +155,8 @@ async function click(name: string) {
 }
 
 beforeEach(() => {
+  kindFlags.introHasReason = true
+  forgetSessionSnapshot(); verifiedStaffRole('owner')
   vi.clearAllMocks()
   m.params = new URLSearchParams('id=sc-a')
   m.get.mockResolvedValue(ok(scenario()))
@@ -143,15 +166,82 @@ beforeEach(() => {
   m.updateStep.mockResolvedValue(ok({}))
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot() })
+
+describe('紹介が選べない理由', () => {
+  const reason = '紹介は未対応です。本文に友だち追加のURLを書いてください。'
+
+  it('理由を一つ見せ、紹介の拒否と他の種類の選択・元の本文の保存を保つ', async () => {
+    const messageContent = 'ご案内 https://example.test/follow?from=scenario&day=1'
+    m.get.mockResolvedValue(ok(scenario({ steps: [step({ messageContent })] })))
+    await mount(<FirstStep />)
+    expect(screen.getAllByText(reason)).toHaveLength(1)
+    expect(screen.getByText(reason).closest('[role="note"]')).toBeTruthy()
+    expect(screen.getByRole('radiogroup', { name: '送るものの種類' }).nextElementSibling).toBe(screen.getByText(reason).closest('[role="note"]'))
+    const intro = screen.getByRole('radio', { name: '紹介', exact: true }) as HTMLButtonElement
+    expect(intro.disabled).toBe(true)
+    expect(intro.title).toContain('LINE側に該当するメッセージの種別がありません')
+    fireEvent.click(intro)
+    expect(intro.getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByRole('radio', { name: 'テキスト', exact: true }).getAttribute('aria-checked')).toBe('true')
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: '画像', exact: true })) })
+    expect(screen.getByRole('radio', { name: '画像', exact: true }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getAllByText(reason)).toHaveLength(1)
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: 'テキスト', exact: true })) })
+    expect(screen.getByRole('textbox', { name: '本文', exact: true }).textContent).toBe(messageContent)
+    expect(m.addStep).not.toHaveBeenCalled()
+    expect(m.updateStep).not.toHaveBeenCalled()
+    await click('作って編集へ')
+    expect(m.updateStep).toHaveBeenCalledExactlyOnceWith('sc-a', 's1', {
+      stepOrder: 1, messageType: 'text', messageContent, offsetDays: 0, offsetMinutes: 90,
+      targetCondition: null, question: null,
+    })
+    expect(m.addStep).not.toHaveBeenCalled()
+  })
+
+  it('テンプレートへ切り替えると理由を消し、この画面で作るへ戻ると一つ出す', async () => {
+    await mount(<FirstStep />)
+    expect(screen.getAllByText(reason)).toHaveLength(1)
+    await click('テンプレートから選ぶ')
+    expect(screen.queryByText(reason)).toBeNull()
+    await click('この画面で作る')
+    expect(screen.getAllByText(reason)).toHaveLength(1)
+    expect(m.addStep).not.toHaveBeenCalled()
+    expect(m.updateStep).not.toHaveBeenCalled()
+  })
+
+  it('紹介に押せない理由が無い対照では、未対応の案内を出さない', async () => {
+    kindFlags.introHasReason = false
+    await mount(<FirstStep />)
+    expect(screen.queryByText(reason)).toBeNull()
+    expect((screen.getByRole('radio', { name: '紹介', exact: true }) as HTMLButtonElement).disabled).toBe(false)
+    expect(m.addStep).not.toHaveBeenCalled()
+    expect(m.updateStep).not.toHaveBeenCalled()
+  })
+
+  it('画像が空で保存できないときも、入力の誤りと理由をそれぞれ保つ', async () => {
+    await mount(<FirstStep />)
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: '画像', exact: true })) })
+    await click('作って編集へ')
+    expect(screen.getAllByText(reason)).toHaveLength(1)
+    expect(screen.getByText('内容を入力してください。あとで書く場合は「1通目はあとで書く」を押してください。')).toBeTruthy()
+    expect(screen.getByRole('radio', { name: '画像', exact: true }).getAttribute('aria-checked')).toBe('true')
+    expect(m.addStep).not.toHaveBeenCalled()
+    expect(m.updateStep).not.toHaveBeenCalled()
+    expect(screen.getByText(reason).closest('[role="note"]')).toBeTruthy()
+  })
+})
 
 describe('SCENARIO-01：分の端数を丸めない', () => {
   it('offsetMinutes=90 の既存1通目をそのまま保存すると90のまま', async () => {
     await mount(<FirstStep />)
+    const body = screen.getByRole('textbox', { name: '本文', exact: true })
+    expect(body.textContent).toBe('監査用本文')
+    expect(body.closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
     // 日・時間・分の3欄に分かれて戻る（0日・1時間・30分）
-    const numbers = screen.getAllByRole('spinbutton').map((el) => (el as HTMLInputElement).value)
+    const numbers = ['購読開始から何日後', 'さらに何時間後', 'さらに何分後'].map((name) => screen.getByRole('button', { name }).textContent?.trim())
     expect(numbers).toEqual(['0', '1', '30'])
-    await click('作成して編集へ →')
+    await click('作って編集へ')
     expect(m.updateStep).toHaveBeenCalledTimes(1)
     expect(m.updateStep.mock.calls[0][2].offsetMinutes).toBe(90)
   })
@@ -161,7 +251,7 @@ describe('SCENARIO-01：分の端数を丸めない', () => {
       ok(scenario({ steps: [step({ offsetDays: 0, offsetMinutes: mins })] })),
     )
     await mount(<FirstStep />)
-    await click('作成して編集へ →')
+    await click('作って編集へ')
     expect(m.updateStep.mock.calls[0][2].offsetMinutes).toBe(mins)
   })
 
@@ -170,7 +260,7 @@ describe('SCENARIO-01：分の端数を丸めない', () => {
       ok(scenario({ deliveryMode: 'relative', steps: [step({ delayMinutes: 90, offsetMinutes: null })] })),
     )
     await mount(<FirstStep />)
-    await click('作成して編集へ →')
+    await click('作って編集へ')
     expect(m.updateStep.mock.calls[0][2].delayMinutes).toBe(90)
   })
 })
@@ -186,7 +276,7 @@ describe('SCENARIO-02：既存の内容を入力欄へ復元する', () => {
     )
     await mount(<FirstStep />)
     expect(screen.getByTestId('image-value').textContent).toContain('https://example.test/a.jpg')
-    await click('作成して編集へ →')
+    await click('作って編集へ')
     expect(m.updateStep).toHaveBeenCalledTimes(1)
     expect(m.updateStep.mock.calls[0][2].messageContent).toBe(content)
   })
@@ -197,7 +287,7 @@ describe('SCENARIO-02：既存の内容を入力欄へ復元する', () => {
     )
     await mount(<FirstStep />)
     expect(screen.getByText(/読み取れませんでした/)).toBeTruthy()
-    await click('作成して編集へ →')
+    await click('作って編集へ')
     expect(m.updateStep.mock.calls[0][2].messageContent).toBe('not-json')
     expect(m.updateStep.mock.calls[0][2].messageType).toBe('image')
   })
@@ -207,11 +297,11 @@ describe('SCENARIO-03：詳細条件が未設定なら全員対象にしない',
   it('詳細条件を選んだまま未設定だと保存せず理由を出す', async () => {
     m.get.mockResolvedValue(ok(scenario({ steps: [] })))
     await mount(<FirstStep />)
-    fireEvent.click(screen.getByLabelText('詳細条件で絞り込んで配信する'))
-    fireEvent.change(screen.getByPlaceholderText('はじめまして。友だち追加ありがとうございます。'), {
+    fireEvent.click(screen.getByRole('radio', { name: /詳細条件で絞る/ }))
+    fireEvent.change(screen.getByPlaceholderText('例：はじめまして。友だち追加ありがとうございます。'), {
       target: { value: '本文' },
     })
-    await click('作成して編集へ →')
+    await click('作って編集へ')
     expect(m.addStep).not.toHaveBeenCalled()
     expect(screen.getByText(/詳細条件がまだ設定されていません/)).toBeTruthy()
   })
@@ -219,14 +309,14 @@ describe('SCENARIO-03：詳細条件が未設定なら全員対象にしない',
   it('全員を明示した場合だけ targetCondition:null を送る', async () => {
     m.get.mockResolvedValue(ok(scenario({ steps: [] })))
     await mount(<FirstStep />)
-    fireEvent.click(screen.getByLabelText('詳細条件で絞り込んで配信する'))
-    fireEvent.change(screen.getByPlaceholderText('はじめまして。友だち追加ありがとうございます。'), {
+    fireEvent.click(screen.getByRole('radio', { name: /詳細条件で絞る/ }))
+    fireEvent.change(screen.getByPlaceholderText('例：はじめまして。友だち追加ありがとうございます。'), {
       target: { value: '本文' },
     })
-    await click('作成して編集へ →')
+    await click('作って編集へ')
     expect(m.addStep).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByLabelText('シナリオ購読中の全員に配信する'))
-    await click('作成して編集へ →')
+    fireEvent.click(screen.getByRole('radio', { name: /購読中の全員/ }))
+    await click('作って編集へ')
     expect(m.addStep).toHaveBeenCalledTimes(1)
     expect(m.addStep.mock.calls[0][1].targetCondition).toBeNull()
   })
@@ -237,23 +327,23 @@ describe('SCENARIO-04：シナリオが確定するまで保存しない', () =>
     const slow = defer<unknown>()
     m.get.mockReturnValue(slow.promise)
     await mount(<FirstStep />)
-    expect(screen.queryByRole('button', { name: '作成して編集へ →' })).toBeNull()
-    expect(screen.getByText('シナリオを読み込んでいます…')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '作って編集へ' })).toBeNull()
+    expect(screen.getByLabelText('シナリオを読み込んでいます')).toBeTruthy()
     await act(async () => {
       slow.resolve(ok(scenario({ steps: [] })))
     })
-    expect(screen.getByRole('button', { name: '作成して編集へ →' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '作って編集へ' })).toBeTruthy()
   })
 
   it('取得失敗では保存できず、再読み込みで取り直せる', async () => {
     m.get.mockResolvedValueOnce(fail).mockResolvedValue(ok(scenario({ steps: [] })))
     await mount(<FirstStep />)
-    expect(screen.queryByRole('button', { name: '作成して編集へ →' })).toBeNull()
-    // 取得の失敗は ★V7 TargetMissing の error で出す（生の応答文は出さない）。
+    expect(screen.queryByRole('button', { name: '作って編集へ' })).toBeNull()
+    // 取得の失敗は ★管理画面 TargetMissing の error で出す（生の応答文は出さない）。
     expect(screen.getByText('シナリオを読み込めませんでした')).toBeTruthy()
     await click('もう一度読み込む')
     expect(m.get).toHaveBeenCalledTimes(2)
-    expect(screen.getByRole('button', { name: '作成して編集へ →' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '作って編集へ' })).toBeTruthy()
   })
 
   it('id 切替後に古い応答が上書きしない（SCENARIO-11の1通目側）', async () => {
@@ -278,15 +368,15 @@ describe('SCENARIO-04：シナリオが確定するまで保存しない', () =>
     m.params = new URLSearchParams('id=sc-b')
     await act(async () => rerender(<FirstStep />))
     expect(
-      (screen.getByPlaceholderText('はじめまして。友だち追加ありがとうございます。') as HTMLTextAreaElement).value,
+      (screen.getByPlaceholderText('例：はじめまして。友だち追加ありがとうございます。') as HTMLTextAreaElement).value,
     ).toBe('B本文')
     await act(async () =>
       slow.resolve(ok(scenario({ steps: [step({ id: 'a-step', messageContent: 'A本文' })] }))),
     )
     expect(
-      (screen.getByPlaceholderText('はじめまして。友だち追加ありがとうございます。') as HTMLTextAreaElement).value,
+      (screen.getByPlaceholderText('例：はじめまして。友だち追加ありがとうございます。') as HTMLTextAreaElement).value,
     ).toBe('B本文')
-    await click('作成して編集へ →')
+    await click('作って編集へ')
     expect(m.updateStep.mock.calls[0].slice(0, 2)).toEqual(['sc-b', 'b-step'])
   })
 })
@@ -296,25 +386,87 @@ describe('SCENARIO-05：保存失敗で「保存中」のままにしない', ()
     m.updateStep.mockRejectedValueOnce(new Error('offline'))
     await mount(<FirstStep />)
     const body = screen.getByPlaceholderText(
-      'はじめまして。友だち追加ありがとうございます。',
+      '例：はじめまして。友だち追加ありがとうございます。',
     ) as HTMLTextAreaElement
     fireEvent.change(body, { target: { value: '書きかけの本文' } })
-    await click('作成して編集へ →')
-    expect(screen.getByText(/保存できませんでした/)).toBeTruthy()
-    const again = screen.getByRole('button', { name: '作成して編集へ →' }) as HTMLButtonElement
+    await click('作って編集へ')
+    expect(screen.getByText('保存できませんでした。入力内容は残っています。通信状態を確認して、もう一度お試しください。')).toBeTruthy()
+    const again = screen.getByRole('button', { name: '作って編集へ' }) as HTMLButtonElement
     expect(again.disabled).toBe(false)
     expect(body.value).toBe('書きかけの本文')
-    await click('作成して編集へ →')
+    await click('作って編集へ')
     expect(m.updateStep).toHaveBeenCalledTimes(2)
   })
 
   it('業務失敗（success:false）でも busy を戻して理由を出す', async () => {
     m.updateStep.mockResolvedValueOnce(fail)
     await mount(<FirstStep />)
-    await click('作成して編集へ →')
+    await click('作って編集へ')
     expect(screen.getByText('検証用エラー')).toBeTruthy()
     expect(
-      (screen.getByRole('button', { name: '作成して編集へ →' }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: '作って編集へ' }) as HTMLButtonElement).disabled,
     ).toBe(false)
+  })
+})
+
+
+describe('入力が足りないときの欄への案内', () => {
+  it('本文が空なら保存せず、その欄へ移り、理由を1つだけ出す', async () => {
+    m.get.mockResolvedValue(ok(scenario({ steps: [] })))
+    await mount(<FirstStep />)
+    await click('作って編集へ')
+    expect(m.addStep).not.toHaveBeenCalled()
+    const field = screen.getByPlaceholderText('例：はじめまして。友だち追加ありがとうございます。')
+    expect(field.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(field)
+    expect(screen.getAllByText(/内容を入力してください/)).toHaveLength(1)
+    fireEvent.change(field, { target: { value: '送る本文' } })
+    await click('作って編集へ')
+    expect(m.addStep).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('空の保存とあとで書く', () => {
+  it('空の保存は「あとで書く」の道を理由に書いて止め、全体の誤りにはしない', async () => {
+    m.get.mockResolvedValue(ok(scenario({ steps: [] })))
+    await mount(<FirstStep />)
+    await click('作って編集へ')
+    expect(m.addStep).not.toHaveBeenCalled()
+    expect(m.push).not.toHaveBeenCalled()
+    expect(screen.getByText('内容を入力してください。あとで書く場合は「1通目はあとで書く」を押してください。')).toBeTruthy()
+  })
+
+  it('「1通目はあとで書く」は保存せずに詳細へ進む', async () => {
+    m.get.mockResolvedValue(ok(scenario({ steps: [] })))
+    await mount(<FirstStep />)
+    await click('1通目はあとで書く')
+    expect(m.addStep).not.toHaveBeenCalled()
+    expect(m.updateStep).not.toHaveBeenCalled()
+    expect(m.push).toHaveBeenCalledWith('/scenarios/detail?id=sc-a')
+  })
+})
+
+describe('本文の文字数と上限', () => {
+  it('「本文」の名前で入力欄に届き、打った文字数を上限と並べて出す', async () => {
+    m.get.mockResolvedValue(ok(scenario({ steps: [] })))
+    await mount(<FirstStep />)
+    const body = screen.getByLabelText('本文')
+    expect(body.id).toBe('first-step-body')
+    fireEvent.change(body, { target: { value: 'こんにちは' } })
+    expect(screen.getByTestId('body-count').textContent).toBe(`5 / ${LINE_TEXT_LIMIT.toLocaleString('ja-JP')}`)
+  })
+
+  it('上限を超えた本文では保存を押せず、理由を本文の下に出し、保存も送らない', async () => {
+    m.get.mockResolvedValue(ok(scenario({ steps: [] })))
+    await mount(<FirstStep />)
+    fireEvent.change(screen.getByLabelText('本文'), { target: { value: 'あ'.repeat(LINE_TEXT_LIMIT + 1) } })
+    const save = screen.getByRole('button', { name: '作って編集へ' }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    expect(screen.getByText(`本文が ${LINE_TEXT_LIMIT.toLocaleString('ja-JP')} 字を超えています。LINEが受け付けないため、この状態では保存できません。`)).toBeTruthy()
+    expect(screen.getByLabelText('本文').getAttribute('aria-invalid')).toBe('true')
+    await act(async () => { fireEvent.click(save) })
+    expect(m.addStep).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('本文'), { target: { value: 'あ'.repeat(LINE_TEXT_LIMIT) } })
+    expect((screen.getByRole('button', { name: '作って編集へ' }) as HTMLButtonElement).disabled).toBe(false)
   })
 })

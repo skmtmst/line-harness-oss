@@ -20,12 +20,7 @@ vi.mock('../services/account-access.js', () => accessMocks)
 const { reminders } = await import('./reminders.js')
 
 /*
- * R15 の数え直し口 (POST /api/reminders/:id/audience) の再発防止。
- *
- * 未保存の条件で人数を数えるだけの口だが、友だちの範囲を読むので
- * 検証の口と同じ権限 (owner/admin + この店舗が見えること) で守る。
- * 数え間違いは誤送信・送り漏れに直結するので、権限・範囲・失敗を
- * 試験で固定する。
+ * 未保存の条件でも友だちの範囲を読むため、人数確認は検証と同じ owner/admin および店舗可視範囲で守る。誤送信を防ぐため、権限・範囲・失敗を確かめる。
  */
 
 const SETTINGS = {

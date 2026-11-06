@@ -1,6 +1,9 @@
+import { logger } from '@line-crm/shared/server';
+import { readCookie } from '../middleware/auth-http.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import {
@@ -10,6 +13,8 @@ import {
   createAuthEmailToken,
   createStaffMember,
   createTrialTenant,
+  createRegistrationApplication,
+  getRegistrationApplication,
   getActiveStaffByEmail,
   getAuthEmailToken,
   getPlatformAdminRecord,
@@ -17,6 +22,7 @@ import {
   getStaffWithPasswordByEmail,
   hasStaffWithEmail,
   hasTenantWithDeviceMarker,
+  markRegistrationApplicationActivated,
   readAuthThrottle,
   recordAuditEvent,
   recordLoginAudit,
@@ -25,37 +31,36 @@ import {
   updateStaffMember,
   type AuthEmailToken,
 } from '@line-crm/db';
-import { clientIp, issueSession, randomToken } from '../services/admin-session.js';
+
+import { clientIp, issueSession, randomToken, recordSuccessfulLoginAudit } from '../services/admin-session.js';
 import { hashPassword, validatePasswordPolicy, verifyPassword } from '../services/password-hash.js';
 import { turnstileErrorMessage, verifyTurnstile } from '../services/turnstile.js';
 import { candidateFromStaffRow, isPlatformAdminRow } from '../middleware/platform-admin.js';
 import {
   PASSWORD_RESET_TOKEN_TTL_MS,
-  SIGNUP_TOKEN_TTL_MS,
   sendAlreadyRegisteredMail,
   sendPasswordResetMail,
-  sendSignupVerifyMail,
+  sendRegistrationReceiptMail,
 } from '../services/auth-mail.js';
 import { TRIAL_DAYS } from '../services/billing-plans.js';
 
 /**
- * 会員登録（★V6 36-4）・メール＋パスワードのログイン・パスワード再設定（36-6）。
- *
- * 流れ（決定 2026-09-13）:
- *   1. メールアドレスだけ入れる → 本登録 URL をメールで送る（誤入力のメールでは進まない）
- *   2. URL の先で会社名・名前・パスワードを入れる → 統括（トライアル 30 日）とオーナー権限者ができ、そのままログイン
- *
- * 守り:
- *   - Turnstile（ロボット対策）。秘密の鍵が無いときは受け付けない
- *   - 同じブラウザからの 2 回目の登録は断る（印を localStorage と Cookie の両方に置く）
- *   - 同じ接続元・同じメールからの送信回数を D1 に残して数える（再起動で消えない）
- *   - メールが登録済みかどうかは返事で分からないようにする（本人にはメールで知らせる）
- *   - URL の元はハッシュだけ保存し、1 回使ったら消費済みにする
+ * 利用申込・メールとパスワードによるログイン・パスワード再設定を扱う。
+ * 申込内容を保存し、運営による連絡・承認の後にだけ招待 URL を送る。
+ * 招待 URL から承認済みの会社名・担当者名とパスワードで、30日トライアルの統括とオーナー権限者を作る。
+ * Turnstile の秘密鍵がなければ受け付けない。同一ブラウザの重複登録は localStorage と Cookie の両方で拒む。
+ * 再起動後も回数制限を保つため、接続元・メール別の送信数を D1 へ残す。
+ * 登録済みメールの有無は応答から漏らさず、本人へメールで伝える。確認 URL は元の値でなくハッシュを保存し、一度だけ使えるようにする。
  */
+import { loginMfaChallenge, mfaAudit } from '../services/login-mfa.js';
+
 export const authEmail = new Hono<Env>();
+authEmail.use('/api/auth/*', async (c, next) => { c.header('Cache-Control', 'private, no-store'); await next(); });
 
 const EMAIL_MAX = 254;
 const NAME_MAX = 80;
+const PHONE_MAX = 24;
+const REFERRAL_SOURCES = new Set(['知人・取引先からの紹介', 'インターネット検索', 'SNS', '広告', 'イベント・セミナー', 'その他']);
 const DEVICE_MARKER_COOKIE = 'lh_signup_marker';
 const DEVICE_MARKER_MAX_AGE = 365 * 24 * 60 * 60;
 
@@ -76,25 +81,6 @@ const TOO_MANY = '送信回数の上限に達しました。しばらく待っ�
 
 type Body = Record<string, unknown>;
 
-async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: string): Promise<void> {
-  try {
-    await recordLoginAudit(c.env.DB, {
-      adminUserId: staffId,
-      action: 'login',
-      ip: clientIp(c),
-      userAgent: c.req.header('user-agent') ?? null,
-    });
-  } catch (error) {
-    const detail = error instanceof Error
-      ? { name: error.name, message: error.message }
-      : { name: 'UnknownError', message: 'Unknown failure' };
-    console.error('[auth-email] authentication branch failed', {
-      branch: 'recordLoginAudit',
-      ...detail,
-    });
-  }
-}
-
 async function readBody(c: Context<Env>): Promise<Body> {
   return c.req.json<Body>().catch(() => ({}) as Body);
 }
@@ -114,21 +100,6 @@ export function normalizeEmail(value: unknown): string | null {
 function adminBase(c: Context<Env>): string | null {
   const base = c.env.ADMIN_PUBLIC_URL?.replace(/\/+$/, '');
   return base || null;
-}
-
-function readCookie(header: string | undefined, name: string): string | null {
-  if (!header) return null;
-  for (const part of header.split(';')) {
-    const [key, ...value] = part.trim().split('=');
-    if (key === name) {
-      try {
-        return decodeURIComponent(value.join('='));
-      } catch {
-        return null;
-      }
-    }
-  }
-  return null;
 }
 
 function markerCookie(value: string, sameSite: 'Strict' | 'Lax' | 'None'): string {
@@ -172,22 +143,29 @@ function readToken(c: Context<Env>, body?: Body): string {
 
 /**
  * POST /api/auth/register/request
- * { email, turnstileToken, agreed: true, deviceMarker? }
+ * { companyName, contactName, email, phone, referralSource, turnstileToken, agreed: true, deviceMarker? }
  *
- * 返事はいつも同じ「送りました」。登録済みのメールには本人向けの案内メールを送る。
+ * 返事は登録済みでも同じ「受け付けました」。登録済みのメールには本人向けの案内を送る。
  */
-authEmail.post('/api/auth/register/request', async (c) => {
-  const base = adminBase(c);
-  if (!base) return c.json({ success: false, error: '管理画面の URL が設定されていません' }, 500);
-
+authEmail.post('/api/auth/register/request', inputJsonBoundary(), async (c) => {
   const body = await readBody(c);
   const email = normalizeEmail(body.email);
-  if (!email) return c.json({ success: false, error: 'メールアドレスの形式が正しくありません' }, 400);
-  if (body.agreed !== true) return c.json({ success: false, error: '利用規約とプライバシーポリシーに同意してください' }, 400);
+  if (!email) return inputError(c, { success: false, error: 'メールアドレスの形式が正しくありません' }, 400, ["email"]);
+  if (body.agreed !== true) return inputError(c, { success: false, error: '利用規約とプライバシーポリシーに同意してください' }, 400, ["agreed"]);
+  const companyName = text(body.companyName, NAME_MAX);
+  const contactName = text(body.contactName, NAME_MAX);
+  const phone = text(body.phone, PHONE_MAX);
+  const referralSource = text(body.referralSource, 40);
+  const errors: Record<string, string> = {};
+  if (!companyName || companyName.length > NAME_MAX) errors.companyName = '会社名を1〜80文字で入力してください';
+  if (!contactName || contactName.length > NAME_MAX) errors.contactName = '担当者名を1〜80文字で入力してください';
+  if (phone.length > PHONE_MAX || !/^[+0-9()\- ]{9,24}$/.test(phone) || phone.replace(/\D/g, '').length < 9) errors.phone = '電話番号を正しく入力してください';
+  if (!REFERRAL_SOURCES.has(referralSource)) errors.referralSource = 'musuboを知ったきっかけを選んでください';
+  if (Object.keys(errors).length) return inputError(c, { success: false, error: Object.values(errors)[0], errors }, 400, Object.keys(errors));
 
   const turnstile = await verifyTurnstile(c.env, body.turnstileToken as string | undefined, clientIp(c));
   if (!turnstile.ok) {
-    return c.json({ success: false, error: turnstileErrorMessage(turnstile.reason) }, turnstile.reason === 'not_configured' ? 503 : 400);
+    return inputError(c, { success: false, error: turnstileErrorMessage(turnstile.reason) }, turnstile.reason === 'not_configured' ? 503 : 400, []);
   }
 
   const markers = deviceMarkerOf(c, body);
@@ -208,23 +186,22 @@ authEmail.post('/api/auth/register/request', async (c) => {
 
   try {
     if (await hasStaffWithEmail(c.env.DB, email)) {
-      await sendAlreadyRegisteredMail(c.env, { email, loginUrl: `${base}/login`, forgotUrl: `${base}/password/forgot` });
+      const base = adminBase(c);
+      if (base) await sendAlreadyRegisteredMail(c.env, { email, loginUrl: `${base}/login`, forgotUrl: `${base}/password/forgot` });
       return c.json({ success: true, data: { sent: true } });
     }
-    const token = randomToken();
-    await createAuthEmailToken(c.env.DB, {
-      purpose: 'signup',
-      tokenHash: await sha256Hex(token),
-      email,
-      ipHash,
-      deviceMarker: markers[0] ?? null,
-      expiresAt: toJstString(new Date(Date.now() + SIGNUP_TOKEN_TTL_MS)),
+    const created = await createRegistrationApplication(c.env.DB, {
+      companyName, contactName, email, phone, referralSource, ipHash, deviceMarker: markers[0] ?? null,
     });
-    await sendSignupVerifyMail(c.env, { email, completeUrl: `${base}/register/complete?token=${encodeURIComponent(token)}` });
-    return c.json({ success: true, data: { sent: true } });
-  } catch (error) {
-    console.error('[auth-email] register request failed', error);
-    return c.json({ success: false, error: 'メールを送れませんでした。しばらく待ってからもう一度お試しください' }, 502);
+    let receiptSent = false;
+    if (created) {
+      try { await sendRegistrationReceiptMail(c.env, { email, companyName }); receiptSent = true; }
+      catch { logger.error('auth_email.registration_receipt_failed'); }
+    }
+    return c.json({ success: true, data: { sent: true, receiptSent } });
+  } catch {
+    logger.error("auth_email.auth_register_request_create_failed");
+    return c.json({ success: false, error: 'お申し込みを受け付けられませんでした。しばらく待ってからもう一度お試しください' }, 502);
   }
 });
 
@@ -233,17 +210,22 @@ authEmail.get('/api/auth/register/check', async (c) => {
   const token = readToken(c);
   const row = token ? await getAuthEmailToken(c.env.DB, 'signup', await sha256Hex(token)) : null;
   const state = tokenState(row);
-  if (state !== 'valid') return c.json({ success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410);
-  return c.json({ success: true, data: { email: row!.email, trialDays: TRIAL_DAYS } });
+  if (state !== 'valid') return inputError(c, { success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410, []);
+  const application = row!.application_id ? await getRegistrationApplication(c.env.DB, row!.application_id) : null;
+  if (!application || application.status !== 'approved' || application.email !== row!.email) {
+    return c.json({ success: false, code: 'approval_required', error: 'お申し込みを確認中です。承認のご案内をお待ちください' }, 403);
+  }
+  return c.json({ success: true, data: { email: row!.email, trialDays: TRIAL_DAYS,
+    companyName: application.company_name, contactName: application.contact_name } });
 });
 
 /**
  * POST /api/auth/register/complete
- * { token, tenantName, name, password, deviceMarker? }
+ * { token, password, deviceMarker? }。会社名と担当者名は承認済み申込から使う。
  *
  * 統括（トライアル）とオーナー権限者を作り、そのままログインした状態にする。
  */
-authEmail.post('/api/auth/register/complete', async (c) => {
+authEmail.post('/api/auth/register/complete', inputJsonBoundary(), async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
 
@@ -251,10 +233,15 @@ authEmail.post('/api/auth/register/complete', async (c) => {
   const token = readToken(c, body);
   const row = token ? await getAuthEmailToken(c.env.DB, 'signup', await sha256Hex(token)) : null;
   const state = tokenState(row);
-  if (state !== 'valid') return c.json({ success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410);
+  if (state !== 'valid') return inputError(c, { success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410, []);
 
-  const tenantName = text(body.tenantName, NAME_MAX);
-  const name = text(body.name, NAME_MAX);
+  const application = row!.application_id ? await getRegistrationApplication(c.env.DB, row!.application_id) : null;
+  if (!application || application.status !== 'approved' || application.email !== row!.email) {
+    return c.json({ success: false, code: 'approval_required', error: 'お申し込みを確認中です。承認のご案内をお待ちください' }, 403);
+  }
+
+  const tenantName = application.company_name;
+  const name = application.contact_name;
   const password = typeof body.password === 'string' ? body.password : '';
   const errors: Record<string, string> = {};
   if (!tenantName) errors.tenantName = '会社名・統括名を入力してください';
@@ -263,7 +250,7 @@ authEmail.post('/api/auth/register/complete', async (c) => {
   else if (name.length > NAME_MAX) errors.name = `お名前は${NAME_MAX}文字以内で入力してください`;
   const passwordError = validatePasswordPolicy(password);
   if (passwordError) errors.password = passwordError;
-  if (Object.keys(errors).length) return c.json({ success: false, error: Object.values(errors)[0], errors }, 400);
+  if (Object.keys(errors).length) return inputError(c, { success: false, error: Object.values(errors)[0], errors }, 400, []);
 
   const markers = deviceMarkerOf(c, body);
   for (const marker of markers) {
@@ -301,15 +288,18 @@ authEmail.post('/api/auth/register/complete', async (c) => {
     email_verified_at: toJstString(now),
   });
   if (!staff) return c.json({ success: false, error: '登録を完了できませんでした' }, 500);
+  await markRegistrationApplicationActivated(c.env.DB, application.id, tenantId);
 
-  // 2段階認証は削除済み。登録完了時点でそのままセッションを発行する。
-  await issueSession(c, staff.id, config.sameSite, false);
+  const challenge = await loginMfaChallenge(c, staff, false);
+  await mfaAudit(c, staff.id, 'auth.register', 'success');
+  if (!challenge) await issueSession(c, staff.id, config.sameSite, false);
   c.header('Set-Cookie', markerCookie(deviceMarker, config.sameSite), { append: true });
   return c.json({
     success: true,
     data: {
       tenantId,
       deviceMarker,
+      ...challenge,
     },
   });
 });
@@ -319,7 +309,7 @@ authEmail.post('/api/auth/register/complete', async (c) => {
 // ---------------------------------------------------------------------------
 
 /** POST /api/auth/password/login { email, password, remember? } */
-authEmail.post('/api/auth/password/login', async (c) => {
+authEmail.post('/api/auth/password/login', inputJsonBoundary(), async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
 
@@ -327,17 +317,24 @@ authEmail.post('/api/auth/password/login', async (c) => {
   const email = normalizeEmail(body.email);
   const password = typeof body.password === 'string' ? body.password : '';
   const remember = body.remember === true;
-  if (!email || !password) return c.json({ success: false, error: 'メールアドレスとパスワードを入力してください' }, 400);
+  if (!email || !password) return inputError(c, { success: false, error: 'メールアドレスとパスワードを入力してください' }, 400, ["email","password"]);
 
+  const accountThrottleKey = `login:account:${await sha256Hex(email)}`;
   const throttleKey = `login:${await sha256Hex(`${email}|${clientIp(c) ?? 'unknown'}`)}`;
-  if ((await readAuthThrottle(c.env.DB, throttleKey, LOGIN_FAIL_WINDOW_MS)) >= LOGIN_FAIL_MAX) {
+  if ((await readAuthThrottle(c.env.DB, throttleKey, LOGIN_FAIL_WINDOW_MS)) >= LOGIN_FAIL_MAX
+    || (await readAuthThrottle(c.env.DB, accountThrottleKey, LOGIN_FAIL_WINDOW_MS)) >= LOGIN_FAIL_MAX) {
+    await recordLoginAudit(c.env.DB, { action: 'fail', ip: clientIp(c), result: 'unauthorized' });
     return c.json({ success: false, error: '失敗が続いたため、15分ほど待ってからもう一度お試しください' }, 429);
   }
+
+  const turnstile = await verifyTurnstile(c.env, body.turnstileToken as string | undefined, clientIp(c));
+  if (!turnstile.ok) return inputError(c, { success: false, error: turnstileErrorMessage(turnstile.reason), code: 'TURNSTILE_REQUIRED' }, turnstile.reason === 'not_configured' ? 503 : 400, []);
 
   const staff = await getStaffWithPasswordByEmail(c.env.DB, email);
   const ok = staff ? await verifyPassword(password, staff.password_hash) : await verifyPassword(password, null);
   if (!staff || !ok || !staff.is_active) {
     await bumpAuthThrottle(c.env.DB, throttleKey, LOGIN_FAIL_WINDOW_MS);
+    await bumpAuthThrottle(c.env.DB, accountThrottleKey, LOGIN_FAIL_WINDOW_MS);
     await recordLoginAudit(c.env.DB, {
       adminUserId: staff?.id ?? null,
       action: 'fail',
@@ -349,6 +346,7 @@ authEmail.post('/api/auth/password/login', async (c) => {
   }
 
   await clearAuthThrottle(c.env.DB, throttleKey);
+  await clearAuthThrottle(c.env.DB, accountThrottleKey);
   if (body.next === 'ops') {
     const pending = await getPlatformAdminRecord(c.env.DB, staff.id);
     const awaitingTotp = pending?.is_active === 1 && pending.activation_state === 'awaiting_totp';
@@ -372,7 +370,9 @@ authEmail.post('/api/auth/password/login', async (c) => {
       }, 403);
     }
   }
-  // 2段階認証は削除済み。パスワード確認後すぐセッション発行
+  const challenge = await loginMfaChallenge(c, staff, remember);
+  await mfaAudit(c, staff.id, 'auth.login.primary', 'success');
+  if (challenge) return c.json({ success: true, data: challenge });
   const session = await issueSession(c, staff.id, config.sameSite, remember);
   await recordSuccessfulLoginAudit(c, staff.id);
   return c.json({
@@ -393,17 +393,17 @@ authEmail.post('/api/auth/password/login', async (c) => {
  * そのメールの有効な権限者がちょうど 1 人のときだけ送る（LINE だけの人が
  * あとからパスワードを持てる道）。
  */
-authEmail.post('/api/auth/password/forgot', async (c) => {
+authEmail.post('/api/auth/password/forgot', inputJsonBoundary(), async (c) => {
   const base = adminBase(c);
   if (!base) return c.json({ success: false, error: '管理画面の URL が設定されていません' }, 500);
 
   const body = await readBody(c);
   const email = normalizeEmail(body.email);
-  if (!email) return c.json({ success: false, error: 'メールアドレスの形式が正しくありません' }, 400);
+  if (!email) return inputError(c, { success: false, error: 'メールアドレスの形式が正しくありません' }, 400, ["email"]);
 
   const turnstile = await verifyTurnstile(c.env, body.turnstileToken as string | undefined, clientIp(c));
   if (!turnstile.ok) {
-    return c.json({ success: false, error: turnstileErrorMessage(turnstile.reason) }, turnstile.reason === 'not_configured' ? 503 : 400);
+    return inputError(c, { success: false, error: turnstileErrorMessage(turnstile.reason) }, turnstile.reason === 'not_configured' ? 503 : 400, []);
   }
 
   const ipHash = await ipHashOf(c);
@@ -437,7 +437,7 @@ authEmail.post('/api/auth/password/forgot', async (c) => {
     }
     return c.json({ success: true, data: { sent: true } });
   } catch (error) {
-    console.error('[auth-email] password forgot failed', error);
+    logger.error("auth_email.auth_password_forgot_create_failed");
     return c.json({ success: false, error: 'メールを送れませんでした。しばらく待ってからもう一度お試しください' }, 502);
   }
 });
@@ -447,28 +447,25 @@ authEmail.get('/api/auth/password/reset/check', async (c) => {
   const token = readToken(c);
   const row = token ? await getAuthEmailToken(c.env.DB, 'password_reset', await sha256Hex(token)) : null;
   const state = tokenState(row);
-  if (state !== 'valid') return c.json({ success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410);
+  if (state !== 'valid') return inputError(c, { success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410, []);
   return c.json({ success: true, data: { email: row!.email } });
 });
 
 /**
  * POST /api/auth/password/reset { token, password } — 設定後はその人のセッションをすべて失効させる。
  *
- * 復旧導線（N-426）: メールのURLを持てることは本人確認の代替になるため、
- * 登録済みのTOTPもここで外す。認証アプリを失くした人は「メールで再設定 →
- * パスワードでログイン → TOTPの再設定（必須）」の順で必ず復帰でき、
- * ロックアウトで詰まない。TOTPを外した記録はログイン記録へ残す。
+ * パスワード再設定はTOTPを保持する。メールだけで第二の認証を外せない。
  */
-authEmail.post('/api/auth/password/reset', async (c) => {
+authEmail.post('/api/auth/password/reset', inputJsonBoundary(), async (c) => {
   const body = await readBody(c);
   const token = readToken(c, body);
   const row = token ? await getAuthEmailToken(c.env.DB, 'password_reset', await sha256Hex(token)) : null;
   const state = tokenState(row);
-  if (state !== 'valid') return c.json({ success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410);
+  if (state !== 'valid') return inputError(c, { success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410, []);
 
   const password = typeof body.password === 'string' ? body.password : '';
   const passwordError = validatePasswordPolicy(password);
-  if (passwordError) return c.json({ success: false, error: passwordError, errors: { password: passwordError } }, 400);
+  if (passwordError) return inputError(c, { success: false, error: passwordError, errors: { password: passwordError } }, 400, ["password"]);
 
   const staff = row!.staff_id ? await getStaffById(c.env.DB, row!.staff_id) : null;
   if (!staff || !staff.is_active) return c.json({ success: false, error: TOKEN_STATE_MESSAGE.invalid, code: 'invalid' }, 404);
@@ -483,39 +480,11 @@ authEmail.post('/api/auth/password/reset', async (c) => {
     return c.json({ success: false, error: TOKEN_STATE_MESSAGE.used, code: 'used' }, 410);
   }
   const now = toJstString(new Date());
-  const hadTotp = Boolean(staff.totp_enabled_at || staff.totp_secret_enc || staff.totp_pending_secret_enc);
   await updateStaffMember(c.env.DB, staff.id, {
     password_hash: await hashPassword(password),
     password_updated_at: now,
     email_verified_at: staff.email_verified_at ?? now,
-    // 復旧: メールのURLを持てた本人に限り、失くした認証アプリの縛りを外す。
-    totp_secret_enc: null,
-    totp_pending_secret_enc: null,
-    totp_enabled_at: null,
-    totp_last_used_step: null,
   });
   await revokeStaffAuthentication(c.env.DB, staff.id);
-  if (hadTotp) {
-    // MFA解除は高危険監査（要件 v6-30 §9-3 の復旧3段の記録）。
-    // 記録の失敗で再設定そのものを止めない（recordLoginAudit と同じ向き）。
-    try {
-      await recordAuditEvent(c.env.DB, {
-        category: 'auth',
-        action: 'auth.totp_reset',
-        actorPrincipalId: staff.id,
-        actorRole: staff.access_level === 'read_only' ? 'view_only' : staff.role === 'owner' || staff.role === 'admin' ? 'administrator' : 'operations',
-        targetKind: 'staff',
-        targetId: staff.id,
-        tenantId: staff.tenant_id,
-        result: 'success',
-        riskLevel: 'high',
-        retentionClass: 'security',
-        reason: 'password_reset_recovery',
-        ipPrefix: (clientIp(c) ?? '').split('.').slice(0, 2).join('.') || null,
-      });
-    } catch (error) {
-      console.error('[auth-email] totp_reset audit failed', error instanceof Error ? error.name : 'unknown');
-    }
-  }
   return c.json({ success: true, data: { email: row!.email } });
 });

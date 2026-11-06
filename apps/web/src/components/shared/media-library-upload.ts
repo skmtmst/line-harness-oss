@@ -1,0 +1,48 @@
+import type { MediaItem } from '@line-crm/shared'
+import { api } from '@/lib/api'
+import { extractMediaMetadata, putMediaFile, validateMediaFile } from '@/v8/contents/public/media-direct-upload/index'
+
+/**
+ * 登録メディアへ入れて、その URL を返す（画像を入れる所 MediaSlot の送り先の1つ）。
+ * 登録メディアと同じ「準備→直接送信→登録完了」の口。URL は完了後の正本から読む。
+ * 音声・動画は長さ（ミリ秒）も返す（読めたときだけ）。
+ */
+export async function uploadToMediaLibrary(
+  file: File,
+  accountId: string,
+  kind: MediaItem['kind'],
+  onProgress: (percent: number) => void = () => {},
+  /** 各書込の直前に確認する。失効した処理ではfalseを返し続けるleaseを渡す。 */
+  canUploadNow?: () => boolean,
+): Promise<{ url: string; durationMs?: number; item: MediaItem }> {
+  const invalid = validateMediaFile(file)
+  if (invalid) throw new Error(invalid)
+  const metadata = await extractMediaMetadata(file)
+  if (canUploadNow?.() === false) throw new Error('権限が変わったため、ファイルの登録を中止しました。')
+  const prepared = await api.media.prepareUploads({
+    accountId,
+    files: [{ filename: file.name, mimeType: file.type, sizeBytes: file.size, folderId: null, metadata }],
+  })
+  if (!prepared.success || prepared.data.sessions.length !== 1) {
+    throw new Error((!prepared.success && prepared.error) || 'ファイルを送る準備ができませんでした。時間をおいて、もう一度お試しください。')
+  }
+  const session = prepared.data.sessions[0]
+  if (canUploadNow?.() === false) throw new Error('権限が変わったため、ファイルの登録を中止しました。')
+  const etag = await putMediaFile(session, file, onProgress)
+  if (canUploadNow?.() === false) throw new Error('権限が変わったため、ファイルの登録を中止しました。')
+  const completed = await api.media.completeUpload(session.id, { accountId, etag })
+  if (!completed.success) throw new Error(completed.error || '登録を完了できませんでした。時間をおいて、もう一度お試しください。')
+  if (completed.data.status !== 'completed' || !completed.data.mediaId) throw new Error('登録を完了できませんでした。時間をおいて、もう一度お試しください。')
+  const media = await api.media.detail(completed.data.mediaId, accountId)
+  if (!media.success || media.data.item.kind !== kind || !media.data.item.url) {
+    throw new Error('登録したファイルを確認できませんでした。登録メディアから選び直してください。')
+  }
+  return { url: media.data.item.url, durationMs: metadata.durationMs, item: media.data.item }
+}
+
+/** 画像を預けてその URL を返す（今までの ImageUploader と同じ口 api.uploads.image）。 */
+export async function uploadImageFile(file: File): Promise<string> {
+  const res = await api.uploads.image(file)
+  if (!res.success) throw new Error(res.error ?? 'アップロード失敗')
+  return res.data.url
+}

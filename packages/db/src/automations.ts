@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstNow } from './utils.js';
 // アクション自動化 (IF-THEN ルール) クエリヘルパー
 
@@ -42,9 +43,9 @@ export interface AutomationExecutionRunRow {
   automation_id: string;
   automation_name: string;
   automation_version_id: string;
-  /** 実行時に固定された版番号（#942 N-354：詳細・CSVで見せる）。 */
+  /** 実行時に固定された版番号（詳細・CSVで見せる）。 */
   version_number: number;
-  /** 1人テストの実行は1（#942 N-354：テスト実行の印）。 */
+  /** 1人テストの実行は1（テスト実行の印）。 */
   is_test: number;
   friend_id: string | null;
   friend_name: string | null;
@@ -59,11 +60,11 @@ export interface AutomationExecutionRunRow {
   skipped_actions: string | null;
   failed_action: string | null;
   failure_code: string | null;
-  /** いま公開中の版。実行した版との違いを画面で区別する（#1043）。 */
+  /** いま公開中の版。実行した版との違いを画面で区別する。 */
   current_published_version_id: string | null;
   current_version_number: number | null;
   /**
-   * 待機中のstepに失敗の再試行が混ざっているか（#1043）。
+   * 待機中のstepに失敗の再試行が混ざっているか。
    * `wait` の待機は retry_at が NULL、失敗の再試行は retry_at を持つ。
    */
   has_retry_wait: number | null;
@@ -86,7 +87,7 @@ export interface AutomationExecutionRunsQuery {
   search?: string;
   /**
    * 既定では本番実行だけを出し、テスト実行は明示したときだけ含める
-   * （V6 25-1-B「既定の一覧では本番だけを出し、切替で含める」）。
+   * （25-1-B「既定の一覧では本番だけを出し、切替で含める」）。
    */
   includeTest?: boolean;
   limit: number;
@@ -96,11 +97,11 @@ export interface AutomationExecutionRunsQuery {
 function automationRunWhere(input: AutomationExecutionRunsQuery, includeFilters: boolean) {
   if (input.allowedAccountIds.length === 0) return { sql: '1 = 0', binds: [] as unknown[] };
   const clauses = [
-    `r.line_account_id IN (${input.allowedAccountIds.map(() => '?').join(', ')})`,
+    `r.line_account_id IN (${sqlIdSet(input.allowedAccountIds).sql})`,
     'datetime(r.created_at) >= datetime(?)',
     'datetime(r.created_at) < datetime(?)',
   ];
-  const binds: unknown[] = [...input.allowedAccountIds, input.from, input.to];
+  const binds: unknown[] = [...(input.allowedAccountIds.length ? sqlIdSet(input.allowedAccountIds).binds : []), input.from, input.to];
   // テスト実行は一覧・集計・CSVすべてで既定除外。切替時だけ含める。
   if (!input.includeTest) clauses.push('r.is_test = 0');
   if (includeFilters && input.status?.length) {
@@ -119,7 +120,7 @@ function automationRunWhere(input: AutomationExecutionRunsQuery, includeFilters:
 }
 
 /**
- * V6 25-1-B: 新しい横断台帳を作らず、既存automation_runsを読み取り用に整える。
+ * 25-1-B: 新しい横断台帳を作らず、既存automation_runsを読み取り用に整える。
  * 書込時の詳細状態はそのまま保存し、共通状態への読み替えはAPI境界で行う。
  */
 export async function getAutomationExecutionRuns(
@@ -190,7 +191,7 @@ export async function getAutomationExecutionRuns(
 }
 
 /**
- * 1件の実行記録を、詳細表示に必要な項目つきで読む（#942 N-354）。
+ * 1件の実行記録を、詳細表示に必要な項目つきで読む。
  *
  * 版番号・テスト実行の印は実行時に `automation_version_id` / `is_test` へ
  * 固定されているものをそのまま出す。対象アカウント外は見せない。
@@ -223,9 +224,9 @@ export async function getAutomationExecutionRun(
        LEFT JOIN line_accounts la ON la.id = r.line_account_id
        LEFT JOIN automation_run_steps s ON s.automation_run_id = r.id
       WHERE r.id = ?
-        AND r.line_account_id IN (${input.allowedAccountIds.map(() => '?').join(',')})
+        AND r.line_account_id IN (${sqlIdSet(input.allowedAccountIds).sql})
       GROUP BY r.id`,
-  ).bind(input.runId, ...input.allowedAccountIds).first<AutomationExecutionRunRow>();
+  ).bind(input.runId, ...(input.allowedAccountIds.length ? sqlIdSet(input.allowedAccountIds).binds : [])).first<AutomationExecutionRunRow>();
 }
 
 export interface AutomationExecutionRunStepRow {
@@ -241,7 +242,7 @@ export interface AutomationExecutionRunStepRow {
 }
 
 /**
- * 実行の処理ごとの結果を順番どおりに読む（#942 N-354：処理ごとの結果と試行数）。
+ * 実行の処理ごとの結果を順番どおりに読む（処理ごとの結果と試行数）。
  *
  * `output_json` / `input_json` は API へ出さない。友だちの情報や送った内容が
  * 入りうるため、結果の状態・回数・エラーの種類だけを返す。

@@ -81,6 +81,7 @@ function installFetch() {
   vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
+    if (path === '/api/staff/me') return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
     const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
     net.calls.push(path)
@@ -140,7 +141,7 @@ async function renderAt(url: string) {
 
 /** いま開いている札の見出し。開いている印が付いている1つだけ。 */
 function currentTab(): string {
-  // ★V7: ボタン切り替えの札は aria-selected で開いているものを示すため、そちらで探す。
+  // ★管理画面: ボタン切り替えの札は aria-selected で開いているものを示すため、そちらで探す。
   const current = Array.from(host.querySelectorAll('[aria-selected="true"]'))
     .map((node) => node.textContent?.trim() ?? '')
   expect(current).toHaveLength(1)
@@ -301,11 +302,12 @@ function buttonByText(text: string, scope: ParentNode = document): HTMLButtonEle
   ) as HTMLButtonElement | undefined
 }
 
-function checkboxByLabel(text: string): HTMLInputElement {
-  const input = Array.from(document.querySelectorAll('input[type="checkbox"]')).find(
-    (item) => item.closest('label')?.textContent?.includes(text),
-  ) as HTMLInputElement | undefined
-  expect(input, `チェック「${text}」`).toBeTruthy()
+function switchByLabel(text: string): HTMLButtonElement {
+  const input = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="switch"]')).find(item => {
+    const name = item.getAttribute('aria-label') ?? (item.getAttribute('aria-labelledby') ?? '').split(/\s+/).map(id => document.getElementById(id)?.textContent ?? '').join(' ')
+    return name.includes(text)
+  })
+  expect(input, `スイッチ「${text}」`).toBeTruthy()
   return input!
 }
 
@@ -316,15 +318,13 @@ function setInputValue(input: HTMLInputElement, value: string) {
 }
 
 describe('検索で探す(#931 N-308)', () => {
-  it('語を入れて「探す」と q= 付きで一覧を取り直し、URLにも語が残る', async () => {
+  it('語を入れて300ms待つと自動で一覧を取り直し、URLにも語が残る', async () => {
     net.handler = detailCapableHandler(MIXED)
     await renderAt('/nen-members?tab=photos')
     const input = host.querySelector('input[placeholder*="探す"]') as HTMLInputElement
     expect(input).toBeTruthy()
     await act(async () => { setInputValue(input, 'モモ') })
-    const submit = buttonByText('探す', host)
-    expect(submit).toBeTruthy()
-    await act(async () => { submit!.click() })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     await act(async () => { await Promise.resolve() })
     expect(net.calls.some((path) => path.startsWith('/api/nen-members/photos?') && path.includes('q='))).toBe(true)
     expect(decodeURIComponent(window.location.search)).toContain('q=モモ')
@@ -350,20 +350,20 @@ describe('戻す約束の2チェック(#931 N-312)', () => {
     await act(async () => { openReject!.click() })
     await act(async () => { await Promise.resolve() })
 
-    const invite = checkboxByLabel('もう一度 送ってもらえるようお願いする')
-    const watch = checkboxByLabel('この人の次の投稿は、必ず人が見る')
+    const invite = switchByLabel('もう一度 送ってもらえるようお願いする')
+    const watch = switchByLabel('この人の次の投稿は、必ず人が見る')
     // 以前は disabled のまま押せず、表示の約束を果たせなかった。
     expect(invite.disabled).toBe(false)
     expect(watch.disabled).toBe(false)
-    expect(invite.checked).toBe(true)
-    expect(watch.checked).toBe(false)
+    expect((invite.getAttribute('aria-checked') === 'true')).toBe(true)
+    expect((watch.getAttribute('aria-checked') === 'true')).toBe(false)
 
     await act(async () => { invite.click() })
-    await act(async () => { watch.click() })
-    expect(invite.checked).toBe(false)
-    expect(watch.checked).toBe(true)
+    await act(async () => { (document.querySelector('details.followup') ?? Array.from(document.querySelectorAll('details')).find((node) => node.textContent?.includes('次の投稿の確認方法')))?.setAttribute('open', ''); watch.click() })
+    expect((invite.getAttribute('aria-checked') === 'true')).toBe(false)
+    expect((watch.getAttribute('aria-checked') === 'true')).toBe(true)
 
-    const confirm = buttonByText('見送って、この文章を送る')
+    const confirm = buttonByText('見送る', document.querySelector('[role="alertdialog"]') as HTMLDivElement)
     expect(confirm).toBeTruthy()
     await act(async () => { confirm!.click() })
     await act(async () => { await Promise.resolve() })
@@ -375,7 +375,7 @@ describe('戻す約束の2チェック(#931 N-312)', () => {
     expect(reviewRequest!.body).toMatchObject({
       accountId: 'account-a',
       status: 'rejected',
-      reasonCode: 'privacy',
+      reasonCode: 'quality',
       resubmitInvite: false,
       watchSubmitter: true,
     })
@@ -417,19 +417,19 @@ describe('写真の向きの保存(#931 N-309)', () => {
   it('「回す」のあと「向きを保存」が版つきで送られ、詳細の表示へ残る', async () => {
     net.handler = detailCapableHandler(MIXED)
     await renderAt('/nen-members?tab=photos')
-    const openDetailButton = buttonByText('⛶ 1枚ずつ大きく見る', host)
+    const openDetailButton = buttonByText('1枚ずつ大きく見る', host)
     expect(openDetailButton).toBeTruthy()
     await act(async () => { openDetailButton!.click() })
     await act(async () => { await Promise.resolve() })
 
     const rotate = buttonByText('回す')
-    const save = buttonByText('向きを保存')
+    const save = buttonByText('向きを保存する')
     expect(rotate).toBeTruthy()
     expect(save).toBeTruthy()
     // 回す前は保存できない（向きに変更が無い）。
     expect(save!.disabled).toBe(true)
     await act(async () => { rotate!.click() })
-    const saveReady = buttonByText('向きを保存')!
+    const saveReady = buttonByText('向きを保存する')!
     expect(saveReady.disabled).toBe(false)
     await act(async () => { saveReady.click() })
     await act(async () => { await Promise.resolve() })
@@ -456,28 +456,28 @@ describe('戻る・再読込での復元(#931 N-314)', () => {
     await renderAt('/nen-members?tab=photos&status=pending&view=detail&photo=p-1')
     await act(async () => { await Promise.resolve() })
     // 詳細が開いている（一覧のカードではなく詳細の操作が出る）。
-    expect(buttonByText('向きを保存')).toBeTruthy()
+    expect(buttonByText('向きを保存する')).toBeTruthy()
     expect(document.body.textContent).toContain('送ってくれた人')
   })
 
   it('詳細から戻ると一覧へ、進むと同じ詳細へ戻れる', async () => {
     net.handler = detailCapableHandler(MIXED)
     await renderAt('/nen-members?tab=photos')
-    await act(async () => { buttonByText('⛶ 1枚ずつ大きく見る', host)!.click() })
+    await act(async () => { buttonByText('1枚ずつ大きく見る', host)!.click() })
     await act(async () => { await Promise.resolve() })
-    expect(buttonByText('向きを保存')).toBeTruthy()
+    expect(buttonByText('向きを保存する')).toBeTruthy()
     // ブラウザの戻る: URLが一覧へ変わったあと popstate が来る。
     window.history.pushState(null, '', '/nen-members?tab=photos&status=pending')
     await act(async () => { window.dispatchEvent(new Event('popstate')) })
     await act(async () => { await Promise.resolve() })
-    expect(buttonByText('向きを保存')).toBeUndefined()
+    expect(buttonByText('向きを保存する')).toBeUndefined()
     expect(host.textContent).toContain('ハナ')
     // 進む: 詳細のURLへ戻ると、同じ写真の詳細を取り直して開く。
     window.history.pushState(null, '', '/nen-members?tab=photos&status=pending&view=detail&photo=p-1')
     await act(async () => { window.dispatchEvent(new Event('popstate')) })
     await act(async () => { await Promise.resolve() })
     expect(net.calls.some((path) => path.startsWith('/api/nen-members/photos/p-1?'))).toBe(true)
-    expect(buttonByText('向きを保存')).toBeTruthy()
+    expect(buttonByText('向きを保存する')).toBeTruthy()
   })
 
   it('再読込のあとも、選んでいた写真がsessionStorageから戻る', async () => {

@@ -1,5 +1,6 @@
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { getLineAccountScopeEntries } from '@line-crm/db';
+import { sqlIdSet } from '@line-crm/db/id-queries';
 
 type SegmentQuery = { sql: string; bindings: unknown[] };
 type FriendInputScope = { allowedAccountIds: readonly string[]; canSeeUnassigned: boolean };
@@ -16,7 +17,7 @@ export function scopeSegmentQuery(query: SegmentQuery, scope: FriendInputScope):
   if (scope.allowedAccountIds.length === 1 && !scope.canSeeUnassigned) {
     return restrictSegmentInput(query, 'f.line_account_id = ?', [scope.allowedAccountIds[0]]);
   }
-  const ids = { sql: 'SELECT value FROM json_each(?)', binds: [JSON.stringify(scope.allowedAccountIds)] };
+  const ids = sqlIdSet([...scope.allowedAccountIds]);
   return restrictSegmentInput(query,
     `(f.line_account_id IN (${ids.sql})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`, ids.binds);
 }
@@ -41,14 +42,4 @@ export async function scopeStoredBroadcastSegmentQuery(
   db: D1Database, query: SegmentQuery, accountId: string | null | undefined,
 ): Promise<SegmentQuery> {
   return scopeSegmentQuery(query, await storedBroadcastFriendScope(db, accountId));
-}
-
-/** Resolve current ownership inside one query, including account transfers between tenants. */
-export function storedBroadcastFriendIds(accountId: string | null): SegmentQuery {
-  const predicate = accountId === null
-    ? '(f.line_account_id IN (SELECT id FROM line_accounts WHERE COALESCE(tenant_id, ?) = ?) OR f.line_account_id IS NULL)'
-    : 'f.line_account_id = ?';
-  const query = restrictSegmentInput({ sql: 'SELECT f.id, f.line_user_id, f.display_name FROM friends f WHERE 1=1', bindings: [] },
-    predicate, accountId === null ? [DEFAULT_TENANT_ID, DEFAULT_TENANT_ID] : [accountId]);
-  return { sql: `SELECT scoped_friends.id FROM (${query.sql}) scoped_friends`, bindings: query.bindings };
 }

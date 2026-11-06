@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import { act } from 'react'
+import { waitFor } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import DashboardPage from './page'
+// 共通ダッシュボード本体の境界/既存カードを検査する。業種の入口分岐はhome.test.tsxが検査する。
+import DashboardPage from '@/v8/dashboard/dashboard'
 
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children?: React.ReactNode }) => <a href={href}>{children}</a>,
@@ -37,6 +39,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('fetch', (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return Promise.resolve(json({ success: true, data: { id: 'test-owner', role: 'owner' } }))
     if (path.includes('/api/dashboard/preferences?')) {
       if (init?.method === 'PUT') {
         return new Promise<Response>(resolve => pending.push({ body: JSON.parse(String(init.body)), resolve }))
@@ -63,14 +66,15 @@ afterEach(async () => {
 })
 
 function button(text: string): HTMLButtonElement {
-  const node = Array.from(host.querySelectorAll('button')).find(item => item.textContent?.trim() === text)
+  const node = Array.from(document.body.querySelectorAll('button')).find(item => item.textContent?.trim() === text)
   if (!node) throw new Error(`Button not found: ${text}`)
   return node
 }
 
 async function openEditor() {
   await act(async () => { root.render(<DashboardPage />) })
-  await act(async () => { button('ダッシュボード編集').click() })
+  await act(async () => { button('表示を変える').click() })
+  await waitFor(() => expect(document.body.querySelector('[role="dialog"]')).not.toBeNull())
 }
 
 describe('N-006 ダッシュボード保存の連打防止 (#758)', () => {
@@ -84,15 +88,16 @@ describe('N-006 ダッシュボード保存の連打防止 (#758)', () => {
     })
     expect(pending).toHaveLength(1)
     expect(pending[0].body.version).toBe(7)
-    expect(button('保存中…').disabled).toBe(true)
-    expect(button('保存中…').getAttribute('aria-busy')).toBe('true')
+    expect(button('保存しています…').disabled).toBe(true)
+    expect(button('保存しています…').getAttribute('aria-busy')).toBe('true')
     expect(button('初期状態に戻す').disabled).toBe(true)
-    await act(async () => { button('保存中…').click() })
+    await act(async () => { button('保存しています…').click() })
     expect(pending).toHaveLength(1)
     await act(async () => { pending[0].resolve(json({ success: true, data: { version: 8 } })) })
-    expect(host.querySelector('[role="dialog"]')).toBeNull()
-    expect(host.textContent).not.toContain('別の画面で配置が更新されました')
-    await act(async () => { button('ダッシュボード編集').click() })
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.body.textContent).not.toContain('別の画面で配置が更新されました')
+    await act(async () => { button('表示を変える').click() })
+  await waitFor(() => expect(document.body.querySelector('[role="dialog"]')).not.toBeNull())
     await act(async () => { button('ダッシュボードに反映').click() })
     expect(pending).toHaveLength(2)
     expect(pending[1].body.version).toBe(8)
@@ -103,12 +108,12 @@ describe('N-006 ダッシュボード保存の連打防止 (#758)', () => {
     await act(async () => { button('ダッシュボードに反映').click() })
     await act(async () => { pending[0].resolve(json({ success: false, error: 'unavailable' }, 503)) })
     expect(button('ダッシュボードに反映').disabled).toBe(false)
-    expect(host.textContent).toContain('ダッシュボードの配置を保存できませんでした')
+    expect(document.body.textContent).toContain('配置を保存できませんでした')
     await act(async () => { button('ダッシュボードに反映').click() })
     expect(pending).toHaveLength(2)
     expect(pending[1].body).toEqual(pending[0].body)
     await act(async () => { pending[1].resolve(json({ success: true, data: { version: 8 } })) })
-    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
   })
 
   it('本当の409は自動で上書きせず既存の競合案内を維持する', async () => {
@@ -117,7 +122,7 @@ describe('N-006 ダッシュボード保存の連打防止 (#758)', () => {
     await act(async () => { pending[0].resolve(json({ success: false, error: 'conflict', currentVersion: 8 }, 409)) })
     expect(pending).toHaveLength(1)
     expect(button('ダッシュボードに反映').disabled).toBe(false)
-    expect(host.querySelector('[role="dialog"]')).not.toBeNull()
-    expect(host.textContent).toContain('別の画面で配置が更新されました。再読み込みしてください')
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(document.body.textContent).toContain('ほかの人が先にダッシュボードの配置を保存しました')
   })
 })

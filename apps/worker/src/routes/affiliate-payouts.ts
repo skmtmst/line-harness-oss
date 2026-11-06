@@ -1,3 +1,7 @@
+import { formatYen } from '@line-crm/shared';
+import { simplePdf } from '../services/affiliate-statement-pdf.js';
+import { customerDownloadEntry } from '../services/download-entrypoints.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
   closeAffiliateAccountSettlement,
@@ -14,9 +18,9 @@ import {
   previewAffiliateAccountSettlement,
 } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
-import { sha256Hex } from '../middleware/auth.js';
+import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { notifyAffiliate } from '../services/affiliate-notifier.js';
@@ -72,43 +76,6 @@ function csvCell(value: string | number): string {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function simplePdf(snapshot: {
-  affiliateCode: string; periodFrom: string; periodTo: string; totalAmount: number; currency: string;
-  grossAmount?: number; deductionAmount?: number;
-}): Uint8Array {
-  const ascii = (value: string) => value.replace(/[^\x20-\x7E]/g, '?').replace(/[()\\]/g, '\\$&');
-  const deduction = snapshot.deductionAmount ?? 0;
-  const lines = [
-    'Affiliate payment statement',
-    `Affiliate: ${ascii(snapshot.affiliateCode)}`,
-    `Period: ${ascii(snapshot.periodFrom)} - ${ascii(snapshot.periodTo)}`,
-    // R288: 取消の差し引きがあるときだけ内訳を分けて出す。
-    ...(deduction > 0 ? [
-      `Gross: ${snapshot.currency} ${snapshot.grossAmount ?? snapshot.totalAmount + deduction}`,
-      `Adjustment: -${snapshot.currency} ${deduction}`,
-    ] : []),
-    `Amount: ${snapshot.currency} ${snapshot.totalAmount}`,
-  ];
-  const stream = `BT /F1 14 Tf 72 760 Td ${lines.map((line, index) => `${index ? '0 -24 Td ' : ''}(${line}) Tj`).join(' ')} ET`;
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
-  ];
-  let document = '%PDF-1.4\n';
-  const offsets = [0];
-  for (let index = 0; index < objects.length; index += 1) {
-    offsets.push(new TextEncoder().encode(document).byteLength);
-    document += `${index + 1} 0 obj\n${objects[index]}\nendobj\n`;
-  }
-  const xref = new TextEncoder().encode(document).byteLength;
-  document += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  for (const offset of offsets.slice(1)) document += `${String(offset).padStart(10, '0')} 00000 n \n`;
-  document += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
-  return new TextEncoder().encode(document);
-}
 
 affiliatePayouts.get(
   '/api/affiliate-settlements/preview',
@@ -129,8 +96,7 @@ affiliatePayouts.get(
       });
       return c.json({ success: true, data });
     } catch (error) {
-      console.error('GET /api/affiliate-settlements/preview error:', error);
-      return c.json({ success: false, error: '締め対象を確認できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -158,8 +124,7 @@ affiliatePayouts.get(
       });
       return c.json({ success: true, data });
     } catch (error) {
-      console.error('GET /api/affiliate-settlements/current error:', error);
-      return c.json({ success: false, error: '締め済みの記録を確認できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -168,7 +133,7 @@ affiliatePayouts.post(
   '/api/affiliate-settlements',
   requireRole('owner', 'admin', 'staff'),
   affiliatePermission('affiliate.settlement.close'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     auditLog(c, 'affiliate.settlement.close', { kind: 'affiliate-settlement' });
     const key = idempotencyKey(c);
     type CloseBody = {
@@ -178,7 +143,7 @@ affiliatePayouts.post(
     if (!key || typeof body.lineAccountId !== 'string' || !validIso(body.periodFrom)
       || !validIso(body.periodTo) || Date.parse(body.periodFrom) > Date.parse(body.periodTo)
       || typeof body.expectedPreviewVersion !== 'string' || !/^[a-f0-9]{64}$/.test(body.expectedPreviewVersion)) {
-      return c.json({ success: false, error: '締め期間、版、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '締め期間、版、再実行キーを確認してください' }, 400, ["lineAccountId","periodFrom","periodTo","expectedPreviewVersion"]);
     }
     if (!await accountVisible(c, body.lineAccountId)) {
       return c.json({ success: false, error: '締め対象が見つかりません' }, 404);
@@ -199,8 +164,7 @@ affiliatePayouts.post(
       if (result.kind === 'idempotency_conflict') return c.json({ success: false, error: '同じ再実行キーが別の入力に使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
       return c.json({ success: true, data: result }, result.kind === 'created' ? 201 : 200);
     } catch (error) {
-      console.error('POST /api/affiliate-settlements error:', error);
-      return c.json({ success: false, error: '締め処理を完了できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -209,7 +173,7 @@ affiliatePayouts.post(
   '/api/affiliate-payout-batches',
   requireRole('owner', 'admin', 'staff'),
   affiliatePermission('affiliate.payout.export'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     auditLog(c, 'affiliate.payout.create', { kind: 'affiliate-payout-batch' });
     const key = idempotencyKey(c);
     type BatchBody = {
@@ -219,7 +183,7 @@ affiliatePayouts.post(
     const version = positiveVersion(body.expectedVersion);
     if (!key || typeof body.lineAccountId !== 'string' || typeof body.settlementId !== 'string'
       || !version || body.bankFormat !== 'zengin_csv') {
-      return c.json({ success: false, error: '支払対象、版、銀行形式、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '支払対象、版、銀行形式、再実行キーを確認してください' }, 400, ["lineAccountId","settlementId","expectedVersion","bankFormat"]);
     }
     if (!await accountVisible(c, body.lineAccountId)) {
       return c.json({ success: false, error: '支払対象が見つかりません' }, 404);
@@ -239,8 +203,7 @@ affiliatePayouts.post(
       }
       return c.json({ success: true, data: result.batch }, result.kind === 'created' ? 201 : 200);
     } catch (error) {
-      console.error('POST /api/affiliate-payout-batches error:', error);
-      return c.json({ success: false, error: '支払バッチを作成できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -249,14 +212,14 @@ affiliatePayouts.post(
   '/api/affiliate-payout-batches/:id/export',
   requireRole('owner', 'admin', 'staff'),
   affiliatePermission('affiliate.payout.export'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     auditLog(c, 'affiliate.payout.export', { kind: 'affiliate-payout-batch', id: c.req.param('id') });
     const key = idempotencyKey(c);
     type ExportBody = { lineAccountId?: unknown; expectedVersion?: unknown };
     const body = await c.req.json<ExportBody>().catch((): ExportBody => ({}));
     const version = positiveVersion(body.expectedVersion);
     if (!key || typeof body.lineAccountId !== 'string' || !version) {
-      return c.json({ success: false, error: '支払バッチ、版、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '支払バッチ、版、再実行キーを確認してください' }, 400, ["lineAccountId","expectedVersion"]);
     }
     const lineAccountId = body.lineAccountId;
     const batchId = c.req.param('id');
@@ -267,6 +230,7 @@ affiliatePayouts.post(
     if (!stepUpToken || !await consumeStepUpGrant(c.env.DB, {
       tokenHash: await sha256Hex(stepUpToken), staffId: c.get('staff')!.id,
       purpose: 'affiliate.payout.export',
+      sessionTokenHash: await adminSessionTokenHashFromRequest(c),
     })) {
       return c.json({ success: false, error: 'CSV出力には二段階認証による再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
     }
@@ -308,6 +272,7 @@ affiliatePayouts.post(
       if (result.kind === 'changed' || result.kind === 'idempotency_conflict') {
         return c.json({ success: false, error: '支払バッチまたは再実行キーが競合しました', code: 'VERSION_CONFLICT' }, 409);
       }
+      c.set('outputAudit', { count: exportData.lines.length, accountId: lineAccountId, targetId: batchId, phase: 'requested' });
       return c.json({
         success: true,
         data: {
@@ -316,8 +281,7 @@ affiliatePayouts.post(
         },
       });
     } catch (error) {
-      console.error('POST /api/affiliate-payout-batches/:id/export error:', error);
-      return c.json({ success: false, error: '銀行CSVを出力できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -337,6 +301,7 @@ affiliatePayouts.get(
       tenantId: tenantId(c), lineAccountId, batchId, tokenHash: await sha256Hex(token),
     });
     if (!file) return c.json({ success: false, error: '出力ファイルが見つからないか期限切れです' }, 404);
+    c.set('outputAudit', { count: file.lineCount, accountId: lineAccountId, targetId: batchId });
     const object = await c.env.IMAGES.get(file.objectKey);
     if (!object) return c.json({ success: false, error: '出力ファイルが見つかりません' }, 404);
     return new Response(object.body, {
@@ -353,7 +318,7 @@ affiliatePayouts.post(
   '/api/affiliate-statements',
   requireRole('owner', 'admin', 'staff'),
   affiliatePermission('affiliate.settlement.close'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     auditLog(c, 'affiliate.statement.generate', { kind: 'affiliate-statement' });
     const key = idempotencyKey(c);
     type StatementBody = {
@@ -363,7 +328,7 @@ affiliatePayouts.post(
     const version = positiveVersion(body.expectedVersion);
     if (!key || typeof body.lineAccountId !== 'string' || typeof body.settlementId !== 'string'
       || typeof body.affiliateId !== 'string' || !version) {
-      return c.json({ success: false, error: '締め、紹介者、版、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '締め、紹介者、版、再実行キーを確認してください' }, 400, ["lineAccountId","settlementId","affiliateId","expectedVersion"]);
     }
     if (!await accountVisible(c, body.lineAccountId)) {
       return c.json({ success: false, error: '明細対象が見つかりません' }, 404);
@@ -387,7 +352,7 @@ affiliatePayouts.post(
       if (snapshot.settlementVersion !== version) {
         return c.json({ success: false, error: '締め内容が更新されています', code: 'VERSION_CONFLICT' }, 409);
       }
-      const pdf = simplePdf(snapshot);
+      const pdf = simplePdf({...snapshot,exportedBy:c.get('staff').id,exportedAt:new Date().toISOString()});
       const checksum = await sha256Hex(new TextDecoder().decode(pdf));
       const objectKey = `affiliate-statements/${body.lineAccountId}/${randomToken(18)}.pdf`;
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60_000).toISOString();
@@ -401,12 +366,11 @@ affiliatePayouts.post(
         c.env.DB,
         c.env,
         body.affiliateId,
-        `支払明細を発行しました。確定額: ¥${snapshot.totalAmount.toLocaleString('ja-JP')}。紹介者マイページから確認できます。`,
+        `支払明細を発行しました。確定額: ${formatYen(snapshot.totalAmount)}。LINEで本人確認して確認できます。\n${customerDownloadEntry(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin, 'statements', statement.id)}`,
       );
       return c.json({ success: true, data: statement, notificationAttempted: true }, 201);
     } catch (error) {
-      console.error('POST /api/affiliate-statements error:', error);
-      return c.json({ success: false, error: '支払明細を発行できませんでした' }, 500);
+      throw error;
     }
   },
 );

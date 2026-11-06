@@ -4,52 +4,24 @@ import { fileURLToPath } from 'node:url'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import ActionMenu from './action-menu'
 import Dialog from './dialog'
-import Drawer from './drawer'
-import Notice from './notice'
 import NotificationPanel from './notification-panel'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SRC = join(HERE, '..', '..')
-const WEB = join(SRC, '..')
 const readSource = (path: string) => readFileSync(join(SRC, path), 'utf8')
 const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('V5 B4 オーバーレイ共通部品', () => {
-  it('標準・重要操作ダイアログがPencil Node IDと状態を持つ', () => {
+  it('標準・重要操作ダイアログが確認中と失敗の状態を持つ', () => {
     const html = renderToStaticMarkup(<div>
       <Dialog open modal={false} title="保存しますか？" description="次回から反映します" onCancel={vi.fn()} onConfirm={vi.fn()} />
       <Dialog open modal={false} tone="destructive" title="統合しますか？" description="元に戻せません" busy error="確認できません" onCancel={vi.fn()} onConfirm={vi.fn()} />
     </div>)
-    expect(html).toContain('data-design-node="J6x4Q"')
-    expect(html).toContain('data-design-node="H2S1T4"')
     expect(html).toContain('role="alertdialog"')
     expect(html).toContain('aria-busy="true"')
     expect(html).toContain('確認できません')
-  })
-
-  it('右詳細・4種の帯・操作メニューを同じAPIで表せる', () => {
-    // 帯の正本は Pencil「★V7 共通部品その2」uR9s8 の §1。旧 tone 名は同じ見た目の別名。
-    const html = renderToStaticMarkup(<div>
-      <Drawer open modal={false} title="友だち詳細" details={[{ label: '担当', value: '未設定' }]} onClose={vi.fn()} />
-      <Notice tone="info" message="この画面の数は日本時間で数えます。" />
-      <Notice tone="success" message="保存しました" onClose={vi.fn()} />
-      <Notice tone="warn" message="入力内容を確認してください" />
-      <Notice tone="danger" message="処理に失敗しました。通信を確かめて、もう一度お試しください。" />
-      <Notice tone="validation" message="入力内容を確認してください" />
-      <Notice tone="error" message="処理に失敗しました。" />
-      <ActionMenu open inline onClose={vi.fn()} items={[{ id: 'delete', label: '削除', tone: 'danger', onSelect: vi.fn() }]} />
-    </div>)
-    // 帯は★V7 共通部品その2（uR9s8）へ1本化、操作メニューは V5 `hGpFq` から ★V7 `xifuV` へ移行した。
-    for (const nodeId of ['VJKAT', 'uR9s8', 'xifuV']) expect(html).toContain(`data-design-node="${nodeId}"`)
-    expect(html).not.toContain('data-design-node="ApbSZ"')
-    expect(html).not.toContain('data-design-node="zPRvi"')
-    expect(html).not.toContain('data-design-node="I5rKbM"')
-    expect(html).not.toContain('data-design-node="hGpFq"')
-    expect(html).toContain('aria-label="通知を閉じる"')
-    expect(html).toContain('role="menuitem"')
   })
 
   it('通知パネルは開・未読・フィルター・読込・失敗をpropsで受ける', () => {
@@ -59,7 +31,6 @@ describe('V5 B4 オーバーレイ共通部品', () => {
       items={[{ id: '1', title: '送信失敗', meta: '昨日 10:04', unread: true }]}
       onFilterChange={vi.fn()} onMarkAllRead={vi.fn()}
     />)
-    expect(html).toContain('data-design-node="z6TmF"')
     expect(html).toContain('aria-selected="true"')
     expect(html).toContain('未読')
     expect(html).toContain('送信失敗')
@@ -75,11 +46,13 @@ describe('V5 B4 オーバーレイ共通部品', () => {
   })
 
   it('代表画面は共通部品を使い、既存の保存・削除・追加処理を残す', () => {
-    const editor = readSource('components/friend-fields/tag-editor-v4.tsx')
-    const list = readSource('components/friend-fields/tags-page-v4.tsx')
-    expect(editor).toMatch(/import Drawer/)
+    const editor = readSource('components/friend-fields/tag-editor-v4.tsx') + readSource('v8/tag-edit/edit-form.tsx')
+    const list = readSource('v8/tags/tags-tab.tsx')
+    const actions = readSource('components/friend-fields/linked-action-list.tsx')
+    expect(actions).toContain('ActionAddButton')
     expect(editor).toMatch(/import Notice/)
-    expect(editor).toContain('onAdd({ id: crypto.randomUUID()')
+    expect(actions).toContain('params: { delayMinutes: 0, cancelIfTagRemoved: true }')
+    expect(actions).toContain('newStepId()')
     expect(list).toMatch(/import ActionMenu/)
     expect(list).toMatch(/import ConfirmDialog/)
     expect(list).toContain('api.tagGroups.delete')
@@ -99,30 +72,9 @@ describe('V5 B4 オーバーレイ共通部品', () => {
   it('ダイアログのボタンは最小幅を保ち、長いラベルを折り返さない', () => {
     // #976: 高さ・文字・色は共通Buttonへ委譲した。ここに残るのは幅の指定だけ。
     const css = read('dialog.module.css')
+    expect(css).toMatch(/:root \.designButton \{[^}]*min-width: 0;/s)
     for (const className of ['designButton']) {
-      expect(css).toMatch(new RegExp(`\\.${className} \\{[^}]*min-width: 112px;[^}]*width: auto;[^}]*white-space: nowrap;`, 's'))
+      expect(css).toMatch(new RegExp(`\\.${className} \\{[^}]*width: auto;[^}]*white-space: nowrap;`, 's'))
     }
-  })
-
-  it('契約はB4の部品・実ノード・宣言数を固定する', () => {
-    const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
-    const inventory = JSON.parse(readFileSync(join(WEB, 'design', 'pencil-component-inventory.json'), 'utf8'))
-    // 2026-09-03: 色と角丸を1系統にまとめ、同値の別名3つ
-    // （--radius-tile / --color-status-warning / --color-status-warning-soft）
-    // を消したので 24 → 21。承認は docs/v6-directives.md §4。
-    expect(contract.required.tokens).toBe(21)
-    expect(contract.required.parts).toBe(20)
-    expect(contract.required.partDeclarations).toBe(301)
-    expect(contract.parts.dialog.pencilNodes).toEqual(['J6x4Q', 'H2S1T4'])
-    expect(contract.parts.drawer.pencilNodes).toEqual(['VJKAT'])
-    // 帯の節点は★V7 共通部品その2（uR9s8）。V5 の3節点は置き換え済みとして棚卸しに残す。
-    expect(contract.parts.notice.pencilNodes).toEqual(['uR9s8'])
-    // ★V7（m13g）：操作メニューは V5 `hGpFq` から ★V7 `xifuV` へ移行した。
-    // 台帳の整合のため新旧両ノードを記録する（`hGpFq` 自体は Pencil に残る）。
-    expect(contract.parts['action-menu'].pencilNodes).toEqual(['hGpFq', 'xifuV'])
-    expect(contract.parts['notification-panel'].status).toBe('implemented')
-    for (const nodeId of ['J6x4Q', 'H2S1T4', 'VJKAT', 'uR9s8', 'hGpFq']) expect(inventory.components[nodeId].status).toBe('active')
-    for (const nodeId of ['ApbSZ', 'zPRvi', 'I5rKbM']) expect(inventory.components[nodeId].status).toBe('implemented')
-    expect(inventory.components.z6TmF.status).toBe('implemented')
   })
 })

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * サイトスクリプト（計測状況）の描画契約。設計 ★V7「監査の直し」D。
+ * サイトスクリプト（計測状況）の描画契約。設計 ★管理画面「監査の直し」D。
  *
  * - 読み込み中：未接続とも失敗とも決めつけない
  * - 未接続：灰色の地＋「未接続」の札＋つなぎ方。0を出さない
@@ -15,7 +15,10 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, loading: false }),
 }))
 
-import SiteScript from './site-script'
+import SiteScript from '@/v8/inflow-links/site-script'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/lib/staff-role', async original => ({...await original(), useStaffRole: () => staffRole}))
+import { fireEvent, screen } from '@testing-library/react'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -122,7 +125,7 @@ describe('サイトスクリプトの計測状況', () => {
   it('読み込み中は未接続とも失敗とも出さない', async () => {
     gated = true
     await act(async () => { root.render(<SiteScript />) })
-    expect(text()).toContain('サイトの計測状況を読み込んでいます')
+    expect(host.querySelector('[aria-busy="true"][aria-label="サイトの計測状況を読み込んでいます"]')).toBeTruthy()
     expect(text()).not.toContain('未接続')
     expect(text()).not.toContain('読み込めませんでした')
     gated = false
@@ -135,12 +138,12 @@ describe('サイトスクリプトの計測状況', () => {
     await settle()
     await settle()
 
-    expect(text()).toContain('未接続')
-    expect(text()).toContain('数字は出しません')
-    const card = host.querySelector('[aria-label="サイトの計測は未接続"]')
+    expect(text()).toContain('まだ届いていません')
+    expect(host.querySelector('#ss-status')?.getAttribute('title')).toContain('数字は出しません')
+    const card = host.querySelector('[aria-labelledby="ss-status"]')
     expect(card).toBeTruthy()
     expect(card?.textContent).not.toMatch(/今日は \d+件/)
-    const button = Array.from(host.querySelectorAll('button')).find((el) => el.textContent?.includes('つなぎ方を見る'))
+    const button = Array.from(host.querySelectorAll('button')).find((el) => el.textContent?.includes('貼りかたが分からないときは'))
     expect(button).toBeTruthy()
     await act(async () => { button!.click() })
     await settle()
@@ -151,9 +154,9 @@ describe('サイトスクリプトの計測状況', () => {
     await act(async () => { root.render(<SiteScript />) })
     await settle()
 
-    expect(text()).toContain('動いています')
-    expect(text()).toContain('最後にデータが届いたのは 9/26 18:02')
-    expect(text()).toContain('今日は 5件')
+    expect(text()).toContain('いま届いているか')
+    expect(text()).toContain('最後に届いたのは 09/26 18:02')
+    expect(host.querySelector('#ss-status')?.getAttribute('title')).toContain('今日は 5件')
     expect(host.querySelector('[aria-label="サイトの計測は未接続"]')).toBeFalsy()
     expect(text()).toContain('/thanks')
   })
@@ -164,7 +167,7 @@ describe('サイトスクリプトの計測状況', () => {
     await settle()
 
     expect(text()).toContain('サイトの計測を読み込めませんでした')
-    expect(text()).toContain('確かめ方を見る')
+    expect(text()).toContain('貼りかたが分からないときは')
     expect(host.querySelector('.text-danger')).toBeFalsy()
     const retry = Array.from(host.querySelectorAll('button')).find((el) => el.textContent?.includes('もう一度読み込む'))
     expect(retry).toBeTruthy()
@@ -172,14 +175,14 @@ describe('サイトスクリプトの計測状況', () => {
     mode = 'active'
     await act(async () => { retry!.click() })
     await settle()
-    expect(text()).toContain('動いています')
+    expect(text()).toContain('いま届いているか')
   })
 
   it('読めなくなっても、最後に受け取った時刻は残す', async () => {
     mode = 'active'
     await act(async () => { root.render(<SiteScript />) })
     await settle()
-    expect(text()).toContain('動いています')
+    expect(text()).toContain('いま届いているか')
 
     mode = 'failing'
     const check = Array.from(host.querySelectorAll('button')).find((el) => el.textContent?.includes('いま届いているか確かめる'))
@@ -187,7 +190,7 @@ describe('サイトスクリプトの計測状況', () => {
     await settle()
 
     expect(text()).toContain('サイトの計測を読み込めませんでした')
-    expect(text()).toContain('最後に受け取ったのは 9/26 18:02')
+    expect(text()).toContain('最後に受け取ったのは 09/26 18:02')
   })
 })
 
@@ -213,11 +216,14 @@ describe('R275 計測サイトの停止と再開', () => {
     await settle()
     await settle()
 
-    const stop = button('計測を止める')
+    // 「…」を開いて止めるを選ぶ（絵どおりの操作）
+    await act(async () => { (host.querySelector('tbody button[aria-haspopup="menu"]') as HTMLElement).click() })
+    await settle()
+    const stop = button('止める')
     expect(stop).toBeTruthy()
     await act(async () => { stop!.click() })
+    await settle()
     // 理由なしでは送らない
-    await act(async () => { button('計測を止める')!.click(); await Promise.resolve() })
     const confirm = Array.from(document.querySelectorAll('button'))
       .filter((el) => el.textContent?.trim() === '計測を止める').pop()!
     await act(async () => { confirm.click(); await Promise.resolve() })
@@ -226,7 +232,7 @@ describe('R275 計測サイトの停止と再開', () => {
       && String((init?.body as string) ?? '').includes('reason'))).toBe(false)
   })
 
-  it('停止中のサイトは札と理由を出し、計測コードは出さない', async () => {
+  it('止めているサイトは札と理由を出し、計測コードは出さない', async () => {
     staffRole = 'owner'
     sites = [{ ...SITE, stoppedAt: '2026-09-27T00:00:00.000Z', stoppedReason: 'サイトを閉じたため' }]
     await act(async () => { root.render(<SiteScript />) })
@@ -234,10 +240,13 @@ describe('R275 計測サイトの停止と再開', () => {
     await settle()
 
     expect(text()).toContain('停止中')
-    expect(text()).toContain('理由: サイトを閉じたため')
+    expect(host.querySelector('[title="理由: サイトを閉じたため"]')).not.toBeNull()
     expect(text()).not.toContain('data-site="site-1"')
-    expect(button('計測を再開する')).toBeTruthy()
-    expect(button('計測を止める')).toBeFalsy()
+    // 「…」の中に再開だけあり、止めるは無い
+    await act(async () => { (host.querySelector('tbody button[aria-haspopup="menu"]') as HTMLElement).click() })
+    await settle()
+    expect(button('再開する')).toBeTruthy()
+    expect(button('止める')).toBeFalsy()
   })
 
   it('staffには止める・再開する入口を出さない', async () => {
@@ -247,7 +256,47 @@ describe('R275 計測サイトの停止と再開', () => {
     await settle()
     await settle()
 
-    expect(button('計測を止める')).toBeFalsy()
-    expect(button('計測を再開する')).toBeFalsy()
+    // 「…」自体が出ない（見るだけ）
+    expect(button('…')).toBeFalsy()
+    expect(button('止める')).toBeFalsy()
+    expect(button('再開する')).toBeFalsy()
+  })
+})
+
+it('V8でサイトごとの受信時刻と未受信を分ける', async () => {
+  sites = [{ id:'one',label:'受信したサイト',domains:[],rejectedCount:0,lastReceivedAt:'2026-09-26T09:02:00.000Z' }, {id:'two',label:'未受信サイト',domains:[],rejectedCount:0,lastReceivedAt:null}];
+  await act(async () => { root.render(<SiteScript />) }); await settle(); await settle();
+  expect(host.querySelector('[title="最後に受け取った時刻: 9月26日 18:02"]')).not.toBeNull();
+  expect(host.querySelector('[title="最後に受け取った時刻: まだ受け取っていません"]')).not.toBeNull();
+});
+
+
+describe('V8 計測サイトの共通メニューからの停止・再開', () => {
+  const site = { id: 'site-1', label: '公式ショップ', domains: ['shop.example.com'], createdAt: '2026-09-01T00:00:00.000Z', rejectedCount: 0, lastRejectedHost: null, lastRejectedAt: null, stoppedAt: null, stoppedReason: null }
+  const postedTo = (suffix: string) => vi.mocked(fetch).mock.calls.filter(([input, init]) => String(input).endsWith(`/measurement-sites/site-1/${suffix}`) && init?.method === 'POST')
+
+  it('理由がない停止は送らず、理由を入れた停止だけ送る', async () => {
+    staffRole = 'owner'; sites = [{ ...site }]
+    await act(async () => { root.render(<SiteScript />) }); await settle(); await settle()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '「公式ショップ」の操作' })) }); await settle()
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '止める' })) }); await settle()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '計測を止める', exact: true })) }); await settle()
+    expect(postedTo('stop')).toHaveLength(0)
+    expect(document.body.textContent).toContain('止める理由を入れてください')
+    await act(async () => { fireEvent.change(document.getElementById('site-stop-reason')!, { target: { value: 'サイトを閉じたため' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '計測を止める', exact: true })) }); await settle()
+    expect(postedTo('stop')).toHaveLength(1)
+    expect(JSON.parse(String(postedTo('stop')[0][1]?.body))).toEqual({ reason: 'サイトを閉じたため' })
+  })
+
+  it('停止中の再開は確認した後だけ送る', async () => {
+    staffRole = 'owner'; sites = [{ ...site, stoppedAt: '2026-09-27T00:00:00.000Z', stoppedReason: 'サイトを閉じたため' }]
+    await act(async () => { root.render(<SiteScript />) }); await settle(); await settle()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '「公式ショップ」の操作' })) }); await settle()
+    expect(screen.queryByRole('menuitem', { name: '止める' })).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '再開する' })) }); await settle()
+    expect(postedTo('resume')).toHaveLength(0)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '再開する', exact: true })) }); await settle()
+    expect(postedTo('resume')).toHaveLength(1)
   })
 })

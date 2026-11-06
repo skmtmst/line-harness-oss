@@ -10,7 +10,26 @@ describe('CreatePage error message', () => {
 
   it('内部の英語エラーを運用者向けの日本語へ置き換える', () => {
     expect(createPageErrorMessage(new Error('conversion create failed')))
-      .toBe('保存に失敗しました。入力内容を確認して、もう一度お試しください。')
+      .toBe('保存できませんでした。通信が切れている可能性があります。接続を確かめて、もう一度お試しください。')
+  })
+
+  /*
+   * D005: 保存が405/500で失敗しても `API error: 405` のような内部文面を
+   * そのまま出さない。運用者向けの文（何が起きたか・どうすればよいか）にする。
+   */
+  it('405・500は内部文面を出さず、立て直し方まで書く', () => {
+    for (const status of [405, 500, 502]) {
+      const message = createPageErrorMessage(new ApiError(status, `API error: ${status}`))
+      expect(message).not.toMatch(/API error/)
+      expect(message).toContain('もう一度お試しください')
+    }
+  })
+
+  it('403は権限の案内、429は待ち時間の案内にする', () => {
+    expect(createPageErrorMessage(new ApiError(403, 'API error: 403')))
+      .toContain('権限')
+    expect(createPageErrorMessage(new ApiError(429, 'API error: 429')))
+      .toContain('少し待ってから')
   })
 })
 

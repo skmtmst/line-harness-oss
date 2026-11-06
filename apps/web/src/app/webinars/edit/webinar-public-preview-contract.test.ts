@@ -3,40 +3,23 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/edit.tsx'), 'utf8')
 
-describe('V6 ウェビナー公開ページ確認の契約', () => {
-  it('実ノードと行き先が分かる操作名を持つ', () => {
-    expect(PAGE).toContain('data-design-node="GB0NR"')
-    expect(PAGE).toContain('公開ページを見る')
+/*
+ * 管理画面 ウェビナー公開ページ確認。公開中で検査済みの URL だけを別窓で開くこと・開けない理由の言い分けは
+ * webinar-edit-contract-react.test.tsx と webinar-unsaved-flow-react.test.tsx、公開ページのテストは
+ * review-v8-react.test.tsx が描いて押して見る。ここは戻してはいけない形の見張りだけ。
+ */
+describe("管理画面 ウェビナー公開ページ確認の契約", () => {
+  it('準備中の仮の文に戻さない', () => {
     expect(PAGE).not.toContain('プレビューは準備中です')
   })
 
-  it('ウェビナー編集APIが検査したLIFF URLだけを使う', () => {
-    expect(PAGE).toContain('const publicUrl = editor.publicPage.url')
-    expect(PAGE).toContain('webinarApi.editor(id)')
-    expect(PAGE).toContain('webinarApi.testPublicPage(webinar.id, editor.version)')
+  it('選んでいるアカウントからは公開先を作らない', () => {
     expect(PAGE).not.toContain('selectedAccountId')
   })
 
-  it('公開中かつLIFF設定済みのときだけ別窓で開く', () => {
-    expect(PAGE).toContain("const canOpenPublicPage = webinar.status === 'active' && publicUrl !== null")
-    expect(PAGE).toContain('target="_blank"')
-    expect(PAGE).toContain('rel="noreferrer"')
-    expect(PAGE).toContain('公開すると、友だちが見るページを確認できます')
-    expect(PAGE).toContain('LIFF IDが設定されていません')
-    expect(PAGE).toContain('<Button disabled title={publicPageReason}>公開ページを見る</Button>')
-  })
-
-  it('アカウント読込中や所属未取得をLIFF未設定と言い切らない', () => {
-    expect(PAGE).toContain('const { accounts, loading: accountsLoading } = useAccount()')
-    expect(PAGE).toContain("accountsLoading\n    ? 'LINE公式アカウントを確認しています。'")
-    expect(PAGE).toContain('!webinar.accountId || !webinarAccount')
-    expect(PAGE).toContain('このウェビナーのLINE公式アカウントを確認できません')
-  })
-
   it('内部の管理APIやslugだけの相対URLを公開先にしない', () => {
-    expect(PAGE).toContain('editor.publicPage.url')
     expect(PAGE).not.toContain('href={`/webinar/${webinar.slug}`')
     expect(PAGE).not.toContain('/api/liff/webinars/${webinar.slug}')
   })

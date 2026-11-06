@@ -19,7 +19,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }))
 
@@ -38,8 +38,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import { ApiError, api, type EcOrderDetail } from '@/lib/api'
-import OrderDetailDrawer from './order-detail-drawer'
-import { EVENT_STATUS_TEXT, FAILURE_KIND_TEXT, eventStoppedStage } from './ec-failure'
+import OrderDetailDrawer from '@/v8/settings/ec-commerce/order-drawer'
+import { EVENT_STATUS_TEXT, FAILURE_KIND_TEXT, eventStoppedStage } from '@/v8/settings/ec-commerce/ec-failure'
 
 const mockOrderDetail = api.ecCommerce.orderDetail as unknown as ReturnType<typeof vi.fn>
 
@@ -115,6 +115,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  document.documentElement.dataset.theme = 'v8'
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -124,6 +125,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   container.remove()
+  delete document.documentElement.dataset.theme
   document.body.innerHTML = ''
 })
 
@@ -180,7 +182,8 @@ describe('注文の状況パネル', () => {
     // EC側への外部リンクは置くが、台帳の複製はしない
     expect(document.body.querySelector('a[href="https://ec.example/admin/order/9001"]')).not.toBeNull()
     // 「重ねない」ことを操作の隣で約束する
-    expect(text).toContain('重ねません')
+    await act(async () => { (document.querySelector('button[aria-label="もう一度行うときの説明"]') as HTMLButtonElement).click() })
+    expect(document.body.textContent).toContain('重ねません')
   })
 
   it('止まった段階と分類ラベルを出し、生メッセージは安全文言だけ出す', async () => {
@@ -237,7 +240,7 @@ describe('注文の状況パネル', () => {
     render()
     await settle()
     const text = document.body.textContent ?? ''
-    expect(text).toContain('成果：初回購入')
+    expect(text).toContain('成果「初回購入」')
     expect(text).toContain('紹介者：紹介者A')
     expect(text).toContain('報酬：¥400')
     expect(text).toContain('支払い確定：締めに入った')
@@ -301,5 +304,21 @@ describe('注文の状況パネル', () => {
     await settle()
     expect(mockOrderDetail).not.toHaveBeenCalled()
     expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+  })
+})
+
+
+describe('V8 注文の引き出し', () => {
+  it('同じ注文と外部リンクを表示し、Escapeで閉じる', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    const close = vi.fn()
+    try {
+      render({ onClose: close }); await settle()
+      expect(document.querySelector('[data-design-part="drawer"][data-width="order"][role="dialog"]')).not.toBeNull()
+      expect(mockOrderDetail).toHaveBeenCalledWith('order-1', 'account-1')
+      expect(document.querySelector('footer a[href="https://ec.example/admin/order/9001"]')).not.toBeNull()
+      await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+      expect(close).toHaveBeenCalledOnce()
+    } finally { delete document.documentElement.dataset.theme }
   })
 })

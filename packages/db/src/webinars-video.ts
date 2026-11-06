@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { advanceWebinarVideoAsset, canPurgeWebinarVideoAsset, findExpiredWebinarVideoAssets, getWebinarSession, getWebinarVideoAsset, isWebinarMissedInWindow, isWebinarVideoReady, purgeWebinarVideoAsset, releaseWebinarSeat, reserveWebinarSeat, setWebinarSessionCapacity, WEBINAR_VIDEO_RETENTION_DAYS, WEBINAR_VIDEO_STAGES } from './webinars/video.js';

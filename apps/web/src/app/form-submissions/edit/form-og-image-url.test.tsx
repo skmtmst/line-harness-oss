@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * カードの画像URLが https だけを受け付けるかの試験（FORM-18 / #1061）。
@@ -22,7 +23,8 @@ const navigation = vi.hoisted(() => ({
   refresh: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => navigation,
   usePathname: () => navigation.pathname,
   useSearchParams: () => new URLSearchParams(navigation.query),
@@ -62,6 +64,13 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     fetchApi: vi.fn(async () => ({ success: true, data: [] })),
     api: {
       ...actual.api,
+      // 「予約を入れる」欄のメニュー・担当読み。予約を使わない店では空。
+      // 素通しすると実通信で試験が環境へ依存するので、ここで空を返す。
+      bookingApi: {
+        ...actual.bookingApi,
+        listMenus: async () => ({ menus: [] }),
+        listMenuStaff: async () => ({ staff: [] }),
+      },
       forms: {
         ...actual.api.forms,
         get: formsGet,
@@ -153,10 +162,20 @@ async function show(over: Partial<ApiForm> = {}) {
   await act(async () => {
     for (let step = 0; step < 10; step += 1) await Promise.resolve()
   })
+  const linkAppearance = ([...host.querySelectorAll('button')].find((button) => button.textContent?.includes('リンクの見え方：')) ?? querySupplementaryPageAction('リンクの見え方：'))!
+  await act(async () => linkAppearance.click())
+  const urlButton = ([...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'URL で入れる') ?? querySupplementaryPageAction('URL で入れる'))!
+  if (urlButton) await act(async () => urlButton.click())
+  else {
+    const remove = ([...document.body.querySelectorAll<HTMLButtonElement>('[data-image-frame] button')].find((button) => button.textContent === '消す') ?? querySupplementaryPageAction('消す'))!
+    await act(async () => remove.click())
+    const url = ([...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'URL で入れる') ?? querySupplementaryPageAction('URL で入れる'))!
+    await act(async () => url.click())
+  }
 }
 
 function ogInput(): HTMLInputElement {
-  const input = host.querySelector<HTMLInputElement>('#form-og-image-url')
+  const input = document.body.querySelector<HTMLInputElement>('#fe-og-image')
   expect(input, 'カードの画像URLの欄がある').toBeTruthy()
   return input!
 }
@@ -169,7 +188,9 @@ function setOgUrl(value: string) {
 }
 
 async function clickSave() {
-  const button = [...host.querySelectorAll('button')].find((b) => b.textContent === '下書きを保存' && !b.disabled)
+  const close = ([...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === '閉じる') ?? querySupplementaryPageAction('閉じる'))!
+  await act(async () => close.click())
+  const button = ([...host.querySelectorAll('button')].find((b) => b.textContent === '下書きを保存' && !b.disabled) ?? querySupplementaryPageAction('下書きを保存'))
   expect(button, '「下書きを保存」がある').toBeTruthy()
   await act(async () => {
     button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -182,7 +203,7 @@ describe('カードの画像URLは https だけ（FORM-18）', () => {
     await show()
     await act(async () => { setOgUrl('http://example.com/og.png') })
     expect(ogInput().value).toBe('http://example.com/og.png')
-    expect(host.querySelector('#form-og-image-url-error')?.textContent).toBe(OG_IMAGE_URL_ERROR)
+    expect(document.body.textContent).toContain(OG_IMAGE_URL_ERROR)
   })
 
   it('http:// のままでは保存を送らず、理由を出す', async () => {
@@ -190,8 +211,10 @@ describe('カードの画像URLは https だけ（FORM-18）', () => {
     await act(async () => { setOgUrl('http://example.com/og.png') })
     await clickSave()
     expect(formsUpdate).not.toHaveBeenCalled()
-    expect(host.textContent).toContain(OG_IMAGE_URL_ERROR)
     // 入力は消えない。直してもう一度保存できる。
+    const linkAppearance = ([...host.querySelectorAll('button')].find((button) => button.textContent?.includes('リンクの見え方：')) ?? querySupplementaryPageAction('リンクの見え方：'))!
+    await act(async () => linkAppearance.click())
+    expect(document.body.textContent).toContain(OG_IMAGE_URL_ERROR)
     expect(ogInput().value).toBe('http://example.com/og.png')
   })
 
@@ -199,7 +222,7 @@ describe('カードの画像URLは https だけ（FORM-18）', () => {
     formsUpdate.mockResolvedValue({ success: true, data: { contentRevision: 2 } })
     await show()
     await act(async () => { setOgUrl('  https://cdn.example.com/og.png  ') })
-    expect(host.querySelector('#form-og-image-url-error')).toBeNull()
+    expect(document.body.textContent).not.toContain(OG_IMAGE_URL_ERROR)
     await clickSave()
     expect(formsUpdate).toHaveBeenCalledTimes(1)
     expect(formsUpdate.mock.calls[0][2]).toMatchObject({ ogImageUrl: 'https://cdn.example.com/og.png' })

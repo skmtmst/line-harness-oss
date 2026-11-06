@@ -1,3 +1,4 @@
+import { assigneeFilter } from './chat-assignees.js';
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 
@@ -45,9 +46,9 @@ export interface UnansweredInboxOptions {
   /** chats API から使う対応状態・担当者の追加絞り込み。 */
   status?: string;
   operatorId?: string;
-  /** Restrict output to accounts visible to the authenticated caller. */
+  /** 認証済みの利用者から見えるアカウントだけを返す。 */
   allowedAccountIds: readonly string[];
-  /** Include legacy friends whose account assignment is missing. */
+  /** 所属アカウントのない保存済み友だちを含めるかを明示する。 */
   canSeeUnassigned: boolean;
 }
 
@@ -115,8 +116,9 @@ function queryFilters(opts: UnansweredInboxOptions, includeSearch: boolean): {
     bindings.push(opts.status);
   }
   if (opts.operatorId) {
-    conditions.push('c.operator_id = ?');
-    bindings.push(opts.operatorId);
+    const filter = assigneeFilter('c', opts.operatorId);
+    conditions.push(filter.sql);
+    bindings.push(...filter.binds);
   }
   if (opts.minWaitMinutes && opts.minWaitMinutes > 0) {
     conditions.push('julianday(c.last_customer_message_at) <= julianday(?)');
@@ -124,10 +126,10 @@ function queryFilters(opts: UnansweredInboxOptions, includeSearch: boolean): {
   }
   if (includeSearch && opts.q?.trim()) {
     /*
-     * #625: LIKE ではなく instr() で部分一致する。
+     * LIKE ではなく instr で部分一致する。
      * D1 の LIKE/GLOB パターンは最大50バイトのため、48バイト超の検索語で
      * SQLite エラー(500)になっていた。COLLATE NOCASE と同じく
-     * 大文字小文字は ASCII だけ畳む (SQLite の lower() と同じ範囲)。
+     * 大文字小文字は ASCII だけ畳む (SQLite の lower と同じ範囲)。
      */
     conditions.push(`(
       instr(lower(f.display_name), lower(?)) > 0

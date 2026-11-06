@@ -1,13 +1,8 @@
+import { d1BindingIdentity } from '../lib/d1-timing.js';
+import { signedLiffState } from '../test-utils/liff-oauth.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// GET /auth/callback — the friend_add auto-enroll loop must delegate the
-// instant welcome to the unified pushImmediateFirstStep service ('once' mode,
-// pre-created enrollment). The pre-unification inline block pushed step 1
-// itself WITHOUT advancing the enrollment, leaving the fresh row at step -1
-// with next_delivery_at already due — the next cron tick then re-sent step 1
-// (double welcome). These tests pin the delegation contract; the claim /
-// cooldown / advance semantics themselves are covered by
-// ../services/immediate-first-step.test.ts.
+// 即時の歓迎文を共通サービスの once へ委ね、送信後に購読を進めて次の cron の二重送信を防ぐ。ここでは接続契約を検証し、実行権・間隔・通番はサービスの試験で守る。
 
 const dbMocks = {
   /*
@@ -25,7 +20,7 @@ const dbMocks = {
       .filter((s) => s.trigger_type === 'friend_add' && s.is_active)
       .map((s) => s.id);
   }),
-  // eager module-load deps
+
   getLineAccounts: vi.fn().mockResolvedValue([
     { id: 'account-main', login_channel_id: '2000000000' },
   ]),
@@ -36,7 +31,7 @@ const dbMocks = {
   getFriendByLineUserIdForAccount: vi.fn(),
   upsertFriend: vi.fn(),
   createUser: vi.fn().mockResolvedValue({ id: 'U-uuid' }),
-  getUserByEmail: vi.fn().mockResolvedValue(null),
+  getUserByEmailForAccess: vi.fn().mockResolvedValue(null),
   linkFriendToUser: vi.fn().mockResolvedValue(undefined),
   getEntryRouteByRefCode: vi.fn().mockResolvedValue(null),
   recordRefTracking: vi.fn().mockResolvedValue(undefined),
@@ -48,7 +43,7 @@ const dbMocks = {
   getAffiliateById: vi.fn().mockResolvedValue(null),
   addTagToFriend: vi.fn().mockResolvedValue(undefined),
   getLineAccountByChannelId: vi.fn().mockResolvedValue(null),
-  getLineAccountById: vi.fn().mockResolvedValue(null),
+  getLineAccountById: vi.fn().mockResolvedValue({ id: 'account-main', login_channel_id: '2000000000', tenant_id: null }),
   isLineAccountTenantActive: vi.fn().mockResolvedValue(true),
   getScenarios: vi.fn().mockResolvedValue([]),
   enrollFriendInScenario: vi.fn().mockResolvedValue(null),
@@ -65,8 +60,7 @@ vi.mock('../services/immediate-first-step.js', () => ({ pushImmediateFirstStep }
 
 const worker = (await import('../index.js')).default;
 
-// No-op prepared statement chain; the callback's raw UPDATE/SELECT statements
-// don't matter for the delegation assertions.
+// 委譲の期待値に関係しない SQL は、何もしない prepared statement で依存を満たす。
 const DB = {
   prepare: () => ({
     bind: () => ({
@@ -83,6 +77,7 @@ const env = {
   WORKER_URL: 'https://worker.example.com',
   LINE_LOGIN_CHANNEL_ID: '2000000000',
   LINE_LOGIN_CHANNEL_SECRET: 'secret',
+  LINE_CHANNEL_SECRET: 'test-oauth-secret',
   LINE_CHANNEL_ACCESS_TOKEN: 'env-token',
 } as unknown as import('../index.js').Env['Bindings'];
 
@@ -108,21 +103,29 @@ function installFetchMock() {
           { status: 200 },
         );
       }
-      // bot/info etc → 404 so the handler falls through to the completion page
+      // bot/info などは404を返し、完了ページへの代替経路を試す。
       return new Response('not found', { status: 404 });
     }),
   );
 }
 
-function callback(state: Record<string, string>) {
-  const encoded = btoa(JSON.stringify(state));
+async function callback(state: Record<string, string>) {
+  const signed = await signedLiffState(env.LINE_CHANNEL_SECRET, state);
+  const encoded = signed.state;
   return worker.fetch(
     new Request(
       `https://worker.example.com/auth/callback?code=abc&state=${encodeURIComponent(encoded)}`,
+      { headers: { Cookie: signed.cookie } },
     ),
     env,
     { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
   );
+}
+
+function requestDb(): D1Database {
+  const db = dbMocks.enrollFriendInScenario.mock.calls[0]?.[0] as D1Database;
+  expect(d1BindingIdentity(db)).toBe(DB);
+  return db;
 }
 
 const FRIEND_ADD_SCENARIO = {
@@ -138,7 +141,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   installFetchMock();
   pushImmediateFirstStep.mockResolvedValue(true);
-  dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null); // brand-new friend
+  dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
   dbMocks.createUser.mockResolvedValue({ id: 'U-uuid' });
   dbMocks.upsertFriend.mockResolvedValue({
     id: 'F-new',
@@ -156,10 +159,10 @@ describe('GET /auth/callback — friend_add auto-enroll delegates to pushImmedia
   it("enrolls and hands the fresh enrollment to the service ('once' mode contract)", async () => {
     await callback({ ref: '' });
 
-    expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledWith(DB, 'F-new', 'scn-1');
+    expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledWith(requestDb(), 'F-new', 'scn-1');
     expect(pushImmediateFirstStep).toHaveBeenCalledTimes(1);
     expect(pushImmediateFirstStep).toHaveBeenCalledWith(
-      DB,
+      requestDb(),
       'F-new',
       'scn-1',
       {
@@ -167,9 +170,7 @@ describe('GET /auth/callback — friend_add auto-enroll delegates to pushImmedia
         workerUrl: 'https://worker.example.com',
         accountChannelId: null,
       },
-      // No mode override → the service defaults to 'once' (claim protocol,
-      // advance-after-send). The push target is the id_token sub, which is
-      // known before friend.line_user_id is fully wired.
+      // once の既定で実行権と送信後の通番更新を守る。follow 前でも、検証済み ID トークンの sub なら宛先が確定している。
       { enrollment: ENROLLMENT, targetLineUserId: 'U-new-friend' },
     );
   });
@@ -222,10 +223,10 @@ describe('GET /auth/callback — friend_add auto-enroll delegates to pushImmedia
     await callback({ ref: '', account: 'CH-9' });
 
     expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledTimes(1);
-    expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledWith(DB, 'F-new', 'scn-mine');
+    expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledWith(requestDb(), 'F-new', 'scn-mine');
     expect(pushImmediateFirstStep).toHaveBeenCalledTimes(1);
     expect(pushImmediateFirstStep).toHaveBeenCalledWith(
-      DB,
+      requestDb(),
       'F-new',
       'scn-mine',
       expect.objectContaining({ accountChannelId: 'CH-9' }),
@@ -244,11 +245,11 @@ describe('GET /auth/callback — friend_add auto-enroll delegates to pushImmedia
     const res = await callback({ ref: '' });
 
     expect(res.status).toBe(200);
-    // scn-a failed, scn-b must still be enrolled and pushed.
+    // あるシナリオが失敗しても、残りの登録と配信を続ける。
     expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledTimes(2);
     expect(pushImmediateFirstStep).toHaveBeenCalledTimes(2);
     expect(pushImmediateFirstStep).toHaveBeenLastCalledWith(
-      DB,
+      requestDb(),
       'F-new',
       'scn-b',
       expect.anything(),

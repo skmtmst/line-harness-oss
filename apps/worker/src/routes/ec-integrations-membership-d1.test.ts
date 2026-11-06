@@ -1,5 +1,5 @@
 /*
- * ECから届く会員ランク・マイル（`membership`）の写し方を実D1で固定する（★V6 37-1）。
+ * ECから届く会員ランク・マイル（`membership`）の写し方を実D1で固定する（★37-1）。
  *  1. membership が届いたら、その値を正にする（通年・ライフタイム・ランク・残高）
  *  2. 届いていない（EC未対応）ときは暫定として足し算の累計と残高だけを追い、ランクキーは触らない
  *  3. 一度ECのランクが入った友だちは、古い形のイベントで上書きされない
@@ -49,6 +49,15 @@ describe('syncMemberSnapshot membership', () => {
     });
   });
 
+  it('EC名を別に保存し、名前のないイベントでは保持し、キー変更時は古い名前を消す', async () => {
+    const event = { event_id: 'name-1', event_type: 'ec.customer.profile_updated', occurred_at: '2026-09-16T09:00:00+09:00', customer_id: 10231 };
+    await syncMemberSnapshot(db, 'friend-a', { ...event, membership: { member_rank_key: 'vip', member_rank_name: 'VIP' } }, NOW);
+    expect(snapshot().ec_member_rank_name).toBe('VIP');
+    await syncMemberSnapshot(db, 'friend-a', { ...event, event_id: 'name-2' }, NOW);
+    expect(snapshot().ec_member_rank_name).toBe('VIP');
+    await syncMemberSnapshot(db, 'friend-a', { ...event, event_id: 'name-3', membership: { member_rank_key: 'other' } }, NOW);
+    expect(snapshot().ec_member_rank_name).toBeNull();
+  });
   it('membership が無い注文イベントは暫定の累計・残高だけを追い、ランクキーは触らない', async () => {
     await syncMemberSnapshot(db, 'friend-a', {
       event_id: 'e2', event_type: 'ec.order.confirmed', occurred_at: '2026-09-16T09:00:00+09:00', customer_id: 10231,

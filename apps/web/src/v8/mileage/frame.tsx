@@ -1,0 +1,143 @@
+'use client'
+
+/*
+ * ★V8 マイルの外枠（Pencil「★V8-B 画面の地図」のマイルの行）。
+ * たまる決めごと ・1152 ・閲覧のみ ・使い道 ・
+ * 友だちの残高 ・履歴 ・行動スコア 。
+ *
+ * 板の頭（題・説明・右の操作）とタブの段・閲覧のみの帯は5つのタブで同じ。
+ * 数の帯・フォルダの列・道具の段・表は各タブが一覧の型（ListPage）の枠へ渡す。
+ */
+import { createContext, useContext, type ReactNode } from 'react'
+
+import { ListPage, type ListFolderNav } from '@/components/templates'
+import { Tabs } from '@/components/shared/tabs'
+import Notice from '@/components/shared/notice'
+import styles from './mileage.module.css'
+
+export const MILEAGE_TABLE_LAYOUT = {
+  headHeight: 'var(--tpl-ml-head-h)',
+  rowHeight: 'var(--tpl-ml-row-h)',
+  gap: 'var(--tpl-ml-col-gap)',
+  padding: '0 var(--tpl-list-inset)',
+  numberInset: 'var(--tpl-ml-num-pad-end)',
+  bodyTextSize: 'var(--polish-text-body)',
+  collapseScope: 'page' as const,
+}
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+export const MILEAGE_TABS = [
+  { key: 'earning-rules', label: 'たまる決めごと', board: 'OC0gy' },
+  { key: 'rewards', label: '使い道', board: 'S35pO' },
+  { key: 'balances', label: '友だちの残高', board: 'CJlf4' },
+  { key: 'history', label: '履歴', board: 'oRbJi' },
+  { key: 'score', label: '行動スコア', board: 'IRPw8' },
+  { key: 'ranks', label: '会員ランク', board: 'QpgfW' },
+] as const
+
+export type MileageTabKey = (typeof MILEAGE_TABS)[number]['key']
+
+export function mileageTabHref(key: MileageTabKey): string {
+  return key === 'earning-rules' ? '/mileage' : `/mileage?tab=${key}`
+}
+
+/** タブの名の横の件数（：たまる決めごと 6・使い道 5・友だちの残高 1,284）。 */
+export type MileageTabCounts = Partial<Record<MileageTabKey, string>>
+
+export interface MileageShellContext {
+  tab: MileageTabKey
+  readonly: boolean
+  narrow: boolean
+  counts: MileageTabCounts
+  balanceSource?: 'ec' | 'musubo' | null
+  /** 読み直したタブが件数を載せ直す。null で消す。 */
+  setCount: (key: MileageTabKey, text: string | null) => void
+}
+
+export const MileageShell = createContext<MileageShellContext>({
+  tab: 'earning-rules',
+  readonly: false,
+  narrow: false,
+  counts: {},
+  setCount: () => {},
+})
+
+export function useMileageShell(): MileageShellContext {
+  return useContext(MileageShell)
+}
+
+/** 閲覧のみの帯。数の帯の上。 */
+export function ViewerBand() {
+  return (
+    <div className={styles.viewerBand}><ReadOnlyNotice role="note"></ReadOnlyNotice></div>
+  )
+}
+
+/**
+ * 作るボタンは各タブで素の Button（variant="primary"）を直接渡す。ラッパーで
+ * 包むと題の右の自動整列が主ボタンを見分けられず、副ボタンの右に出てしまう。
+ * 閲覧のみの人には出さない（2026-10-06 オーナー：押せない形で残さず隠す）。
+ */
+
+export interface MileageFrameProps {
+  /** 板の頭の右（CSV など）。 */
+  help?: ReactNode
+  explanation?: ReactNode
+  explanationInset?: 'notice' | 'content'
+  actions?: ReactNode
+  stats?: ReactNode
+  folders?: ReactNode
+  collapsedFolders?: ReactNode
+  /** 板が狭く左の列が畳まれたときに型が道具の段へ出す「作る・フォルダ」。 */
+  folderNav?: ListFolderNav
+  toolbar?: ReactNode
+  pagination?: ReactNode
+  overlays?: ReactNode
+  children: ReactNode
+}
+
+/** 5つのタブの共通の外側。題・説明・タブの段・閲覧のみの帯をここで持つ。 */
+export function MileageFrame({ help, explanation, explanationInset, actions, stats, folders, collapsedFolders, folderNav, toolbar, pagination, overlays, children }: MileageFrameProps) {
+  const { tab, readonly, narrow, counts, balanceSource } = useMileageShell()
+  const board = tab === 'earning-rules' && narrow
+    ? 'ZJIyl'
+    : tab === 'earning-rules' && readonly
+      ? 'E2Any'
+      : MILEAGE_TABS.find((item) => item.key === tab)?.board
+  return (
+    <ListPage
+      skeleton
+      explanation={explanation}
+      explanationInset={explanationInset}
+      help={<>{"行動でマイルがたまり、クーポン・特典と交換できます。"}{help}</>}
+      boardId={board}
+      headingSize="regular"
+      title="マイル"
+
+      actions={actions}
+      tabs={
+        <Tabs
+          /* 件数が読み込まれるとタブの幅が変わるので、下線の位置も測り直す。 */
+          key={MILEAGE_TABS.map((item) => counts[item.key] ?? '').join('|')}
+          label="マイルのタブ"
+          items={MILEAGE_TABS.map((item) => ({
+            /* 絵は「たまる決めごと 6」で1つの文字。数を別の札に分けない。 */
+            label: counts[item.key] ? `${item.label} ${counts[item.key]}` : item.label,
+            href: mileageTabHref(item.key),
+            current: item.key === tab,
+          }))}
+        />
+      }
+      stats={stats || readonly || (balanceSource === 'ec' && ['earning-rules', 'rewards', 'balances', 'history'].includes(tab)) ? <>{readonly ? <ViewerBand /> : null}{balanceSource === 'ec' && ['earning-rules', 'rewards', 'balances', 'history'].includes(tab) ? <Notice tone="info" message="マイルはECで管理しています" /> : null}{stats}</> : undefined}
+      folders={folders}
+      collapsedFolders={collapsedFolders}
+      folderNav={folderNav}
+      toolbar={toolbar}
+      pagination={pagination}
+      overlays={overlays}
+    >
+      {children}
+    </ListPage>
+  )
+}

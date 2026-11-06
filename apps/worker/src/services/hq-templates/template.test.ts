@@ -1,21 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createTestD1 } from '../../test-utils/d1-sqlite.js';
 import type { HqTemplateAdapterContext, HqTemplateResolution, HqTemplateSnapshotToken } from './contract.js';
-import {
-  createTemplateHqTemplateAdapter,
-  readMessageTemplateSourceBytes,
-  MESSAGE_TEMPLATE_MEDIA_MAX_BYTES,
-  MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES,
-  inspectMessageTemplateDefinition,
-  nextMessageTemplateAlias,
-  parseMessageTemplateDefinition,
-  planMessageTemplateDistribution,
-  type AuthorizedMessageTemplateSource,
-  type MessageTemplateAdapterDependencies,
-  type MessageTemplateSourceAuthority,
-  type MessageTemplateSourceVersion,
-  type MessageTemplateTargetSnapshot,
-} from './template.js';
+import { createTemplateHqTemplateAdapter, readMessageTemplateSourceBytes, MESSAGE_TEMPLATE_MEDIA_MAX_BYTES, MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES, inspectMessageTemplateDefinition, nextMessageTemplateAlias, parseMessageTemplateDefinition, planMessageTemplateDistribution, type AuthorizedMessageTemplateSource, type MessageTemplateAdapterDependencies, type MessageTemplateSourceAuthority, type MessageTemplateSourceVersion } from './template.js';
+import { type MessageTemplateTargetSnapshot } from './message-target-snapshot.js';
 
 const token = 'hqts1.snapshot' as HqTemplateSnapshotToken;
 const contentHash = '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a';

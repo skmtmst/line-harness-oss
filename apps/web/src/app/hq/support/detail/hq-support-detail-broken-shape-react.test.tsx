@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import HqSupportDetailPage from './page'
 
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string } & Record<string, unknown>) => <a href={href} {...rest}>{children}</a> }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(window.location.search),  useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},  usePageTitle: () => {} }))
 
 /**
  * API の中身が欠けていても問い合わせ詳細の画面全体が落ちないこと。
@@ -34,7 +34,7 @@ beforeEach(() => {
     }
     // 履歴の口が配列ではなく頁の器で返る（偽APIの既定）。
     if (url.endsWith('/api/hq/support/requests')) return json({ success: true, data: { items: [], total: 0, page: 1, limit: 20 } })
-    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { id: 's1', name: '山田 太郎', email: 'yamada@example.com' } })
+    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { id: 's1', name: '山田 太郎', role: 'staff', email: 'yamada@example.com' } })
     if (url.endsWith('/api/tenants/me')) return json({ success: true, data: { name: '株式会社サンプル' } })
     return json({ success: false, error: `unexpected ${url}` }, 404)
   }))
@@ -64,6 +64,6 @@ describe('中身が欠けたお問い合わせ詳細', () => {
     expect(text).toContain('これまでの問い合わせを読み込めませんでした。')
     // 画面全体の失敗表示にはしない。
     expect(text).not.toContain('お問い合わせを読み込めませんでした')
-    expect(host.querySelector('[data-design-node="Nt0UH"]')).not.toBeNull()
+    expect(host.querySelector('textarea')).not.toBeNull()
   })
 })

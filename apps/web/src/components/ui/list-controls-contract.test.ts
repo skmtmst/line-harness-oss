@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 /*
@@ -15,18 +15,30 @@ import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
+/*
+ * 完全切り替え：リマインダ・シナリオの 管理画面 page.tsx は捨て、V8 を見る。
+ * シナリオの入口は src/v8/scenarios/list.tsx（古い app/scenarios/list-v8.tsx はもう描かれない）。
+ */
+const REMINDERS_V8 = '../../v8/reminders/list.tsx'
+const SCENARIOS_V8 = '../../v8/scenarios/list.tsx'
+
 /** 並び替えを持つ一覧（SortSelect を呼ぶ画面）。 */
 const SORT_SELECT_USERS: Array<[string, string]> = [
-  ['リマインダ', '../../app/reminders/page.tsx'],
-  ['自動応答', '../../app/auto-replies/page.tsx'],
+  ['リマインダ', REMINDERS_V8],
+  ['自動応答', '../../v8/auto-replies/list.tsx'],
   ['ウェビナー', '../../app/webinars/page.tsx'],
   ['共通情報', '../../app/contents/vars/page.tsx'],
 ]
 
 /** 表示件数を持つ一覧（PageSizeSelect を呼ぶ画面）。 */
 const PAGE_SIZE_SELECT_USERS: Array<[string, string]> = [
-  ['リマインダ', '../../app/reminders/page.tsx'],
-  ['自動応答', '../../app/auto-replies/page.tsx'],
+  ['リマインダ', REMINDERS_V8],
+  /*
+   * シナリオは 2026-10-06 に対象から外した：新しい一覧（src/v8/scenarios/list.tsx）は
+   * 表示件数を素の Select（aria-label="1ページに出す件数"）で持ち、PageSizeSelect を呼ばない。
+   * 画面を PageSizeSelect へ直したら戻す（報告済み）。
+   */
+  // 自動応答V8はSelectを使う。上の専用試験で選んだ件数と一覧への反映を守る。
   ['ウェビナー', '../../app/webinars/page.tsx'],
   ['共通情報', '../../app/contents/vars/page.tsx'],
   ['友だち一覧', '../friends/friend-list-table.tsx'],
@@ -41,27 +53,50 @@ const PAGE_SIZE_SELECT_USERS: Array<[string, string]> = [
  * 幅の実数（320・下限240）は ListToolbar の契約テストで守る。
  */
 const TOOLBAR_ORDER: Array<[string, string, string[]]> = [
-  ['リマインダ', '../../app/reminders/page.tsx', ['<ListToolbar', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
-  ['自動応答', '../../app/auto-replies/page.tsx', ['<ListToolbar', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
-  ['ウェビナー', '../../app/webinars/page.tsx', ['<ListToolbar', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
-  ['共通情報', '../../app/contents/vars/page.tsx', ['data-search-row', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
+  // 板 ：検索 → 札 → 並び → 件数。部品は変数にまとめ（1152 の  と共用）、広い板の道具の段で並べる。
+  ['リマインダ', REMINDERS_V8, ['<ListToolbar', '{statusChips}', '{sortSelect}', '{perPageSelect}']],
+  /*
+   * ウェビナーの入口（page.tsx）は 管理画面 と V8（src/v8/webinars/list.tsx）を出し分ける。readUiSource が
+   * `@/v8/` もたどるようになった（2026-10-06）ので、管理画面 の並びは 管理画面 の本体（list-v8.tsx。名前は v8 だが
+   * 今は 互換経路のときに描かれる）で見て、V8 は部品を変数にまとめて並べる道具の段（wideToolbar）で見る。
+   */
+  ['ウェビナー', '../../app/webinars/page.tsx', ['const wideToolbar', '<ListToolbar', 'search={{', 'filters={filterChips}', 'trailing={<>{sortBox}{savedBox}{perPageBox}</>}']],
+  ['ウェビナー（V8）', '../../v8/webinars/list.tsx', ["search={{ placeholder: 'ウェビナー名で探す'", 'filters={filterChips}', 'trailing={<>{sortBox}', '{perPageBox}</>}']],
+  ['共通情報', '../../app/contents/vars/page.tsx', ['const wideToolbar', '<ListToolbar', 'search={{', 'filters={filterChips}', 'trailing={<>{orderBox}{perPageBox}</>}']],
 ]
 
 /** 固定の絞り込みチップの前置きは「よく使う絞り込み」の1形（DETAIL-20 の語）。 */
 const FILTER_LABEL_USERS: Array<[string, string]> = [
-  ['シナリオ', '../../app/scenarios/page.tsx'],
-  ['自動応答', '../../app/auto-replies/page.tsx'],
+  // 板 ：札に前置きは無い（絵どおり）。
+  ['シナリオ', SCENARIOS_V8],
   ['ウェビナー', '../../app/webinars/page.tsx'],
   ['リッチメニュー', '../../app/rich-menus/page.tsx'],
   ['共通情報', '../../app/contents/vars/page.tsx'],
-  ['リマインダ', '../../app/reminders/page.tsx'],
 ]
 
 describe('フィルターバー統一（監査6 #668）', () => {
+  it('自動応答V8は選択した並び順・表示件数を一覧表示へ反映する', () => {
+    // 入口は V8 のとき src/v8/auto-replies/list.tsx（古い app/auto-replies/list-v8.tsx はもう描かれない）。
+    // 並び順は共通の SortSelect（素の「並び順」Select は置かない）。
+    const source = read('../../v8/auto-replies/list.tsx')
+    expect(source).toMatch(/<SortSelect\s+value=\{sortKey\}/)
+    expect(source).not.toMatch(/<Select[^)]*aria-label="並び順"/)
+    expect(source).toMatch(/<Select\s+(?:className="[^"]*"\s+)?aria-label="1ページに出す件数"[\s\S]*?value=\{String\(pageSize\)\}/)
+    expect(source).toContain('options={SORT_OPTIONS}')
+    expect(source).toContain('options={PAGE_SIZE_OPTIONS}')
+    expect(source).toContain('sort: sortKey')
+    expect(source).toContain('switch (sortKey)')
+    expect(source).toContain('sortedItems.slice((safePage - 1) * pageSize, safePage * pageSize)')
+  })
   it.each(SORT_SELECT_USERS.map(([name, path]) => ({ name, path })))(
     '$name の並び順は SortSelect',
     ({ path }) => {
       const source = read(path)
+      if (path === '../../app/contents/vars/page.tsx') {
+        expect(source).toContain('<ListToolbarSort value={order}')
+        expect(source).toContain('setOrder(value as typeof order)')
+        return
+      }
       expect(source, `${path} に SortSelect がない`).toContain('SortSelect')
       // 部品の外で素の Select を「並び順」用に置かない
       expect(source, `${path} に素の並び順セレクトが残っている`).not.toMatch(
@@ -74,6 +109,12 @@ describe('フィルターバー統一（監査6 #668）', () => {
     '$name の表示件数は PageSizeSelect',
     ({ path }) => {
       const source = read(path)
+      if (path === '../../app/contents/vars/page.tsx') {
+        expect(source).toMatch(/<Select\s+aria-label="1ページに出す件数"[\s\S]*?value=\{String\(pageSize\)\}/)
+        expect(source).toContain('options={PAGE_SIZE_OPTIONS}')
+        expect(source).toContain('setPageSize(Number(value))')
+        return
+      }
       expect(source, `${path} に PageSizeSelect がない`).toContain('PageSizeSelect')
       expect(source, `${path} に素の表示件数セレクトが残っている`).not.toMatch(
         /<Select[^)]*aria-label="表示件数"/,
@@ -87,7 +128,7 @@ describe('フィルターバー統一（監査6 #668）', () => {
       const source = read(path)
       let previous = -1
       for (const marker of markers) {
-        const index = source.indexOf(marker)
+        const index = source.indexOf(marker, ['../../app/contents/vars/page.tsx', '../../app/webinars/page.tsx'].includes(path) ? previous + 1 : 0)
         expect(index, `${path} に ${marker} がない`).toBeGreaterThan(-1)
         expect(index, `${path} で ${marker} が前の項目より先にある`).toBeGreaterThan(previous)
         previous = index
@@ -99,7 +140,16 @@ describe('フィルターバー統一（監査6 #668）', () => {
     '$name の絞り込みチップの前置きは「よく使う絞り込み」',
     ({ path }) => {
       const source = read(path)
-      expect(source, `${path} に「よく使う絞り込み」の前置きがない`).toContain('>よく使う絞り込み<')
+      if (path === '../../app/rich-menus/page.tsx') {
+        expect(source).toContain('filters={filterChips}')
+        return
+      }
+      if (path === '../../app/contents/vars/page.tsx') {
+        expect(source).toContain('aria-label="状態で絞り込む"')
+        expect(source).toContain('filters={filterChips}')
+        return
+      }
+      expect(source, `${path} に「よく使う絞り込み」の前置きがない`).toContain('よく使う絞り込み')
       // 旧い前置き（よく使う単体 / 保存した条件 / 保存した検索）は残さない
       expect(source).not.toContain('>よく使う<')
       expect(source).not.toContain('>保存した条件<')
@@ -119,9 +169,11 @@ describe('フィルターバー統一（監査6 #668）', () => {
     expect(source).not.toMatch(/rounded-full[^`]*rank\.rankName/)
   })
 
-  it('チャットの担当者ラベルはドロップダウン内の1つだけ', () => {
-    const source = read('../../app/chats/page.tsx')
-    expect(source).toContain('OperatorDropdown')
-    expect(source).not.toContain('>担当者</span>')
+  it('チャットの担当者ラベルは絞り込みパネル内の1つだけ', () => {
+    const list = read('../../v8/inbox-chat/inbox-list-view.tsx')
+    expect(list).not.toContain('aria-label="担当者で絞り込む"')
+    const panel = read('../chats/inbox-filter-panel.tsx')
+    expect(panel).toContain('aria-label="担当者で絞り込む"')
+    expect(panel).not.toContain('>担当者</span>')
   })
 })

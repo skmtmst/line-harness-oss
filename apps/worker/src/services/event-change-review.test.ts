@@ -371,3 +371,30 @@ describe('U 待ちの順番変更・飛ばし', () => {
     expect(result).toEqual({ kind: 'invalid', error: 'waitlist_not_waiting' });
   });
 });
+
+test('100開催回を2回の読取りでまとめ、席数・通知数・別店の境界を保つ',async()=>{
+ const {eventId,slotId}=seedBase({published:true,capacity:20});
+ const changes=Array.from({length:100},(_,i)=>({slot_id:i?`batch-${i}`:slotId,capacity:8}));
+ const insert=sqlite.prepare('INSERT INTO event_slots(id,event_id,starts_at,ends_at,capacity) VALUES(?,?,?,?,20)');
+ for(const change of changes.slice(1))insert.run(change.slot_id,eventId,futureIso(7),futureIso(7.1));
+ addBooking('batch-requested',slotId,'f1','requested',2);
+ addBooking('batch-confirmed',slotId,'f2','confirmed',3);
+ addBooking('batch-cancelled',slotId,'f3','cancelled',99);
+ for(const [id,status,size] of [['wait','waiting',2],['offer','offered',3],['accept','accepted',1],['expired','expired',99]] as const)
+  sqlite.prepare(`INSERT INTO event_waitlist(id,line_account_id,event_id,slot_id,friend_id,identity_key,status,party_size,created_at,updated_at)
+    VALUES(?,'la1',?,?, 'f1',?,?,?,'2026-10-01','2026-10-01')`).run(id,eventId,slotId,id,status,size);
+ sqlite.prepare(`INSERT INTO event_booking_reminders(id,booking_id,kind,scheduled_at,status) VALUES('batch-reminder','batch-confirmed','day_before',?,'pending')`).run(futureIso(6));
+ let reads=0;const counted=new Proxy(db,{get(target,key){if(key==='prepare')return (sql:string)=>{reads++;return target.prepare(sql)};return Reflect.get(target,key);}});
+ const preview=await previewEventChange(counted,{eventId,lineAccountId:'la1',slotChanges:changes});
+ expect(reads).toBe(2);
+ if('kind' in preview)throw new Error('preview missing');
+ expect(preview.impacts).toHaveLength(100);
+ expect(preview.impacts[0]).toMatchObject({confirmed_seats:5,waiting_seats:6,pending_reminders:1,errors:['slot_capacity_below_bookings']});
+ expect(preview.total_confirmed).toBe(5);expect(preview.total_waiting).toBe(6);
+ sqlite.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret)VALUES('other','other','other','token','secret');
+ INSERT INTO events(id,line_account_id,name)VALUES('other-event','other','other');
+ INSERT INTO event_slots(id,event_id,starts_at,ends_at,capacity)VALUES('other-slot','other-event','2026-12-01T00:00:00Z','2026-12-01T01:00:00Z',20);`);
+ const other=await previewEventChange(db,{eventId,lineAccountId:'la1',slotChanges:[{slot_id:'other-slot'}]});
+ expect(other).toMatchObject({impacts:[{errors:['slot_not_found'],confirmed_seats:0,waiting_seats:0}]});
+ reads=0;expect(await previewEventChange(counted,{eventId,lineAccountId:'other',slotChanges:changes})).toEqual({kind:'not_found'});expect(reads).toBe(1);
+});

@@ -28,7 +28,9 @@ vi.mock('next/link', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/contexts/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner', useStaffIdentity: () => ({ role: 'owner', readOnly: false }) }))
 vi.mock('@/components/shared/page-header', () => ({ default: () => null }))
 vi.mock('@/lib/api', () => ({
   ApiError: class extends Error {
@@ -71,7 +73,7 @@ describe('emergency 台帳の形違い', () => {
     apiMocks.sendPaths.mockResolvedValue({ success: true, data: { items: [], total: 0, page: 1, limit: 20 } })
     render(<Page />)
     await flush()
-    expect(await screen.findByText('送信経路の台帳を取得できませんでした。停止の届く範囲が確認できないため、経路の網羅は保証できません。時間をおいて読み直してください。')).toBeTruthy()
+    expect(await screen.findByText(/送信経路の台帳を(?:読み込め|取得でき)ませんでした/)).toBeTruthy()
   })
 
   it('本物の形なら経路の一覧を出す', async () => {

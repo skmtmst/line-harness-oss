@@ -38,12 +38,12 @@
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
-    "tsup": "^8.4.0",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "@types/node": "^22.0.0",
-    "vitest": "^3.2.6"
+    "@types/node": "22.19.15",
+    "vitest": "4.1.11"
   },
   "engines": {
-    "node": ">=20"
+    "node": "^22.23.4 || ^24.22.1 || ^26.12.1"
   }
 }

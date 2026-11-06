@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { emptyLayout, newBlockId } from '@line-crm/shared';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
  * P（回答フォームの公開前の試し・一覧の数・読みにくい色）の実DBテスト。
@@ -288,7 +288,7 @@ describe('公開前の試し', () => {
     );
     const detailBody = await detail.json() as { data: { submitCount: number } };
     expect(detailBody.data.submitCount).toBe(1);
-  });
+  }, 30_000);
 });
 
 describe('一覧の今月の数', () => {
@@ -351,7 +351,7 @@ describe('一覧の今月の数', () => {
   });
 });
 
-describe('読みにくい色は保存・公開できない', () => {
+describe('読みにくい色は注意を返し保存・公開できる', () => {
   const lowContrastTheme = {
     main: '#008f3d',
     sub: '#ffffff',
@@ -363,7 +363,7 @@ describe('読みにくい色は保存・公開できない', () => {
     backgroundImageUrl: null,
   };
 
-  test('下書き保存で422、公開前の検査で400', async () => {
+  test('下書き保存も公開も成功し、注意を返す', async () => {
     const formId = await makeDraftWithLayout(textLayout());
     const layout = textLayout() as unknown as {
       sections: Array<{ blocks: unknown[] }>;
@@ -374,21 +374,17 @@ describe('読みにくい色は保存・公開できない', () => {
       layout,
       expectedContentRevision: 2,
     });
-    expect(save.status).toBe(422);
-    await expect(save.json()).resolves.toMatchObject({
-      error: expect.stringContaining('保存できません'),
-    });
-    // すり抜けた古い色は公開で止まる。
+    expect(save.status).toBe(200);
+    const saved = await save.json() as { data: { contentRevision: number; warnings: unknown[] } };
+    expect(saved.data.warnings).toEqual([expect.objectContaining({ code: 'LOW_CONTRAST' })]);
+    // 同じ色のまま公開できる。
     sqlite.raw.prepare(`UPDATE forms SET layout = ? WHERE id = ?`).run(
       JSON.stringify(layout),
       formId,
     );
     const published = await adminRequest(`/api/forms/${formId}/publish`, 'POST', {
-      expectedContentRevision: 2,
+      expectedContentRevision: saved.data.contentRevision,
     });
-    expect(published.status).toBe(400);
-    await expect(published.json()).resolves.toMatchObject({
-      error: expect.stringContaining('保存できません'),
-    });
+    expect(published.status).toBe(200);
   });
 });

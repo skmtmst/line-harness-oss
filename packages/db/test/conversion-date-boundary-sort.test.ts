@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { getConversionEvents, getConversionReport } from '../src/conversions.js';
-import { listConversionDefinitions } from '../src/conversion-definitions.js';
+import { getConversionEvents, getConversionReport } from '../src/conversions/index.js';
+import { listConversionDefinitions } from '../src/conversion-definitions/index.js';
 import { applyConversionTestSchema } from './conversion-test-schema.js';
 import { asD1 } from './d1-test-helper.js';
 

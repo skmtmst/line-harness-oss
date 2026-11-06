@@ -1,0 +1,204 @@
+/*
+ * 作る画面の共通の形（create-parts.tsx）。値は globals.css の --tpl-* だけ。
+ * 見本：自動応答の作る① （98%）・リマインダを作る① （98%）。
+ */
+
+/* 右の列の「設定内容」の箱。枠は outline（border だと中身が1つ下がる）。 */
+.summary {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: var(--tpl-side-card-gap);
+  min-width: 0;
+  padding: var(--tpl-side-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+.summaryTitle {
+  margin: 0;
+  color: var(--color-ink);
+  line-height: var(--tpl-side-title-lh);
+}
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-side-row-gap);
+  margin: 0;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-label-tag-gap);
+  padding: var(--tpl-side-row-pad) 0;
+  box-shadow: var(--shadow-row-line);
+}
+.row:last-child {
+  box-shadow: none;
+}
+.rowLabel {
+  flex-shrink: 0;
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+  white-space: nowrap;
+}
+.rowValue[data-wrap] {
+  white-space: normal;
+  word-break: keep-all;
+}
+.rowValue {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-text-sm-lh);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 完了の本文では項目ごとに値の開始位置をそろえ、長い結果も読めるようにする。 */
+.summary[data-variant='completion'] .row { justify-content: flex-start; }
+.summary[data-variant='completion'] .rowLabel { flex: 0 0 var(--tpl-bd-row-label); }
+.summary[data-variant='completion'] .rowValue {
+  flex: 1;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/*  の発行されるリンク。既定の設定内容の箱の寸法は変えない。 */
+.summary[data-variant='link'] { gap: var(--tpl-side-card-gap); }
+.summaryHead { display: flex; flex-direction: column; gap: var(--tpl-wa-af-side-gap); }
+.summary[data-variant='link'] .summaryTitle { line-height: var(--tpl-wa-af-side-title-lh); }
+.summaryDescription { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-wa-af-side-note-lh); }
+.summary[data-variant='link'] .rows { gap: normal; }
+.summary[data-variant='link'] .row { padding: var(--tpl-af-cr-kv-pad); border: 0; }
+.summary[data-variant='link'] .rowLabel { flex-shrink: 0; line-height: var(--tpl-wa-af-note-lh); }
+.summary[data-variant='link'] .rowValue { font-size: var(--text-label); font-weight: var(--polish-weight-body); line-height: var(--tpl-wa-af-preview-lh); }
+/* 実行の記録の小箱：行の線は寸法を増やさず、段の間は4。 */
+.summary[data-variant='record'] { gap: var(--tpl-fm2-rd-box-gap); }
+.summary[data-variant='record'] .rows { gap: var(--tpl-fm2-rd-box-gap); }
+.summary[data-variant='record'] .row { border: 0; box-shadow: var(--shadow-row-line); }
+.summary[data-variant='record'] .row:last-child { box-shadow: none; }
+.summary[data-variant='record'] .rowValue { font-weight: var(--polish-weight-body); }
+
+/* 箱の外の淡い案内。 */
+.note {
+  align-self: stretch;
+  margin: 0;
+  padding: var(--tpl-side-note-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+
+/* ひな形のカード列。カードは同じ高さ・ボタンは下の真ん中にそろえる。 */
+.starter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-side-card-pad);
+  min-width: 0;
+}
+.starterHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-side-card-gap);
+}
+.starterTitle {
+  margin: 0;
+  color: var(--color-ink);
+}
+.starterDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+.starterGrid {
+  display: grid;
+  grid-template-columns: repeat(var(--starter-cols, 3), minmax(0, 1fr));
+  gap: var(--tpl-starter-gap);
+}
+.starterCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-row);
+  min-width: 0;
+  min-height: var(--tpl-starter-card-h);
+  padding: var(--tpl-side-card-pad);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+.starterName,
+.starterLine {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.starterName {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-side-title-lh);
+}
+.starterLine {
+  /* ⑩：条件と返信の説明は省略せず、必要な行数で読む。 */
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+.starterActions {
+  display: flex;
+  justify-content: center;
+  margin-top: auto;
+}
+.starterFoot {
+  display: flex;
+  justify-content: flex-end;
+}
+@media (max-width: 900px) {
+  .starterGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ・仕上げ2 */
+.rowValue { font-weight: var(--polish-weight-body); }
+
+/* ：設定内容・右欄の段の題。欄のラベルはFormFieldが12/500を持つ。 */
+:root .summaryTitle,
+:root .summary[data-variant='link'] .summaryTitle,
+:root .starterTitle {
+  font-size: var(--tpl-section-title-size);
+  font-weight: var(--tpl-section-title-weight);
+}
+
+.summaryDescriptionList { padding-inline-start: var(--text-caption); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); list-style-type: '・'; }
+/* 予約などの完了を示す印。指定しない設定内容の箱は変えない。 */
+.summaryCompletion { display: flex; align-items: center; gap: var(--polish-space-field); }
+.completionIcon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; padding: var(--polish-space-row); border-radius: var(--radius-pill); background: var(--color-notice-success-bg); color: var(--color-success); }
+.completionIcon > svg { width: var(--polish-space-section); height: var(--polish-space-section); }
+.completionHeading { display: flex; flex-direction: column; align-items: center; gap: var(--polish-space-card); min-width: 0; }
+.completionMark { display: inline-flex; align-items: center; justify-content: center; padding: var(--polish-space-row); border-radius: var(--radius-pill); background: var(--color-notice-success-bg); color: var(--color-success); }
+.completionMark > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
+.completionTitle { margin: 0; text-align: center; font-size: var(--tpl-rm-done-title-size); line-height: var(--tpl-rm-done-title-lh); font-weight: var(--polish-weight-title); color: var(--color-ink); }
+.completionDescription { align-self: stretch; margin: 0; font-size: var(--polish-text-body); line-height: var(--tpl-rm-done-note-lh); color: var(--color-ink-secondary); }

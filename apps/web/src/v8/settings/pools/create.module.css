@@ -1,0 +1,102 @@
+/* ★V8-B 。左右の配置はSettingsPage、段の面と余白はCardが持つ。
+ * ここは受け入れ先とプレビューの中身だけ。 */
+.main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-sb-group-gap);
+}
+
+.cardSub,
+.hint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-sb-row-sub-lh);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-field-gap);
+}
+
+.label {
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-st2-pc-label-lh);
+}
+
+.accountName {
+  overflow: hidden;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountSub {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.addRow {
+  align-self: flex-start;
+}
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-ctl-gap);
+}
+
+.pickerSelect {
+  min-width: 0;
+  flex: 1;
+}
+
+.facts {
+  margin: 0;
+}
+
+.fact {
+  display: flex;
+  gap: var(--tpl-sb-group-gap);
+  padding: var(--tpl-st2-pc-fact-pad);
+  box-shadow: var(--tpl-sb-line-top);
+}
+
+.fact dt {
+  flex-shrink: 0;
+  width: var(--tpl-st2-od-fact-label-w);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.fact dd {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-st2-od-text-lh);
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+.btnIcon {
+  width: var(--tpl-sb-icon-m);
+  height: var(--tpl-sb-icon-m);
+  flex-shrink: 0;
+}

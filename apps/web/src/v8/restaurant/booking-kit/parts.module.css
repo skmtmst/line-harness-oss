@@ -1,0 +1,114 @@
+/*
+ * ★V8 飲食店向け（在庫・予約台帳・座席・メニュー）の小さな部品。
+ * 値は globals.css の --tpl-rs-*。
+ */
+
+.moreBox {
+  display: inline-flex;
+  align-items: center;
+}
+
+.more {
+  width: var(--tpl-rs-icon-btn);
+  height: var(--tpl-rs-icon-btn);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-rs-ring);
+}
+
+.morePlaceholder {
+  display: inline-block;
+  width: var(--tpl-rs-icon-btn);
+  height: var(--tpl-rs-icon-btn);
+}
+
+/*
+ * 窓の中身：題の段（共通の窓の頭）のすぐ下から 14 の間で並べる。
+ * 絵の段の間がそれと違う窓だけ RsDialog の bodyGap で `--rs-dlg-body-gap` を渡す。
+ */
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-dlg-body-gap, var(--tpl-rs-dlg-gap));
+  width: 100%;
+  margin-top: var(--tpl-rs-dlg-pull);
+}
+
+/*
+ * 上の間は既定のまま（線ありは 14・線なしは 8）。
+ * 絵の間がそれと違う窓だけ RsDialog の footerGap で `--rs-dlg-actions-pad-top` を渡す。
+ */
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tpl-rs-dlg-actions-gap);
+  padding-top: var(--rs-dlg-actions-pad-top, var(--tpl-rs-dlg-gap));
+  box-shadow: var(--tpl-rs-line-top);
+}
+
+/* 絵に下の線が無い窓（デリバリーの確認窓 dgeTy・XCVGd）のボタンの段。 */
+.dialogActionsPlain {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tpl-rs-dlg-actions-gap);
+  padding-top: var(--rs-dlg-actions-pad-top, var(--tpl-rs-dlg-actions-pad-plain));
+}
+
+/* 共通操作帯の説明だけが1行を取り、操作を内包しない。 */
+.footerNote {
+  flex: 0 0 100%;
+  min-width: 0;
+  margin-bottom: calc(var(--rs-dlg-actions-pad-top, var(--tpl-rs-dlg-gap)) - var(--space-8));
+}
+
+.scrollHint {
+  flex: 1;
+  min-width: 0;
+  margin: 0 auto 0 0;
+  align-self: center;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * 欄（題＋中身）。間は既定の 6。
+ * 窓の中の欄（`DialogField`）は共通の欄を出すので、ここの間は効かない。
+ * 絵の間が既定と違う欄は、その欄へ `contentGap` を渡して合わせる。
+ */
+.field {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--rs-field-gap, var(--tpl-rs-field-gap));
+  min-width: 0;
+}
+
+.fieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-rs-lh-14);
+}
+
+.fieldLabelSelect {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.note {
+  margin: 0;
+  padding: var(--tpl-rs-dlg-note-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rs-lh-12);
+}

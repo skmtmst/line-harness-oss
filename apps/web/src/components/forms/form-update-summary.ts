@@ -17,6 +17,7 @@ import {
   type FormLayout,
 } from '@line-crm/shared'
 import type { FormRefs } from './form-refs'
+import { formatNumber } from '@/lib/format'
 
 /** 情報欄の名前を引く。消えた項目・EC管理（書き込まない）は区別して返す。 */
 function friendFieldLabel(refs: FormRefs, fieldId: string): { name: string; blocked: boolean } {
@@ -51,7 +52,7 @@ export function describeInputUpdates(
   }
   if (dest?.realName) targets.push('本名')
   if (dest?.displayName) targets.push('システム表示名')
-  if (dest?.note) targets.push('個別メモ')
+  if (dest?.note) targets.push('メモ')
   if (targets.length > 0) {
     lines.push(`回答を ${targets.join('・')} に登録（未回答なら更新しない）`)
   }
@@ -80,7 +81,7 @@ export function describeInputUpdates(
         0,
       )
       if (actionCount > 0) {
-        lines.push(`選んだ選択肢に応じて動作を実行（計${actionCount}件、選んだものだけ）`)
+        lines.push(`選んだ選択肢に応じて動作を実行（計${formatNumber(actionCount)}件、選んだものだけ）`)
       }
     }
     if (choiceCount > 0 && (block.choices ?? []).some((choice) => choice.jumpToSectionId)) {
@@ -109,6 +110,7 @@ export function describeInputUpdates(
  */
 export function describeAction(action: FormAction, refs: FormRefs): string {
   switch (action.kind) {
+    case 'research_action': return 'リサーチで設定した回答後の動作'
     case 'send_text':
       return action.text.trim()
         ? 'テキストを送る'

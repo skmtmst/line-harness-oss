@@ -1,0 +1,12 @@
+// この機能が外へ公開する名前。機能内では宣言元を直接読む。
+export { default as TemplateEditV8 } from './edit'
+export { ACCOUNT_MISMATCH_MESSAGE, TEMPLATE_LOAD_FAILED_MESSAGE, TEMPLATE_LOADING_MESSAGE, isTemplateDetailData, loadTemplateReferences, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, templateAccountMismatch, templateSaveGuard, templateUsageEntries, validateTemplateSave, EMPTY_REFERENCES } from './core'
+export type { TemplateReferences } from './core'
+export { TemplateAccountNotice, UsageCard, default as TemplateMessageEditor } from './message'
+export type { TemplateEditHost, TemplateHostContent } from './host'
+export { default as TemplateRichEditor } from './rich'
+export { default as TemplateAssetEditor } from './asset'
+export { default as TemplateRichVideoEditor } from './rich-video'
+export { TemplateEditFrame } from './frame'
+export { default as CarouselImage } from './carousel-image'
+export { uploadCarouselImage } from './carousel-image-upload'

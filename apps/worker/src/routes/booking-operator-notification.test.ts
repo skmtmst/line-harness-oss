@@ -1,5 +1,5 @@
 /*
- * N-327 #663: 予約の受付から運用者通知が自動発火することを、実 SQLite と
+ *  予約の受付から運用者通知が自動発火することを、実 SQLite と
  * 実ルートで見張る。
  *
  * ここで止めたい崩れ方:
@@ -24,19 +24,19 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const dispatchOperatorEvent = vi.hoisted(() => vi.fn());
 vi.mock('../services/operator-notification-dispatch.js', () => ({ dispatchOperatorEvent }));
-// R150: 送信Webhookへの発火だけ差し替える。他の公開口は本物。
+// 送信Webhookへの発火だけ差し替える。他の公開口は本物。
 const fireOutgoingWebhooks = vi.hoisted(() => vi.fn());
 vi.mock('../services/event-bus.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   fireOutgoingWebhooks,
 }));
 // 送る側(顧客への LINE 通知)は対象外。予約の成否と運用者通知だけを見る。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../services/account-access.js', () => ({
@@ -88,7 +88,7 @@ function asD1(sqlite: Database.Database): D1Database {
 /**
  * waitUntil に渡された Promise を集めて、明示的に待てるようにする。
  *
- * 拒否は握り潰さず `settle()` の戻りで返す。allSettled で飲み込むと
+ * 拒否は握り潰さず `settle` の戻りで返す。allSettled で飲み込むと
  * 「副作用が自分で後始末しているか」を見張れなくなり、.catch を外しても
  * 緑のままになる。本番の Worker では waitUntil の中の未処理拒否が
  * そのまま実行の失敗として残るので、ここでも表に出す。
@@ -144,9 +144,9 @@ describe('N-327 #663 予約の受付から運用者通知を自動発火する',
       VALUES
         ('${ACCOUNT}', 'channel-a', 'A店', 'token-a', 'secret-a', 'liff-a-1', 'Asia/Tokyo'),
         ('${OTHER_ACCOUNT}', 'channel-b', 'B店', 'token-b', 'secret-b', 'liff-b-1', 'Asia/Tokyo');
-      INSERT INTO booking_settings (id, line_account_id, timezone)
-      VALUES ('settings-a', '${ACCOUNT}', 'Asia/Tokyo'),
-             ('settings-b', '${OTHER_ACCOUNT}', 'Asia/Tokyo');
+      INSERT INTO booking_settings (id, line_account_id, timezone, approval_mode)
+      VALUES ('settings-a', '${ACCOUNT}', 'Asia/Tokyo', 'manual'),
+             ('settings-b', '${OTHER_ACCOUNT}', 'Asia/Tokyo', 'manual');
 
       INSERT INTO staff (id, line_account_id, name, display_name)
       VALUES ('staff-a', '${ACCOUNT}', '担当A', '担当A'),
@@ -268,7 +268,7 @@ describe('N-327 #663 予約の受付から運用者通知を自動発火する',
     await second.settle();
 
     expect(response.status).toBe(422);
-    await expect(response.json()).resolves.toEqual({ error: 'slot_not_available' });
+    await expect(response.json()).resolves.toMatchObject({ code: 'slot_not_available' , fields: expect.any(Object), error: expect.any(String) });
     expect(bookingRows()).toHaveLength(1);
     expect(dispatchOperatorEvent).not.toHaveBeenCalled();
   });
@@ -318,7 +318,7 @@ describe('N-327 #663 予約の受付から運用者通知を自動発火する',
   });
 
   /*
-   * R150: 予約の送信Webhook発火。運用者通知と同じ成否境界で、予約が
+   * 予約の送信Webhook発火。運用者通知と同じ成否境界で、予約が
    * 成立したときだけ booking_created を購読者へ届ける。発生元は予約ID
    * で固定し、作成→承認の二重発火は配送台帳の冪等キーで吸収する。
    */

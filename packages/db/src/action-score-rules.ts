@@ -1,4 +1,4 @@
-import { isAccountFeatureEnabled } from './account-settings.js';
+import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
 
 export type ActionScoreRuleOperation = 'delta' | 'set';
 export type ActionScoreRuleSetStatus = 'draft' | 'published' | 'stopped';
@@ -122,7 +122,7 @@ const DEFAULT_RULES: ActionScoreRule[] = [
     operation: 'set', value: 0, frequency: { kind: 'unlimited', limit: 1 },
     sameSourceEventOnce: true, validFrom: null, validUntil: null, enabled: true,
   },
-  // N-239: 友だち追加はLINE webhookから実際に届く出来事。新規作成時の
+  // 友だち追加はLINE webhookから実際に届く出来事。新規作成時の
   // 初期ルールにも入れておく（再フォロー時にも同じだけ加点される）。
   {
     id: 'friend-joined', name: '友だちになった', eventType: 'friend_add', source: 'line_webhook',
@@ -361,7 +361,7 @@ export async function saveActionScoreRuleDraft(
   }
 
   if (owner.current_draft_version_id) {
-    // R131: 同じ版IDのまま中身だけ書き換えると、古い版を持つ人の保存が
+    // 同じ版IDのまま中身だけ書き換えると、古い版を持つ人の保存が
     // 成功して先の変更を消してしまう。保存ごとに新しい版を作り、版IDが
     // 進むことで古い版での保存を競合にできる（migrationなし）。
     const expected = owner.current_draft_version_id;
@@ -426,6 +426,35 @@ export async function saveActionScoreRuleDraft(
     throw new ActionScoreRuleValidationError('version_conflict', '別の人が新版を作りました。再読み込みしてください');
   }
   return getActionScoreRuleConfiguration(db, input.lineAccountId);
+}
+
+/**
+ * M505: 応答消失後の再送を、競合ではなく保存済みとして返すための照合。
+ *
+ * 保存は通ったのに応答だけ失われると、画面は古い版IDのまま送り直す。
+ * 最新の下書きの中身と送られた中身が同じなら、自分の保存が通ったものとして
+ * 現在の設定を返す（migrationなしで版の競合と再送を見分ける）。
+ * 中身が違う・下書きが無い・形が壊れているときは null を返し、
+ * 呼び出し側は409のままにする。
+ */
+export async function getActionScoreDraftReplayIfSameContent(
+  db: D1Database,
+  lineAccountId: string,
+  configuration: unknown,
+): Promise<ActionScoreRuleConfiguration | null> {
+  let wanted: ActionScoreRuleBundle;
+  try {
+    wanted = validateActionScoreRuleBundle(configuration);
+  } catch {
+    return null;
+  }
+  const owner = await getRuleSet(db, lineAccountId);
+  const current = await getVersion(db, owner?.current_draft_version_id ?? null);
+  if (!current) return null;
+  const same = JSON.stringify({ rules: wanted.rules, bands: wanted.bands })
+    === JSON.stringify({ rules: current.rules, bands: current.bands });
+  if (!same) return null;
+  return getActionScoreRuleConfiguration(db, lineAccountId);
 }
 
 export async function publishActionScoreRuleDraft(
@@ -758,36 +787,32 @@ export async function postActionScoreManualAdjustment(
   }
 
   const friend = await db.prepare(
-    `SELECT id, COALESCE(score, 0) AS score FROM friends WHERE id = ? AND line_account_id = ?`,
-  ).bind(input.friendId, input.lineAccountId).first<{ id: string; score: number }>();
+    `SELECT id FROM friends WHERE id = ? AND line_account_id = ?`,
+  ).bind(input.friendId, input.lineAccountId).first<{ id: string }>();
   if (!friend) {
     throw new ActionScoreRuleValidationError('friend_not_found', '対象の友だちが見つかりません');
   }
-  const scoreBefore = friend.score;
-  const scoreAfter = scoreBefore + input.scoreChange;
-  if (scoreAfter < bands.min || scoreAfter > bands.max) {
-    throw new ActionScoreRuleValidationError(
-      'score_out_of_range',
-      `点数は${bands.min}〜${bands.max}点の範囲でしか動かせません（現在${scoreBefore}点）`,
-      'amount',
-    );
-  }
-
   const historyId = crypto.randomUUID();
   const occurredAt = input.occurredAt ?? new Date().toISOString();
+  // 加算元・範囲の判定・履歴の写しを同じSQLに置く。事前に読んだ点数で
+  // 絶対値を作ると、同時に保存された別の調整を消してしまう。
   const write = await db.prepare(
     `INSERT OR IGNORE INTO friend_scores
        (id, friend_id, scoring_rule_id, score_change, reason, created_at,
         line_account_id, event_type, source, idempotency_key,
         operation, score_before, score_after, occurred_at,
         executed_by_staff_id, executed_by_staff_name)
-     VALUES (?, ?, NULL, ?, ?, ?, ?, 'manual_adjustment', 'staff', ?,
-             'manual_adjustment', ?, ?, ?, ?, ?)`,
+     SELECT ?, id, NULL, ?, ?, ?, ?, 'manual_adjustment', 'staff', ?,
+            'manual_adjustment', COALESCE(score, 0), COALESCE(score, 0) + ?, ?, ?, ?
+       FROM friends
+      WHERE id = ? AND line_account_id = ?
+        AND COALESCE(score, 0) + ? BETWEEN ? AND ?`,
   ).bind(
-    historyId, input.friendId, input.scoreChange, reason, occurredAt,
+    historyId, input.scoreChange, reason, occurredAt,
     input.lineAccountId, input.idempotencyKey,
-    scoreBefore, scoreAfter, occurredAt,
+    input.scoreChange, occurredAt,
     input.executedByStaffId, input.executedByStaffName,
+    input.friendId, input.lineAccountId, input.scoreChange, bands.min, bands.max,
   ).run();
 
   const row = await db.prepare(
@@ -795,6 +820,20 @@ export async function postActionScoreManualAdjustment(
        FROM friend_scores WHERE line_account_id = ? AND idempotency_key = ?`,
   ).bind(input.lineAccountId, input.idempotencyKey).first<ManualAdjustmentRow>();
   if (!row) {
+    // 他の加減点が先に確定した場合も、保存時の現在点で範囲を守る。
+    const current = await db.prepare(
+      `SELECT COALESCE(score, 0) AS score FROM friends WHERE id = ? AND line_account_id = ?`,
+    ).bind(input.friendId, input.lineAccountId).first<{ score: number }>();
+    if (!current) {
+      throw new ActionScoreRuleValidationError('friend_not_found', '対象の友だちが見つかりません');
+    }
+    if (current.score + input.scoreChange < bands.min || current.score + input.scoreChange > bands.max) {
+      throw new ActionScoreRuleValidationError(
+        'score_out_of_range',
+        `点数は${bands.min}〜${bands.max}点の範囲でしか動かせません（現在${current.score}点）`,
+        'amount',
+      );
+    }
     throw new ActionScoreRuleValidationError('score_write_failed', 'スコア履歴を保存できませんでした');
   }
   // 同時実行で別内容の行が先に入った場合、無視されたこちらを成功とは返さない。
@@ -877,10 +916,13 @@ export async function processActionScoreInactivity(
   if (Number.isNaN(now.getTime())) throw new ActionScoreRuleValidationError('now_invalid', '基準日時を確認してください');
   const cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60_000).toISOString();
   const limit = Math.max(1, Math.min(options.limit ?? 200, 500));
+  // LIMIT の前にOFFと適用済みの期間を外す。1つの期間の途中で失敗した
+  // ときは、まだ履歴がない有効ルールだけを見て候補に残す。
   const rows = await db.prepare(
     `WITH latest AS (
        SELECT f.id AS friend_id, f.line_account_id,
-              COALESCE(MAX(ee.occurred_at), f.created_at) AS last_activity_at
+              COALESCE(MAX(ee.occurred_at), f.created_at) AS last_activity_at,
+              v.rules_json
          FROM friends f
          JOIN action_score_rule_sets s
            ON s.line_account_id = f.line_account_id
@@ -891,12 +933,31 @@ export async function processActionScoreInactivity(
            ON COALESCE(ee.actor_friend_id, ee.subject_friend_id) = f.id
         WHERE f.is_following = 1
           AND v.rules_json LIKE '%"eventType":"inactivity_30d"%'
-        GROUP BY f.id, f.line_account_id, f.created_at
+          AND NOT ${accountFeatureOffExclusionSql('f.line_account_id', 'mileage')}
+        GROUP BY f.id, f.line_account_id, f.created_at, v.rules_json
      )
      SELECT friend_id, line_account_id, last_activity_at
        FROM latest WHERE datetime(last_activity_at) <= datetime(?)
-      ORDER BY last_activity_at ASC LIMIT ?`,
-  ).bind(cutoff, limit).all<{ friend_id: string; line_account_id: string; last_activity_at: string }>();
+        AND EXISTS (
+          SELECT 1 FROM json_each(latest.rules_json) rule
+           WHERE json_extract(rule.value, '$.eventType') = 'inactivity_30d'
+             AND json_extract(rule.value, '$.enabled') = 1
+             AND (json_extract(rule.value, '$.source') IS NULL
+               OR json_extract(rule.value, '$.source') = 'scheduler')
+             AND (json_extract(rule.value, '$.validFrom') IS NULL
+               OR julianday(json_extract(rule.value, '$.validFrom')) <= julianday(?))
+             AND (json_extract(rule.value, '$.validUntil') IS NULL
+               OR julianday(json_extract(rule.value, '$.validUntil')) >= julianday(?))
+             AND NOT EXISTS (
+               SELECT 1 FROM friend_scores fs
+                WHERE fs.line_account_id = latest.line_account_id
+                  AND fs.idempotency_key = 'action-score:' || json_extract(rule.value, '$.id')
+                    || ':scheduler:inactivity:' || latest.friend_id || ':' || latest.last_activity_at
+             )
+        )
+      ORDER BY datetime(last_activity_at) ASC, friend_id ASC LIMIT ?`,
+  ).bind(cutoff, now.toISOString(), now.toISOString(), limit)
+    .all<{ friend_id: string; line_account_id: string; last_activity_at: string }>();
   let applied = 0;
   const transitions: Array<{ lineAccountId: string; friendId: string; applications: ActionScoreApplication[] }> = [];
   for (const row of rows.results ?? []) {

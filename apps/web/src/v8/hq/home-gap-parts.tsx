@@ -1,0 +1,62 @@
+'use client'
+
+import { lineAccountConnectionState } from '@/lib/line-account-state'
+
+import { accountHandle } from './account-dialogs'
+import { formatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
+
+import { type AccountWithStats } from '@/contexts/account-context';
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
+
+/* ★V8 統括のアカウント。読み書き・権限は既存の口を保つ。 */
+type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
+
+type View = 'cards' | 'table'
+
+/** 「未分類」を表す印。空文字は「すべて」なので別の値にする。 */
+const UNFILED = '__none__'
+
+const ALL = '__all__'
+
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'すべて' },
+  { value: 'ok', label: '正常' },
+  { value: 'warn', label: '要確認' },
+  { value: 'archived', label: 'アーカイブ' },
+]
+
+
+const SORT_OPTIONS = [
+  { value: 'friends', label: '友だち順' },
+  { value: 'name', label: '名前順' },
+  { value: 'display', label: '登録順' },
+]
+
+
+const PAGE_SIZES = STANDARD_PAGE_SIZES
+
+
+function isArchived(account: AccountWithStats) {
+  return Boolean(account.archivedAt)
+}
+
+
+function matchesStatus(account: AccountWithStats, filter: StatusFilter) {
+  if (filter === 'all') return !isArchived(account)
+  if (filter === 'archived') return isArchived(account)
+  if (isArchived(account)) return false
+  const state = lineAccountConnectionState(account)
+  if (filter === 'ok') return state.tone === 'ok'
+  return state.label === '要確認' || state.label === '未確認'
+}
+
+
+function statusOf(account: AccountWithStats): { label: string; tone: 'ok' | 'warn' | 'idle' } {
+  return lineAccountConnectionState(account)
+}
+export { type StatusFilter, type View, UNFILED, ALL, STATUS_FILTERS, SORT_OPTIONS, PAGE_SIZES, isArchived, matchesStatus, statusOf }
+
+export function accountMeta(account: AccountWithStats, parent: string | null) {
+  return [accountHandle(account), parent ? `親：${parent}` : null, typeof account.stats?.staffCount === 'number' ? `権限者 ${formatNumber(account.stats.staffCount)} 人` : `権限者 ${emptyValue('unknown')}`].filter(Boolean).join('・')
+}

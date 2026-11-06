@@ -2,6 +2,8 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 import type { MediaItem } from '@line-crm/shared'
 
 /**
@@ -60,6 +62,7 @@ vi.mock('@/lib/api', () => {
         list: () => Promise.resolve({ success: true, data: [], unfiledCount: 0 }),
       },
       media: {
+        counts: () => Promise.resolve({ success: true, data: { total: fixture.archived ? 0 : 1, byKind: { image: fixture.archived ? 0 : 1, video: 0, audio: 0, file: 0 }, unused: fixture.archived ? 0 : 1, archived: fixture.archived ? 1 : 0 } }),
         list: (accountId: string, params?: { archived?: string }) => {
           fixture.listCalls.push({ accountId, params })
           const items = params?.archived === 'only'
@@ -133,7 +136,7 @@ function buttonByLabel(label: string): HTMLButtonElement {
 }
 
 /*
- * ★V7: 編集・取得・アーカイブは札の「…」の中。開く操作と選ぶ操作は
+ * V8: 編集・取得・アーカイブは札の「…」の中。開く操作と選ぶ操作は
  * 別の act に分ける（同じ act ではメニューの装着が間に合わない）。
  */
 async function openCardMenu() {
@@ -141,13 +144,15 @@ async function openCardMenu() {
 }
 
 async function clickChip(label: string) {
+  await act(async () => { buttonByLabel('よく使う絞り込み').click(); await settle() })
   const chip = [...document.querySelectorAll<HTMLButtonElement>('button')]
-    .find((candidate) => candidate.textContent?.trim() === label)
+    .find((candidate) => candidate.textContent?.trim() === `${label}だけ`)
   if (!chip) throw new Error(`絞り込みがありません: ${label}`)
   await act(async () => { chip.click(); await settle() })
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   fixture.accountId = 'account-a'
   fixture.role = 'owner'
   fixture.listCalls.length = 0
@@ -181,7 +186,11 @@ describe('登録メディアの退避と復帰（N-201）', () => {
   it('既定の一覧は退避済みを外し、「アーカイブ済み」棚だけ archived=only で読む', async () => {
     await renderPage()
     await waitForText(MEDIA.filename)
-    expect(fixture.listCalls.every((call) => call.params?.archived === undefined)).toBe(true)
+    // : 数の tile が limit=1 の数え読みを2口足す（未使用・アーカイブ）。
+    // 一覧本体の読み分けの約束は tile を除いて見る。
+    const listReads = fixture.listCalls.filter((call) => call.params?.limit !== 1)
+    expect(listReads.length).toBeGreaterThan(0)
+    expect(listReads.every((call) => call.params?.archived === undefined)).toBe(true)
 
     await clickChip('アーカイブ済み')
     expect(fixture.listCalls.at(-1)?.params?.archived).toBe('only')
@@ -193,7 +202,9 @@ describe('登録メディアの退避と復帰（N-201）', () => {
 
     await openCardMenu()
     await act(async () => { buttonByLabel('アーカイブ').click(); await settle() })
-    expect(document.body.textContent).toContain('理由必須（あとから履歴で確認できます）')
+    const dialog = document.querySelector('[role="dialog"]')!
+    expect(dialog.textContent).toContain('理由（あとから履歴で確認できます）')
+    expect(dialog.textContent).toContain('必須')
 
     const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('button')]
       .find((candidate) => candidate.textContent === 'アーカイブする')!

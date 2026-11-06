@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: required-pr-gate-${{ github.event.pull_request.number || github.ref }}
@@ -26,28 +27,102 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0
+          # The PR merge contains both comparison parents. Avoid fetching every
+          # branch and tag in this large repository for a path-only gate.
+          fetch-depth: 500
+
+      - name: Ensure PR comparison history is available
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] && \
+             ! git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null 2>&1; then
+            git fetch --no-tags --unshallow origin
+            git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null
+          fi
 
       - name: Protect command-center owned documents
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "PR差分がない手動実行のため、司令塔の所有パス検査を飛ばします。"
             exit 0
           fi
 
-          # 本番へ昇格するPR（base が main）は、開発版で既に司令塔の経路を通った
-          # 変更をまとめて運ぶだけで、ここで所有パスを新しく書き換えるわけではない。
-          # この検査は lane のPR（機能開発 → 開発版）が所有パスへ勝手に手を入れるのを
-          # 止めるためのものなので、本番昇格には効かせない。
-          # 効かせると、開発版の文書変更を必ず含む本番昇格が常に落ちて、
-          # 本番へ出す手段そのものが無くなる（#1016 で実際に詰まった）。
+          # 本番昇格は、検証済みの開発版か、共同開発者の新しい統合を
+          # 含めないために固定した一度限りのリリース枝に限る。
           if [ "$BASE_REF" = "main" ]; then
-            echo "本番へ昇格するPRのため、所有パスの変更を許可します。"
+            if [[ ! "$HEAD_REF" == codex/masato-production-release-* ]]; then
+              echo "::error::本番昇格専用ブランチではありません。"
+              exit 1
+            fi
+            if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+              echo "::error::本番昇格の枝は同じリポジトリに必要です。"
+              exit 1
+            fi
+            git fetch --no-tags origin codex/development
+            excluded_merge=7e7f4f704ed237f88b2bee20c4e5b50a73c8bf45
+            if ! git cat-file -e "$excluded_merge^{commit}"; then
+              echo "::error::対象外マージの履歴を確認できません。"
+              exit 1
+            fi
+            if [ "$HEAD_REF" = codex/masato-production-release-20261104 ] && \
+               git merge-base --is-ancestor "$excluded_merge" "$HEAD_SHA"; then
+              echo "::error::今回の対象外PR #2075が含まれています。"
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$HEAD_SHA" FETCH_HEAD; then
+              release_base=941616d7a41390199ee6cfef7569cfd43b2d8497
+              git cat-file -e "$release_base^{commit}"
+              if [ "$HEAD_REF" != codex/masato-production-release-20261104 ] || \
+                 [ "$(git merge-base "$HEAD_SHA" FETCH_HEAD)" != "$release_base" ] || \
+                 ! git merge-base --is-ancestor "$release_base" "$HEAD_SHA" || \
+                 git merge-base --is-ancestor "$excluded_merge" "$HEAD_SHA"; then
+                echo "::error::PRのHEADは検証済み開発版にも、今回固定したリリース枝にも該当しません。"
+                exit 1
+              fi
+            fi
+            proof_sha="$HEAD_SHA"
+            if [ "$HEAD_REF" = codex/masato-production-release-20261104 ]; then
+              # This one release was fully published before a CI-only fix.
+              # Accept that historical run only while every later path is
+              # release-proof code. Any app, migration or deploy-config change
+              # fails before the run can count as publication evidence.
+              proof_sha=4482ab95c890276cd1e2dcc4e25e43d3a5042821
+              git cat-file -e "$proof_sha^{commit}"
+              git merge-base --is-ancestor "$proof_sha" "$HEAD_SHA"
+              proof_changes=$(git diff --name-only --no-ext-diff "$proof_sha" "$HEAD_SHA") || exit 1
+              while IFS= read -r path; do
+                [ -n "$path" ] || continue
+                case "$path" in
+                  .github/workflows/required-pr-gate.yml|scripts/deploy/production/preflight.ts|scripts/deploy/production/preflight-flow.test.ts|scripts/deploy/production/safety.test.ts|scripts/deploy/production/known-v8-screen.mjs|scripts/deploy/production/known-v8-screen.test.mjs|apps/web/src/v8/hq-templates/console-draft-review.test.tsx|apps/web/src/v8/restaurant/line-followup/followup-unsaved-navigation.test.tsx|apps/web/src/v8/form-edit/edit.test.tsx) ;;
+                  *) echo "::error::検証配備以降に本番成果物へ影響する変更があります: $path"; exit 1 ;;
+                esac
+              done <<< "$proof_changes"
+            fi
+            stage_runs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-cloudflare-staging.yml/runs?head_sha=$proof_sha&status=success&per_page=100")
+            deployed=false
+            while IFS= read -r run_id; do
+              jobs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")
+              if jq -e '[.jobs[] | select(.name == "deploy") | .steps[]
+                | select(.name == "Deploy Worker to staging" or .name == "Deploy Admin Panel to staging" or .name == "Verify public source revisions")
+                | select(.conclusion == "success")] | length == 3' <<< "$jobs" >/dev/null; then
+                deployed=true
+                break
+              fi
+            done < <(jq -r --arg sha "$proof_sha" --arg branch "$HEAD_REF" '.workflow_runs[] | select(.head_sha == $sha and .head_branch == $branch and .event == "workflow_dispatch" and .conclusion == "success") | .id' <<< "$stage_runs")
+            if [ "$deployed" != true ]; then
+              echo "::error::同一の本番成果物をWorker・管理画面へ検証配備した成功記録がありません。"
+              exit 1
+            fi
+            echo "検証済み開発版からの本番昇格を確認しました。"
             exit 0
           fi
 
@@ -59,7 +134,7 @@ jobs:
           esac
 
           protected_files=$(git diff --name-only "$BASE_SHA...$HEAD_SHA" \
-            | grep -E '^(docs/brain/|docs/v6-requirements/|docs/v6-[^/]*\.md$)' || true)
+            | grep -E '^(docs/brain/|docs/v6-requirements/|docs/v6-[^/]*\.md$|docs/v8-[^/]*\.md$|docs/v8-requirements/)' || true)
           if [ -n "$protected_files" ]; then
             echo "::error::司令塔の所有パスを変更しています。laneのPRから変更できません。"
             printf '%s\n' "$protected_files" | sed 's/^/    /'
@@ -83,8 +158,7 @@ jobs:
           fi
 
           changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
-          if printf '%s\n' "$changed" \
-            | grep -qE '^packages/db/(src/|test/|migrations/)'; then
+          if grep -qE '^packages/db/(src/|test/|migrations/)' <<< "$changed"; then
             echo "db_tests=true" >> "$GITHUB_OUTPUT"
             echo "DBの実装・テスト・マイグレーション変更があるため、DBテストを行います。"
           else
@@ -92,8 +166,7 @@ jobs:
           fi
 
           full_suite=false
-          if [ -n "$changed" ] && printf '%s\n' "$changed" \
-            | grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)'; then
+          if [ -n "$changed" ] && grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)' <<< "$changed"; then
             full_suite=true
             echo "コードまたは設定の変更があるため、全検査を行います。"
           else
@@ -106,8 +179,7 @@ jobs:
           # 秘密の扱い（値を出さない・main へ配らない）を見張っている(#704)。
           # ワークフローだけを変えたPRは full_suite=false になり、いちばん効く場面で
           # 外れてしまうので、そこだけ別に見る。
-          if [ "$full_suite" = "true" ] || printf '%s\n' "$changed" \
-            | grep -qE '^\.github/workflows/'; then
+          if [ "$full_suite" = "true" ] || grep -qE '^\.github/workflows/' <<< "$changed"; then
             echo "docs_tests=true" >> "$GITHUB_OUTPUT"
             echo "docs の試験を行います。"
           else
@@ -265,6 +337,13 @@ jobs:
 
           sys.exit(1 if failed else 0)
           PY
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/test_production_workflows.py
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/check_production_workflows.py
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/test_workflow_commands.py
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/check_workflow_commands.py
+
+      - name: Lint production release workflows
+        run: bash scripts/security/lint-production-workflows.sh
 
   repository-checks:
     name: Repository and shared checks
@@ -273,12 +352,68 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 500
+      - name: Ensure PR comparison history is available
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] && \
+             ! git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null 2>&1; then
+            git fetch --no-tags --unshallow origin
+            git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null
+          fi
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: '22.23.4'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Guard shared pattern ownership
+        env:
+          PATTERN_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PATTERN_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PATTERN_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PATTERN_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # The one-time 2026-11-04 release was cut before #2075 entered
+          # development. Compare its new UI only against that exact cut point;
+          # comparing the whole staged release with old production reports
+          # pre-existing UI as newly introduced debt.
+          if [ "$PATTERN_BASE_REF" = main ] && \
+             [ "$PATTERN_HEAD_REF" = codex/masato-production-release-20261104 ]; then
+            release_base=941616d7a41390199ee6cfef7569cfd43b2d8497
+            git cat-file -e "$release_base^{commit}"
+            git merge-base --is-ancestor "$release_base" "$PATTERN_HEAD_SHA"
+            PATTERN_BASE_SHA="$release_base"
+          fi
+          if [ -n "$PATTERN_BASE_SHA" ]; then
+            node scripts/visual-qa/v8-pattern-audit.mjs \
+              --code . --base "$PATTERN_BASE_SHA" --out "$RUNNER_TEMP/pattern-ownership"
+          else
+            node scripts/visual-qa/v8-pattern-audit.mjs \
+              --code . --out "$RUNNER_TEMP/pattern-ownership"
+          fi
+      - name: Guard newly added source visual contracts
+        env:
+          SOURCE_CONTRACT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          SOURCE_CONTRACT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SOURCE_CONTRACT_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          SOURCE_CONTRACT_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          node --test scripts/verify-no-source-visual-contracts.test.mjs scripts/source-provenance.test.mjs
+          base="${SOURCE_CONTRACT_BASE_SHA:-$(git rev-parse HEAD^)}"
+          # The isolated release was cut before later development changes.
+          # Only this release PR uses its audited cut point as the comparison base.
+          if [ "$SOURCE_CONTRACT_BASE_REF" = main ] && \
+             [ "$SOURCE_CONTRACT_HEAD_REF" = codex/masato-production-release-20261104 ]; then
+            release_base=941616d7a41390199ee6cfef7569cfd43b2d8497
+            git cat-file -e "$release_base^{commit}"
+            git merge-base --is-ancestor "$release_base" "$SOURCE_CONTRACT_HEAD_SHA"
+            base="$release_base"
+          fi
+          node scripts/verify-no-source-visual-contracts.mjs --base "$base"
       - name: Build shared packages
         run: >-
           pnpm
@@ -294,26 +429,59 @@ jobs:
         run: pnpm tsx scripts/check-migrations.ts
       - name: Test database package
         if: needs.changes.outputs.db_tests == 'true'
-        run: pnpm --filter @line-crm/db test
+        run: pnpm --config.enable-pre-post-scripts=false --filter @line-crm/db test
       # 自己更新まわりの2つは release.yml のタグ push でしか動いていなかった。
       # 取り込んだ後、リリースを打つ段になって初めて失敗が分かる位置にあったので、
       # PRの必須ゲートへ引き上げる(#704)。この工程はすでに update-engine を
       # build しているので、依存の追加も待ち時間の追加もほぼない。
       - name: Test the self-update engine
         run: pnpm --filter @line-harness/update-engine test
-      # `pretest` が update-engine を build し直す。上の build と同じ内容。
+      # Dependencies were built above; standalone package hooks remain enabled locally.
       - name: Test the setup CLI
-        run: pnpm --filter create-line-harness test
-      - run: pnpm test:scripts
-      - name: Typecheck repository scripts
+        run: pnpm --config.enable-pre-post-scripts=false --filter create-line-harness test
+      - name: Install ripgrep for repository audits
         run: |
-          npm install --no-save --prefix "$RUNNER_TEMP/typedeps" @types/node@22
-          pnpm exec tsc -p scripts/tsconfig.json \
-            --typeRoots "$RUNNER_TEMP/typedeps/node_modules/@types"
+          if ! command -v rg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ripgrep
+          fi
+      - name: Test repository scripts against the PR base
+        env:
+          HONORIFIC_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HONORIFIC_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HONORIFIC_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HONORIFIC_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # This isolated release inherits the honorifics already present at
+          # its audited development cut point. Keep later additions covered.
+          if [ "$HONORIFIC_BASE_REF" = main ] && \
+             [ "$HONORIFIC_HEAD_REF" = codex/masato-production-release-20261104 ]; then
+            release_base=941616d7a41390199ee6cfef7569cfd43b2d8497
+            git cat-file -e "$release_base^{commit}"
+            git merge-base --is-ancestor "$release_base" "$HONORIFIC_HEAD_SHA"
+            HONORIFIC_BASE_SHA="$release_base"
+          fi
+          if [ -z "$HONORIFIC_BASE_SHA" ]; then
+            git fetch --no-tags origin \
+              +refs/heads/codex/development:refs/remotes/origin/codex/development
+          fi
+          pnpm test:scripts
+      - name: Ratchet code quality against the PR base
+        env:
+          QUALITY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          pnpm quality:test
+          pnpm quality:typecheck
+          base="${QUALITY_BASE_SHA:-$(git rev-parse HEAD^)}"
+          pnpm quality:check --base "$base"
+      - name: Check names and public dependency boundaries
+        run: pnpm exec tsx scripts/structure/check.ts
+      - name: Typecheck repository scripts
+        run: pnpm typecheck:scripts
       - name: Test shared
         run: |
           pnpm --filter @line-crm/shared typecheck
-          pnpm --filter @line-crm/shared test
+          TZ=UTC pnpm --filter @line-crm/shared test
           TZ=Asia/Bangkok pnpm --filter @line-crm/shared test
       - run: pnpm --filter liff typecheck
       - run: pnpm --filter liff test
@@ -325,22 +493,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # monthly-migration.test.ts compares bootstrap.sql against a historical commit.
+          fetch-depth: 0
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: '22.23.4'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build Worker dependencies
         run: >-
           pnpm
+          --filter @line-harness/sdk
           --filter @line-crm/shared
           --filter @line-crm/line-sdk
           --filter @line-crm/db
-          --filter @line-harness/update-engine
           build
-      - run: pnpm --filter worker typecheck
-      - run: pnpm --filter worker test
+      - name: Typecheck Worker with sufficient Node heap
+        run: pnpm --config.enable-pre-post-scripts=false --filter worker typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+      - run: pnpm --config.enable-pre-post-scripts=false --filter worker test
 
   worker-build:
     name: Worker build
@@ -352,7 +526,7 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: '22.23.4'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build Worker dependencies
@@ -361,14 +535,20 @@ jobs:
           --filter @line-crm/shared
           --filter @line-crm/line-sdk
           --filter @line-crm/db
-          --filter @line-harness/update-engine
           build
       - name: Build Worker
         env:
           VITE_LIFF_ID: ${{ vars.VITE_LIFF_ID }}
-          VITE_BOT_BASIC_ID: ${{ vars.VITE_BOT_BASIC_ID }}
           VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
-        run: pnpm --filter worker build
+        run: pnpm --config.enable-pre-post-scripts=false --filter worker build
+      - name: Verify built production Worker config and security headers (offline)
+        run: pnpm exec tsx scripts/deploy/production/check-build.ts worker
+      - name: Install browser for deployed LIFF entry guard
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Guard customer waitlist entry, theme and short actions
+        run: node scripts/browser/liff-recovery.mjs
+      - name: Verify LIFF security headers and public SDK compatibility
+        run: node scripts/security/browser-headers.mjs worker
 
   web-checks:
     name: Admin lint, typecheck and tests
@@ -382,18 +562,27 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: '22.23.4'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build Admin dependencies
-        run: >-
-          pnpm
-          --filter @line-crm/shared
-          --filter @line-harness/update-engine
-          build
+        run: |
+          pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/update-engine build
+          pnpm --filter web release-log
       - run: pnpm --filter web exec next lint --report-unused-disable-directives-severity error
-      - run: pnpm --filter web typecheck
-      - run: pnpm --filter web test
+      - run: node apps/web/scripts/verify-entity-pickers.mjs
+      - name: Reject restored legacy admin appearance
+        run: node apps/web/scripts/verify-v8-only.mjs
+      - run: pnpm --config.enable-pre-post-scripts=false --filter web typecheck
+      # The route-permission matrix expands to thousands of cases. When it shares
+      # a long-lived Vitest fork with the rest of the suite, Node can exhaust its
+      # heap on the hosted runner. Run the matrix in a fresh process.
+      - name: Test Admin except route-permission matrix
+        run: pnpm --filter web exec vitest run --config vitest.config.ts --exclude src/components/view-permission-routes.test.tsx
+      - name: Test route-permission matrix in isolation
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: pnpm --filter web exec vitest run --config vitest.config.ts src/components/view-permission-routes.test.tsx --maxWorkers=1
       # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
       # 専用の設定が無く、**どのワークフローからも一度も呼ばれていなかった**(#704)。
       # #704 で繋いだところ2試験が落ち、原因が画面側の不具合だと分かったので
@@ -412,9 +601,20 @@ jobs:
       - name: Install Chromium for the webhook runtime contract
         run: pnpm exec playwright install --with-deps chromium
       - name: Webhook screen runtime contract on a real browser (#704, #705)
-        run: >-
-          pnpm exec playwright test
-          --config apps/web/src/app/webhooks/webhook-runtime.config.mjs
+        run: |
+          webhook_ports="$(node --input-type=module -e '
+            import { createServer } from "node:net";
+            const servers = [createServer(), createServer()];
+            await Promise.all(servers.map(server => new Promise((resolve, reject) => {
+              server.once("error", reject);
+              server.listen(0, "127.0.0.1", resolve);
+            })));
+            console.log(servers.map(server => server.address().port).join(" "));
+            await Promise.all(servers.map(server => new Promise(resolve => server.close(resolve))));
+          ')"
+          read -r webhook_api_port webhook_web_port <<< "$webhook_ports"
+          WEBHOOK_RUNTIME_API_PORT="$webhook_api_port" WEBHOOK_RUNTIME_PORT="$webhook_web_port" \
+            pnpm exec playwright test --config apps/web/src/app/webhooks/webhook-runtime.config.mjs
       # 失敗したときのDOMを残す。#705 は「吹き出しが次の行のボタンを覆う」という
       # 見た目の重なりで、後から読めないと原因に辿り着けない種類の失敗だった。
       - name: Upload webhook runtime contract failure context
@@ -435,7 +635,7 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: '22.23.4'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build MCP dependencies
@@ -445,8 +645,8 @@ jobs:
       # ここで続けて動かすのが一番安い。
       - name: Test the SDK
         run: pnpm --filter @line-harness/sdk test
-      - run: pnpm --filter @line-harness/mcp-server typecheck
-      - run: pnpm --filter @line-harness/mcp-server test
+      - run: pnpm --config.enable-pre-post-scripts=false --filter @line-harness/mcp-server typecheck
+      - run: pnpm --config.enable-pre-post-scripts=false --filter @line-harness/mcp-server test
       - run: pnpm --filter @line-harness/mcp-server build
 
   # apps/docs の2ファイル6試験は、`deploy-cloudflare-docs.yml` が呼ぶのが
@@ -469,7 +669,7 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: '22.23.4'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter docs test
@@ -486,7 +686,7 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: '22.23.4'
           cache: pnpm
       # restore-keys でロックファイルのハッシュだけ一致させると、ソースが
       # まったく違う古い .next/cache を復元してしまい、Next.js の webpack
@@ -498,12 +698,11 @@ jobs:
           key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/**/*.[jt]s', 'apps/web/**/*.[jt]sx') }}
       - run: pnpm install --frozen-lockfile
       - name: Build Admin dependencies
-        run: >-
-          pnpm
-          --filter @line-crm/shared
-          --filter @line-harness/update-engine
-          build
+        # web prebuild builds shared and line-sdk and prepares the release log.
+        run: pnpm --filter @line-harness/update-engine build
       - run: pnpm --filter web build
+      - name: Verify exported Admin headers and all external bootstrap scripts (offline)
+        run: pnpm exec tsx scripts/deploy/production/check-build.ts admin
       # 画面の権限は「文字列がある」では確かめられない。書き出した `out` を
       # 本番と同じ当て方で配り、実ブラウザで owner/admin/staff を動かす（N-197）。
       # vitest は `.test.ts(x)` しか見ないので、ここから呼ばないと必須ゲートの
@@ -519,7 +718,7 @@ jobs:
       - name: Verify EC import list account-switch behavior on the built admin
         run: >-
           pnpm exec playwright test
-          --config apps/web/src/app/ec-commerce/ec-commerce-issue-685.config.mjs
+          --config scripts/browser/ec-commerce-isolated.config.mjs
       # 間欠的な失敗(#685)の原因切り分け用。失敗時のDOM(error-context.md)を
       # artifactとして残し、CIでしか再現しない症状を後から読めるようにする。
       - name: Upload EC import list failure context
@@ -539,14 +738,274 @@ jobs:
         run: >-
           pnpm exec playwright test
           --config apps/web/src/components/friend-fields/tag-archived-edit.config.mjs
+      # 左メニューの上端・左端そろえ（オーナー指摘）。組の見出しの文字の
+      # 上端と板の上端の差・ロゴの縦中心・箱の左端は、実ブラウザで測らないと
+      # 検知できないため、書き出した `out` を実ブラウザで開いて確かめる。
+      - name: Verify sidebar top and left alignment on the built admin
+        run: >-
+          pnpm exec playwright test
+          --config apps/web/src/components/layout/sidebar-top-alignment.config.mjs
+      - name: MFA auth input and button behavior at three widths
+        run: pnpm exec playwright test --config scripts/browser/auth-isolated.config.mjs
+      - name: Verify admin security headers and auth interactions
+        run: node scripts/security/browser-headers.mjs web
+      - name: Upload MFA browser layout evidence and failure context
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mfa-browser-results
+          path: apps/web/test-results/train30-mfa/
+          retention-days: 7
       - run: pnpm --filter web verify:design
       # 画面の実挙動は、書き出した本番と同じ中身をブラウザで押して見る。
       # 型と文字列の検査だけでは、押せない口や取り違えた導線が残る。
-      - name: Install Chromium for browser checks
-        run: pnpm exec playwright install --with-deps chromium
       - name: Admin browser behavior checks
         run: |
           node apps/web/src/app/form-submissions/form-submissions-browser-behavior.mjs
+
+  v8-screen-guard:
+    name: V8 screen guard
+    needs: changes
+    if: needs.changes.outputs.full_suite == 'true'
+    runs-on: ubuntu-latest
+    # Check the current V8 screens at 1152, 1440 and 1920.
+    env:
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8788
+      NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
+      NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED: 'true'
+      V8_SPEED_ENFORCEMENT: ${{ vars.V8_SPEED_ENFORCEMENT }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 500
+      - name: Ensure PR comparison history is available
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] && \
+             ! git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null 2>&1; then
+            git fetch --no-tags --unshallow origin
+            git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null
+          fi
+      - name: Decide whether to run the screen guard
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "compare=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "compare=true" >> "$GITHUB_OUTPUT"
+          screen_base="$BASE_SHA"
+          if [ "$BASE_REF" = main ] && \
+             [ "$HEAD_REF" = codex/masato-production-release-20261104 ] && \
+             [ "$HEAD_REPO" = "$GITHUB_REPOSITORY" ]; then
+            # This one release promotes the exact Admin source already deployed
+            # at the audited staging SHA. Keep the full screen guard running;
+            # compare any later changes against that published source.
+            screen_base=4482ab95c890276cd1e2dcc4e25e43d3a5042821
+            git cat-file -e "$screen_base^{commit}"
+            git merge-base --is-ancestor "$screen_base" "$HEAD_SHA"
+            changes=$(git diff --name-only --no-ext-diff "$screen_base" "$HEAD_SHA") || exit 1
+            while IFS= read -r path; do
+              [ -n "$path" ] || continue
+              case "$path" in
+                .github/workflows/required-pr-gate.yml|scripts/deploy/production/preflight.ts|scripts/deploy/production/preflight-flow.test.ts|scripts/deploy/production/safety.test.ts|scripts/deploy/production/known-v8-screen.mjs|scripts/deploy/production/known-v8-screen.test.mjs|apps/web/src/v8/hq-templates/console-draft-review.test.tsx|apps/web/src/v8/restaurant/line-followup/followup-unsaved-navigation.test.tsx|apps/web/src/v8/form-edit/edit.test.tsx) ;;
+                *) echo "::error::検証公開済みの画面ソースから変更されています: $path"; exit 1 ;;
+              esac
+            done <<< "$changes"
+            echo "release_known_baseline=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "base_sha=$screen_base" >> "$GITHUB_OUTPUT"
+          if git diff --name-only "$BASE_SHA...$HEAD_SHA" \
+            | grep -qE '^(apps/web/|packages/shared/|scripts/visual-qa/|pnpm-lock\.yaml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        if: steps.scope.outputs.run == 'true'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: steps.scope.outputs.run == 'true'
+        with:
+          node-version: '22.23.4'
+          cache: pnpm
+      - if: steps.scope.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Build the right-panel fixtures with the conversation AI entry
+        if: steps.scope.outputs.run == 'true'
+        env:
+          NEXT_PUBLIC_CONVERSATION_AI_ENABLED: 'true'
+        run: |
+          pnpm --filter @line-harness/update-engine build
+          pnpm --filter web build
+          cp -a apps/web/out /tmp/detail-out
+      - name: Build the PR admin against the visual-qa mock API
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          pnpm --filter @line-harness/update-engine build
+          pnpm --filter web build
+          cp -a apps/web/out /tmp/head-out
+      - name: Build the base admin against the same mock API
+        if: steps.scope.outputs.run == 'true' && steps.scope.outputs.compare == 'true'
+        env:
+          BASE_SHA: ${{ steps.scope.outputs.base_sha }}
+        run: |
+          git worktree add /tmp/base "$BASE_SHA"
+          cd /tmp/base
+          pnpm install --frozen-lockfile
+          pnpm --filter @line-harness/update-engine build
+          pnpm --filter web build
+      - name: Install Chromium for the V8 screen guard
+        if: steps.scope.outputs.run == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Start the mock API and serve the built admin
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          node scripts/visual-qa/mock-api.mjs > /tmp/mock-api.log 2>&1 &
+          node apps/web/scripts/v8-guard/serve-out.mjs /tmp/head-out 4310 > /tmp/serve-head.log 2>&1 &
+          if [ "${{ steps.scope.outputs.compare }}" = "true" ]; then
+            node apps/web/scripts/v8-guard/serve-out.mjs /tmp/base/apps/web/out 4311 > /tmp/serve-base.log 2>&1 &
+          fi
+          ready=false
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:4310/friends > /dev/null \
+              && curl -sf 'http://127.0.0.1:8788/api/friends?account_id=visual-qa-account' > /dev/null \
+              && { [ "${{ steps.scope.outputs.compare }}" != "true" ] || curl -sf http://127.0.0.1:4311/friends > /dev/null; }; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != "true" ]; then
+            cat /tmp/mock-api.log /tmp/serve-head.log
+            echo "::error::速度・画面検査のサーバーが起動しませんでした"
+            exit 1
+          fi
+      - name: No permission copy flashes during navigation
+        if: steps.scope.outputs.run == 'true'
+        env:
+          V8_GUARD_BASE: http://127.0.0.1:4310
+          V8_GUARD_ARTIFACT_DIR: /tmp/v8-guard/permission-navigation
+        run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/permission-flash.test.mjs apps/web/scripts/v8-guard/permission-navigation.test.mjs
+      - name: No V8 layout breaks at 1152, 1440 and 1920
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
+      # 空白量は診断のみ。切れ・重なり・操作の遮断を必須で確認する。
+      - name: Broken fixtures must fail the V8 layout guard
+        if: steps.scope.outputs.run == 'true'
+        env:
+          V8_GUARD_BASE: http://127.0.0.1:4310
+          V8_GUARD_DETAIL_OUT: /tmp/detail-out
+        run: |
+          node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/create-footer-choices.test.mjs apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs apps/web/scripts/v8-guard/affixed-input-layout.test.mjs apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs apps/web/scripts/v8-guard/action-row-narrow.test.mjs apps/web/scripts/v8-guard/button-content-width.test.mjs apps/web/scripts/v8-guard/control-feedback.test.mjs apps/web/scripts/v8-guard/window-focus-clip.test.mjs apps/web/scripts/v8-guard/automation-field-error.test.mjs apps/web/scripts/v8-guard/fix-patterns.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs apps/web/scripts/v8-guard/shared-surface-layout.test.mjs apps/web/scripts/v8-guard/b244-rules.test.mjs apps/web/scripts/v8-guard/dialog-layout.test.mjs apps/web/scripts/v8-guard/table-column-alignment.test.mjs apps/web/scripts/v8-guard/visual-state.test.mjs apps/web/scripts/v8-guard/bar-chart-layout.test.mjs apps/web/scripts/v8-guard/reservation-reading.test.mjs apps/web/scripts/v8-guard/input-retention.test.mjs apps/web/scripts/v8-guard/record-columns.test.mjs apps/web/scripts/v8-guard/drawer-layout.test.mjs apps/web/scripts/v8-guard/layout-overflow.test.mjs apps/web/scripts/v8-guard/form-rules.test.mjs apps/web/scripts/v8-guard/active-modal-audit.test.mjs apps/web/scripts/v8-guard/edge-inset.test.mjs apps/web/scripts/v8-guard/inbox-filter-layout.test.mjs apps/web/scripts/v8-guard/scenarios-list-layout.test.mjs apps/web/scripts/v8-guard/salon-filters-row.test.mjs apps/web/scripts/v8-guard/list-name-open.test.mjs apps/web/scripts/v8-guard/ui-layout-alignment.test.mjs apps/web/scripts/v8-guard/ui-layout-tabrow.test.mjs
+          node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/viewport-footer.test.mjs
+          node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/heading-band.test.mjs apps/web/scripts/v8-guard/store-heading.test.mjs apps/web/scripts/v8-guard/dashboard-content.test.mjs apps/web/scripts/v8-guard/home-pending-heading.test.mjs apps/web/scripts/v8-guard/document-title.test.mjs apps/web/scripts/v8-guard/canonical-route.test.mjs apps/web/scripts/v8-guard/dialog-footer.test.mjs apps/web/scripts/v8-guard/dialog-leading.test.mjs apps/web/scripts/v8-guard/patrol-layout.test.mjs apps/web/scripts/v8-guard/scheduled-message.test.mjs apps/web/scripts/v8-guard/route-pending.test.mjs apps/web/scripts/v8-guard/style-switcher.test.mjs apps/web/scripts/v8-guard/monthly-flow.test.mjs
+      - name: Sidebar, booking and pagination details stay as designed
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/nav-detail.test.mjs apps/web/scripts/v8-guard/booking-dialog-layout.test.mjs apps/web/scripts/v8-guard/booking-title.test.mjs
+      - name: Narrow preview opens once and preserves form input
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/narrow-preview.test.mjs
+      - name: Train 17 waitlist failure and inflow mouse regressions
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/stgfix17-browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix17
+      - name: Booking preview date agrees through settings and preview tabs
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/stgfix18-preview.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix18-preview
+      - name: No new V8 layout or owner-rule defects
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          rm -f /tmp/v8-guard/defects.json
+          result=0
+          node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}' || result=$?
+          if [ '${{ steps.scope.outputs.release_known_baseline }}' = true ]; then
+            node --test scripts/deploy/production/known-v8-screen.test.mjs
+            node scripts/deploy/production/known-v8-screen.mjs /tmp/v8-guard/defects.json
+          else
+            exit "$result"
+          fi
+      - name: Store comparison delta labels stay inside their values
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/store-compare-layout.test.mjs
+      - name: Inventory edge insets, folder dots and page actions on all admin screens
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          result=0
+          node apps/web/scripts/v8-guard/presentation-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/presentation || result=$?
+          if [ '${{ steps.scope.outputs.release_known_baseline }}' = true ]; then
+            node apps/web/scripts/v8-guard/presentation-audit.mjs http://127.0.0.1:4311 /tmp/v8-guard/presentation-base || true
+            node scripts/deploy/production/known-v8-screen.mjs --presentation /tmp/v8-guard/presentation/presentation.json /tmp/v8-guard/presentation-base/presentation.json
+          else
+            exit "$result"
+          fi
+      - name: List row rules
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          node apps/web/scripts/list-row-audit.mjs
+          node apps/web/scripts/v8-guard/list-row-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-rows.json
+          node apps/web/scripts/v8-guard/list-skeleton-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-skeleton.json
+      - name: Speed measurement and reference policy controls
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        run: node --test apps/web/scripts/v8-guard/mock-local.test.mjs apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/speed-check.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs
+      - name: Common V8 speed checks (11 scenes, five medians)
+        id: speed_budget
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        env:
+          V8_SPEED_PROFILE: ci
+        run: pnpm qa:speed http://127.0.0.1:4310 /tmp/v8-guard/speed.json
+      - name: Train 17 absolute targets
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        run: node apps/web/scripts/v8-guard/stgfix17-targets.mjs /tmp/v8-guard/speed.json
+      - name: 2000 friends meet absolute speed targets
+        id: stress_speed
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        env:
+          V8_SPEED_PROFILE: ci
+        run: node apps/web/scripts/v8-guard/stress-targets.mjs /tmp/v8-guard/speed.json
+      - name: PERF-01 fixed list speed targets
+        id: perf3_targets
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        run: node apps/web/scripts/v8-guard/perf3-targets.mjs /tmp/v8-guard/speed.json
+      - name: Report speed reference results (including incomplete measurements)
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        env:
+          SPEED_BUDGET_OUTCOME: ${{ steps.speed_budget.outcome }}
+          STRESS_SPEED_OUTCOME: ${{ steps.stress_speed.outcome }}
+          PERF3_TARGETS_OUTCOME: ${{ steps.perf3_targets.outcome }}
+        run: node apps/web/scripts/v8-guard/speed-report.mjs /tmp/v8-guard/speed.json
+      - name: Virtual table selection, keyboard and layout
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 scripts/visual-qa/friends-table-state.test.mjs
+          node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
+      - name: Upload V8 screen guard results
+        if: always() && steps.scope.outputs.run == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v8-screen-guard
+          path: |
+            /tmp/v8-guard/
+            /tmp/mock-api.log
+            /tmp/serve-head.log
+            /tmp/serve-base.log
+          retention-days: 7
+
+      - name: Upload separate speed diagnosis traces
+        if: always() && steps.scope.outputs.run == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v8-speed-diagnosis
+          path: /tmp/v8-guard/speed.json.diagnosis/
+          if-no-files-found: ignore
+          retention-days: 7
 
   required-pr-gate:
     name: required-pr-gate
@@ -559,6 +1018,7 @@ jobs:
       - web-build
       - mcp-checks
       - docs-checks
+      - v8-screen-guard
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -572,6 +1032,7 @@ jobs:
           WEB_BUILD_RESULT: ${{ needs.web-build.result }}
           MCP_CHECKS_RESULT: ${{ needs.mcp-checks.result }}
           DOCS_CHECKS_RESULT: ${{ needs.docs-checks.result }}
+          V8_SCREEN_GUARD_RESULT: ${{ needs.v8-screen-guard.result }}
         run: |
           failed=0
           for result in \
@@ -582,7 +1043,8 @@ jobs:
             "$WEB_CHECKS_RESULT" \
             "$WEB_BUILD_RESULT" \
             "$MCP_CHECKS_RESULT" \
-            "$DOCS_CHECKS_RESULT"; do
+            "$DOCS_CHECKS_RESULT" \
+            "$V8_SCREEN_GUARD_RESULT"; do
             case "$result" in
               success|skipped) ;;
               *) failed=1 ;;

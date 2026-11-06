@@ -5,6 +5,7 @@
  * IDで保存された既定値が「B」と表示され、そのまま保存できることを確かめる。
  */
 import React from 'react'
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: () => true }))
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
@@ -45,6 +46,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/tags',
   useRouter: () => ({ push: () => {} }),
   useSearchParams: () => new URLSearchParams('?id=ff-1'),
 }))
@@ -76,7 +78,7 @@ describe('R182 単一選択の既定値', () => {
     render(<EditFriendFieldPage />)
     await screen.findByRole('button', { name: '既定値' })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
     expect(mockState.payload).not.toBeNull()
     expect(mockState.payload?.defaultValue).toBe('B')

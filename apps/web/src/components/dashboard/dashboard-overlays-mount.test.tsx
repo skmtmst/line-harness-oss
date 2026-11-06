@@ -10,7 +10,8 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import DashboardEditor, { defaultDashboardPreferences } from './dashboard-editor'
+import DashboardEditor from '@/v8/dashboard/dashboard-editor'
+import { defaultDashboardPreferences } from './dashboard-editor'
 import QrDialog from './qr-dialog'
 
 // 共通部品側は React を import していないため、この環境では素の select へ
@@ -74,7 +75,7 @@ const focusables = (container: HTMLElement) =>
   ))
 
 const dialog = () => {
-  const node = host.querySelector<HTMLElement>('[role="dialog"]')
+  const node = document.body.querySelector<HTMLElement>('[role="dialog"]')
   if (!node) throw new Error('dialog not found')
   return node
 }
@@ -115,7 +116,7 @@ describe('N-014 ダッシュボード編集overlay', () => {
     await flush()
     keydown('Escape')
     expect(onCancel).not.toHaveBeenCalled()
-    const overlay = host.firstElementChild as HTMLElement
+    const overlay = dialog().parentElement as HTMLElement
     act(() => { overlay.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })) })
     expect(onCancel).not.toHaveBeenCalled()
     expect(dialog().querySelector<HTMLButtonElement>('button[aria-label="閉じる"]')?.disabled).toBe(true)

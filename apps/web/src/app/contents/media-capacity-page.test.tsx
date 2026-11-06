@@ -6,6 +6,7 @@
  */
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { MediaQuota } from '@/lib/api'
@@ -43,6 +44,7 @@ vi.mock('@/lib/api', () => {
         visibility: () => Promise.resolve({ success: true, data: { features: { media: true } } }),
       },
       media: {
+        counts: () => Promise.resolve({ success: true, data: { total: 1, byKind: { image: 0, video: 1, audio: 0, file: 0 }, unused: 1, archived: 0 } }),
         list: (accountId: string, params?: unknown) => {
           fixture.listCalls.push({ accountId, params })
           return Promise.resolve({

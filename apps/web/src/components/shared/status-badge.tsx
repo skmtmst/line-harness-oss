@@ -1,41 +1,70 @@
 import React, { type HTMLAttributes, type ReactNode } from 'react'
+import { statusLabel, type StandardStatus } from '@/lib/status-labels'
 import HelpTip from './help-tip'
+import TruncatedText from './truncated-text'
 import styles from './status-badge.module.css'
 
-export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
+/**
+ * 札の色。warning＝橙（対応中・送信中など進んでいる途中）、caution＝黄（要確認・承認待ち）、
+ * danger＝赤（未対応・失敗）、success＝緑（済み・正常・有効）、info＝青、neutral＝灰（保留・種類）。
+ */
+export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'caution' | 'success' | 'danger'
 
-/** 色だけに頼らず、必ず状態を文字で伝える共通バッジ。 */
+/** 色だけに頼らず、必ず状態を文字で伝える共通バッジ。地の色のある札に色の点と字を載せる。 */
 export default function StatusBadge({
   children,
+  status,
   tone = 'neutral',
   size = 'default',
   className,
   help,
   helpLabel,
   helpHref,
+  dot = true,
+  surface = 'tinted',
+  distinctFrom,
   ...props
 }: Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
-  children: ReactNode
+  children?: ReactNode
+  status?: StandardStatus
   tone?: StatusBadgeTone
-  size?: 'default' | 'compact'
+  /**
+   * ★V8 `'delivery'` はデリバリー受注の承認 v02（kDQHr・hjdqV・OzHLO・h7OeT）の札。
+   * 見た目は `'compact'` と同じで、余白だけ絵に合わせる。点・印と字の間はほかの札と同じ 8
+   * （§6.5 の 4）。画面CSSから共通の札を削る書き方（★V8 §24で禁止）
+   * の代わりに、渡したときだけ効くこの大きさを部品側に置く。
+   */
+  size?: 'default' | 'compact' | 'micro' | 'annotation' | 'dining' | 'delivery'
+  /** 選んだ顧客の連携情報だけ白地にする。 */
+  surface?: 'tinted' | 'white'
+  /** 同じ状態を既に表示しているとき、指定した札だけを省く。 */
+  distinctFrom?: string
   /**
    * 札の意味（例：審査中・保留・期限切れの違い）。札のすぐ右の「？」へ入れる
-   * （★V7・§2-1b）。札の列が並ぶ表では、見出しの「？」にまとめるのも可。
+   * （★管理画面・§2-1b）。札の列が並ぶ表では、見出しの「？」にまとめるのも可。
    */
   help?: ReactNode
   /** 「？」の見出し。省略時は札の文字。読み上げ名は「{見出し}の説明」。 */
   helpLabel?: string
   /** 長い説明がある場所。渡すと吹き出しに「くわしく」が出る。 */
   helpHref?: string
+  /**
+   * ★V8 の色の点。既定は出す。「変わる」のように状態ではなく変化の印として使う札は false
+   * （「変わる」は点なしの札）。
+   */
+  dot?: boolean
 }) {
-  const classes = [styles.badge, styles[tone], size === 'compact' ? styles.compact : null, className]
+  const label = status ? statusLabel(status) : typeof children === 'string' ? statusLabel(children) : children
+  if (typeof label === 'string' && distinctFrom !== undefined
+    && statusLabel(label.trim()) === statusLabel(distinctFrom.trim())) return null
+  const classes = [styles.badge, styles[tone], size === 'compact' || size === 'delivery' ? styles.compact : size === 'micro' ? styles.micro : size === 'annotation' ? styles.annotation : null, dot ? null : styles.noDot, className]
     .filter(Boolean)
     .join(' ')
   const hasHelp = help !== undefined && help !== null
-  const heading = helpLabel ?? (typeof children === 'string' ? children : 'この状態')
+  const heading = helpLabel ? statusLabel(helpLabel) : (typeof label === 'string' ? label : 'この状態')
   return (
-    <span className={classes} data-design-node="xRvDB" {...props}>
-      {children}
+    <span className={classes} data-size={size} data-tone={tone} data-design-node="xRvDB" data-surface={surface} {...props}>
+      {typeof label === 'string' ? <TruncatedText value={label} /> : label}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
           {help}

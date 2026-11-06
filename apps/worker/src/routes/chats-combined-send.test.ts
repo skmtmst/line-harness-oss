@@ -1,5 +1,5 @@
 /*
- * 画像と本文の結合送信(N-022)。
+ * 画像と本文の結合送信。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物の chats ルートを当て、
  * LINE clientだけを止める。単体送信口2回呼びの部分送信を直す。
@@ -11,12 +11,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const pushMessage = vi.fn().mockResolvedValue({ sentMessages: [{}, {}] });
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({ pushMessage })),
+  LineClient: vi.fn().mockImplementation(function () { return ({ pushMessage }); }),
 }));
 
 const { chats } = await import('./chats.js');
@@ -157,7 +157,7 @@ describe('結合送信(N-022)', () => {
   });
 
   /*
-   * G-4: テンプレートのパック送信。texts は選んだ順のまま1回のpushに
+   * テンプレートのパック送信。texts は選んだ順のまま1回のpushに
    * まとまり、履歴も1通ごとに残る。6通以上はLINEのpush上限を超える
    * のでLINE呼び出し0回で止める。
    */
@@ -189,4 +189,13 @@ describe('結合送信(N-022)', () => {
     expect(pushMessage).not.toHaveBeenCalled();
     expect(rows()).toEqual([]);
   });
+});
+
+
+test('ブロック後のまとめて送信は送信0回', async () => {
+  sqlite.raw.prepare("UPDATE friends SET is_following = 0 WHERE id = 'fr-1'").run();
+  const response = await postCombined({ text: '送らない' }, KEY1);
+  expect(response.status).toBe(409);
+  expect(await response.json()).toMatchObject({ code: 'FRIEND_NOT_FOLLOWING' });
+  expect(pushMessage).not.toHaveBeenCalled();
 });

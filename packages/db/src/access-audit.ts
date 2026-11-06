@@ -1,3 +1,4 @@
+import { currentRequestId } from '@line-crm/shared/server';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 
@@ -97,7 +98,7 @@ function parsePermissionKeys(value: string): string[] {
 const STORED_ROLE_BUNDLES: readonly AccessRoleBundle[] = ['administrator', 'operations', 'reception', 'view_only', 'custom'];
 
 function roleBundleFor(row: { role: string; access_level: string; role_bundle?: string | null }): AccessRoleBundle {
-  // 明示保存された束があればそれが正本（N-424: 受付を運用へ潰さない）。
+  // 明示保存された束があればそれが正本（受付を運用へ潰さない）。
   if (row.role_bundle && (STORED_ROLE_BUNDLES as readonly string[]).includes(row.role_bundle)) {
     return row.role_bundle as AccessRoleBundle;
   }
@@ -130,6 +131,7 @@ function canSeeRowInAccountScope(
   visibleIds: ReadonlySet<string>,
   requestedLineAccountId?: string,
 ): boolean {
+  // 統括メンバーは同じ統括の全アカウントへ現在の役割のまま参加する。
   if (row.account_scope === 'all') return true;
   const rowIds = new Set(parseStringArray(row.scoped_line_account_ids));
   if (row.assigned_line_account_id) rowIds.add(row.assigned_line_account_id);
@@ -142,7 +144,7 @@ function emptyRoleCounts(): Record<AccessRoleBundle, number> {
   return { administrator: 0, operations: 0, reception: 0, view_only: 0, custom: 0 };
 }
 
-function accessUserItem(row: StaffAccessRow, now: string): AccessUserItem {
+function accessUserItem(row: StaffAccessRow, now: string, requestedLineAccountId?: string): AccessUserItem {
   const scopedLineAccountIds = parseStringArray(row.scoped_line_account_ids);
   const permissionKeys = parsePermissionKeys(row.permission_keys);
   return {
@@ -156,8 +158,8 @@ function accessUserItem(row: StaffAccessRow, now: string): AccessUserItem {
     hasFieldMasks: null,
     accountScope: {
       type: row.account_scope ?? 'all',
-      assignedLineAccountId: row.assigned_line_account_id ?? null,
-      lineAccountIds: row.account_scope === 'accounts' ? scopedLineAccountIds : [],
+      assignedLineAccountId: requestedLineAccountId && row.account_scope === 'accounts' ? requestedLineAccountId : row.assigned_line_account_id ?? null,
+      lineAccountIds: row.account_scope === 'accounts' ? requestedLineAccountId ? [requestedLineAccountId] : scopedLineAccountIds : [],
       includesDescendants: Boolean(row.can_access_descendant_accounts),
     },
     lastLoginAt: row.last_login_at,
@@ -201,9 +203,15 @@ export async function listAccessUsers(db: D1Database, input: ListAccessUsersInpu
   ).bind(DEFAULT_TENANT_ID, tenantId).all<StaffAccessRow>();
 
   const visibleIds = new Set(input.allowedLineAccountIds);
-  const visibleRows = result.results.filter((row) =>
-    canSeeRowInAccountScope(row, visibleIds, input.lineAccountId));
-  const allItems = visibleRows.map((row) => accessUserItem(row, now));
+  const creator = input.lineAccountId
+    ? await db.prepare('SELECT created_by_staff_id FROM line_accounts WHERE id=? AND COALESCE(tenant_id,?)=?')
+      .bind(input.lineAccountId, DEFAULT_TENANT_ID, tenantId).first<{ created_by_staff_id: string | null }>()
+    : null;
+  const visibleRows = input.lineAccountId && (!creator || !visibleIds.has(input.lineAccountId))
+    ? []
+    : result.results.filter((row) => canSeeRowInAccountScope(row, visibleIds, input.lineAccountId)
+      || row.id === creator?.created_by_staff_id);
+  const allItems = visibleRows.map((row) => accessUserItem(row, now, input.lineAccountId));
   const roleCounts = emptyRoleCounts();
   for (const item of allItems) roleCounts[item.roleBundle] += 1;
   const activeItems = allItems.filter((item) => item.status === 'active');
@@ -226,7 +234,7 @@ export async function listAccessUsers(db: D1Database, input: ListAccessUsersInpu
     if (input.roleBundle && item.roleBundle !== input.roleBundle) return false;
     if (!normalizedQuery) return true;
     /*
-     * #620: 検索欄は「人の名前・メールで検索」。照合は画面に出る項目だけに限る。
+     * 検索欄は「人の名前・メールで検索」。照合は画面に出る項目だけに限る。
      * roleBundle（administrator 等の内部enum ID）を対象に入れていたときは、
      * "admin" や "view" のような見た目に無い語でも行が返っていた。
      */
@@ -351,7 +359,7 @@ export function auditEventStatement(
     safeAuditJson(input.before),
     safeAuditJson(input.after),
     input.reason ? redactAuditText(input.reason).slice(0, 300) : null,
-    safeText(input.requestTraceId, 160),
+    safeText(currentRequestId() ?? input.requestTraceId, 160),
     safeText(input.ipPrefix, 80),
     safeText(input.deviceFamily, 80),
     input.riskLevel ?? 'normal',
@@ -407,9 +415,9 @@ type AuditEventRow = {
 export type AuditEventGroup = 'deleted' | 'sent' | 'changed' | 'login' | 'attention';
 
 /*
- * 監査 R69: 件数の集計・一覧の絞り込み・ページ分割に同じ分類を使う。
- * 以前は集計が send/publish・update/change/patch/put を数えるのに
- * 絞り込みは send・update だけだったため、数えたはずの操作が一覧から消えた。
+ * 件数の集計・一覧の絞り込み・ページ分割に同じ分類を使う。
+ * 集計が send/publish・update/change/patch/put を数えるのに
+ * 絞り込みが send・update だけだと、数えたはずの操作が一覧から消える。
  * 「ログイン」は成功・失敗を問わず auth.login を数える（失敗は「気になるもの」にも出る）。
  */
 export const AUDIT_GROUP_CONDITIONS: Record<AuditEventGroup, string> = {
@@ -423,19 +431,18 @@ export const AUDIT_GROUP_CONDITIONS: Record<AuditEventGroup, string> = {
 export type ListAuditEventsInput = {
   tenantId?: string | null;
   allowedLineAccountIds: string[];
-  includeTenantWide?: boolean;
   lineAccountId?: string;
   category?: AuditCategory;
   result?: AuditResult;
   attentionOnly?: boolean;
-  /** 集計タブと同じ分類での絞り込み。件数と一覧が同じ行を指す（監査 R69）。 */
+  /** 集計タブと同じ分類での絞り込み。件数と一覧が同じ行を指す。 */
   group?: AuditEventGroup;
   actorId?: string;
   action?: string;
   query?: string;
   from?: string;
   to?: string;
-  /** ページ分割もこの順序で行う。既定は新しい順（監査 R68）。 */
+  /** ページ分割もこの順序で行う。既定は新しい順。 */
   sort?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
@@ -463,41 +470,11 @@ function auditRegionLabel(ipPrefix: string | null): string | null {
 function auditScopeSql(input: ListAuditEventsInput): { conditions: string[]; values: unknown[] } {
   const conditions = ['ae.tenant_id = ?'];
   const values: unknown[] = [input.tenantId ?? DEFAULT_TENANT_ID];
-  if (input.lineAccountId) {
-    /*
-     * 監査 R70: 認証イベント（ログイン・失敗）はLINEアカウント未所属で保存される。
-     * アカウントで絞ると業務記録だけになり、認証の記録が一覧と集計から消えていた。
-     * アカウントの業務記録に、組織全体の認証記録を添える。権限がアカウント限定の
-     * 人には、そのアカウントを担当する人の認証記録だけを添える。
-     */
-    if (input.includeTenantWide) {
-      conditions.push(`(ae.line_account_id = ? OR (ae.line_account_id IS NULL AND ae.category = 'auth'))`);
-      values.push(input.lineAccountId);
-    } else {
-      conditions.push(`(ae.line_account_id = ? OR (
-        ae.line_account_id IS NULL AND ae.category = 'auth' AND ae.actor_principal_id IS NOT NULL AND EXISTS (
-          SELECT 1 FROM staff_account_scopes audit_scope
-           WHERE audit_scope.staff_id = ae.actor_principal_id
-             AND audit_scope.line_account_id = ?
-        )
-      ))`);
-      values.push(input.lineAccountId, input.lineAccountId);
-    }
-  } else if (input.includeTenantWide && input.allowedLineAccountIds.length > 0) {
-    conditions.push(`(ae.line_account_id IS NULL OR ae.line_account_id IN (${input.allowedLineAccountIds.map(() => '?').join(', ')}))`);
-    values.push(...input.allowedLineAccountIds);
-  } else if (input.includeTenantWide) {
-    conditions.push('ae.line_account_id IS NULL');
-  } else if (input.allowedLineAccountIds.length > 0) {
-    const placeholders = input.allowedLineAccountIds.map(() => '?').join(', ');
-    conditions.push(`(ae.line_account_id IN (${placeholders}) OR (
-      ae.line_account_id IS NULL AND ae.actor_principal_id IS NOT NULL AND EXISTS (
-        SELECT 1 FROM staff_account_scopes audit_scope
-         WHERE audit_scope.staff_id = ae.actor_principal_id
-           AND audit_scope.line_account_id IN (${placeholders})
-      )
-    ))`);
-    values.push(...input.allowedLineAccountIds, ...input.allowedLineAccountIds);
+  // 所属先が記録されていない認証履歴を、現在の担当範囲から推測して表示しない。
+  // 担当範囲は後から変わり得るため、過去の操作先を証明できない。
+  if (input.lineAccountId && input.allowedLineAccountIds.includes(input.lineAccountId)) {
+    conditions.push('ae.line_account_id = ?');
+    values.push(input.lineAccountId);
   } else {
     conditions.push('1 = 0');
   }
@@ -517,7 +494,7 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
   }
   if (input.actorId) { conditions.push('ae.actor_principal_id = ?'); values.push(input.actorId); }
   /*
-   * #620: ユーザー語は LIKE ではなく instr で照合する。
+   * ユーザー語は LIKE ではなく instr で照合する。
    * `%…%` の LIKE だと入力中の % や _ がワイルドカードとして効いて
    * 意図しない行を返し、さらに D1 の LIKE パターンは 50 バイト上限のため
    * 長文の検索がサーバーエラーになっていた。
@@ -537,7 +514,7 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
     `SELECT COUNT(*) AS count FROM audit_events ae
       LEFT JOIN staff_members sm ON sm.id = ae.actor_principal_id ${where}`,
   ).bind(...values).first<{ count: number }>();
-  // 監査 R68: 「古い順」もDB側の並び替えでページを分ける。取った1頁だけを
+  // 「古い順」もDB側の並び替えでページを分ける。取った1頁だけを
   // 画面で並び替えると、頁またぎで新しい日付が先に出る逆転が起きていた。
   const direction = input.sort === 'asc' ? 'ASC' : 'DESC';
   const rows = await db.prepare(
@@ -550,9 +527,9 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
 
   const summaryScope = auditScopeSql(input);
   /*
-   * STAFF-02: 集計の期間は一覧と同じ from/to にそろえる。
-   * 以前は常に「直近30日」で集計していたため、画面で期間を90日・全期間へ
-   * 切り替えても集計だけが30日のままずれていた。
+   * 集計の期間は一覧と同じ from/to にそろえる。
+   * 常に「直近30日」で集計すると、画面で期間を90日・全期間へ
+   * 切り替えても集計だけが30日のままずれる。
    * from 未指定は全期間、to があれば集計の上限にも使う。
    */
   const summaryConditions = [...summaryScope.conditions];
@@ -571,7 +548,7 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
     summaryConditions.push('ae.created_at <= ?');
     summaryValues.push(input.to);
   }
-  // 監査 R69: 各タブの件数は一覧の絞り込みと同じ分類（AUDIT_GROUP_CONDITIONS）で数える。
+  // 各タブの件数は一覧の絞り込みと同じ分類（AUDIT_GROUP_CONDITIONS）で数える。
   const summary = await db.prepare(
     `SELECT COUNT(*) AS total,
             SUM(CASE WHEN ${AUDIT_GROUP_CONDITIONS.deleted} THEN 1 ELSE 0 END) AS deleted,

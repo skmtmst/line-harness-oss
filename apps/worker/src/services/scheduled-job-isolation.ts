@@ -1,3 +1,4 @@
+import { logger, scheduledJobCode } from '@line-crm/shared/server';
 export type ScheduledJob = {
   name: string;
   run: () => Promise<void>;
@@ -9,6 +10,7 @@ export type ScheduledJobFailure = {
 };
 
 export const SCHEDULED_CRONS = {
+  restaurantMinute: '* * * * *',
   delivery: '*/5 * * * *',
   frequentHeavy: '1-56/5 * * * *',
   sixHourlyHeavy: '0 */6 * * *',
@@ -21,12 +23,20 @@ export function scheduledLane(cron: string): ScheduledLane {
   return (matched?.[0] as keyof typeof SCHEDULED_CRONS | undefined) ?? 'ignored';
 }
 
+
+/** 呼出元の固定名だけを記録する。例外の本文・任意のjob名は出さない。 */
+function logScheduledFailure({ name, reason }: ScheduledJobFailure): void {
+  const job = scheduledJobCode(name);
+  const category = reason instanceof TypeError ? 'type_error'
+    : reason instanceof SyntaxError ? 'syntax_error'
+      : reason instanceof Error && reason.name === 'AbortError' ? 'aborted' : 'error';
+  logger.error('scheduled.job_failed', { scheduledJob: job, failureKind: category });
+}
+
 /** 同じcron内の処理を独立して走らせ、1件の失敗で残りを止めない。 */
 export async function runIsolatedScheduledJobs(
   jobs: ScheduledJob[],
-  onFailure: (failure: ScheduledJobFailure) => void = ({ name, reason }) => {
-    console.error(`${name} error:`, reason);
-  },
+  onFailure: (failure: ScheduledJobFailure) => void = logScheduledFailure,
 ): Promise<{ succeeded: number; failed: number }> {
   const results = await Promise.allSettled(jobs.map((job) => job.run()));
   let failed = 0;

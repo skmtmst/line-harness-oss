@@ -1,0 +1,9 @@
+.steps { display: grid; gap: 24px; width: 100%; margin: 0; padding: 26px 10px 0; border-top: 1px solid #eceef1; list-style: none; }
+.steps li { display: flex; align-items: flex-start; gap: 14px; }
+.steps li > span { display: grid; place-items: center; flex: 0 0 28px; height: 28px; border-radius: 50%; background: #fafafc; color: #4a5565; font-size: 13px; font-weight: 700; }
+.steps li:first-child > span { background: #087a3e; color: #fff; }
+.steps p { margin: 0; }
+.steps strong, .steps small { display: block; font-size: 13px; }
+.steps strong { font-weight: 700; }
+.steps small { margin-top: 3px; color: #4a5565; }
+.restriction { width: 100%; margin: 18px 0 0; padding: 14px; border-radius: 10px; background: #fdf3e1; color: #94600a; font-size: 12px; }

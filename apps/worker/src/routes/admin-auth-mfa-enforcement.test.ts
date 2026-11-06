@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hashPassword } from '../services/password-hash.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
@@ -8,22 +8,18 @@ import { adminAuth } from './admin-auth.js';
 import { authEmail } from './auth-email.js';
 import { authMiddleware, sha256Hex } from '../middleware/auth.js';
 
-/**
- * N-426/N-434: 管理者のMFA必須とセッション期限（既定8時間・記憶時7日）。
- *
- * - 管理者束（owner/admin・閲覧専用でない）はTOTP未登録のまま通常セッションを取れない
- * - 設定は setup 用途の合言葉経由で行い、確認が通った時点でセッションが出る
- * - verify 用途と setup 用途の合言葉は入れ替えて使えない
- * - 期限は cookie の Max-Age と admin_sessions.expires_at が一致する
- *
- * ただし今はログイン時の二段階認証の強制をいったん外している（利用者の指示。
- * 再開の時機は利用者が決める）。強制が前提の確かめは下の印で休ませる。TOTPの
- * 設定・確認の仕組み自体は残してあるので、再開するときは TWO_FACTOR_ENFORCED を
- * true へ戻し、ログイン経路（admin-auth.ts・auth-email.ts）の門を戻すだけでよい。
- */
-const TWO_FACTOR_ENFORCED = false;
-const itWhenTwoFactorEnabled = TWO_FACTOR_ENFORCED ? it : it.skip;
+// トークンと設定の検証は実物を使い、Cloudflare の外部応答だけを差し替える。
+vi.mock('../services/turnstile.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../services/turnstile.js')>();
+  const verify: typeof actual.verifyTurnstile = (environment, token, ip) => actual.verifyTurnstile(environment, token, ip, async (url, init) => {
+    const sent = new URLSearchParams(String(init?.body ?? ''));
+    return Response.json({ success: String(url) === 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+      && init?.method === 'POST' && sent.get('secret') === 'fixture-turnstile-secret' && sent.get('response') === 'fixture-login-robot' });
+  });
+  return { ...actual, verifyTurnstile: verify };
+});
 
+/** 人のログインは既定で MFA を要求し、明示的な無効設定との互換性も試す。 */
 const MASTER_KEY = 'test-master-key-which-is-longer-than-32-characters';
 const SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 
@@ -32,6 +28,7 @@ let testDb: SqliteD1;
 function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
   return {
     DB: testDb.db,
+    TURNSTILE_SECRET_KEY: 'fixture-turnstile-secret',
     ADMIN_ORIGIN: 'https://admin.example.com',
     ADMIN_PUBLIC_URL: 'https://admin.example.com',
     LINE_LOGIN_CHANNEL_ID: 'login-channel',
@@ -58,8 +55,12 @@ async function call(
   return app().request(`https://api.example.com${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', ...(opts.headers ?? {}) },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(path === '/api/auth/password/login' ? { ...(body as Record<string, unknown>), turnstileToken: 'fixture-login-robot' } : body),
   }, env(opts.env));
+}
+
+function setPolicyOff() {
+  testDb.raw.prepare('INSERT OR REPLACE INTO platform_settings(key,value) VALUES (?,?)').run('auth.mfa.required:00000000-0000-4000-8000-000000000001', 'false');
 }
 
 function seedStaff(id: string, overrides: Record<string, unknown> = {}) {
@@ -118,7 +119,7 @@ afterEach(() => {
 });
 
 describe('N-426: 管理者のTOTP未登録では通常セッションを発行しない', () => {
-  itWhenTwoFactorEnabled('メール+パスワード: オーナーが未登録なら設定用の合言葉だけ返し、セッションは出さない', async () => {
+  it('メール+パスワード: オーナーが未登録なら設定用の合言葉だけ返し、セッションは出さない', async () => {
     await seedOwnerWithPassword();
     const res = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' });
     expect(res.status).toBe(200);
@@ -130,7 +131,7 @@ describe('N-426: 管理者のTOTP未登録では通常セッションを発行�
     expect(challengeRows()).toMatchObject([{ staff_id: 's1', purpose: 'setup', remember: 0 }]);
   });
 
-  itWhenTwoFactorEnabled.each(['suspended', 'archived'] as const)(
+  it.each(['suspended', 'archived'] as const)(
     'メール+パスワード: %s のオーナーも2要素認証後に状態付きセッションへ入れる',
     async (status) => {
       testDb.raw.prepare(`INSERT INTO tenants (id, name, status) VALUES ('tenant-unavailable', '停止中契約先', ?)`).run(status);
@@ -152,7 +153,8 @@ describe('N-426: 管理者のTOTP未登録では通常セッションを発行�
     },
   );
 
-  it('staff 役割は必須対象外のため、未登録でもそのままセッションが出る', async () => {
+  it('Off: staff 役割は必須対象外のため、未登録でもそのままセッションが出る', async () => {
+    setPolicyOff();
     const hash = await hashPassword('Abcdefg1');
     testDb.raw
       .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash) VALUES ('st1', '受付', 'staff@example.com', 'staff', 'key-st1', 1, ?)`)
@@ -163,7 +165,8 @@ describe('N-426: 管理者のTOTP未登録では通常セッションを発行�
     expect(sessionRows()).toHaveLength(1);
   });
 
-  it('閲覧専用のオーナー（view_only束）も必須対象外', async () => {
+  it('Off: 閲覧専用のオーナー（view_only束）も必須対象外', async () => {
+    setPolicyOff();
     const hash = await hashPassword('Abcdefg1');
     testDb.raw
       .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, access_level, password_hash) VALUES ('ro1', '閲覧', 'ro@example.com', 'owner', 'key-ro1', 1, 'read_only', ?)`)
@@ -173,7 +176,7 @@ describe('N-426: 管理者のTOTP未登録では通常セッションを発行�
     expect(sessionRows()).toHaveLength(1);
   });
 
-  itWhenTwoFactorEnabled('APIキー経由でも管理者のMFA必須は迂回できない', async () => {
+  it('APIキー経由でも管理者のMFA必須は迂回できない', async () => {
     seedStaff('s2', { role: 'admin' });
     const res = await call('POST', '/api/auth/login', { apiKey: 'key-s2' });
     expect(res.status).toBe(200);
@@ -183,7 +186,7 @@ describe('N-426: 管理者のTOTP未登録では通常セッションを発行�
     expect(challengeRows()).toMatchObject([{ staff_id: 's2', purpose: 'setup' }]);
   });
 
-  itWhenTwoFactorEnabled('TOTP登録済みなら従来どおり確認用の合言葉が返る', async () => {
+  it('TOTP登録済みなら従来どおり確認用の合言葉が返る', async () => {
     await seedOwnerWithPassword();
     await enableTotp('s1');
     const res = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' });
@@ -201,7 +204,7 @@ describe('N-426: 初回設定（setup合言葉 → 確認 → セッション）
     return body.data.challengeToken;
   }
 
-  itWhenTwoFactorEnabled('合言葉でQRの元（provisioningUri）を取り、正しいコードで登録完了＝セッション発行', async () => {
+  it('合言葉でQRの元（provisioningUri）を取り、正しいコードで登録完了＝セッション発行', async () => {
     await seedOwnerWithPassword();
     const token = await setupTokenFor('s1');
 
@@ -231,7 +234,7 @@ describe('N-426: 初回設定（setup合言葉 → 確認 → セッション）
     expect(challengeRows()).toEqual([]);
   });
 
-  itWhenTwoFactorEnabled('初回設定完了時の監査記録が例外でもセッションを発行する', async () => {
+  it('初回設定完了時の監査記録が例外でもセッションを発行する', async () => {
     await seedOwnerWithPassword();
     const token = await setupTokenFor('s1');
     const setup = await call('POST', '/api/auth/two-factor/setup', { challengeToken: token });
@@ -248,7 +251,7 @@ describe('N-426: 初回設定（setup合言葉 → 確認 → セッション）
     expect(cookieFor(confirm, 'lh_admin_session')).toBeTruthy();
   });
 
-  itWhenTwoFactorEnabled('コードが違うと400で試行回数が増え、5回で合言葉が消える', async () => {
+  it('コードが違うと400で試行回数が増え、5回で合言葉が消える', async () => {
     await seedOwnerWithPassword();
     const token = await setupTokenFor('s1');
     await call('POST', '/api/auth/two-factor/setup', { challengeToken: token });
@@ -263,7 +266,7 @@ describe('N-426: 初回設定（setup合言葉 → 確認 → セッション）
     expect(challengeRows()).toEqual([]);
   });
 
-  itWhenTwoFactorEnabled('期限切れ・でたらめな合言葉は401。verify用途の合言葉では設定を始められない', async () => {
+  it('期限切れ・でたらめな合言葉は401。verify用途の合言葉では設定を始められない', async () => {
     await seedOwnerWithPassword();
     await enableTotp('s1');
     const login = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' });
@@ -288,14 +291,14 @@ describe('N-426: 初回設定（setup合言葉 → 確認 → セッション）
     expect(challengeRows().filter((row) => row.staff_id === 's9')).toEqual([]);
   });
 
-  itWhenTwoFactorEnabled('setup用途の合言葉は verify では使えない（登録前に6桁を出しても401）', async () => {
+  it('setup用途の合言葉は verify では使えない（登録前に6桁を出しても401）', async () => {
     await seedOwnerWithPassword();
     const token = await setupTokenFor('s1');
     const res = await call('POST', '/api/auth/two-factor/verify', { challengeToken: token, code: '123456' });
     expect(res.status).toBe(401);
   });
 
-  itWhenTwoFactorEnabled('登録済みの人でも、用途を setup へ書き換えた合言葉は verify で通らない', async () => {
+  it('登録済みの人でも、用途を setup へ書き換えた合言葉は verify で通らない', async () => {
     await seedOwnerWithPassword();
     await enableTotp('s1');
     const login = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' });
@@ -307,7 +310,7 @@ describe('N-426: 初回設定（setup合言葉 → 確認 → セッション）
     expect(sessionRows()).toEqual([]);
   });
 
-  itWhenTwoFactorEnabled('すでにTOTP登録済みの人には409', async () => {
+  it('すでにTOTP登録済みの人には409', async () => {
     await seedOwnerWithPassword();
     const token = await setupTokenFor('s1');
     await enableTotp('s1');
@@ -315,7 +318,7 @@ describe('N-426: 初回設定（setup合言葉 → 確認 → セッション）
     expect(res.status).toBe(409);
   });
 
-  itWhenTwoFactorEnabled('別の権限者の合言葉では他人を設定できない（account境界）', async () => {
+  it('別の権限者の合言葉では他人を設定できない（account境界）', async () => {
     await seedOwnerWithPassword();
     seedStaff('s2', { role: 'admin' });
     const token = await setupTokenFor('s1');
@@ -330,10 +333,61 @@ describe('N-426: 初回設定（setup合言葉 → 確認 → セッション）
     // セッションは s1 のもの
     expect(sessionRows().map((row) => row.staff_id)).toEqual(['s1']);
   });
+
+  it('R509: 同じ合言葉で2回取っても同じQRを返し、保存は最初のまま', async () => {
+    await seedOwnerWithPassword();
+    const token = await setupTokenFor('s1');
+
+    const first = await call('POST', '/api/auth/two-factor/setup', { challengeToken: token });
+    expect(first.status).toBe(200);
+    const uri1 = (await first.json() as { data: { provisioningUri: string } }).data.provisioningUri;
+    const pending1 = (testDb.raw.prepare('SELECT totp_pending_secret_enc FROM staff_members WHERE id = ?').get('s1') as { totp_pending_secret_enc: string }).totp_pending_secret_enc;
+
+    const second = await call('POST', '/api/auth/two-factor/setup', { challengeToken: token });
+    expect(second.status).toBe(200);
+    const uri2 = (await second.json() as { data: { provisioningUri: string } }).data.provisioningUri;
+    // 2回目は新しい秘密を作らず、最初のQRをそのまま返す。
+    expect(uri2).toBe(uri1);
+    const pending2 = (testDb.raw.prepare('SELECT totp_pending_secret_enc FROM staff_members WHERE id = ?').get('s1') as { totp_pending_secret_enc: string }).totp_pending_secret_enc;
+    expect(pending2).toBe(pending1);
+
+    // 最終応答のQRから作るコードで登録できる。
+    const secret = new URL(uri2).searchParams.get('secret')!;
+    const confirm = await call('POST', '/api/auth/two-factor/setup/confirm', { challengeToken: token, code: await currentCode(secret) });
+    expect(confirm.status).toBe(200);
+  });
+
+  it('R509: 先に置かれた仮秘密があるとそれを返し、そのQRで登録できる', async () => {
+    await seedOwnerWithPassword();
+    const token = await setupTokenFor('s1');
+    // 同時要求のBが先に置いたことにする。
+    const secretB = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+    testDb.raw.prepare('UPDATE staff_members SET totp_pending_secret_enc = ? WHERE id = ?')
+      .run(await encryptTotpSecret(secretB, MASTER_KEY), 's1');
+
+    const res = await call('POST', '/api/auth/two-factor/setup', { challengeToken: token });
+    expect(res.status).toBe(200);
+    const uri = (await res.json() as { data: { provisioningUri: string } }).data.provisioningUri;
+    // 負けた側（後から来た要求）は置かれた側のQRを返す。保存と一致する。
+    expect(new URL(uri).searchParams.get('secret')).toBe(secretB);
+
+    const confirm = await call('POST', '/api/auth/two-factor/setup/confirm', { challengeToken: token, code: await currentCode(secretB) });
+    expect(confirm.status).toBe(200);
+  });
+
+  it('R509: 仮秘密の条件付き確保は空のときだけ置く', async () => {
+    const { claimTotpPendingSecret } = await import('@line-crm/db');
+    await seedOwnerWithPassword();
+    expect(await claimTotpPendingSecret(testDb.db, 's1', 'enc-a')).toBe(true);
+    expect(await claimTotpPendingSecret(testDb.db, 's1', 'enc-b')).toBe(false);
+    const row = testDb.raw.prepare('SELECT totp_pending_secret_enc FROM staff_members WHERE id = ?').get('s1') as { totp_pending_secret_enc: string };
+    expect(row.totp_pending_secret_enc).toBe('enc-a');
+  });
 });
 
 describe('N-434: セッション期限（既定8時間・明示選択で7日・cookieとサーバー一致）', () => {
-  it('未選択は8時間: cookie Max-Age=28800 と admin_sessions.expires_at が一致', async () => {
+  it('Off: 未選択は8時間: cookie Max-Age=28800 と admin_sessions.expires_at が一致', async () => {
+    setPolicyOff();
     const hash = await hashPassword('Abcdefg1');
     testDb.raw
       .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash) VALUES ('st1', '受付', 'staff@example.com', 'staff', 'key-st1', 1, ?)`)
@@ -347,7 +401,8 @@ describe('N-434: セッション期限（既定8時間・明示選択で7日・c
     expect(expiresAt - Date.now()).toBeLessThan(8.1 * 3600 * 1000);
   });
 
-  it('remember=true で7日: cookie Max-Age=604800 と DB が一致', async () => {
+  it('Off: remember=true で7日: cookie Max-Age=604800 と DB が一致', async () => {
+    setPolicyOff();
     const hash = await hashPassword('Abcdefg1');
     testDb.raw
       .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash) VALUES ('st1', '受付', 'staff@example.com', 'staff', 'key-st1', 1, ?)`)
@@ -359,7 +414,7 @@ describe('N-434: セッション期限（既定8時間・明示選択で7日・c
     expect(expiresAt - Date.now()).toBeGreaterThan(6.9 * 24 * 3600 * 1000);
   });
 
-  itWhenTwoFactorEnabled('TOTP確認経路でも記憶の選択が引き継がれる（合言葉→verify→7日）', async () => {
+  it('TOTP確認経路でも記憶の選択が引き継がれる（合言葉→verify→7日）', async () => {
     await seedOwnerWithPassword();
     await enableTotp('s1');
     const login = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1', remember: true });
@@ -372,7 +427,7 @@ describe('N-434: セッション期限（既定8時間・明示選択で7日・c
     expect(expiresAt - Date.now()).toBeGreaterThan(6.9 * 24 * 3600 * 1000);
   });
 
-  itWhenTwoFactorEnabled('初回設定経路でも記憶の選択が引き継がれる（setup→confirm→7日）', async () => {
+  it('初回設定経路でも記憶の選択が引き継がれる（setup→confirm→7日）', async () => {
     await seedOwnerWithPassword();
     const login = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1', remember: true });
     const token = (await login.json() as { data: { challengeToken: string } }).data.challengeToken;
@@ -386,7 +441,7 @@ describe('N-434: セッション期限（既定8時間・明示選択で7日・c
 });
 
 describe('N-426: 2要素認証確認の監査はbest-effort', () => {
-  itWhenTwoFactorEnabled('確認成功後の監査記録が例外でもセッションを発行する', async () => {
+  it('確認成功後の監査記録が例外でもセッションを発行する', async () => {
     await seedOwnerWithPassword();
     await enableTotp('s1');
     const login = await call('POST', '/api/auth/password/login', {
@@ -500,7 +555,7 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(sessionRows()).toEqual([]);
   });
 
-  itWhenTwoFactorEnabled('awaiting_totpの運営メンバーは設定画面へ進み、通常セッションを受け取らない', async () => {
+  it('awaiting_totpの運営メンバーは設定画面へ進み、通常セッションを受け取らない', async () => {
     seedStaff('awaiting', { role: 'staff' });
     seedPlatformAdmin('awaiting', 'awaiting_totp');
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-awaiting' WHERE id = 'awaiting'`).run();
@@ -514,6 +569,34 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(sessionRows()).toEqual([]);
   });
 
+  /*
+   * 招待の扱いはメール＋パスワードのログイン（auth-email.ts）とそろえる。
+   * 自分の招待が保留中なら、互換判定で入れる立場でも止めて登録を完了させる。
+   */
+  it('自分の招待が保留中なら、既定の統括のオーナーでもnext=opsで止める', async () => {
+    seedStaff('invited-owner', { role: 'owner' });
+    seedPlatformAdmin('invited-owner', 'invited');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-invited' WHERE id = 'invited-owner'`).run();
+    lineFetchMock('U-invited');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    expect(res.headers.get('Location')).toBe('https://admin.example.com/ops/login?error=not_authorized');
+    expect(sessionRows()).toEqual([]);
+  });
+
+  /*
+   * 他人の招待が保留中なだけで互換判定まで閉じると、運営マスターが0人のまま
+   * 誰も入れなくなる（画面から復旧できない）。
+   */
+  it('他人の招待が保留中でも、既定の統括のオーナーはnext=opsで進める', async () => {
+    seedStaff('compat-owner', { role: 'owner' });
+    seedStaff('someone-else', { role: 'staff' });
+    seedPlatformAdmin('someone-else', 'invited');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-compat' WHERE id = 'compat-owner'`).run();
+    lineFetchMock('U-compat');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    expect(res.headers.get('Location')).not.toBe('https://admin.example.com/ops/login?error=not_authorized');
+  });
+
   it('invite Cookie無しでは既存staffのLINE連携を変更しない', async () => {
     seedStaff('existing', { role: 'staff' });
     seedPlatformAdmin('existing');
@@ -524,7 +607,7 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(row.line_user_id).toBe('U-existing');
   });
 
-  itWhenTwoFactorEnabled('TOTP登録済み運営メンバーは確認画面へ進み、通常セッションを受け取らない', async () => {
+  it('TOTP登録済み運営メンバーは確認画面へ進み、通常セッションを受け取らない', async () => {
     seedStaff('verified-ops', { role: 'staff' });
     seedPlatformAdmin('verified-ops');
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-verified' WHERE id = 'verified-ops'`).run();
@@ -539,7 +622,7 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(sessionRows()).toEqual([]);
   });
 
-  itWhenTwoFactorEnabled('TOTP未登録の既存owner運営メンバーは設定画面へ進む', async () => {
+  it('TOTP未登録の既存owner運営メンバーは設定画面へ進む', async () => {
     seedStaff('owner-ops', { role: 'owner' });
     seedPlatformAdmin('owner-ops');
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-owner-ops' WHERE id = 'owner-ops'`).run();
@@ -551,7 +634,7 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(challengeRows()).toMatchObject([{ staff_id: 'owner-ops', purpose: 'setup' }]);
   });
 
-  itWhenTwoFactorEnabled('role=staffの運営メンバーにもTOTP設定を必須にする', async () => {
+  it('role=staffの運営メンバーにもTOTP設定を必須にする', async () => {
     seedStaff('staff-ops', { role: 'staff' });
     seedPlatformAdmin('staff-ops');
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-staff-ops' WHERE id = 'staff-ops'`).run();
@@ -562,7 +645,7 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(sessionRows()).toEqual([]);
   });
 
-  itWhenTwoFactorEnabled('LINE OAuthのrememberをchallengeと7日セッションへ引き継ぐ', async () => {
+  it('LINE OAuthのrememberをchallengeと7日セッションへ引き継ぐ', async () => {
     seedStaff('remember-ops', { role: 'staff' });
     seedPlatformAdmin('remember-ops');
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-remember' WHERE id = 'remember-ops'`).run();
@@ -580,7 +663,7 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(cookieFor(verify, 'lh_admin_session') ?? '').toContain('Max-Age=604800');
   });
 
-  itWhenTwoFactorEnabled('統括側のLINEログインはnext無しの確認画面へ進む', async () => {
+  it('統括側のLINEログインはnext無しの確認画面へ進む', async () => {
     seedStaff('hq-owner', { role: 'owner' });
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-hq-owner' WHERE id = 'hq-owner'`).run();
     await enableTotp('hq-owner');
@@ -591,7 +674,7 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(location.search).toBe('');
   });
 
-  itWhenTwoFactorEnabled('停止中契約先のLINEログインは2要素認証後に停止中セッションを発行する', async () => {
+  it('停止中契約先のLINEログインは2要素認証後に停止中セッションを発行する', async () => {
     testDb.raw.prepare(
       `INSERT INTO tenants (id, name, status) VALUES ('tenant-stopped', '停止中契約先', 'suspended')`,
     ).run();
@@ -620,7 +703,8 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(await session.json()).toMatchObject({ success: true, data: { tenantStatus: 'suspended' } });
   });
 
-  it('セッションDBが古い場合はLINE callbackを安全に失敗させ、Cookieを出さない', async () => {
+  it('Off: セッションDBが古い場合はLINE callbackを安全に失敗させ、Cookieを出さない', async () => {
+    setPolicyOff();
     seedStaff('legacy-schema', { role: 'staff' });
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-legacy-schema' WHERE id = 'legacy-schema'`).run();
     // V の列（494・495）が載る前の古い形を再現する。列を参照する索引から先に落とす。
@@ -635,7 +719,7 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(cookieFor(res, 'lh_admin_session')).toBeUndefined();
   });
 
-  itWhenTwoFactorEnabled('2要素認証後のセッション作成が失敗してもCookieを出さない', async () => {
+  it('2要素認証後のセッション作成が失敗してもCookieを出さない', async () => {
     seedStaff('session-failure', { role: 'staff' });
     seedPlatformAdmin('session-failure');
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-session-failure' WHERE id = 'session-failure'`).run();
@@ -657,7 +741,8 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(cookieFor(verify, 'lh_admin_session')).toBeUndefined();
   });
 
-  it('監査記録が例外でもLINE callbackの正常ログインを成立させる', async () => {
+  it('Off: 監査記録が例外でもLINE callbackの正常ログインを成立させる', async () => {
+    setPolicyOff();
     const db = await import('@line-crm/db');
     vi.spyOn(db, 'recordLoginAudit').mockRejectedValueOnce(new Error('audit unavailable'));
     seedStaff('audit-failure', { role: 'staff' });
@@ -669,7 +754,7 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(cookieFor(res, 'lh_admin_session')).toBeTruthy();
   });
 
-  itWhenTwoFactorEnabled('TOTP未登録の管理者は設定画面へ回され、セッションは発行されない', async () => {
+  it('TOTP未登録の管理者は設定画面へ回され、セッションは発行されない', async () => {
     seedStaff('s1', { role: 'admin' });
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-admin' WHERE id = 's1'`).run();
     const spy = lineFetchMock('U-admin');
@@ -685,7 +770,8 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     spy.mockRestore();
   });
 
-  it('必須対象でない staff はそのままセッションが出る', async () => {
+  it('Off: 必須対象でない staff はそのままセッションが出る', async () => {
+    setPolicyOff();
     seedStaff('s3', { role: 'staff' });
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-staff' WHERE id = 's3'`).run();
     const spy = lineFetchMock('U-staff');
@@ -699,7 +785,7 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     spy.mockRestore();
   });
 
-  itWhenTwoFactorEnabled('?remember=1 の印がcallbackの合言葉へ引き継がれる', async () => {
+  it('?remember=1 の印がcallbackの合言葉へ引き継がれる', async () => {
     seedStaff('s1', { role: 'admin' });
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-admin' WHERE id = 's1'`).run();
     // /api/auth/line?remember=1 が lh_line_remember cookie を立てる
@@ -716,7 +802,7 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
 });
 
 describe('運営コンソールのパスワードログインも役割に関係なくTOTP必須', () => {
-  itWhenTwoFactorEnabled('role=staffの運営メンバーを設定用challengeへ回し、通常セッションを発行しない', async () => {
+  it('role=staffの運営メンバーを設定用challengeへ回し、通常セッションを発行しない', async () => {
     const hash = await hashPassword('Abcdefg1');
     testDb.raw.prepare(
       `INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash)
@@ -740,7 +826,8 @@ describe('運営コンソールのパスワードログインも役割に関係�
     expect(sessionRows()).toEqual([]);
   });
 
-  it('監査記録が例外でも通常のパスワードログインを成立させる', async () => {
+  it('Off: 監査記録が例外でも通常のパスワードログインを成立させる', async () => {
+    setPolicyOff();
     const db = await import('@line-crm/db');
     vi.spyOn(db, 'recordLoginAudit').mockRejectedValueOnce(new Error('audit unavailable'));
     const hash = await hashPassword('Abcdefg1');
@@ -759,7 +846,7 @@ describe('運営コンソールのパスワードログインも役割に関係�
 });
 
 describe('N-426: 復旧導線（認証アプリを失くしても詰まない）', () => {
-  itWhenTwoFactorEnabled('パスワード再設定は登録済みTOTPも外し、次のログインは再設定へ進む', async () => {
+  it('パスワード再設定は登録済みTOTPを保持し、次のログインでも確認が必要', async () => {
     await seedOwnerWithPassword();
     await enableTotp('s1');
     // reset token を直接作る（メール送信経路は auth-email.test.ts が担保）
@@ -768,16 +855,16 @@ describe('N-426: 復旧導線（認証アプリを失くしても詰まない）
       `INSERT INTO auth_email_tokens (id, purpose, token_hash, email, staff_id, expires_at) VALUES ('t1', 'password_reset', ?, 'owner@example.com', 's1', '2999-01-01T00:00:00.000+09:00')`,
     ).bind(await sha256Hex(token)).run();
 
-    const res = await call('POST', '/api/auth/password/reset', { token, password: 'Newpass99' });
+    const res = await call('POST', '/api/auth/password/reset', { token, password: 'Newpass99Secure!' });
     expect(res.status).toBe(200);
     const staff = testDb.raw.prepare('SELECT totp_secret_enc, totp_enabled_at FROM staff_members WHERE id = ?').get('s1') as Record<string, unknown>;
-    expect(staff.totp_secret_enc).toBeNull();
-    expect(staff.totp_enabled_at).toBeNull();
+    expect(staff.totp_secret_enc).toBeTruthy();
+    expect(staff.totp_enabled_at).toBeTruthy();
     // 復旧でTOTPを外した記録が高危険監査へ残る
     const audit = testDb.raw.prepare(`SELECT COUNT(*) AS n FROM audit_events WHERE action = 'auth.totp_reset' AND actor_principal_id = 's1' AND risk_level = 'high'`).get() as { n: number };
-    expect(audit.n).toBe(1);
-    // 次のログインは設定用の合言葉へ
-    const login = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Newpass99' });
-    expect((await login.json() as { data: { twoFactorSetup?: boolean } }).data.twoFactorSetup).toBe(true);
+    expect(audit.n).toBe(0);
+    // 次のログインも確認用の合言葉へ
+    const login = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Newpass99Secure!' });
+    expect((await login.json() as { data: { twoFactor?: boolean } }).data.twoFactor).toBe(true);
   });
 });

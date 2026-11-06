@@ -1,5 +1,5 @@
 /*
- * N-101(#622): 友だち追加の webhook を「独立した2つのD1接続」で取り合わせる。
+ * 友だち追加の webhook を「独立した2つのD1接続」で取り合わせる。
  *
  * 1つの接続で await を挟むだけの並行では、SQL が競合を捌けているかまでは
  * 分からない。ここでは同じDBファイルへ**別々の接続**を開き、2つの実行主体が
@@ -12,7 +12,7 @@ import Database from 'better-sqlite3';
 import { copyFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { publishScenarioVersion } from '@line-crm/db';
 
@@ -28,7 +28,7 @@ vi.mock('@line-crm/line-sdk', async () => {
   return {
     ...actual,
     verifySignature: vi.fn(),
-    LineClient: vi.fn().mockImplementation(() => lineClientMocks),
+    LineClient: vi.fn().mockImplementation(function () { return lineClientMocks; }),
   };
 });
 
@@ -94,7 +94,7 @@ function seedBase(raw: Database.Database): void {
   });
 }
 
-async function postFollow(webhookEventId: string, useDb: D1Database): Promise<void> {
+async function postFollow(webhookEventId: string, useDb: D1Database,timestamp=Date.now()): Promise<void> {
   const app = new Hono();
   app.route('/', webhook);
   const waitUntil = vi.fn();
@@ -102,8 +102,9 @@ async function postFollow(webhookEventId: string, useDb: D1Database): Promise<vo
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
     body: JSON.stringify({
+      destination: 'bot',
       events: [{
-        type: 'follow', webhookEventId, timestamp: Date.now(),
+        type: 'follow', webhookEventId, timestamp,
         source: { type: 'user', userId: 'U-1' }, replyToken: `reply-${webhookEventId}`,
         follow: { isUnblocked: false },
       }],
@@ -128,7 +129,7 @@ beforeAll(async () => {
   templateFile = join(templateDir, 'template.sqlite');
   const setup = createTestD1({ file: templateFile });
   seedBase(setup.raw);
-  // 参加には明示公開が要る（351 / #644）。写し元の時点で稼働中にしておく。
+  // 参加には明示公開が要る。写し元の時点で稼働中にしておく。
   await publishScenarioVersion(setup.db, 'scenario-1', {
     staffId: null,
     idempotencyKey: 'two-connections-seed',
@@ -195,9 +196,10 @@ describe('POST /webhook — 独立2接続の並行follow (#622)', () => {
     lineClientMocks.replyMessage.mockImplementation(
       async () => { await new Promise((resolve) => setTimeout(resolve, 50)); },
     );
+    const occurredAt=Date.now();
     await Promise.all([
-      postFollow('webhook-a', connA.db),
-      postFollow('webhook-b', connB.db),
+      postFollow('webhook-a', connA.db,occurredAt),
+      postFollow('webhook-b', connB.db,occurredAt),
     ]);
 
     expect(sendCount()).toBe(1);

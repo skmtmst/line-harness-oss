@@ -53,6 +53,26 @@ afterEach(() => {
 });
 
 describe('広告送信のクリック選択snapshot', () => {
+  it('対応表の名前・Googleの成果IDを実送信へ渡し、再送は初回の対応を保つ', async () => {
+    const { trackConversion, saveAdEventMapping } = await import('@line-crm/db');
+    const testDb = setup(); const now = new Date().toISOString();
+    testDb.raw.prepare("UPDATE ad_platforms SET verified_at = ? WHERE id='p1'").run(now);
+    testDb.raw.prepare(`INSERT INTO ad_platforms(id,name,config,is_active,line_account_id,verified_at) VALUES('g1','google',?,1,'a1',?)`)
+      .run(JSON.stringify({customer_id:'123',conversion_action_id:'111',oauth_token:'token',developer_token:'dev',click_id_validity_days:30}),now);
+    testDb.raw.exec(`INSERT INTO conversion_points(id,name,event_type,line_account_id,status,value_mode,value,deduplication_mode) VALUES('goal','Goal','purchase','a1','active','fixed',1000,'every')`);
+    testDb.raw.prepare(`INSERT INTO ref_tracking(id,ref_code,friend_id,line_account_id,fbclid,gclid,created_at,ad_conversion_consent_at) VALUES('mapped-click','ad','f1','a1','fb','gc',?,?)`).run(now,now);
+    await saveAdEventMapping(testDb.db,'goal',{account_id:'a1',provider:'meta',mode:'manual',eventName:'CustomPurchase',expectedVersion:0});
+    await saveAdEventMapping(testDb.db,'goal',{account_id:'a1',provider:'google',mode:'manual',eventName:'purchase_first',googleActionId:'222',expectedVersion:0});
+    await trackConversion(testDb.db,{conversionPointId:'goal',friendId:'f1',idempotencyKey:'mapped-order'});
+    await saveAdEventMapping(testDb.db,'goal',{account_id:'a1',provider:'google',mode:'manual',eventName:'changed',googleActionId:'333',expectedVersion:1});
+    stubFetch();expect(await drainAdConversionOutbox(testDb.db)).toMatchObject({sent:2});
+    expect(requests.map(r=>r.body)).toEqual(expect.arrayContaining([
+      expect.objectContaining({data:expect.arrayContaining([expect.objectContaining({event_name:'CustomPurchase'})])}),
+      expect.objectContaining({conversions:expect.arrayContaining([expect.objectContaining({conversion_action:'customers/123/conversionActions/222',conversion_value:1000})])}),
+    ]));
+    expect(await drainAdConversionOutbox(testDb.db)).toMatchObject({sent:0});expect(requests).toHaveLength(2);
+  });
+
   it.each([
     ['同意なし', { clickId: 'fb-no-consent', createdAt: '2026-09-15T00:00:00.000Z', consentAt: null }, 'missing_consent'],
     ['期限切れ', { clickId: 'fb-expired', createdAt: '2026-08-16T23:59:59.999Z' }, 'expired'],

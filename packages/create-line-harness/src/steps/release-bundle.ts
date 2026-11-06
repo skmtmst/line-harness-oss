@@ -12,6 +12,8 @@ import {
   type ReleaseEntry,
 } from "@line-harness/update-engine";
 
+
+
 export interface FetchedRelease {
   manifest: Manifest;
   release: ReleaseEntry;
@@ -22,7 +24,7 @@ export interface FetchedRelease {
  * Fetch the release manifest and download + verify an official bundle.
  *
  * Setup deploys the Worker from this bundle (instead of building from
- * source) so the shipped `_version.ts` stamp — version + component hashes —
+ * source) so the shipped `release-version.ts` stamp — version + component hashes —
  * matches a manifest entry and `update`'s fork detection recognizes the
  * install as vanilla. A source build would report 0.0.0-dev and lock the
  * install out of automatic updates permanently.

@@ -27,6 +27,7 @@ const PER_RECIPIENT = [
  * 誰に送っても同じ値になる。
  */
 const BROADCAST_WIDE = [
+  /^account\.name$/,
   /^liff_id$/,
   /^var\.[a-z][a-z0-9_]*$/,
   /^date([+-]\d+)?(:[a-z_]+)?$/,
@@ -38,7 +39,7 @@ export const INTERPOLATION_RE = /\{\{\s*([^{}]+?)\s*\}\}/g;
 
 /** 本文に書かれている差し込みの名前を、重複なく集める。 */
 export function listInterpolations(content: string): string[] {
-  return [...new Set([...content.matchAll(INTERPOLATION_RE)].map((m) => m[1].trim()))];
+  return [...new Set([...normalizeStoreInterpolations(content).matchAll(INTERPOLATION_RE)].map((m) => m[1].trim()))];
 }
 
 /** 相手ごとに変わるか。 */
@@ -69,4 +70,10 @@ export function findUnsupportedInterpolations(content: string): string[] {
 /** 1人ずつ送る必要があるか。 */
 export function needsPerRecipientDelivery(content: string): boolean {
   return listInterpolations(content).some(isPerRecipientInterpolation);
+}
+
+/** 店舗の共通情報の正規キー。値がない場合は送信前確認で止める。 */
+export const STORE_INTERPOLATION_KEYS = ['store_phone','reservation_url'] as const;
+export function normalizeStoreInterpolations(content:string):string {
+ return content.replace(/\{\{\s*(店の電話番号|予約ページ)\s*\}\}|\{(店の電話番号|予約ページ)\}/g,(_m,a:string,b:string)=>`{{var.${(a??b)==='店の電話番号'?'store_phone':'reservation_url'}}}`);
 }

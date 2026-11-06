@@ -1,3 +1,4 @@
+import { parseHqMessageCard } from '@line-crm/shared'
 import type { TemplateInput, TemplateType } from './hq-templates-api'
 import { normalizeLayout } from '@line-crm/shared'
 
@@ -25,14 +26,22 @@ export function sameCreationScope(a: CreationScope, b: CreationScope): boolean {
   return a.tenantId === b.tenantId && a.actorId === b.actorId
 }
 export function creationStorageKey(scope: CreationScope, type: TemplateType): string {
-  if (!identifier(scope.tenantId) || !identifier(scope.actorId) || !['tag', 'template', 'rich_menu', 'form'].includes(type)) throw storageError()
+  if (!identifier(scope.tenantId) || !identifier(scope.actorId) || !['tag', 'template', 'rich_menu', 'form', 'scenario'].includes(type)) throw storageError()
   return `lh_hq_create_v1:${scope.tenantId}:${scope.actorId}:${type}`
 }
 function validAttempt(value: unknown): value is CreationAttempt {
   if (!object(value, ['requestId', 'input', 'distribute']) || !identifier(value.requestId) || typeof value.distribute !== 'boolean') return false
   const input = value.input
-  if (!object(input, ['type', 'name', 'description', 'definition']) || !['tag', 'template', 'rich_menu', 'form'].includes(String(input.type)) || !text(input.name, 200) || !input.name.trim() || !optionalText(input.description, 2000)) return false
+  if (!object(input, ['type', 'name', 'description', 'definition', 'folderId']) || !['tag', 'template', 'rich_menu', 'form', 'scenario'].includes(String(input.type)) || !text(input.name, 200) || !input.name.trim() || !optionalText(input.description, 2000)) return false
+  if (!(input.folderId === undefined || input.folderId === null || identifier(input.folderId))) return false
   const definition = input.definition
+  if (definition && typeof definition === 'object' && 'card' in definition && definition.card !== undefined) {
+    try { parseHqMessageCard(definition.card) } catch { return false }
+  }
+  if (input.type === 'scenario') {
+    if (!object(definition,['schemaVersion','scenario','steps']) || definition.schemaVersion!==1 || !object(definition.scenario,['name','description']) || !text(definition.scenario.name,200) || !definition.scenario.name.trim() || !(definition.scenario.description===null || optionalText(definition.scenario.description,2000)) || !Array.isArray(definition.steps) || !definition.steps.length || definition.steps.length>100) return false
+    return definition.steps.every(step=>object(step,['id','delayMinutes','messageType','messageContent']) && identifier(step.id) && integerBetween(step.delayMinutes,0,525600) && ['text','flex'].includes(String(step.messageType)) && text(step.messageContent,step.messageType==='text'?5000:32000) && !!step.messageContent.trim())
+  }
   if (input.type === 'tag') {
     if (!object(definition, ['schemaVersion', 'tag', 'folders']) || definition.schemaVersion !== 1 || !Array.isArray(definition.folders) || definition.folders.length > 8) return false
     const tag = definition.tag
@@ -47,7 +56,10 @@ function validAttempt(value: unknown): value is CreationAttempt {
       && (folder.parentId === null || folder.parentId === undefined || identifier(folder.parentId)) && (folder.color === null || folder.color === undefined || /^#[0-9a-f]{6}$/i.test(String(folder.color))))
   }
   if (input.type === 'template') {
-    if (!object(definition, ['schemaVersion', 'template', 'media']) || definition.schemaVersion !== 1 || !Array.isArray(definition.media) || definition.media.length > 50) return false
+    if (!object(definition, ['schemaVersion', 'template', 'media', 'card', 'asset']) || definition.schemaVersion !== 1 || !Array.isArray(definition.media) || definition.media.length > 50) return false
+    /* API-17：店と同じ6種類の素材（クーポン・リサーチ・リッチメッセージ・カード）。中身の検査はサーバーが行う。 */
+    if (definition.asset !== undefined && (!object(definition.asset, ['kind', 'payload']) || !['card_message', 'rich_message', 'coupon', 'research'].includes(String(definition.asset.kind))
+      || !definition.asset.payload || typeof definition.asset.payload !== 'object' || Array.isArray(definition.asset.payload))) return false
     const template = definition.template
     if (!object(template, ['id', 'name', 'category', 'messageType', 'messageContent', 'carouselActionsJson', 'carouselTapLimitMode', 'carouselTapLimitText', 'questionJson', 'questionStatus'])
       || !identifier(template.id) || !text(template.name, 255) || !text(template.category, 100) || !['text', 'image', 'flex', 'carousel'].includes(String(template.messageType))
@@ -104,4 +116,87 @@ export function clearCreationAttempt(storage: StoragePort, scope: CreationScope,
     storage.removeItem(key)
     if (storage.getItem(key) !== null) throw storageError()
   } catch { throw storageError() }
+}
+/*
+ * H-18原文（再読込で入力が消える）の子画面の通常入力の一時下書き。結果不明の送信依頼（attempt）とは
+ * 別キーで、所属・種別・タブ（kind）を区別する。保存・取消・作り直しで消す。壊れても本機能を止めない。
+ */
+export interface EditorDraftContent { kind: string; name: string; [key: string]: unknown }
+const DRAFT_LIMIT = 262_144
+const draftKind = (kind: string): boolean => /^[A-Za-z0-9_-]{1,64}$/.test(kind)
+export function editorDraftStorageKey(scope: CreationScope, type: TemplateType, kind: string): string {
+  if (!identifier(scope.tenantId) || !identifier(scope.actorId) || !draftKind(kind)) throw storageError()
+  return `lh_hq_create_draft_v1:${scope.tenantId}:${scope.actorId}:${type}:${kind}`
+}
+const recordObject = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
+function validDraftExtrasTree(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(validDraftExtrasTree)
+  if (!recordObject(value)) return true
+  return Object.entries(value).every(([key, child]) => {
+    if (key === 'choiceTapExtras') return child === undefined || Array.isArray(child) && child.every(extra => validDraftExtrasTree({ tapExtras: extra }))
+    if (key !== 'tapExtras') return validDraftExtrasTree(child)
+    return child == null || recordObject(child)
+      && (child.tagIds === undefined || Array.isArray(child.tagIds) && child.tagIds.every(id => typeof id === 'string'))
+      && (child.scoreChange == null || typeof child.scoreChange === 'number')
+  })
+}
+function validEditorState(kind: string, value: unknown): boolean {
+  if (!recordObject(value) || !validDraftExtrasTree(value)) return false
+  if (!(value.pickedMedia === null || recordObject(value.pickedMedia) && typeof value.pickedMedia.id === 'string' && typeof value.pickedMedia.kind === 'string')) return false
+  if (kind === 'coupon' || kind === 'research') {
+    const strings = ['description', 'couponTitle', 'imageUrl', 'couponOnce', 'couponVisibility', 'lotteryRate', 'winnerLimit', 'couponStartsAt', 'couponEndsAt', 'researchStartsAt', 'researchEndsAt', 'targetTagId']
+    if (!strings.every(key => typeof value[key] === 'string') || !['once', 'unlimited', 'limited'].includes(String(value.couponOnce)) || !['friends', 'link'].includes(String(value.couponVisibility))
+      || typeof value.countTouched !== 'boolean' || typeof value.lottery !== 'boolean' || !recordObject(value.couponDraft) || !Array.isArray(value.couponUseActions) || !Array.isArray(value.answerActions) || !Array.isArray(value.questions)) return false
+    if (![...value.couponUseActions, ...value.answerActions].every(action => recordObject(action) && typeof action.key === 'string' && typeof action.actionType === 'string' && ['stop', 'continue'].includes(String(action.onFailure)))) return false
+    const coupon = value.couponDraft
+    if (!['amount', 'percent', 'before', 'after', 'conditions', 'code', 'instructions'].every(key => typeof coupon[key] === 'string') || typeof coupon.showCode !== 'boolean'
+      || !['discount', 'none'].includes(String(coupon.couponType)) || !['amount', 'percent', 'price', 'none'].includes(String(coupon.mode))) return false
+    return value.questions.every(q => recordObject(q) && typeof q.key === 'string' && typeof q.text === 'string' && ['single', 'multiple', 'free'].includes(String(q.format)) && typeof q.required === 'boolean' && Array.isArray(q.choices) && q.choices.every(choice => typeof choice === 'string'))
+  }
+  if (kind === 'rich_message') {
+    if (typeof value.imageUrl !== 'string' || typeof value.shapeValue !== 'string' || !recordObject(value.areas)) return false
+    if (!(value.uploaded === null || recordObject(value.uploaded) && recordObject(value.uploaded.payload) && Array.isArray(value.uploaded.media))) return false
+    return Object.values(value.areas).every(area => recordObject(area) && typeof area.kind === 'string' && typeof area.uri === 'string' && typeof area.text === 'string' && typeof area.refId === 'string')
+  }
+  return false
+}
+function validEditorDraft(value: unknown): value is EditorDraftContent {
+  if (!recordObject(value) || typeof value.kind !== 'string' || !draftKind(value.kind) || !text(value.name, 200)) return false
+  if (!(value.folderId === undefined || value.folderId === null || identifier(value.folderId))) return false
+  return value.editorState === undefined || validEditorState(value.kind, value.editorState)
+}
+export function loadEditorDraft(storage: StoragePort, scope: CreationScope, type: TemplateType, kind: string, onFailure?: () => void): EditorDraftContent | null {
+  let key: string
+  try { key = editorDraftStorageKey(scope, type, kind) } catch { return null }
+  try {
+    const raw = storage.getItem(key)
+    if (raw === null) return null
+    if (raw.length > DRAFT_LIMIT) throw new Error('draft size')
+    const record: unknown = JSON.parse(raw)
+    if (!object(record, ['version', 'tenantId', 'actorId', 'type', 'kind', 'draft']) || record.version !== 1 || record.tenantId !== scope.tenantId || record.actorId !== scope.actorId || record.type !== type || record.kind !== kind || !validEditorDraft(record.draft) || record.draft.kind !== kind) throw new Error('draft')
+    return record.draft
+  } catch { try { storage.removeItem(key) } catch { /* 呼ぶ側で再読込前の保存を案内する。 */ } onFailure?.(); return null }
+}
+export function persistEditorDraft(storage: StoragePort, scope: CreationScope, type: TemplateType, kind: string, draft: EditorDraftContent): boolean {
+  let key: string
+  try { key = editorDraftStorageKey(scope, type, kind) } catch { return false }
+  try {
+    if (!validEditorDraft(draft) || draft.kind !== kind) throw new Error('draft')
+    const raw = JSON.stringify({ version: 1, ...scope, type, kind, draft })
+    if (raw.length > DRAFT_LIMIT) throw new Error('draft size')
+    storage.setItem(key, raw)
+    if (storage.getItem(key) !== raw) throw new Error('draft write')
+    return true
+  } catch {
+    // 最新入力を記録できなければ、古い内容を最新として復元しない。
+    try { storage.removeItem(key) } catch {
+      try { storage.setItem(key, 'null') } catch { /* 呼ぶ側に失敗を知らせ、再読込前の保存を案内する。 */ }
+    }
+    return false
+  }
+}
+export function clearEditorDraft(storage: StoragePort, scope: CreationScope, type: TemplateType, kind: string): void {
+  let key: string
+  try { key = editorDraftStorageKey(scope, type, kind) } catch { return }
+  try { storage.removeItem(key) } catch { /* 下書きの掃除失敗は無視する */ }
 }

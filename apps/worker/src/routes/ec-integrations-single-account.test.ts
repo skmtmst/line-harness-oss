@@ -1,11 +1,6 @@
 /*
- * EC-CUBE → LINE のイベント受け口で `X-Line-Account-Id` が無いとき。
- *
- * EC-CUBE 側（LineCommerceEventService::deliverPending）はこのヘッダーを送らず、
- * 署名も `timestamp.body` で作る。動いている LINE アカウントが 1 つだけの構成では
- * 旧形式の署名を確かめたうえで、本文の line_user_id が友だちとして 1 つのアカウントに見つかればそのアカウント宛て、
- * 見つからなければ動いているアカウントが 1 つだけのときだけそのアカウント宛て。決められなければ 400。
- * 検証環境で「標準の EC→LINE 自動送信が 400 になる」問題（2026-09-16）を塞ぐ。
+ * EC-CUBE は X-Line-Account-Id なしで timestamp.body の署名を送るため、その形式を検証して送信先を解決する。
+ * 本文の line_user_id に対応するアカウントが一意なら採用し、なければ稼働アカウントが1つの場合だけ採用する。決められなければ400で拒む。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';

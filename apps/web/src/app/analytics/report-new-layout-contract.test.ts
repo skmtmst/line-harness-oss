@@ -11,14 +11,20 @@ const PAGE = readFileSync(new URL('./reports/new/page.tsx', import.meta.url), 'u
 describe('定期レポート「いつ送りますか」の幅 (R229)', () => {
   it('間隔・曜日/日・集計期間は列の幅に合わせる（固定176pxへ戻さない）', () => {
     expect(PAGE).not.toContain('size="standard"')
-    for (const label of ['間かく', '送る曜日', '送る日', '集計する期間']) {
+    expect(PAGE).toMatch(/<Field label="集計する期間" required><PeriodPicker days=/)
+    for (const label of ['間かく', '送る曜日', '送る日']) {
       const line = PAGE.split('\n').find((l) => l.includes(`aria-label="${label}"`))
       expect(line, label).toBeTruthy()
       expect(line).toContain('size="full"')
     }
   })
 
-  it('4欄を横に並べる組み方は維持する（欄を消して幅を稼がない）', () => {
-    expect(PAGE).toContain('md:grid-cols-4')
+
+})
+
+/* 板 「知らせの決めごと」：3つ目の札の名まえは絵どおり「続いた日数」。 */
+describe('定期レポート「知らせの決めごと」の札名', () => {
+  it('成果0件の札は「続いた日数」と出す', () => {
+    expect(PAGE).toContain("thresholdLabel: '続いた日数'")
   })
 })

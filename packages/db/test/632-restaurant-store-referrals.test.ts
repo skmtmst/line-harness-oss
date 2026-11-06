@@ -1,0 +1,23 @@
+import { readFileSync } from 'node:fs';
+import Database from 'better-sqlite3';
+import { afterEach, expect, it } from 'vitest';
+import { purgeTablesChildFirst, tenantScopeCondition } from '../src/data-retention-tables.js';
+let db: Database.Database;
+afterEach(() => db?.close());
+it('組織外の参加を拒否し、店舗削除・保存期限の削除で案内情報を取り残さない', () => {
+  db=new Database(':memory:');db.exec(readFileSync(new URL('../bootstrap.sql',import.meta.url),'utf8'));db.pragma('foreign_keys=ON');
+  db.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_secret,channel_access_token) VALUES('a','a','店','s','t'),('a2','a2','外店','s','t');
+    INSERT INTO rt_organizations(id,account_id,name) VALUES('o','a','系列'),('x','a2','別組織');
+    INSERT INTO rt_stores(id,organization_id,name,code) VALUES('s','o','元店','s'),('t','o','先店','t'),('x','x','外店','x');
+    INSERT INTO rt_store_groups(id,organization_id,name) VALUES('g','o','組');
+    INSERT INTO rt_store_group_members(group_id,store_id) VALUES('g','s'),('g','t');`);
+  expect(()=>db.exec("UPDATE rt_store_group_members SET store_id='x' WHERE store_id='t'")).toThrow('referral_organization_conflict');
+  expect(db.prepare('SELECT referral_enabled FROM rt_store_group_members WHERE store_id=?').get('t')).toEqual({referral_enabled:0});
+  db.exec("INSERT INTO rt_reservation_referrals(id,source_store_id,target_store_id) VALUES('r','s','t'); DELETE FROM rt_store_followup_step_bindings WHERE store_id='t'; DELETE FROM rt_store_followup_templates WHERE store_id='t'; DELETE FROM rt_floors WHERE store_id='t'; DELETE FROM rt_stores WHERE id='t'");
+  expect(db.prepare('SELECT COUNT(*) n FROM rt_reservation_referrals').get()).toEqual({n:0});
+  expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+  const order=purgeTablesChildFirst();
+  expect(order.indexOf('rt_store_group_members')).toBeLessThan(order.indexOf('rt_store_groups'));
+  expect(order.indexOf('rt_reservation_referrals')).toBeLessThan(order.indexOf('rt_stores'));
+  expect(tenantScopeCondition('rt_store_group_members')).toContain('organization_id');
+});

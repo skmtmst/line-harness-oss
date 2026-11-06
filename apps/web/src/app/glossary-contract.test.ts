@@ -3,6 +3,8 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { terms, termsAvoid } from '@/lib/terms'
+
 const SRC = path.join(__dirname, '..')
 
 /** 画面のコードを、`.test.` を除いて集める。 */
@@ -32,7 +34,7 @@ function visible(src: string): string {
 
 const FILES = sources(SRC).map((p) => ({ p: path.relative(SRC, p), s: visible(fs.readFileSync(p, 'utf8')) }))
 
-/** `docs/v6-requirements/v6-00-glossary.md` の1〜2節。使うほうを左に書く。 */
+/** `docs/管理画面-requirements/管理画面-00-glossary.md` の1〜2節。使うほうを左に書く。 */
 const BANNED: Array<{ use: string; avoid: RegExp; why: string }> = [
   { use: 'すべて', avoid: /全て/, why: '要件書が93対5で「すべて」' },
   { use: '対応済み', avoid: /対応済(?!み)/, why: '未対応・対応中・保留と語尾をそろえる' },
@@ -42,7 +44,7 @@ const BANNED: Array<{ use: string; avoid: RegExp; why: string }> = [
   { use: 'アカウント', avoid: /アカ(?![ウ])/, why: '省略語を開く' },
 ]
 
-describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
+describe("用語表（管理画面 §7 48番の表記ゆれ潰し）", () => {
   for (const { use, avoid, why } of BANNED) {
     it(`画面には「${use}」を出す（${why}）`, () => {
       const hits = FILES.filter((f) => avoid.test(f.s)).map((f) => f.p)
@@ -53,9 +55,9 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
   /**
    * **固定の4状態と、自由分類のマークは別物。**
    *
-   * 要件書 `v6-02-inbox-requirements-draft.md:77`
-   *   「V6画面の『対応マーク』は、実装時に『対応状況』へ変更する。
-   *     友だち属性の対応マークは右パネル内の別項目として表示する。」
+   * 要件書 `管理画面-02-inbox-requirements-draft.md:77`
+   *   「管理画面画面の『対応マーク』は、実装時に『対応状況』へ変更する。
+   *     タグの対応マークは右パネル内の別項目として表示する。」
    *
    * 見分け方は API の形。`chatStatus` / `status` が
    * unread・in_progress・on_hold・resolved を取るものは**対応状況**。
@@ -71,7 +73,7 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
       'components/friends/single-friend-actions.tsx',
       'components/friends/advanced-search-dialog.tsx',
       'components/dashboard/side-cards.tsx',
-      'components/dashboard/dashboard-editor.tsx',
+      'v8/dashboard/dashboard-editor.tsx',
     ]
     for (const rel of FIXED_STATE) {
       const f = FILES.find((x) => x.p === rel)
@@ -90,16 +92,56 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
    * **期間の言い方を1つにする。**
    *
    * 同じ30日を「直近30日」「過去30日」「この30日」の3通りで書いていた。
-   * `/analytics` は1つの画面の中で「直近30日」と「この30日」が混ざっていた。
-   * 設計は60回が「この30日」なので、そちらへ寄せる。
+   * 2026-10-09 オーナー決定（ の 5・ の ⑦）で「過去30日」に1つ
+   * （用語表 `docs/管理画面-requirements/管理画面-00-glossary.md` §3-3）。前の「この30日に寄せる」と
+   * Webhook・マイルの「直近30日」（WEB-025・WEB-073）はこの決定で置き換え。
    *
-   * **28日は別の話。** `/conversions` とダッシュボードは本当に28日で
-   * 数えている（`conversions/page.tsx:44`）。言い方をそろえる前に、
-   * どの窓が正しいかを決める必要があるので、ここでは見張らない。
+   * 2026-10-09 時点で古い言い方が残っているファイルは、下の「直す途中」に入れてある。
+   * 直したら一覧から外す。一覧に無いファイルが古い言い方を足すと落ちる。
    */
-  it('30日の窓は「この30日」と書く', () => {
-    const hits = FILES.filter((f) => /直近30日|過去30日/.test(f.s)).map((f) => f.p)
-    expect(hits, '「この30日」に寄せる').toEqual([])
+  it('30日の窓は「過去30日」と書く', () => {
+    /* 直す途中（2026-10-09 時点で「この30日」「直近30日」が画面に残るファイル）。 */
+    const migrating = new Set([
+    'app/booking/menus/page.tsx',
+    'app/common-actions/versions/page.tsx',
+    'app/emergency/page.tsx',
+
+
+    'app/line-notifications/page.tsx',
+    'app/mileage/page.tsx',
+    'v8/nen-campaigns/list.tsx',
+    'app/nen-members/photo-review-v8.tsx',
+    'v8/restaurant/google/reviews.tsx',
+    'app/visual-qa/v8-parts/page.tsx',
+    'components/broadcasts/segment-preset-controls.tsx',
+    'components/staff/login-audit.tsx',
+    'v8/auto-replies/runs.tsx',
+    'v8/automations/list.tsx',
+    'v8/automations/runs.tsx',
+    'v8/automations/templates.tsx',
+    'v8/conversions/create.tsx',
+    'v8/conversions/dialogs.tsx',
+    'v8/conversions/list.tsx',
+    'v8/inflow-links/ad-connections.tsx',
+    'v8/inflow-links/ads.tsx',
+    'v8/inflow-links/site-script.tsx',
+    'v8/mileage/balances.tsx',
+    'v8/mileage/earning-rule-new/create.tsx',
+    'v8/mileage/earning-rules.tsx',
+    'v8/mileage/history.tsx',
+    'v8/nen-health/summary.tsx',
+    'v8/restaurant/google/reviews.tsx',
+    'v8/settings/ec-commerce/connector.tsx',
+    'v8/settings/emergency/health.tsx',
+    'v8/settings/emergency/history.tsx',
+    'v8/settings/line-notifications/customer-kpis.ts',
+    'v8/settings/line-notifications/screen.tsx',
+    'v8/webhooks/interactions.tsx',
+    'v8/webhooks/outgoing.tsx',
+    'v8/webhooks/shell.tsx',
+    ])
+    const hits = FILES.filter((f) => !migrating.has(f.p) && /この30日|直近30日/.test(f.s)).map((f) => f.p)
+    expect(hits, '「過去30日」に寄せる').toEqual([])
   })
 
   /**
@@ -128,4 +170,17 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
     const order = [...inbox!.s.matchAll(/label: '(未対応|対応中|保留|対応済み)'/g)].map((m) => m[1])
     expect(order, 'v6-02-inbox-requirements-draft.md:188 の順').toEqual(['未対応', '対応中', '保留', '対応済み'])
   })
+
+  /**
+   * **言葉の表（docs/v8-requirements/terms.md）の「使わない」を画面に出さない。**
+   *
+   * 表の写し（lib/terms.ts の termsAvoid）をそのまま使う。表に行を足せば見張りも増える。
+   * 表そのもの（lib/terms.ts）と、法務の文（content/ の利用規約）は対象外。
+   */
+  for (const { id, avoid } of termsAvoid) {
+    it(`言葉の表 TM-${id}：「${terms[id]}」と書く`, () => {
+      const hits = FILES.filter((f) => f.p !== 'lib/terms.ts' && !f.p.startsWith('content/') && avoid.test(f.s)).map((f) => f.p)
+      expect(hits, `「${terms[id]}」に直す`).toEqual([])
+    })
+  }
 })

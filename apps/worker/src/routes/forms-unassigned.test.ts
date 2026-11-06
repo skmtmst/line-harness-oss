@@ -1,5 +1,5 @@
 /*
- * 管理者確認専用口 GET /api/forms/unassigned(#724)。
+ * 管理者確認専用口 GET /api/forms/unassigned。
  *
  * 実DB・実権限で見る。DBモックでは「誰が見られるか」自体を差し替えられて
  * しまい、この口の存在理由（権限の絞り）を何も見張れないため。
@@ -7,8 +7,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { forms } from './forms.js';

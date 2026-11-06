@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bookingMenuError } from './menu-validation'
+import { bookingMenuError } from '@/v8/booking-menus/lib/menu-validation'
 
 describe('予約メニューの基本入力', () => {
   it('正常な値を受け付ける', () => {

@@ -1,5 +1,6 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { useCallback, useEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Button from '../shared/button'
@@ -44,9 +45,22 @@ export default function ScrollableTabs({
     const el = scrollerRef.current
     if (!el) return
     updateEdges()
+    /*
+     * ResizeObserver は「送る容器そのものの箱」が変わったときだけ動く。
+     * あとから届いた本文フォントで中のタブ名だけが広がった場合は動かず、
+     * 右に続きがあるのに影と送りボタンが出ないまま残る。読み込みが
+     * 終わった時点でもう一度測る。
+     */
     const observer = new ResizeObserver(updateEdges)
     observer.observe(el)
-    return () => observer.disconnect()
+    let done = false
+    void document.fonts?.ready.then(() => {
+      if (!done) updateEdges()
+    })
+    return () => {
+      done = true
+      observer.disconnect()
+    }
   }, [updateEdges])
 
   /*
@@ -57,7 +71,7 @@ export default function ScrollableTabs({
   useEffect(() => {
     const el = scrollerRef.current
     /*
-     * ★V7: 開いているタブの印が2種類ある。リンク移動のタブは
+     * ★管理画面: 開いているタブの印が2種類ある。リンク移動のタブは
      * aria-current="page"、ボタン切り替えのタブは aria-selected="true"。
      */
     const current = el?.querySelector<HTMLElement>('[aria-current="page"], [aria-selected="true"]')
@@ -78,7 +92,7 @@ export default function ScrollableTabs({
   const scrollByEdge = (direction: 1 | -1) => {
     const el = scrollerRef.current
     if (!el) return
-    el.scrollBy({ left: direction * Math.max(160, el.clientWidth * 0.6), behavior: 'smooth' })
+    el.scrollBy({ left: direction * Math.max(160, el.clientWidth * 0.6), behavior: scrollMotion() })
   }
 
   /*

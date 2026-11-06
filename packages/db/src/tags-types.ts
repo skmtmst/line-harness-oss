@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export type { CreateTagInput, CreateTagsBulkInput, CreateTagsBulkResult, FriendTag, Tag, TagAssignSource, TagCleanupReason, TagDeleteImpact, TagDeleteImpactReferences, TagDeleteImpactRow, TagGroup, TagRetroactiveMileagePreview, TagUsageCountRow, TagUsageReferenceRow, TagWithCount, TagWithUsage, TagWithUsageRow } from './tags/types.js';

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
- * LINEアカウントの乗り換え（引き継ぎ）。設計 ★V6 33-4（`nx3XW`）。台帳 #133。
+ * LINEアカウントの乗り換え（引き継ぎ）。設計 ★33-4（`nx3XW`）。台帳。
  *
  * ここで守りたいのは 3 点。
  *   **合計が合わない数を通さない**（合わないと、どこかの人が消えたように見える）
@@ -55,10 +55,10 @@ const bind = vi.fn((..._values: unknown[]) => ({
 const prepare = vi.fn((_sql: string) => ({ bind }));
 const env = { DB: { prepare } as unknown as D1Database };
 
-function makeApp() {
+function makeApp(role: 'owner' | 'staff' = 'owner') {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'u-1', name: 'テスト', role: 'owner', readOnly: false });
+    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false });
     return next();
   });
   app.route('/', accountHandovers);
@@ -121,6 +121,8 @@ const HANDOVER = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  run.mockResolvedValue({ meta: { changes: 1 } });
+  bind.mockImplementation((..._values: unknown[]) => ({ run, first: vi.fn().mockResolvedValue({ id: 'owned-friend' }), all: vi.fn(async () => ({ results: [] })) }));
   accountAccess.canAccessAllLineAccounts.mockResolvedValue(true);
   db.getHandoverById.mockResolvedValue(HANDOVER);
   db.listDecisions.mockResolvedValue([]);
@@ -451,4 +453,59 @@ describe('見える範囲', () => {
     );
     expect(res.status).toBe(404);
   });
+});
+
+describe('見るだけの担当者の変更拒否（R522）', () => {
+  // 口側の境目 requireRole('owner', 'admin') を役割×操作の表で固定する。
+  // 画面の出し分け（canManageRole）と同じ表。直しを戻すと赤くなる。
+  it.each([
+    ['発行', 'POST', '/api/account-handovers', { fromAccountId: 'acc-from' }],
+    ['連結', 'POST', '/api/account-handovers/link', { code: 'ABCD-EFGH-JKMN', toAccountId: 'acc-to' }],
+    ['事前確認', 'POST', '/api/account-handovers/ho-1/preview', {
+      sourceFriendTotal: 2,
+      counts: { auto: 1, review: 1, unmatched: 0, lookalike: 0 },
+    }],
+    ['判断の保存', 'PUT', '/api/account-handovers/ho-1/decisions', { decisions: [] }],
+    ['本実行', 'POST', '/api/account-handovers/ho-1/execute', {}],
+    ['取り消し', 'POST', '/api/account-handovers/ho-1/cancel', {}],
+    ['切り戻し', 'POST', '/api/account-handovers/ho-1/rollback', {}],
+  ])('%sはstaffに403を返す', async (_label, method, path, body) => {
+    const res = await makeApp('staff').fetch(
+      new Request(`https://example.com${path}`, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it.each([
+    ['詳細の読み取り', '/api/account-handovers/ho-1'],
+    ['一覧の読み取り', '/api/line-accounts/acc-from/handovers'],
+  ])('%sはstaffにも許す', async (_label, path) => {
+    const res = await makeApp('staff').fetch(
+      new Request(`https://example.com${path}`),
+      env,
+    );
+    expect(res.status).not.toBe(403);
+  });
+});
+
+
+it('F13: foreign source/target friends cannot be saved as handover decisions', async () => {
+  bind.mockImplementation((..._values: unknown[]) => ({ run, first: vi.fn().mockResolvedValue(null), all: vi.fn(async () => ({ results: [] })) }));
+  const res = await makeApp().fetch(put('/api/account-handovers/ho-1/decisions', { decisions: [{ fromFriendId: 'foreign', toFriendId: 'foreign-target', decision: 'link', bucket: 'auto' }] }), env);
+  expect(res.status).toBe(404);
+  expect(db.saveDecision).not.toHaveBeenCalled();
+});
+it('F13: execution counts a stale/moved source as failure and never claims a move', async () => {
+  db.getHandoverById.mockResolvedValue({ ...HANDOVER, source_friend_total: 1, review_count: 0 });
+  db.listDecisions.mockResolvedValue([{ from_friend_id: 'foreign', to_friend_id: null, decision: 'new' }]);
+  run.mockResolvedValue({ meta: { changes: 0 } });
+  const res = await makeApp().fetch(stepUpPost('/api/account-handovers/ho-1/execute', {}), env);
+  expect(res.status).toBe(200);
+  expect(db.completeHandover).toHaveBeenCalledWith(expect.anything(), 'ho-1', expect.objectContaining({ movedCount: 0, failedCount: 1 }));
+  expect(prepare.mock.calls.some(([sql]) => sql.includes('AND line_account_id = ?'))).toBe(true);
 });

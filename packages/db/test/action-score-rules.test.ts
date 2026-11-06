@@ -58,7 +58,7 @@ async function publishDefaults(db: D1Database, accountId = 'account-1') {
   });
 }
 
-describe('V6 action score rule versions', () => {
+describe('action score rule versions', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -76,7 +76,7 @@ describe('V6 action score rule versions', () => {
   it('returns a non-persisted safe draft and excludes unavailable LINE read scoring', async () => {
     const config = await getActionScoreRuleConfiguration(db, 'account-1');
     expect(config).toMatchObject({ configured: false, status: 'not_configured' });
-    // N-239: friend_add（友だち追加）は実際に届く出来事なので初期ルールに入る。
+    // friend_add（友だち追加）は実際に届く出来事なので初期ルールに入る。
     expect(config.editableVersion.rules).toHaveLength(8);
     expect(config.editableVersion.rules.some((rule) => rule.eventType === 'friend_add' && rule.source === 'line_webhook')).toBe(true);
     expect(config.editableVersion.rules.some((rule) => rule.eventType === 'message_opened')).toBe(false);
@@ -170,7 +170,7 @@ describe('V6 action score rule versions', () => {
     expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM friend_scores`).get()).toEqual({ count: 2 });
   });
 
-  it('does not fall back to legacy behavior after a V6 set is stopped', async () => {
+  it('does not fall back to legacy behavior after a set is stopped', async () => {
     await publishDefaults(db);
     const stopped = await stopActionScoreRules(db, 'account-1');
     expect(stopped.status).toBe('stopped');
@@ -216,7 +216,7 @@ describe('V6 action score rule versions', () => {
     expect(sqlite.prepare(`SELECT score FROM friends WHERE id = 'friend-1'`).get()).toEqual({ score: 99 });
   });
 
-  // N-239: 選べるようになった出来事（friend_add）は公開ルールからそのまま加点される。
+  // 選べるようになった出来事（friend_add）は公開ルールからそのまま加点される。
   it('applies the newly selectable friend_add event from the published defaults', async () => {
     await publishDefaults(db);
     const result = await applyPublishedActionScoreRules(db, {
@@ -227,7 +227,7 @@ describe('V6 action score rule versions', () => {
     expect(sqlite.prepare(`SELECT score FROM friends WHERE id = 'friend-1'`).get()).toEqual({ score: 3 });
   });
 
-  // N-235: 手で直した点数は、履歴の追記だけで表す（過去の行は書き換えない）。
+  // 手で直した点数は、履歴の追記だけで表す（過去の行は書き換えない）。
   it('appends a manual adjustment with staff identity and replays without double-applying', async () => {
     const adjusted = await postActionScoreManualAdjustment(db, {
       lineAccountId: 'account-1', friendId: 'friend-1', scoreChange: 12,
@@ -288,7 +288,7 @@ describe('V6 action score rule versions', () => {
     })).rejects.toMatchObject({ code: 'friend_not_found' });
   });
 
-  // N-235: 帯の分けかたの試算は人数だけを返し、点数も履歴も動かさない。
+  // 帯の分けかたの試算は人数だけを返し、点数も履歴も動かさない。
   it('previews the band distribution without mutating scores or history', async () => {
     await postActionScoreManualAdjustment(db, {
       lineAccountId: 'account-1', friendId: 'friend-1', scoreChange: 50,
@@ -316,4 +316,23 @@ describe('V6 action score rule versions', () => {
       bands: { min: 0, max: 100, normalMin: 70, highMin: 30 },
     })).rejects.toMatchObject({ code: 'bands_invalid' });
   });
+  it('PKG31: 同じ友だちへの並行加点を両方残し、履歴を次の現在値から計算する', async () => {
+    sqlite.exec("UPDATE friends SET score=50 WHERE id='friend-1'");
+    const results = await Promise.all([10,20].map((scoreChange,i) => postActionScoreManualAdjustment(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', scoreChange, reason: 'Adjustment', idempotencyKey: `request${i}`,
+      executedByStaffId: null, executedByStaffName: null,
+    })));
+    expect(sqlite.prepare("SELECT score FROM friends WHERE id='friend-1'").get()).toEqual({ score: 80 });
+    expect(results.map(r => [r.scoreBefore,r.scoreAfter])).toEqual([[50,60],[60,80]]);
+  });
+  it('PKG32: 200人の適用済みの友だちで後続が止まらず、同じ期間には再適用しない', async () => {
+    await publishDefaults(db);
+    for (let i=0; i<201; i++) sqlite.prepare(`INSERT INTO friends(id,line_user_id,line_account_id,created_at,updated_at)
+      VALUES (?,?,'account-1','2026-06-01T00:00:00Z','2026-06-01T00:00:00Z')`).run(`friend-more${i}`,`Umore${i}`);
+    expect((await processActionScoreInactivity(db, { now: NOW })).applied).toBe(200);
+    expect((await processActionScoreInactivity(db, { now: NOW })).applied).toBe(2);
+    expect((await processActionScoreInactivity(db, { now: NOW })).applied).toBe(0);
+    expect(sqlite.prepare("SELECT COUNT(*) n FROM friend_scores WHERE event_type='inactivity_30d'").get()).toEqual({ n: 202 });
+  });
+
 });

@@ -1,0 +1,68 @@
+/*
+ * LINEアカウントの詳細から開く窓（・・・）。
+ * 絵の窓は「余白24・段の間14・題17」で、頭・中身・下が同じ余白の中に並ぶ（下の線も内側）。
+ * 外側と操作段の余白は共通Dialogのaccount-insetが持つ。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-acd-dlg-gap);
+  width: 100%;
+}
+
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-acd-dlg-field-gap);
+  min-width: 0;
+  flex: 1;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-acd-inline-gap);
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--tpl-acd-dlg-label-size);
+  font-weight: 500;
+  line-height: var(--tpl-acd-dlg-label-lh);
+}
+
+
+.pair {
+  display: flex;
+  gap: var(--tpl-acd-dlg-pair-gap);
+  width: 100%;
+}
+.pair > * { flex: 1; min-width: 0; }
+
+.narrow {
+  display: flex;
+  flex: 0 0 var(--tpl-acd-ho-choice-w);
+}
+
+.sub {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-acd-dlg-sub-size);
+  font-weight: 700;
+  line-height: var(--tpl-acd-dlg-sub-lh);
+}
+
+
+.verify {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-acd-dlg-field-gap);
+}
+
+
+
+.fill {
+  width: 100%;
+}

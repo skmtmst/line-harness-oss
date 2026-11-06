@@ -22,9 +22,15 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return {
     ...actual,
+    fetchApi: (path: string) => {
+      const params = new URL(path, 'http://worker.test').searchParams
+      return params.get('filter') === 'pending' && params.get('limit') === '1'
+        ? Promise.resolve({ items: [], total: 0 }) : listEvents(path)
+    },
     api: {
       ...actual.api,
       staff: { ...actual.api.staff, me: staffMe },
+      folders: { ...actual.api.folders, list: vi.fn().mockResolvedValue({ success: true, data: [] }) },
     },
     eventsApi: { ...actual.eventsApi, listEvents, deleteEvent },
   }
@@ -36,11 +42,13 @@ vi.mock('next/link', () => ({
   ),
 }))
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1' }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
 }))
 
@@ -126,6 +134,8 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  history.replaceState({}, '', '/events')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -157,11 +167,11 @@ async function renderPage() {
 
 /** 行の「⋯」を開いて、メニュー項目を文字で探す。無ければ null。 */
 async function openRowMenu(): Promise<HTMLElement | null> {
-  const menuButton = document.querySelector<HTMLElement>('button[aria-label*="その他操作"], button[aria-label*="そのほかの操作"]')
+  const menuButton = document.querySelector<HTMLElement>('button[aria-label="体験レッスンの操作"]')
   if (!menuButton) return null // 追加項目が無い行には「⋯」自体が出ない
   await act(async () => { menuButton.click() })
   return [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
-    .find((m) => m.textContent?.includes('イベントを削除')) ?? null
+    .find((m) => m.textContent?.includes('削除する')) ?? null
 }
 
 describe('R217 イベント本体の削除口', () => {
@@ -187,6 +197,7 @@ describe('R217 イベント本体の削除口', () => {
     const close = document.querySelector<HTMLElement>('[aria-label="閉じる"]')
     expect(close, '右上の×がある').toBeTruthy()
     await act(async () => { close!.click() })
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
     await flush()
     expect(deleteEvent).not.toHaveBeenCalled()
     expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
@@ -206,6 +217,7 @@ describe('R217 イベント本体の削除口', () => {
 
     expect(deleteEvent).toHaveBeenCalledWith('acc-1', 'e1')
     expect(listEvents.mock.calls.length).toBeGreaterThan(callsBefore)
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
     expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
   })
 

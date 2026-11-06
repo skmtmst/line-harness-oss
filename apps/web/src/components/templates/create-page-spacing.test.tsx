@@ -1,0 +1,117 @@
+// @vitest-environment happy-dom
+/*
+ * V8 移行で崩れる原因⑤：画面の CSS が型の余白を上書きしていた。
+ *
+ * 1画面の★V8に要る違いは型の明示の口（CreatePage の contentSpacing・previewSurface）で選び、
+ * 画面の CSS から `[data-template-region=…]` の余白を書き換えない。渡さない画面は型の既定のまま
+ * （1画面の寸法を全画面へ押し付けない）。
+ */
+import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { join } from 'node:path'
+import { cleanup, render } from '@testing-library/react'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { getPageAction } from '@/test-utils/page-action'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import HqCreate from '@/v8/hq-broadcasts/create'
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/hq/broadcasts/new', useSearchParams: () => new URLSearchParams() }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null, selectedAccount: null }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner', useTenantWideAccess: () => true }))
+import { CreatePage } from '.'
+
+const WEB = process.cwd()
+const read = (path: string) => readFileSync(join(WEB, path), 'utf8')
+
+afterEach(() => { cleanup(); verifiedStaffRole(null) })
+
+describe('作成の型の余白の口', () => {
+  it('タブが区切りを持つ見出しだけ線を外す口を渡し、既定へ戻せる', () => {
+    const { container, rerender } = render(<CreatePage title="編集" dirty={false} separator="none" steps={<div>タブ</div>} footerActions={null}>本文</CreatePage>)
+    expect(container.querySelector('[data-template-region="heading"]')!.getAttribute('data-heading-separator')).toBe('none')
+    expect(container.querySelector('[data-template-region="steps"]')!.textContent).toBe('タブ')
+    rerender(<CreatePage title="作成" dirty={false} footerActions={null}>本文</CreatePage>)
+    expect(container.querySelector('[data-template-region="heading"]')!.hasAttribute('data-heading-separator')).toBe(false)
+    expect(container.querySelector('[data-template-region="content"]')!.textContent).toBe('本文')
+  })
+
+  it('渡さなければ型の既定（印を出さない）', () => {
+    const { container } = render(<CreatePage title="作成" preview={<p>見え方</p>} footerActions={null}>入力</CreatePage>)
+    const content = container.querySelector('[data-template-region="content"]')!
+    const preview = container.querySelector('[data-template-region="preview"]')!
+    expect(content.hasAttribute('data-content-spacing')).toBe(false)
+    expect(preview.hasAttribute('data-content-spacing')).toBe(false)
+    expect(preview.hasAttribute('data-preview-surface')).toBe(false)
+  })
+
+  it('プレビュー後の案内の余白口は操作と本文へ渡し、既定とflush-topに混ぜない', () => {
+    const { container, rerender } = render(<CreatePage title="作成" dirty={false} preview={<p>見本</p>} previewToggle={<button>見本を開く</button>} contentSpacing="notice-after-preview" footerActions={null}>案内</CreatePage>)
+    expect(container.querySelector('[data-template-region="content"]')!.getAttribute('data-content-spacing')).toBe('notice-after-preview')
+    expect(container.querySelector('button')!.parentElement!.getAttribute('data-content-spacing')).toBe('notice-after-preview')
+    rerender(<CreatePage title="作成" dirty={false} preview={<p>見本</p>} previewToggle={<button>見本を開く</button>} contentSpacing="flush-top" footerActions={null}>案内</CreatePage>)
+    expect(container.querySelector('button')!.parentElement!.hasAttribute('data-content-spacing')).toBe(false)
+    expect(container.querySelector('[data-template-region="content"]')!.getAttribute('data-content-spacing')).toBe('flush-top')
+  })
+
+  it('直に続く閲覧案内だけに余白口を渡し、本文と両方の通知を残す', () => {
+    verifiedStaffRole('viewer')
+    const { container, rerender } = render(<CreatePage title="作成" dirty={false} readOnly contentSpacing="notice-after-read-only" footerActions={null}><p>権限の説明</p></CreatePage>)
+    const slot = container.querySelector('[data-read-only-notice]')!.parentElement!
+    expect(slot.getAttribute('data-content-spacing')).toBe('notice-after-read-only')
+    expect(container.querySelector('[data-template-region="content"]')!.textContent).toBe('権限の説明')
+    expect(slot.nextElementSibling?.getAttribute('data-template-region')).toBe('body')
+    rerender(<CreatePage title="作成" dirty={false} readOnly contentSpacing="flush-top" footerActions={null}>権限の説明</CreatePage>)
+    expect(container.querySelector('[data-read-only-notice]')!.parentElement!.hasAttribute('data-content-spacing')).toBe(false)
+  })
+
+  it('flush-top・plain を渡すと入力欄と右の列に印が付く', () => {
+    const { container } = render(
+      <CreatePage title="作成" contentSpacing="flush-top" previewSurface="plain" preview={<p>見え方</p>} footerActions={null}>入力</CreatePage>,
+    )
+    expect(container.querySelector('[data-template-region="content"]')!.getAttribute('data-content-spacing')).toBe('flush-top')
+    const preview = container.querySelector('[data-template-region="preview"]')!
+    expect(preview.getAttribute('data-content-spacing')).toBe('flush-top')
+    expect(preview.getAttribute('data-preview-surface')).toBe('plain')
+  })
+
+  it("口の寸法は型の CSS と globals の値に1か所（E-9 p17Qku：上8・左右24・下24、段の間24）", () => {
+    const css = read('src/components/templates/page-templates.module.css')
+    expect(css).toContain(".createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }")
+    expect(css).toContain(".preview[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); }")
+    // plain の実際の地と故障対照は create-consistency.test.mjs でCI検証する。
+    const globals = read('src/app/globals.css')
+    expect(globals).toMatch(/--tpl-create-flush-pad:\s*var\(--polish-space-row\) var\(--polish-space-section\) var\(--polish-space-section\);/)
+    expect(globals).toMatch(/--tpl-create-flush-gap:\s*var\(--polish-space-section\);/)
+  })
+
+  it('統括の一括配信は共通型の入力・右欄・下帯で操作を描く', () => {
+    const { container } = render(<HqCreate />)
+    const frame = container.querySelector('[data-page-template="create"][data-design-node="BBRDb"]')!
+    expect(frame).toBeTruthy()
+    expect(frame.querySelector('[data-template-region="content"] input[aria-label="配信名"]')).toBeTruthy()
+    expect(frame.querySelector('[data-template-region="preview"][aria-label="LINEの見え方"]')).toBeTruthy()
+    expect(frame.querySelector('[data-template-region="footer"]')?.textContent).toContain('対象設定へ')
+    expect(frame.querySelector('[data-sticky-actions]')?.contains(getPageAction({ name: '下書きを保存する' }))).toBe(true)
+  })
+})
+
+/*
+ * 今も画面の CSS で型の欄（[data-template-region=…]）を書き換えている所。増やさない。
+ * どれも設定の型（SettingsPage）の中身の幅・余白を絵に広げるもので、型の口に移すのは
+ * 寸法を絵と照合してから（V8 移行の報告の一覧）。直したらここから消す。
+ */
+const KNOWN_REGION_OVERRIDES: string[] = []
+
+describe('画面の CSS が型の欄を書き換える所は増やさない', () => {
+  it('src/v8 の CSS で [data-template-region] を選ぶ所は既知の一覧だけ', () => {
+    let out = ''
+    try {
+      out = execFileSync('git', ['grep', '-l', 'data-template-region', '--', 'src/v8/**/*.css'], { cwd: WEB, encoding: 'utf8' })
+    } catch {
+      out = '' // 1件も無いと git grep は 1 で終わる
+    }
+    const files = out.split('\n').filter(Boolean).map((f) => (f.startsWith('src/') ? f : f.replace(/^apps\/web\//, ''))).sort()
+    expect(files).toEqual([...KNOWN_REGION_OVERRIDES].sort())
+  })
+})

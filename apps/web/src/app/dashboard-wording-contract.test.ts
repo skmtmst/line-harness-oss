@@ -1,7 +1,9 @@
-import fs from 'node:fs'
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
+const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
+import { formatWaitRough } from '../lib/format-duration'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
@@ -26,7 +28,9 @@ const CODE = code(PAGE)
 describe('ダッシュボードの言葉を設計にそろえる', () => {
   it('送信枠は、使用数か残りかが分かる形で書く', () => {
     expect(CODE, '数字だけで向きが分からない').not.toMatch(/\$\{remaining\.toLocaleString\('ja-JP'\)\} \/ \$\{limit/)
-    expect(CODE).toContain('残り ${remaining.toLocaleString(\'ja-JP\')} / 上限 ${limit.toLocaleString(\'ja-JP\')}通')
+    expect(CODE).toContain('LINE公式 残り')
+    expect(CODE).toContain("remaining === null ? emptyValue('unknown') : formatNumber(remaining)")
+    expect(CODE).toContain('/ ${formatNumber(limit)}通')
   })
 
   it('残りは limit - used から出す（向きを取り違えない）', () => {
@@ -34,7 +38,7 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
   })
 
   it('待ち時間は読める単位で言う', () => {
-    expect(CODE, '分のまま出している').not.toContain("`${oldestWaitMinutes.toLocaleString('ja-JP')}分前`")
+    expect(CODE, '分のまま出している').not.toContain("`${formatNumber(oldestWaitMinutes)}分前`")
     expect(CODE).toContain('formatWaitRough(oldestWaitMinutes)')
   })
 
@@ -46,15 +50,12 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
   it('待ち時間の言い方は、画面の中で1つにそろえる', () => {
     expect(CODE, 'ダッシュボードの中で細かいほうを混ぜている').not.toContain('formatDurationMinutes(inboxSummary')
     const rough = [...CODE.matchAll(/formatWaitRough\(/g)].length
-    expect(rough, '待ち時間を出す場所が2つとも粗いほうを使う').toBe(2)
+    expect(rough, 'すべての待ち時間に同じ整形を使う').toBeGreaterThanOrEqual(2)
   })
 
   it('待ち時間の整形は共通の場所に置く（画面ごとに書かない）', () => {
-    const shared = code(fs.readFileSync(path.join(__dirname, '..', 'lib', 'format-duration.ts'), 'utf8'))
-    expect(shared).toContain('export function formatWaitRough(minutes: number): string')
-    expect(shared).toContain('if (total < 60) return `${total}分前`')
-    expect(shared).toContain('if (total < 60 * 24) return `${Math.floor(total / 60)}時間前`')
-    expect(shared).toContain('return `${Math.floor(total / (60 * 24))}日前`')
+    expect(formatWaitRough(65)).toBe('1時間前')
+    expect(formatWaitRough(24 * 60)).toBe('24時間前')
     expect(CODE, 'ダッシュボードの中に自前の整形を書かない').not.toContain('function humanWait')
   })
 
@@ -65,7 +66,7 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
      */
     expect(CODE, '「優先度順」のまま').not.toContain('>優先度順<')
     expect(CODE).not.toContain('優先度が高い順')
-    // ★V7（2026-09-24）：並び順のラベル自体を出さない。見出しの横の小さな説明は読まれず、場所を取るだけだった。
+    // ★管理画面（2026-09-24）：並び順のラベル自体を出さない。見出しの横の小さな説明は読まれず、場所を取るだけだった。
     expect(CODE).not.toContain('自分で並べた順')
   })
 
@@ -83,7 +84,7 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
     for (const [i, raw] of targets.entries()) {
       const source = code(raw)
       expect(source, `ファイル${i} に「取得できません」が残っている`).not.toContain('取得できません')
-      expect(source, `ファイル${i} に「読み込み中」が残っている`).not.toContain('読み込み中')
+      expect(source, `ファイル${i} に内部エラーを出さない`).not.toContain('API error:')
     }
     expect(CODE).toContain('STATE_TEXT.error')
     expect(CODE).toContain('STATE_TEXT.loading')

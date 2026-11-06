@@ -1,0 +1,89 @@
+// @vitest-environment happy-dom
+/*
+ * 監査 WEB074（画面側）：「使った・取り消し」は1ページずつ手元で絞っているので、
+ * このページに無くても「ありません」と言い切らず、ページ送りを残す。
+ */
+import React from 'react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, afterEach, expect, test, vi } from 'vitest'
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: () => {} }),
+  useSearchParams: () => new URLSearchParams('tab=history'),
+  usePathname: () => '/mileage',
+}))
+vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children?: React.ReactNode }) => <a href={href}>{children}</a> }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc', loading: false }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
+
+const periodFailure = vi.hoisted(() => ({ value: false }))
+const requests = vi.hoisted(() => [] as Array<Record<string, unknown>>)
+const grant = (id: string) => ({
+  id, friendId: 'f', displayName: '田中', entryType: 'grant', mode: 'automatic', amount: 10, reason: '来店',
+  balanceAfter: 10, occurredAt: '2026-10-01T00:00:00.000Z', status: 'available', executedByStaffName: null,
+})
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      mileage: {
+        ...actual.api.mileage,
+        history: async (params: Record<string, unknown>) => { requests.push(params); if (periodFailure.value && params.limit === 1) throw new Error('period unavailable'); return ({
+          success: true,
+          data: { items: Array.from({ length: 20 }, (_, i) => grant(`g${i}`)), summary: { byType: [] }, pagination: { total: 60, limit: 20, offset: 0 } },
+        }) },
+      },
+    },
+  }
+})
+
+import HistoryTab from './history'
+import { flushListUrlState } from '@/components/shared/list-url-state'
+beforeEach(() => { periodFailure.value = false; flushListUrlState(); window.history.replaceState(null, '', '/mileage?tab=history') })
+afterEach(cleanup)
+
+test('使った・取り消しで、このページに無くても「まだありません」と言わず、ページ送りを残す', async () => {
+  render(<HistoryTab />)
+  await screen.findAllByText('田中')
+  await act(async () => { screen.getByRole('button', { name: /使った・取り消し/ }).click() })
+  await waitFor(() => expect(screen.getByText('このページには、使った・取り消しの履歴がありません')).toBeTruthy())
+  expect(screen.queryByText('条件に合う履歴はありません')).toBeNull()
+  expect(screen.getByText(/使った・取り消し 0\s*件/)).toBeTruthy()
+})
+
+ test('WEB-073：履歴の帯は直近30日を別集計し、回数を件で示す', async () => {
+  requests.length = 0
+  render(<HistoryTab />)
+  await screen.findAllByText('田中')
+  expect(screen.getByText('直近30日の動き')).toBeTruthy()
+  expect(requests.some(params => typeof params.from === 'string' && typeof params.to === 'string' && params.limit === 1)).toBe(true)
+  expect(screen.queryByText('今月の動き')).toBeNull()
+ })
+
+ test('期間集計が失敗しても履歴の件数・ページ送りと説明は使える', async () => {
+   periodFailure.value = true
+   render(<HistoryTab />)
+   await screen.findAllByText('田中')
+   const pager = screen.getByRole('navigation', { name: 'ページ送り' })
+   expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe('60件中 1〜20件')
+   const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+   await act(async () => toggle.click())
+   expect(document.getElementById(toggle.getAttribute('aria-describedby') ?? '')?.textContent).toContain('取り消しの明細を足します')
+   await act(async () => toggle.click())
+   expect(toggle.getAttribute('aria-expanded')).toBe('false')
+   requests.length = 0
+   await act(async () => screen.getByRole('button', { name: '次のページ' }).click())
+   await waitFor(() => expect(requests.some(params => params.offset === 20)).toBe(true))
+ })
+
+test('直近30日の集計に失敗しても、取得できた履歴の件数とページ送りを使える', async () => {
+  periodFailure.value = true
+  requests.length = 0
+  render(<HistoryTab />)
+  await screen.findAllByText('田中')
+  expect(screen.getByText('60件中 1〜20件')).toBeTruthy()
+  await act(async () => { screen.getByRole('button', { name: '次のページ' }).click() })
+  await waitFor(() => expect(requests.some(params => params.offset === 20)).toBe(true))
+})

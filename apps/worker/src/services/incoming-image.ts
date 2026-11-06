@@ -1,3 +1,5 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 const LINE_CONTENT_API_BASE = 'https://api-data.line.me/v2/bot/message';
 
 const CONTENT_TYPE_TO_EXT: Record<string, string> = {
@@ -39,19 +41,19 @@ export async function fetchAndStoreIncomingImage(
       headers: { Authorization: `Bearer ${opts.channelAccessToken}` },
     });
   } catch (err) {
-    console.error('incoming-image: fetch failed', { err, messageId: opts.messageId, accountId: opts.accountId });
+    logger.error("incoming_image.fetch_content_failed");
     return null;
   }
 
   if (!res.ok) {
-    console.error('incoming-image: non-200', { status: res.status, messageId: opts.messageId, accountId: opts.accountId });
+    logger.error("incoming_image.fetch_content_failed");
     return null;
   }
 
   const contentType = res.headers.get('Content-Type')?.split(';')[0].trim() ?? 'application/octet-stream';
   const ext = CONTENT_TYPE_TO_EXT[contentType];
   if (!ext) {
-    console.error('incoming-image: unsupported content-type', { contentType, messageId: opts.messageId, accountId: opts.accountId });
+    logger.error("incoming_image.validate_content_type_failed");
     return null;
   }
   // accountId / messageId は実質 UUID / LINE 数字 ID で安全だが、念のため
@@ -64,14 +66,14 @@ export async function fetchAndStoreIncomingImage(
   try {
     data = await res.arrayBuffer();
   } catch (err) {
-    console.error('incoming-image: arrayBuffer failed', { err, messageId: opts.messageId, accountId: opts.accountId });
+    logger.error("incoming_image.read_content_failed");
     return null;
   }
 
   try {
     await opts.r2.put(key, data, { httpMetadata: { contentType } });
   } catch (err) {
-    console.error('incoming-image: R2 put failed', { err, messageId: opts.messageId, accountId: opts.accountId });
+    logger.error("incoming_image.store_content_failed");
     return null;
   }
 

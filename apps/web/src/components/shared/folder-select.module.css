@@ -1,0 +1,116 @@
+@layer properties, theme, base, components, utilities;
+/*
+ * ★V8 フォルダを選ぶ欄（dLffh・iBuZH）。値は globals.css の [data-theme="v8"] の --select-menu-*。
+ * 板（白い地・角丸・影）は select-menu が持つ。点は FolderDot、ここは「新しいフォルダ」の中身だけ。
+ */
+@layer components {
+
+.panel {
+  display: flex;
+  box-sizing: border-box;
+  /* 板は幅 220（内側 10）。欄がもっと広いときは板の幅いっぱい。 */
+  width: 100%;
+  min-width: calc(var(--select-menu-panel-w) - var(--select-menu-panel-pad) * 2);
+  flex-direction: column;
+  gap: var(--select-menu-panel-gap);
+}
+
+.heading {
+  color: var(--color-ink-faint);
+  font-size: var(--select-menu-heading-size);
+  font-weight: 500;
+  line-height: var(--select-menu-item-line);
+  white-space: nowrap;
+}
+
+.field {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  height: var(--select-menu-field-h);
+  padding: var(--select-menu-field-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--select-menu-item-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--select-menu-item-size);
+}
+
+.field::placeholder {
+  color: var(--color-placeholder);
+  opacity: 1;
+}
+
+.field[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.nameRow { display: flex; align-items: center; gap: var(--select-menu-swatch-gap); }
+.error {
+  inline-size: 0;
+  min-inline-size: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--select-menu-button-size);
+  line-height: var(--select-menu-item-line);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--select-menu-swatch-gap);
+}
+
+.cancel,
+.primary {
+  box-sizing: border-box;
+  display: inline-flex;
+  height: var(--select-menu-button-h);
+  align-items: center;
+  border-radius: var(--select-menu-item-radius);
+  font-family: inherit;
+  font-size: var(--select-menu-button-size);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cancel {
+  padding: var(--select-menu-button-pad);
+  border: 1px solid var(--color-control-border);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-weight: var(--font-weight-ui);
+}
+
+.cancel:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.primary {
+  padding: var(--select-menu-button-pad-primary);
+  border: 0;
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-weight: 600;
+}
+
+.cancel:focus-visible,
+.primary:focus-visible {
+  outline: var(--polish-focus-width) solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
+}
+
+.cancel:disabled,
+.primary:disabled {
+  cursor: not-allowed;
+  opacity: var(--polish-disabled-opacity);
+}
+}
+
+@layer components {
+:root .field { box-shadow: var(--control-shadow); }
+}/* 青の輪は共通の焦点指定を使い、誤りの時だけ色を変える。 */

@@ -10,6 +10,7 @@ export const BOOKING_STAFF_LIMITS = {
 } as const;
 
 export interface BookingStaffSaveInput {
+  nominationFee?:number;
   name?: string;
   display_name?: string;
   role?: string | null;
@@ -18,7 +19,7 @@ export interface BookingStaffSaveInput {
   sort_order?: number;
   is_designation_optional?: 0 | 1;
   is_active?: 0 | 1;
-  /** N-411: 本人勤務の対象となるログインユーザー(staff_members.id)。null で解除。 */
+  /** 本人勤務の対象となるログインユーザー(staff_members.id)。null で解除。 */
   staff_member_id?: string | null;
 }
 
@@ -175,6 +176,7 @@ export function parseBookingStaffInput(
     }
   }
 
+  if(own(body,'nominationFee')){if(!Number.isSafeInteger(body.nominationFee)||Number(body.nominationFee)<0||Number(body.nominationFee)>10000000)return {ok:false,field:'nominationFee',error:'指名料は0以上の整数で入力してください'};value.nominationFee=Number(body.nominationFee);}
   if (mode === 'update' && Object.keys(value).length === 0) {
     return { ok: false, field: 'body', error: '変更するスタッフ情報を入力してください' };
   }

@@ -1,0 +1,113 @@
+import { retryTime, validateState } from './policy.js';
+import { resumeInvocation } from '@line-crm/shared/server';
+import type { CallRequest, CallResult, CallState, CircuitStore, Outcome } from './types.js';
+export * from './types.js';
+export * from './policy.js';
+export { MemoryCircuitStore } from './circuit.js';
+export { createHttpAttempt } from './http.js';
+
+/** 1回の呼出で物理試行は最大1回とし、長い待機はジョブや cron へ返す。 */
+export function createExternalCall(options: { circuits: CircuitStore; now?: () => number; random?: () => number }) {
+  const now = options.now ?? Date.now;
+  const random = options.random ?? Math.random;
+  return function externalCall<T>(request: CallRequest<T>): Promise<CallResult<T>> {
+    return resumeInvocation(request.state.requestId, () => execute(request));
+  };
+  async function execute<T>(request: CallRequest<T>): Promise<CallResult<T>> {
+    // await をまたぐ呼出元の変更で識別や予算が変わらないよう、不変の値として保持する。
+    const state = structuredClone(request.state);
+    validateState(state);
+    if (state.phase !== 'ready') {
+      return { kind: state.phase === 'started' ? 'unknown' : state.phase, state };
+    }
+    const persist = async (previous: CallState, next: CallState): Promise<'ok' | 'conflict' | 'storage_error'> => {
+      try { return await request.journal.compareAndSwap(structuredClone(previous), structuredClone(next)) ? 'ok' : 'conflict'; }
+      catch { return 'storage_error'; }
+    };
+    const stop = async (): Promise<CallResult<T>> => {
+      const next: CallState = { ...state, phase: 'stopped', reason: 'budget', revision: state.revision + 1 };
+      const saved = await persist(state, next);
+      return { kind: saved === 'ok' ? 'stopped' : saved, state: saved === 'ok' ? next : state };
+    };
+    if (state.attempts >= state.policy.maxAttempts || now() >= state.policy.deadlineAt) return stop();
+    if (state.nextAt > now()) return { kind: 'deferred', reason: 'schedule', nextAt: state.nextAt, state };
+    if (request.signal?.aborted) return { kind: 'stopped', state };
+    let admission;
+    try { admission = await options.circuits.acquire(state.identity.scope, now()); }
+    catch { return { kind: 'storage_error', state }; }
+    if (!admission.allowed) return { kind: 'deferred', reason: 'circuit', nextAt: admission.nextAt, state };
+    const lease = admission.lease;
+    const settle = async (result: 'success' | 'failure' | 'neutral', retryAt?: number) => {
+      // 保存失敗で確定済みの結果を上書きしない。解除失敗時は回復確認の実行権を保持して安全側に止める。
+      try { await options.circuits.settle(lease, result, now(), retryAt); } catch { /* keep stopped */ }
+    };
+    let allowed = false;
+    try { allowed = await request.authorize(); } catch { /* fail closed */ }
+    if (!allowed || request.signal?.aborted || now() >= state.policy.deadlineAt) {
+      await settle('neutral');
+      return { kind: 'stopped', state };
+    }
+    const started: CallState = { ...state, phase: 'started', attempts: state.attempts + 1, revision: state.revision + 1 };
+    const claimed = await persist(state, started);
+    if (claimed !== 'ok') { await settle('neutral'); return { kind: claimed, state }; }
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancel!: () => void;
+    const interrupted = new Promise<Outcome<T>>(resolve => {
+      const interrupt = (reason: 'timeout' | 'cancelled') => {
+        controller.abort();
+        resolve({ kind: state.identity.effect === 'write' ? 'unknown' : reason === 'cancelled' ? 'permanent' : 'transient', reason });
+      };
+      cancel = () => interrupt('cancelled');
+      timer = setTimeout(() => interrupt('timeout'), Math.min(state.policy.timeoutMs, Math.max(1, state.policy.deadlineAt - now())));
+    });
+    request.signal?.addEventListener('abort', cancel, { once: true });
+    let outcome: Outcome<T>;
+    try {
+      if (request.signal?.aborted || now() >= state.policy.deadlineAt) {
+        outcome = { kind: 'permanent', reason: 'cancelled' };
+      } else {
+        const work = request.execute(controller.signal, structuredClone(state.identity)).catch((): Outcome<T> => ({
+          kind: state.identity.effect === 'write' ? 'unknown' : 'transient', reason: 'network',
+        }));
+        outcome = await Promise.race([work, interrupted]);
+      }
+    } catch {
+      outcome = { kind: state.identity.effect === 'write' ? 'unknown' : 'transient', reason: 'network' };
+    } finally {
+      clearTimeout(timer);
+      request.signal?.removeEventListener('abort', cancel);
+    }
+    // 認証・権限・入力の失敗を再試行可能へ言い換えない。
+    if (outcome.kind !== 'success' && outcome.status !== undefined && outcome.status >= 400 && outcome.status < 500
+      && outcome.status !== 408 && outcome.status !== 429) outcome = { ...outcome, kind: 'permanent' };
+    let next: CallState = { ...started, revision: started.revision + 1 };
+    if (outcome.kind === 'success') {
+      next.phase = 'succeeded';
+      delete next.reason;
+      delete next.status;
+    }
+    else {
+      next.reason = outcome.reason;
+      next.status = outcome.status;
+      next.phase = outcome.kind === 'unknown' ? 'unknown' : 'stopped';
+      if (outcome.kind === 'transient' && next.attempts < state.policy.maxAttempts) {
+        try {
+          next.nextAt = Math.max(retryTime(state.policy, next.attempts, now(), random), outcome.retryAt ?? 0);
+          if (Number.isSafeInteger(next.nextAt) && next.nextAt < state.policy.deadlineAt) next.phase = 'ready';
+          else next.reason = 'budget';
+        } catch { next.reason = 'budget'; }
+      }
+    }
+    await settle(outcome.kind === 'success' ? 'success'
+      : outcome.kind === 'transient' || outcome.kind === 'unknown' && outcome.reason !== 'cancelled' ? 'failure' : 'neutral',
+    outcome.kind === 'success' ? undefined : outcome.retryAt);
+    const saved = await persist(started, next);
+    // 外部で成功して保存だけ失敗した場合、通常の再試行へ戻さず送達不明として扱う。
+    if (saved !== 'ok') return { kind: 'unknown', state: { ...started, phase: 'unknown', reason: 'storage' } };
+    if (outcome.kind === 'success') return { kind: 'success', state: next, value: outcome.value };
+    if (next.phase === 'ready') return { kind: 'deferred', reason: 'schedule', state: next, nextAt: next.nextAt };
+    return { kind: next.phase === 'unknown' ? 'unknown' : 'stopped', state: next };
+  };
+}
+export { lineTransport, lineFailure } from './line.js';

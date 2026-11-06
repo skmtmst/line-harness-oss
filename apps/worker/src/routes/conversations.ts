@@ -1,8 +1,9 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-import { listLimit } from './list-pagination.js';
-
+import { parseOffsetPaging, buildOffsetListResponse, listLimit } from '../lib/list-paging.js';
+import { fail } from '../lib/fail.js';
 const conversations = new Hono<Env>();
 
 // GET /api/conversations?lineAccountId=&minHoursSince=&maxHoursSince=&limit=&offset=
@@ -13,17 +14,16 @@ conversations.get('/api/conversations', async (c) => {
     const minHoursSince = Number(url.searchParams.get('minHoursSince') ?? '0');
     const maxHoursSinceParam = url.searchParams.get('maxHoursSince');
     const maxHoursSince = maxHoursSinceParam !== null ? Number(maxHoursSinceParam) : null;
-    const limit = listLimit(url.searchParams.get('limit') ?? undefined, 50);
-    const offset = Number(url.searchParams.get('offset') ?? '0');
+    const { limit, offset } = parseOffsetPaging({ limit: url.searchParams.get('limit') ?? undefined, offset: url.searchParams.get('offset') ?? undefined }, { defaultLimit: 50, offsetPolicy: {} });
 
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (accountId && !scope.ids.includes(accountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const accountIds = accountId ? [accountId] : scope.allowedAccountIds;
     const includeUnassigned = !accountId && scope.canSeeUnassigned;
     const whereAccount = accountIds.length > 0
-      ? `AND (f.line_account_id IN (${accountIds.map(() => '?').join(',')})${includeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+      ? `AND (f.line_account_id IN (${sqlIdSet(accountIds).sql})${includeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
       : includeUnassigned
         ? 'AND f.line_account_id IS NULL'
         : 'AND 1 = 0';
@@ -103,14 +103,14 @@ conversations.get('/api/conversations', async (c) => {
 
     const bindings: (string | number)[] = [minHoursSince];
     if (maxHoursSince !== null) bindings.push(maxHoursSince);
-    bindings.push(...accountIds);
+    bindings.push(...(accountIds.length ? sqlIdSet(accountIds).binds : []));
     bindings.push(limit, offset);
 
     const { results } = await c.env.DB.prepare(sql)
       .bind(...bindings)
       .all();
 
-    // total count
+
     const countSql = `
       WITH last_incoming AS (
         SELECT friend_id, MAX(created_at) AS at FROM messages_log
@@ -136,21 +136,21 @@ conversations.get('/api/conversations', async (c) => {
     `;
     const countBindings: (string | number)[] = [minHoursSince];
     if (maxHoursSince !== null) countBindings.push(maxHoursSince);
-    countBindings.push(...accountIds);
+    countBindings.push(...(accountIds.length ? sqlIdSet(accountIds).binds : []));
 
     const countRow = await c.env.DB.prepare(countSql)
       .bind(...countBindings)
       .first<{ total: number }>();
 
-    // tags lookup (friend_id -> tag names)
+
     const friendIds = results.map((r) => (r as { friend_id: string }).friend_id);
     const tagMap: Record<string, string[]> = {};
     if (friendIds.length > 0) {
-      const placeholders = friendIds.map(() => '?').join(',');
+      const placeholders = sqlIdSet(friendIds).sql;
       const tagRows = await c.env.DB.prepare(
         `SELECT ft.friend_id, t.name FROM friend_tags ft JOIN tags t ON t.id = ft.tag_id WHERE ft.friend_id IN (${placeholders})`,
       )
-        .bind(...friendIds)
+        .bind(...(friendIds.length ? sqlIdSet(friendIds).binds : []))
         .all<{ friend_id: string; name: string }>();
       for (const row of tagRows.results) {
         (tagMap[row.friend_id] ??= []).push(row.name);
@@ -183,14 +183,13 @@ conversations.get('/api/conversations', async (c) => {
       };
     });
 
-    return c.json({ success: true, data: { total: countRow?.total ?? 0, items } });
+    return c.json({ success: true, data: buildOffsetListResponse({ total: countRow?.total ?? 0, items, paging: { limit, offset }, sort: [] }) });
   } catch (err) {
-    console.error('GET /api/conversations error:', err);
-    return c.json({ success: false, error: String(err) }, 500);
+    throw err;
   }
 });
 
-// GET /api/conversations/:friendId?limit=&before=
+
 conversations.get('/api/conversations/:friendId', async (c) => {
   try {
     const friendId = c.req.param('friendId');
@@ -213,14 +212,14 @@ conversations.get('/api/conversations/:friendId', async (c) => {
       }>();
 
     if (!friend) {
-      return c.json({ success: false, error: 'friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const canReadFriend = friend.line_account_id
       ? scope.allowedAccountIds.includes(friend.line_account_id)
       : scope.canSeeUnassigned;
     if (!canReadFriend) {
-      return c.json({ success: false, error: 'friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const tagRows = await c.env.DB.prepare(
@@ -230,10 +229,7 @@ conversations.get('/api/conversations/:friendId', async (c) => {
       .all<{ name: string }>();
     const tags = tagRows.results.map((r) => r.name);
 
-    // Normalize the `before` cursor via julianday() so sub-second precision
-    // is preserved and cursors in any ISO 8601 timezone form (Z, +09:00) sort
-    // correctly against stored `+09:00` timestamps. strftime('%s', ...) would
-    // truncate to whole seconds and drop messages that share a second.
+    // 同秒のメッセージを落とさないよう、before は julianday で正規化して小数秒を保つ。Z と +09:00 も保存済み日時と正しく比較し、秒へ切り詰めない。
     const msgSql = before
       ? `SELECT id, direction, message_type, content, delivery_type, source, broadcast_id, scenario_step_id, created_at
          FROM messages_log WHERE friend_id = ? AND julianday(created_at) < julianday(?)
@@ -262,11 +258,7 @@ conversations.get('/api/conversations/:friendId', async (c) => {
       messageType: m.message_type,
       content: m.content,
       deliveryType: m.delivery_type,
-      // Infer source from associated foreign keys / delivery_type when missing.
-      // Historically some writers (incl. orphan deploys before migration 028)
-      // left source NULL on scenario/broadcast/auto_reply outgoings. Mirrors
-      // the backfill rules in migrations/028_messages_log_source.sql so the
-      // dashboard does not misclassify automated messages as operator replies.
+      // source が空の保存済み行は、関連する外部キーと delivery_type から推定する。自動送信を担当者の返信と誤表示しないよう、migration 028 の補完規則と一致させる。
       source: m.source ?? (
         m.direction === 'incoming' ? 'user'
           : m.scenario_step_id ? 'scenario'
@@ -293,8 +285,7 @@ conversations.get('/api/conversations/:friendId', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/conversations/:friendId error:', err);
-    return c.json({ success: false, error: String(err) }, 500);
+    throw err;
   }
 });
 

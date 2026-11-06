@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PANEL = readFileSync(new URL('./folder-panel.tsx', import.meta.url), 'utf8')
+const CSS = readFileSync(new URL('./folder-panel.module.css', import.meta.url), 'utf8')
 
 describe('共通フォルダ欄', () => {
   it('テンプレート画面の252px幅を全画面用の1値として公開する', () => {
@@ -11,9 +12,9 @@ describe('共通フォルダ欄', () => {
 
   it('フォルダ追加操作を一覧の下へ出す', () => {
     expect(PANEL).toContain('onAddFolder?: () => void')
-    expect(PANEL).toContain("addFolderLabel = 'フォルダを追加'")
+    expect(PANEL).toContain("addFolderLabel = 'フォルダを追加する'")
     expect(PANEL.indexOf('{rows.map')).toBeLessThan(PANEL.indexOf('onClick={onAddFolder}'))
-    expect(PANEL).toContain('className="w-full"')
+    expect(PANEL).toContain('styles.add')
   })
 
   it('分類の呼び名が異なる画面は見出しを指定できる', () => {
@@ -24,6 +25,6 @@ describe('共通フォルダ欄', () => {
   })
 
   it('R37: 狭い幅では操作メニューを常に出す（スマホでも名前変更・削除に届く）', () => {
-    expect(PANEL).toContain('max-lg:opacity-100')
+    expect(CSS).toMatch(/@media \(hover: none\)[\s\S]*?\.menuButton \{ opacity: 1; \}/)
   })
 })

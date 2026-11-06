@@ -1,11 +1,14 @@
-import { normalizeScopedTagName } from '@line-crm/db';
-import { layoutToFields, normalizeLayout, type FormLayout } from '@line-crm/shared';
-import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateStatement, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan, } from './contract.js';
+import type { FormSnapshot, BookingResource } from './form-snapshot-types.js';
+import { formMediaUsageQueries, resolveCommonVarValuesAt, normalizeScopedTagName } from '@line-crm/db';
+import { DEFAULT_TENANT_ID, collectInputs, layoutToFields, normalizeLayout, validateFormDefinition, type FormLayout } from '@line-crm/shared';
+
+import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
+import { type HqTemplateStatement } from '@line-crm/db';
 import { bindScenarioGraphRevision, loadScenarioReferenceGraph, scenarioGraphSnapshotToken, ScenarioGraphError } from './scenario-graph.js';
-/** Unbound callers remain closed until the common executor provides dependencies. */
+/** 共通実行側が依存を接続するまで、未接続の呼出は安全側で拒む。 */
 export const formHqTemplateAdapter = unsupportedHqTemplateAdapter('form');
 export class FormTemplateError extends Error {
-    constructor(public readonly code: 'INVALID_DEFINITION' | 'FORBIDDEN' | 'REFERENCE_UNAVAILABLE' | 'UNSUPPORTED_REFERENCE' | 'VERSION_CONFLICT' | 'SELECTION_REQUIRED' | 'SHARED_FORM' | 'INVALID_PHASE' | 'LIFF_UNAVAILABLE') { super(code); }
+    constructor(public readonly code: 'PUBLIC_IMAGE_REFERENCE_UNSUPPORTED' | 'FORM_STORE_REFERENCE_UNAVAILABLE' | 'INVALID_DEFINITION' | 'FORBIDDEN' | 'REFERENCE_UNAVAILABLE' | 'UNSUPPORTED_REFERENCE' | 'VERSION_CONFLICT' | 'SELECTION_REQUIRED' | 'SHARED_FORM' | 'INVALID_PHASE' | 'LIFF_UNAVAILABLE') { super(code); }
 }
 export type FormTemplateDefinition = {
     schemaVersion: 1;
@@ -25,9 +28,9 @@ export type FormReference = HqTemplateReference & {
 export type FormReferenceResolution = {
     targetId: string;
     aliasName?: string;
-    /** The target is created or updated by an earlier statement in this same atomic plan. */
+    /** 対象は同じ原子的計画の先行文で作成・更新される。 */
     planned?: boolean;
-    /** A trusted reference adapter's plan; it must not write before this batch. */
+    /** 信頼済み参照アダプターも、この batch より前には書き込まない。 */
     dbCommit?: readonly HqTemplateStatement[];
 };
 export type FormTemplateDependencies = {
@@ -47,7 +50,7 @@ function text(value: unknown, max = 200): string {
 }
 function optionalText(value: unknown, max = 2000): string | null { return value == null || value === '' ? null : text(value, max); }
 const referenceKey = (kind: string, id: string) => `${kind}:${id}`;
-/** Match the form editor's absolute HTTP(S) contract; account links need an explicit resolver. */
+/** 編集画面と同じ絶対 HTTP(S) を求め、アカウント依存のリンクは明示的に解決する。 */
 function validatePortableUrl(value: unknown): void {
     if (value == null || value === '') return;
     if (typeof value !== 'string' || value.length > 2048 || /[\u0000-\u001f\u007f\\]/.test(value))
@@ -62,7 +65,7 @@ function validatePortableUrl(value: unknown): void {
             if (next === current) return current;
             current = next;
         }
-        // Do not silently accept indefinitely encoded account references.
+        // 多重符号化したアカウント参照も、黙って通さない。
         if (/%[0-9a-f]{2}/i.test(current)) throw new FormTemplateError('UNSUPPORTED_REFERENCE');
         return current;
     };
@@ -88,7 +91,7 @@ function validatePortableUrl(value: unknown): void {
         || [path, query, hash].some(part => referencePath.test(part) || referenceFragment.test(part) || liff.test(part)))
         throw new FormTemplateError('UNSUPPORTED_REFERENCE');
 }
-/** The visitor remaps supported references and rejects unknown cross-account dependencies. */
+/** 実行契約が分かる参照だけを変換し、未知のアカウント間依存は拒む。 */
 function visitLayout(value: unknown, resolve: (kind: 'tag' | 'scenario', id: string) => string): unknown {
     if (Array.isArray(value))
         return value.map(v => visitLayout(v, resolve));
@@ -96,8 +99,10 @@ function visitLayout(value: unknown, resolve: (kind: 'tag' | 'scenario', id: str
         return value;
     const result: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value)) {
-        if (['url', 'linkUrl', 'thanksUrl'].includes(key)) validatePortableUrl(item);
-        if (['friendFieldId', 'friendFieldIds', 'choiceFriendFieldId', 'fieldId', 'templateId', 'reminderId', 'mediaUrl', 'backgroundImageUrl'].includes(key) && item != null && item !== '' && !(Array.isArray(item) && !item.length))
+        if (['url', 'linkUrl', 'thanksUrl', 'mediaUrl'].includes(key)) validatePortableUrl(item);
+        if (key === 'mediaUrl' && typeof item === 'string' && /\/(?:images\/(?:media|form-uploads)|api\/media|media)\//i.test(item))
+            throw new FormTemplateError('UNSUPPORTED_REFERENCE');
+        if (['friendFieldId', 'friendFieldIds', 'choiceFriendFieldId', 'fieldId', 'templateId', 'reminderId', 'backgroundImageUrl'].includes(key) && item != null && item !== '' && !(Array.isArray(item) && !item.length))
             throw new FormTemplateError('UNSUPPORTED_REFERENCE');
         if ((key === 'tagId' || key === 'scenarioId') && item != null && item !== '')
             result[key] = resolve(key === 'tagId' ? 'tag' : 'scenario', text(item, 160));
@@ -124,15 +129,17 @@ export function parseFormTemplateDefinition(input: HqTemplateAdapterInput): Form
     if (root.schemaVersion !== 1)
         throw new FormTemplateError('INVALID_DEFINITION');
     const form = object(root.form);
-    // Webhook credentials, source URLs, publication flags and answer data are not portable configuration.
+    // Webhook 資格情報・元 URL・公開フラグ・回答は、配布可能な設定へ含めない。
     const allowed = new Set(['name', 'description', 'fields', 'layout', 'on_submit_tag_id', 'on_submit_scenario_id', 'save_to_metadata']);
     if (Object.keys(form).some(k => !allowed.has(k)))
         throw new FormTemplateError('INVALID_DEFINITION');
     const layout = form.layout == null ? null : normalizeLayout(form.layout);
     if (form.layout != null && !layout)
         throw new FormTemplateError('INVALID_DEFINITION');
-    if (layout)
+    if (layout) {
         visitLayout(layout, (_kind, id) => id);
+        if (validateFormDefinition(layout)) throw new FormTemplateError('INVALID_DEFINITION');
+    }
     let fields: Record<string, unknown>[];
     if (layout)
         fields = layoutToFields(layout) as unknown as Record<string, unknown>[];
@@ -178,52 +185,60 @@ function references(def: FormTemplateDefinition): FormReference[] {
     visitLayout(def.form.layout, add);
     return [...refs.values()].sort((a, b) => referenceKey(a.kind, a.sourceId).localeCompare(referenceKey(b.kind, b.sourceId)));
 }
-// Answer counts, submissions and deletion-impact revision intentionally do not enter
-// content comparison: a new answer must not masquerade as an editor conflict.
+// 回答が増えただけで編集競合にしないよう、回答数・回答・削除影響の版を内容比較へ混ぜない。
 const SNAPSHOT_SQL = `SELECT json_object(
  'account',json((SELECT json_object('id',id,'tenant',tenant_id,'active',is_active,'archived',archived_at,'liff',liff_id) FROM line_accounts WHERE id=?)),
  'forms',json((SELECT json_group_array(json_object('id',id,'name',name,'description',description,'fields',fields,'layout',layout,'tag',on_submit_tag_id,'scenario',on_submit_scenario_id,'active',is_active,'status',status,'content_revision',content_revision,'owners',json((SELECT json_group_array(line_account_id) FROM (SELECT line_account_id FROM form_accounts WHERE form_id=f.id ORDER BY line_account_id))))) FROM (SELECT f.* FROM forms f WHERE EXISTS(SELECT 1 FROM form_accounts WHERE form_id=f.id AND line_account_id=?) ORDER BY f.id) f)),
  'tags',json((SELECT json_group_array(json_object('id',id,'name',name,'version',version,'updated_at',updated_at,'status',status)) FROM (SELECT * FROM tags WHERE line_account_id=? ORDER BY id))),
  'scenarios',json((SELECT json_group_array(json_object('id',id,'name',name,'updated_at',updated_at,'active',is_active,'published',current_published_version_id)) FROM (SELECT * FROM scenarios WHERE line_account_id=? ORDER BY id))),
+ 'bookingMenus',json((SELECT json_group_array(json_object('id',id,'name',name,'accountId',line_account_id,'active',is_active,'deleted',deleted_at,'version',version)) FROM menus WHERE line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=(SELECT tenant_id FROM line_accounts WHERE id=?)) ORDER BY id)),
+ 'bookingStaff',json((SELECT json_group_array(json_object('id',id,'name',name,'accountId',line_account_id,'active',is_active,'deleted',deleted_at)) FROM staff WHERE line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=(SELECT tenant_id FROM line_accounts WHERE id=?)) ORDER BY id)),
+ 'seatStores',json((SELECT json_group_array(json_object('id',s.id,'accountId',s.line_account_id,'status',s.status,'updated',s.updated_at)) FROM rt_stores s JOIN line_accounts a ON a.id=s.line_account_id JOIN rt_organizations o ON o.id=s.organization_id WHERE COALESCE(o.tenant_id,'${DEFAULT_TENANT_ID}')=COALESCE(a.tenant_id,'${DEFAULT_TENANT_ID}') AND o.status!='archived' AND a.tenant_id=(SELECT tenant_id FROM line_accounts WHERE id=?) AND a.is_active=1 AND a.archived_at IS NULL ORDER BY s.id)),
+ 'seatCourses',json((SELECT json_group_array(json_object('id',m.id,'storeId',m.store_id,'name',m.name,'status',m.status,'updated',m.updated_at)) FROM rt_menu_items m JOIN rt_stores s ON s.id=m.store_id JOIN line_accounts a ON a.id=s.line_account_id JOIN rt_organizations o ON o.id=s.organization_id WHERE COALESCE(o.tenant_id,'${DEFAULT_TENANT_ID}')=COALESCE(a.tenant_id,'${DEFAULT_TENANT_ID}') AND o.status!='archived' AND m.kind='course' AND a.tenant_id=(SELECT tenant_id FROM line_accounts WHERE id=?) AND a.is_active=1 AND a.archived_at IS NULL ORDER BY m.id)),
+ 'storeVars',json((SELECT json_group_array(json_object('key',var_key,'type',type,'status',status,'archived',archived_at,'version',version,'updated',updated_at,'from',valid_from,'until',valid_until,'expiry',expiry_behavior)) FROM (SELECT * FROM common_vars WHERE line_account_id=? AND var_key IN (SELECT value FROM json_each(?)) ORDER BY id))),
  'templates',json((SELECT json_group_array(json_object('id',id,'name',name,'updated_at',updated_at,'draft_revision',draft_revision,'published_version',published_version)) FROM (SELECT * FROM templates WHERE line_account_id=? ORDER BY id)))
 ) AS snapshot`;
-type FormSnapshot = {
-    account: {
-        id: string;
-        tenant: string | null;
-        active: number;
-        archived: string | null;
-        liff: string | null;
-    } | null;
-    forms: {
-        id: string;
-        name: string;
-        status: string;
-        content_revision: number;
-        owners: string[];
-    }[];
-    tags: {
-        id: string;
-        name: string;
-        version: number;
-        updated_at: string | null;
-        status: string;
-    }[];
-    scenarios: {
-        id: string;
-        name: string;
-        updated_at: string | null;
-    }[];
-    templates: {
-        id: string;
-        name: string;
-        updated_at: string | null;
-        draft_revision: number;
-        published_version: number;
-    }[];
-};
-export async function formTemplateSnapshot(db: D1Database, accountId: string): Promise<string> {
-    const result = await db.prepare(SNAPSHOT_SQL).bind(accountId, accountId, accountId, accountId, accountId).first<{
+function mapBookingLayout(value:FormLayout|null,state:FormSnapshot,accountId:string):FormLayout|null {
+    if(!value) return null;
+    const layout=JSON.parse(JSON.stringify(value)) as FormLayout;
+    const resolve=(id:string,rows:BookingResource[])=>{
+      const source=rows.find(r=>r.id===id && r.active===1&&!r.deleted);
+      if(!source)throw new FormTemplateError('REFERENCE_UNAVAILABLE');
+      const matches=rows.filter(r=>r.accountId===accountId&&r.active===1&&!r.deleted&&normalizeScopedTagName(r.name)===normalizeScopedTagName(source.name));
+      if(matches.length!==1)throw new FormTemplateError('REFERENCE_UNAVAILABLE');
+      return matches[0].id;
+    };
+    for(const block of collectInputs(layout)) if(block.type==='booking'&&block.booking) {
+      if(block.booking.kind==='seats') {
+        const stores=state.seatStores??[],courses=state.seatCourses??[];
+        const source=stores.find(store=>store.id===block.booking!.storeId&&store.status==='active');
+        const targets=stores.filter(store=>store.accountId===accountId&&store.status==='active');
+        if(!source||targets.length!==1)throw new FormTemplateError('REFERENCE_UNAVAILABLE');
+        const target=targets[0]!;
+        if(block.booking.courseId) {
+          const course=courses.find(course=>course.id===block.booking!.courseId&&course.storeId===source.id&&course.status==='active');
+          if(!course)throw new FormTemplateError('REFERENCE_UNAVAILABLE');
+          const matches=courses.filter(row=>row.storeId===target.id&&row.status==='active'&&normalizeScopedTagName(row.name)===normalizeScopedTagName(course.name));
+          if(matches.length!==1)throw new FormTemplateError('REFERENCE_UNAVAILABLE');
+          block.booking.courseId=matches[0]!.id;
+        }
+        block.booking.storeId=target.id;
+        continue;
+      }
+      block.booking.menuId=resolve(block.booking.menuId,state.bookingMenus??[]);
+      if(block.booking.staffId)block.booking.staffId=resolve(block.booking.staffId,state.bookingStaff??[]);
+    }
+    return layout;
+}
+function storeReferenceKeys(layout?: FormLayout | null): string[] {
+    return [...new Set((layout?.references ?? []).flatMap(reference => reference.kind === 'store_information'
+        ? Object.values(reference.fields).map(source => source!.varKey) : []))];
+}
+function formSnapshotBindings(accountId: string, layout?: FormLayout | null): string[] {
+    return [...Array(9).fill(accountId), JSON.stringify(storeReferenceKeys(layout)), accountId];
+}
+export async function formTemplateSnapshot(db: D1Database, accountId: string, layout?: FormLayout | null): Promise<string> {
+    const result = await db.prepare(SNAPSHOT_SQL).bind(...formSnapshotBindings(accountId, layout)).first<{
         snapshot: string;
     }>();
     if (!result)
@@ -247,16 +262,33 @@ function authorize(authority: HqTemplateAuthority, context: Pick<HqTemplateAdapt
     if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || authority.tenantId !== context.tenantId || state.account?.tenant !== authority.tenantId || state.account.active !== 1 || state.account.archived)
         throw new FormTemplateError('FORBIDDEN');
 }
+export async function formTemplateWarnings(db: D1Database, accountId: string, input: HqTemplateAdapterInput): Promise<string[]> {
+    const def = parseFormTemplateDefinition(input);
+    if (!def.form.layout || !collectInputs(def.form.layout).some(block=>block.fixedField==='anniversary'||block.fixedField==='seat_preference')) return [];
+    const store = await db.prepare("SELECT id FROM rt_stores WHERE line_account_id=? AND status='active' LIMIT 1").bind(accountId).first();
+    return store ? [] : ['飲食を使わない店です。記念日・席の好みが含まれています。配る前に内容を確かめてください'];
+}
+/** 名前が同じ公開項目だけを配布先で解決し、元の店の値は持ち出さない。 */
+async function verifyStoreReferences(db: D1Database, accountId: string, layout: FormLayout | null): Promise<void> {
+    if (layout?.references?.some(reference => reference.kind === 'image'))
+        throw new FormTemplateError('PUBLIC_IMAGE_REFERENCE_UNSUPPORTED');
+    const keys = (layout?.references ?? []).flatMap(reference => reference.kind === 'store_information'
+        ? Object.values(reference.fields).map(source => source!.varKey) : []);
+    if (keys.length && !(await resolveCommonVarValuesAt(db, accountId, keys, new Date().toISOString())).ok)
+        throw new FormTemplateError('FORM_STORE_REFERENCE_UNAVAILABLE');
+}
 export async function inspectFormTemplate(db: D1Database, authority: HqTemplateAuthority, accountId: string, input: HqTemplateAdapterInput) {
-    const def = parseFormTemplateDefinition(input), snapshot = await formTemplateSnapshot(db, accountId), state = JSON.parse(snapshot) as FormSnapshot;
+    const def = parseFormTemplateDefinition(input), snapshot = await formTemplateSnapshot(db, accountId, def.form.layout), state = JSON.parse(snapshot) as FormSnapshot;
     authorize(authority, { tenantId: authority.tenantId, targetAccountId: accountId }, state);
+    mapBookingLayout(def.form.layout,state,accountId);
+    await verifyStoreReferences(db, accountId, def.form.layout);
     const found = target(state, def.form.name);
     const allowedModes = !found ? ['create'] as const : found.status === 'archived' || found.owners.length !== 1 ? ['alias'] as const : ['overwrite', 'alias'] as const;
     return { snapshot, snapshotToken: await formTemplateSnapshotToken(snapshot), sourceId: 'form', itemKind: 'form', name: def.form.name, targetId: found?.id ?? null, expectedRevision: found ? String(found.content_revision) : null, duplicate: Boolean(found), allowedModes, references: references(def) };
 }
-/** Preflight rows make every form reference an explicit, immutable operator decision. */
+/** フォーム参照ごとの選択は、事前確認行へ明示的かつ不変の判断として保存する。 */
 export async function inspectFormTemplateReferences(db: D1Database, authority: HqTemplateAuthority, accountId: string, input: HqTemplateAdapterInput, inspectedSnapshot?: string) {
-    const def = parseFormTemplateDefinition(input), snapshot = inspectedSnapshot ?? await formTemplateSnapshot(db, accountId), state = JSON.parse(snapshot) as FormSnapshot;
+    const def = parseFormTemplateDefinition(input), snapshot = inspectedSnapshot ?? await formTemplateSnapshot(db, accountId, def.form.layout), state = JSON.parse(snapshot) as FormSnapshot;
     authorize(authority, { tenantId: authority.tenantId, targetAccountId: accountId }, state);
     const directReferences = references(def);
     const expanded = new Map(directReferences.map(reference => [referenceKey(reference.kind, reference.sourceId), reference]));
@@ -315,7 +347,7 @@ export async function inspectFormTemplateReferences(db: D1Database, authority: H
     }
     return referenceItems;
 }
-/** The URL is derived from the destination LIFF and stable form ID, never copied. */
+/** 元 URL を複製せず、配布先の LIFF と固定フォーム ID から組み立てる。 */
 export async function formTemplatePublicUrl(db: D1Database, authority: HqTemplateAuthority, accountId: string, formId: string): Promise<string | null> {
     if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED')
         throw new FormTemplateError('FORBIDDEN');
@@ -324,7 +356,7 @@ export async function formTemplatePublicUrl(db: D1Database, authority: HqTemplat
     }>();
     return row?.liff_id ? `https://liff.line.me/${encodeURIComponent(row.liff_id)}/forms/${encodeURIComponent(formId)}` : null;
 }
-/** Produces an atomic plan only. The shared executor owns result claims and audits. */
+/** ここは原子的な計画だけを作り、結果の実行権と監査は共通実行側が管理する。 */
 export function createFormHqTemplateAdapter(deps: FormTemplateDependencies): HqTemplateAdapter {
     let def: FormTemplateDefinition | null = null, inputBinding: string | null = null, contextBinding: string | null = null, snapshot: string | null = null;
     let resolved = new Map<string, FormReferenceResolution>(), planned: HqTemplateStoreAtomicCommitPlan | null = null;
@@ -339,13 +371,14 @@ export function createFormHqTemplateAdapter(deps: FormTemplateDependencies): HqT
             resolved = new Map();
             if (!def || JSON.stringify(refs) !== JSON.stringify(references(def)))
                 throw new FormTemplateError('INVALID_PHASE');
-            snapshot = await formTemplateSnapshot(deps.db, context.targetAccountId);
+            snapshot = await formTemplateSnapshot(deps.db, context.targetAccountId, def.form.layout);
             const state = JSON.parse(snapshot) as FormSnapshot;
             authorize(deps.authority, context, state);
             if (!state.account?.liff)
                 throw new FormTemplateError('LIFF_UNAVAILABLE');
             if (await formTemplateSnapshotToken(snapshot) !== context.snapshotToken)
                 throw new FormTemplateError('VERSION_CONFLICT');
+            await verifyStoreReferences(deps.db, context.targetAccountId, def.form.layout);
             for (const ref of references(def)) {
                 const mapped = await deps.resolveReference(ref, context);
                 text(mapped?.targetId, 160);
@@ -386,11 +419,11 @@ export function createFormHqTemplateAdapter(deps: FormTemplateDependencies): HqT
                 ids[key] = value.targetId;
             const map = (kind: 'tag' | 'scenario', source: string) => { const value = ids[referenceKey(kind, source)]; if (!value)
                 throw new FormTemplateError('REFERENCE_UNAVAILABLE'); return value; };
-            const layout = def!.form.layout ? visitLayout(def!.form.layout, map) as FormLayout : null;
+            const layout = mapBookingLayout(def!.form.layout ? visitLayout(def!.form.layout, map) as FormLayout : null,state,context.targetAccountId);
             const fields = layout ? layoutToFields(layout) : def!.form.fields;
             const tagId = def!.form.on_submit_tag_id ? map('tag', def!.form.on_submit_tag_id) : null;
             const scenarioId = def!.form.on_submit_scenario_id ? map('scenario', def!.form.on_submit_scenario_id) : null;
-            const statements: HqTemplateStatement[] = [guard(`(${SNAPSHOT_SQL})=?`, [context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, snapshot!])];
+            const statements: HqTemplateStatement[] = [guard(`(${SNAPSHOT_SQL})=?`, [...formSnapshotBindings(context.targetAccountId, def!.form.layout), snapshot!])];
             statements.push(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [context.targetAccountId, deps.authority.tenantId]));
             for (const value of resolved.values())
                 statements.push(...value.dbCommit ?? []);
@@ -400,9 +433,10 @@ export function createFormHqTemplateAdapter(deps: FormTemplateDependencies): HqT
             }
             const values = [name, def!.form.description, JSON.stringify(fields), layout ? JSON.stringify(layout) : null, tagId, scenarioId, def!.form.save_to_metadata ? 1 : 0];
             if (selection.mode === 'overwrite')
-                statements.push({ sql: `UPDATE forms SET name=?,description=?,fields=?,layout=?,on_submit_tag_id=?,on_submit_scenario_id=?,save_to_metadata=?,is_active=0,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1,content_revision=content_revision+1 WHERE id=? AND content_revision=?`, bindings: [...values, id, found!.content_revision] });
+                statements.push({ sql: `UPDATE forms SET name=?,description=?,fields=?,layout=?,on_submit_tag_id=?,on_submit_scenario_id=?,save_to_metadata=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),revision=revision+1,content_revision=content_revision+1 WHERE id=? AND content_revision=?`, bindings: [...values, id, found!.content_revision] });
             else
                 statements.push({ sql: `INSERT INTO forms(id,name,description,fields,layout,on_submit_tag_id,on_submit_scenario_id,save_to_metadata,is_active) VALUES (?,?,?,?,?,?,?,?,0)`, bindings: [id, ...values] }, { sql: `INSERT INTO form_accounts(form_id,line_account_id) VALUES (?,?)`, bindings: [id, context.targetAccountId] });
+            statements.push(...formMediaUsageQueries(id));
             planned = { tenantId: context.tenantId, targetAccountId: context.targetAccountId, preflightId: context.preflightId, idempotencyFingerprint: context.idempotencyFingerprint, snapshotToken: context.snapshotToken, mode: context.mode, resolutions: context.resolutions.map(r => {
                 if (r === selection)
                     return { ...r, targetId: id, aliasName: selection.mode === 'alias' ? name : undefined };

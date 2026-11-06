@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import TriggerEditor from './trigger-editor'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -25,14 +26,16 @@ const removeTrigger = vi.hoisted(() => vi.fn())
 const simulate = vi.hoisted(() => vi.fn())
 const fetchTags = vi.hoisted(() => vi.fn())
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async importOriginal => ({ ...(await importOriginal<typeof import('@/lib/api')>()),
   api: {
+    tags: { list: fetchTags },
+    tagGroups: { list: vi.fn(async () => ({ success: true, data: [] })) },
     scenarios: {
       triggers: { list: listTriggers, add: addTrigger, remove: removeTrigger },
       simulate,
     },
   },
-}))
+} ))
 
 vi.mock('@/components/scenarios/scenario-reference-data', () => ({
   scenarioReferenceData: { tags: fetchTags },
@@ -124,7 +127,7 @@ describe('U004: 開始条件のキャンセル', () => {
   it('タグを足してもキャンセルで元に戻る', async () => {
     const { onClose } = await renderEditor()
 
-    fireEvent.change(screen.getByLabelText('きっかけにするタグ'), { target: { value: 'tag-2' } })
+    await pickEntity('きっかけにするタグ', '購入済')
     fireEvent.click(screen.getByText('＋ このタグが付いたとき'))
     expect(addTrigger).not.toHaveBeenCalled()
     expect(screen.getByText('タグ「購入済」が付いたとき')).toBeTruthy()
@@ -141,13 +144,13 @@ describe('U004: 開始条件のキャンセル', () => {
 
     // 既存の友だち追加を外し、タグを1つ足す。
     fireEvent.click(screen.getAllByText('外す')[0])
-    fireEvent.change(screen.getByLabelText('きっかけにするタグ'), { target: { value: 'tag-2' } })
+    await pickEntity('きっかけにするタグ', '購入済')
     fireEvent.click(screen.getByText('＋ このタグが付いたとき'))
     expect(removeTrigger).not.toHaveBeenCalled()
     expect(addTrigger).not.toHaveBeenCalled()
 
     await act(async () => {
-      fireEvent.click(screen.getByText('開始条件を保存'))
+      fireEvent.click(screen.getByText('開始条件を保存する'))
     })
     expect(onClose).toHaveBeenCalled()
     expect(removeTrigger).toHaveBeenCalledWith('sc-1', 'trig-1')
@@ -162,10 +165,10 @@ describe('U004: 開始条件のキャンセル', () => {
 
     fireEvent.click(screen.getAllByText('外す')[0])
     await act(async () => {
-      fireEvent.click(screen.getByText('開始条件を保存'))
+      fireEvent.click(screen.getByText('開始条件を保存する'))
     })
 
-    expect(screen.getByText('外せませんでした')).toBeTruthy()
+    expect(screen.getByText(/外せませんでした/)).toBeTruthy()
     expect(onClose).not.toHaveBeenCalled()
     // 部分反映を「保存済み」と見せないため、実態を読み直す。
     expect(listTriggers).toHaveBeenCalledTimes(2)
@@ -202,7 +205,7 @@ describe('U006: 開始回数は固定仕様の説明にする', () => {
     expect(screen.queryByText('同じ友だちは初回のみ開始')).toBeNull()
     expect(screen.queryByText('条件を満たすたびに開始')).toBeNull()
     // 実挙動: status != 'completed' の重複だけを弾くので、読了後は再開する。
-    expect(SOURCE).toContain('最後まで読み終えた人が条件を満たすと、もう一度最初から始まります')
+    expect(screen.getByText('最後まで読み終えた人が条件を満たすと、もう一度最初から始まります。', { exact: false })).toBeTruthy()
   })
 })
 
@@ -247,3 +250,38 @@ describe('U088/U089: 共通アクセシブル部品と閉じる操作', () => {
     expect(onClose).toHaveBeenCalled()
   })
 })
+
+it('WEB268: 保存の通信例外から入力を残して再試行できる', async () => {
+  removeTrigger.mockRejectedValueOnce(new Error('offline'))
+  const { onClose } = await renderEditor()
+  fireEvent.click(screen.getAllByText('外す')[0])
+  await act(async () => fireEvent.click(screen.getByText('開始条件を保存する')))
+  expect(document.body.textContent).toContain('保存に失敗しました')
+  expect(onClose).not.toHaveBeenCalled()
+  expect(screen.getByText('開始条件を保存する').closest('button')!.disabled).toBe(false)
+  await act(async () => fireEvent.click(screen.getByText('開始条件を保存する')))
+  expect(removeTrigger).toHaveBeenCalledTimes(2)
+  expect(onClose).toHaveBeenCalledTimes(1)
+})
+
+it('WEB268: A→B→Aに戻っても最初のAの保存完了で今の窓を閉じない', async () => {
+  let finish!: (value: unknown) => void
+  removeTrigger.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  const onClose = vi.fn()
+  const props = {onClose, lineAccountId:'acc-1'}
+  const view = render(<TriggerEditor {...props} scenarioId="sc-1" />)
+  await act(async () => {})
+  fireEvent.click(screen.getAllByText('外す')[0])
+  await act(async () => fireEvent.click(screen.getByText('開始条件を保存する')))
+  expect(removeTrigger).toHaveBeenCalledTimes(1)
+  view.rerender(<TriggerEditor {...props} scenarioId="sc-2" />)
+  await act(async () => {})
+  view.rerender(<TriggerEditor {...props} scenarioId="sc-1" />)
+  await act(async () => {})
+  await act(async () => finish({success:true,data:null}))
+  expect(onClose).not.toHaveBeenCalled()
+  expect(screen.getByText('友だち追加時')).toBeTruthy()
+})
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

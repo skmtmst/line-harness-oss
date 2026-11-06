@@ -1,14 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { getTemplateById } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-/**
- * 実DBで通す一気通貫(#645・差し戻し6要件)。
- * 保存→下書きにだけ書かれ、送信側が読む live 列は公開操作まで不変。
- * モック単体の契約は templates-published-version.test.ts にある。
- */
+/** 下書き保存から公開まで実 DB で検証し、公開操作まで送信側の live 列が変わらないことを確かめる。 */
 
 const accountAccess = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(),
@@ -28,7 +24,12 @@ function app() {
   return hono;
 }
 
-function json(method: string, path: string, body: unknown, key?: string, db = store.db) {
+async function json(method: string, path: string, body: unknown, key?: string, db = store.db) {
+  // 読みたての編集画面から保存する経路を試す。古い版を試す場合は、本文に明示した版を優先する。
+  if (method === 'PUT' && path.startsWith('/api/templates/')) {
+    const row = store.raw.prepare('SELECT published_version, draft_revision FROM templates WHERE id=?').get(path.split('/').at(-1)) as {published_version:number;draft_revision:number} | undefined;
+    if (row) body = { expectedVersion: row.published_version, expectedDraftRevision: row.draft_revision, ...body as Record<string, unknown> };
+  }
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (key) headers['Idempotency-Key'] = key;
   return app().request(path, {
@@ -425,5 +426,45 @@ describe('実DB: 削除・同時編集・冪等の保証', () => {
 
     const row = await getTemplateById(store.db, id);
     expect(row?.published_version).toBe(1);
+  });
+});
+
+describe('質問の追加処理を保存して読み戻す', () => {
+  it('既存の質問のタグと合計点を保存し、別店のタグの更新を拒否する', async () => {
+    store.raw.exec(`INSERT INTO tenants(id,name) VALUES ('tenant','Tenant');
+      INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES ('account-1','Shop','c','t','s','tenant'),('other','Other','o','t','s','tenant');
+      INSERT INTO tags(id,name,line_account_id) VALUES ('tag-own','興味','account-1'),('tag-out','別店','other');`);
+    const question={text:'続けますか',tapMode:'single',choices:[{label:'はい',behavior:'none',addTagIds:['tag-own'],scoreChange:10}]};
+    const created=await json('POST','/api/templates',{accountId:'account-1',name:'質問',messageType:'text',messageContent:question.text,question});
+    expect(created.status).toBe(201);
+    const body=await created.json() as {data:{id:string;question:unknown}};
+    expect(body.data.question).toEqual(question);
+    const saved=await json('PUT',`/api/templates/${body.data.id}`,{question:{...question,choices:[{...question.choices[0],scoreChange:20}]}});
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toMatchObject({data:{question:{choices:[{scoreChange:20,addTagIds:['tag-own']}]}}});
+    const rejected=await json('PUT',`/api/templates/${body.data.id}`,{question:{...question,choices:[{...question.choices[0],addTagIds:['tag-out']}]}});
+    expect(rejected.status).toBe(422);
+    expect(await rejected.json()).toMatchObject({code:'TAP_EXTRA_INVALID'});
+  });
+});
+
+describe('リッチテキストの追加処理の保存', () => {
+  it.each(['rich_message','imagemap'])('%sのテキストにタグ・合計点を保存し、公開版へ渡す', async messageType => {
+    store.raw.exec(`INSERT INTO tenants(id,name) VALUES ('tenant','Tenant');
+      INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES ('account-1','Shop','c','t','s','tenant');
+      INSERT INTO tags(id,name,line_account_id) VALUES ('tag-own','興味','account-1');`);
+    const tapExtras={tagIds:['tag-own'],scoreChange:10};
+    const content={baseUrl:'https://image.test/map',imageUrl:'https://image.test/map/1040',baseSize:{width:1040,height:520},altText:'予約案内',
+      ...(messageType==='rich_message' ? {tapAreas:[{x:0,y:0,width:100,height:100,actionType:'message',text:'予約したい',tapExtras}]}
+        : {actions:[{type:'message',text:'予約したい',tapExtras,area:{x:0,y:0,width:1040,height:520}}]})};
+    const messageContent=JSON.stringify(content);
+    const response=await json('POST','/api/templates',{accountId:'account-1',name:'予約案内',messageType,messageContent});
+    expect(response.status).toBe(201);
+    const body=await response.json() as {data:{id:string}};
+    const published=await json('POST',`/api/templates/${body.data.id}/publish`,{expectedVersion:0,expectedDraftRevision:1},`rich-text-extras-${messageType}`);
+    expect(published.status).toBe(200);
+    const saved=await getTemplateById(store.db,body.data.id);
+    expect(saved!.message_content).toBe(messageContent);
+    expect(saved!.published_version).toBe(1);
   });
 });

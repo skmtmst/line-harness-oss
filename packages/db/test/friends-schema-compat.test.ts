@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, test } from 'vitest';
-import { upsertFriend } from '../src/friends.js';
+import { upsertFriend } from '../src/friends/index.js';
 
 const databases: Database.Database[] = [];
 
@@ -12,6 +12,10 @@ function legacyDb(): { d1: D1Database; sqlite: Database.Database } {
   const sqlite = new Database(':memory:');
   databases.push(sqlite);
   sqlite.exec(`
+    -- Keep the friend columns at the pre-065 shape; account ownership is still
+    -- required to authorize a legacy unassigned friend lookup.
+    CREATE TABLE line_accounts(id TEXT PRIMARY KEY, tenant_id TEXT);
+    INSERT INTO line_accounts(id,tenant_id) VALUES ('account-legacy',NULL);
     CREATE TABLE friends (
       id TEXT PRIMARY KEY,
       line_user_id TEXT NOT NULL UNIQUE,

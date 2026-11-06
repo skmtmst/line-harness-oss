@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   listMessageTemplates,
@@ -7,7 +8,8 @@ import {
   deleteMessageTemplate,
 } from '@line-crm/db';
 import type { MessageTemplate } from '@line-crm/db';
-import type { Env } from '../index.js';
+import { listResponse } from '../lib/list-etag.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 
 const messageTemplates = new Hono<Env>();
@@ -27,10 +29,10 @@ function serialize(t: MessageTemplate) {
 messageTemplates.get('/api/message-templates', async (c) => {
   try {
     const templates = await listMessageTemplates(c.env.DB);
-    return c.json({ success: true, data: templates.map(serialize) });
+    // 同じ中身なら304（list-etag）。
+    return listResponse(c, { success: true, data: templates.map(serialize) });
   } catch (err) {
-    console.error('GET /api/message-templates error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -41,13 +43,12 @@ messageTemplates.get('/api/message-templates/:id', async (c) => {
     if (!t) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serialize(t) });
   } catch (err) {
-    console.error('GET /api/message-templates/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/message-templates — create
-messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), async (c) => {
+messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"messageType":["string"],"messageContent":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -56,19 +57,19 @@ messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), a
     }>();
 
     if (!body.name || !body.messageType || !body.messageContent) {
-      return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
+      return inputError(c, { success: false, error: 'name, messageType, messageContent are required' }, 400, ["name","messageType","messageContent"]);
     }
 
     if (!['text', 'flex'].includes(body.messageType)) {
-      return c.json({ success: false, error: 'messageType must be text or flex' }, 400);
+      return inputError(c, { success: false, error: 'messageType must be text or flex' }, 400, ["messageType"]);
     }
 
-    // Validate flex JSON
+
     if (body.messageType === 'flex') {
       try {
         JSON.parse(body.messageContent);
       } catch {
-        return c.json({ success: false, error: 'messageContent must be valid JSON for flex type' }, 400);
+        return inputError(c, { success: false, error: 'messageContent must be valid JSON for flex type' }, 422, ["messageContent"]);
       }
     }
 
@@ -79,13 +80,12 @@ messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), a
     });
     return c.json({ success: true, data: serialize(t) }, 201);
   } catch (err) {
-    console.error('POST /api/message-templates error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // PUT /api/message-templates/:id — update
-messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin'), async (c) => {
+messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"messageType":["string"],"messageContent":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name?: string;
@@ -94,10 +94,10 @@ messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin')
     }>();
 
     if (body.messageType && !['text', 'flex'].includes(body.messageType)) {
-      return c.json({ success: false, error: 'messageType must be text or flex' }, 400);
+      return inputError(c, { success: false, error: 'messageType must be text or flex' }, 400, ["messageType"]);
     }
 
-    // Resolve effective type and content for validation
+
     const existing = await getMessageTemplateById(c.env.DB, c.req.param('id'));
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const effectiveType = body.messageType ?? existing.message_type;
@@ -107,7 +107,7 @@ messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin')
       try {
         JSON.parse(effectiveContent);
       } catch {
-        return c.json({ success: false, error: 'messageContent must be valid JSON for flex type' }, 400);
+        return inputError(c, { success: false, error: 'messageContent must be valid JSON for flex type' }, 422, ["messageContent"]);
       }
     }
 
@@ -119,20 +119,18 @@ messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin')
     if (!t) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serialize(t) });
   } catch (err) {
-    console.error('PUT /api/message-templates/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// DELETE /api/message-templates/:id — delete
+
 messageTemplates.delete('/api/message-templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const deleted = await deleteMessageTemplate(c.env.DB, c.req.param('id'));
     if (!deleted) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true });
   } catch (err) {
-    console.error('DELETE /api/message-templates/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

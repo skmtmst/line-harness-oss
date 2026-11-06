@@ -4,6 +4,9 @@ import type { BookingRequest, DashboardOverview, DashboardUpcoming, DeliveryFail
 import { api } from '@/lib/api'
 import Card from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
+import TextLink from '@/components/shared/text-link'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
 /**
  * 右カラムのカード。
@@ -44,7 +47,7 @@ export function SideCard({
   return (
     <Card padding="roomy">
       <div className="flex flex-col gap-2.5">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           {/*
             題と「？」・期間はひとかたまりにし、文字の縦の中央でそろえる
             （★V7・2026-09-27）。ばらばらに置くと「？」だけ右端へ飛び、
@@ -54,14 +57,10 @@ export function SideCard({
             <h2 className="text-ink min-w-0 text-base leading-normal font-bold">{title}</h2>
             {helpTip ? <HelpTip label={`${title}の説明`}>{helpTip}</HelpTip> : null}
             {/* 期間は常に1行にする（DASH-23）。折り返すとカード間で見出しの高さがずれる。 */}
-            {period ? <span className="text-ink-faint shrink-0 text-[11px] font-normal whitespace-nowrap">{period}</span> : null}
+            {period ? <span className="text-ink-faint shrink-0 text-micro font-medium whitespace-nowrap">{period}</span> : null}
           </div>
-          {/*
-            行き先リンクは CardHeader の action（actionTone="info"）と
-            同じ見た目にする。ダッシュボードの行き先リンクはこの1つに
-            そろえ、独自の色・大きさを増やさない。
-          */}
-          {action ? <Link href={action.href} className="text-status-info shrink-0 text-label font-semibold hover:underline">{action.label}</Link> : null}
+          {/* 行き先は共通リンクの緑・文字・矢印を使い、見出しの右に1つ置く。 */}
+          {action ? <TextLink href={action.href} className="shrink-0">{action.label.replace(/\s*→\s*$/, '')}</TextLink> : null}
         </div>
         <div>{children}</div>
         {freshness ? <div className="flex justify-end">{freshness}</div> : null}
@@ -76,8 +75,8 @@ function Figure({ label, value, unit }: { label: string; value: number | null; u
     <div>
       <p className="text-ink-faint text-xs">{label}</p>
       <p className="text-ink mt-0.5 text-lg font-bold tabular-nums">
-        {value === null ? '—' : value.toLocaleString('ja-JP')}
-        <span className="text-ink-secondary ml-1 text-xs font-normal">{unit}</span>
+        {value === null ? '—' : formatNumber(value)}
+        <span className="text-ink-secondary ml-1 text-xs font-medium">{unit}</span>
       </p>
     </div>
   )
@@ -121,7 +120,7 @@ export function MonthlyDeliveryCard({ delivery, freshness }: { delivery: Dashboa
  * 「メッセージ受信時の自動変更」は、選択中のLINEアカウントの
  * 対応マーク一覧を読み、1件でも自動変更があれば「有効」とする。
  * **「対応マーク」は自由分類のほう。**このカードが並べる4状態は
- * 固定4状態の「対応状況」で、別物（要件書 `v6-02-inbox-requirements-draft.md:77`）。
+ * 固定4状態の「対応状況」で、別物（要件書 `管理画面-02-inbox-requirements-draft.md:77`）。
  * 一覧を取得できなかったときだけ `—`（未取得）にする。
  */
 export function SupportMarkStatusCard({
@@ -159,6 +158,7 @@ export function SupportMarkStatusCard({
           { label: '対応済み', value: inbox?.resolved ?? null, href: '/chats?status=resolved' },
         ].map((row) => (
           <Link
+            prefetch={false}
             key={row.label}
             href={row.href}
             title={`${row.label}で絞った受信箱を開く`}
@@ -166,7 +166,7 @@ export function SupportMarkStatusCard({
           >
             <span className="min-w-0 truncate">{row.label}</span>
             <span className="shrink-0 tabular-nums">
-              {row.value === null ? '—' : `${row.value.toLocaleString('ja-JP')}件`}
+              {row.value === null ? '—' : `${formatNumber(row.value)}件`}
             </span>
           </Link>
         ))}
@@ -201,14 +201,14 @@ export function RecentResultsCard({
             <div key={point.name} className="flex items-baseline justify-between gap-3">
               <span className="text-ink-secondary truncate text-xs">{point.name}</span>
               <span className="text-ink shrink-0 text-sm font-bold tabular-nums">
-                {point.count.toLocaleString('ja-JP')} 件
+                {formatNumber(point.count)} 件
               </span>
             </div>
           ))}
           <div className="border-hairline flex items-baseline justify-between border-t pt-2.5">
             <span className="text-ink-secondary text-xs">合計</span>
             <span className="text-ink text-sm font-bold tabular-nums">
-              {conversions.total.toLocaleString('ja-JP')} 件
+              {formatNumber(conversions.total)} 件
             </span>
           </div>
         </div>
@@ -229,25 +229,19 @@ export function activeUpcomingBookings(bookings: BookingRequest[], now = Date.no
 }
 
 function formatUpcomingDate(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 const upcomingKindLabel: Record<string, string> = {
   broadcast: '配信',
-  reminder: 'リマインダー',
+  reminder: 'リマインダ',
   booking: '予約',
 }
 
 /**
  * 今後の予定（M）。
  *
- * 予約配信・リマインダー・予約の7日分を時刻順に並べる。種類ごとの
+ * 予約配信・リマインダ・予約の7日分を時刻順に並べる。種類ごとの
  * 一覧へつなぐ。ここから変えることはできない（読むだけ）。
  * 旧Worker（upcoming 未返却）では予約だけの表示へ戻る。
  */
@@ -256,6 +250,7 @@ export function UpcomingCard({
   bookings,
   loading,
   updatedAt,
+  startLoad = true,
 }: {
   /** 選択中のLINEアカウント。upcoming の取得に使う。 */
   accountId?: string | null
@@ -263,11 +258,17 @@ export function UpcomingCard({
   loading: boolean
   /* 明細を最後に取れた時刻。読込中・失敗時は出さない（IDEA-01）。 */
   updatedAt?: Date | null
+  /*
+   * V8 速さ対応：右の列が見えるまで取得を待つとき false。
+   * 省略時は今までどおりすぐ取る（互換経路は変えない）。
+   */
+  startLoad?: boolean
 }) {
   const [upcoming, setUpcoming] = useState<DashboardUpcoming | null>(null)
   const [upcomingFailed, setUpcomingFailed] = useState(false)
   const [upcomingAt, setUpcomingAt] = useState<Date | null>(null)
   useEffect(() => {
+    if (!startLoad) return
     if (!accountId) return
     let cancelled = false
     setUpcoming(null)
@@ -289,15 +290,15 @@ export function UpcomingCard({
     return () => {
       cancelled = true
     }
-  }, [accountId])
+  }, [accountId, startLoad])
 
   const merged = accountId && !upcomingFailed ? upcoming : null
   if (merged) {
     return (
       <SideCard
         title="今後の予定"
-        helpTip="7日分の予約配信・リマインダー・予約です。見るだけで、ここからは変えられません。"
-        freshness={upcomingAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {upcomingAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}</span> : undefined}
+        helpTip="7日分の予約配信・リマインダ・予約です。見るだけで、ここからは変えられません。"
+        freshness={upcomingAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {formatTime(upcomingAt)}</span> : undefined}
       >
         {merged.items.length === 0 ? (
           <p className="text-ink-faint text-xs leading-relaxed">予定されている配信・予約はありません。</p>
@@ -307,7 +308,7 @@ export function UpcomingCard({
               <div key={`${item.kind}-${item.id}`} className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-ink truncate text-xs font-medium" title={item.title}>
-                    <Link href={item.href} className="hover:underline">{item.title}</Link>
+                    <Link href={item.href} prefetch={false} className="hover:underline">{item.title}</Link>
                   </p>
                   <p className="text-ink-faint text-micro mt-0.5">
                     {upcomingKindLabel[item.kind] ?? '予定'}
@@ -333,15 +334,20 @@ export function UpcomingCard({
     */
     <SideCard
       title="今後の予定"
-      helpTip="7日分の予約配信・リマインダー・予約です。見るだけで、ここからは変えられません。"
+      helpTip="7日分の予約配信・リマインダ・予約です。見るだけで、ここからは変えられません。"
       action={{ label: 'すべて見る →', href: '/booking/bookings?view=list' }}
-      freshness={updatedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {updatedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}</span> : undefined}
+      freshness={updatedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {formatTime(updatedAt)}</span> : undefined}
     >
       {legacyLoading ? (
-        <div className="space-y-2">
-          <div className="bg-canvas-sunken h-5 animate-pulse rounded" />
-          <div className="bg-canvas-sunken h-5 animate-pulse rounded" />
-        </div>
+        <DelayedSkeleton
+          loading
+          skeleton={
+            <div className="space-y-2">
+              <Skeleton className="block h-5 w-full" />
+              <Skeleton className="block h-5 w-full" />
+            </div>
+          }
+        />
       ) : legacyFailed ? (
         <p className="text-ink-faint text-xs leading-relaxed">予定を読み込めませんでした。</p>
       ) : legacy.length === 0 ? (
@@ -352,11 +358,11 @@ export function UpcomingCard({
             <div key={booking.id} className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-ink truncate text-xs font-medium" title={booking.menu_name}>{booking.menu_name}</p>
-                <p className="text-ink-faint mt-0.5 truncate text-[11px]" title={booking.friend_name ?? undefined}>
+                <p className="text-ink-faint mt-0.5 truncate text-micro" title={booking.friend_name ?? undefined}>
                   {booking.friend_name ?? '名前未設定'}
                 </p>
               </div>
-              <span className="text-ink-secondary shrink-0 text-[11px] tabular-nums">{formatUpcomingDate(booking.starts_at)}</span>
+              <span className="text-ink-secondary shrink-0 text-micro tabular-nums">{formatUpcomingDate(booking.starts_at)}</span>
             </div>
           ))}
         </div>
@@ -366,13 +372,7 @@ export function UpcomingCard({
 }
 
 function formatAsOfMonthDay(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(iso)
 }
 
 /**
@@ -382,11 +382,19 @@ function formatAsOfMonthDay(iso: string): string {
  * 数えない。出どころといつ時点の数かは、見出しの「？」に出す。
  * 本文に補足を書いて箱を高くしない。
  */
-export function DeliveryFailuresCard({ accountId }: { accountId?: string | null }) {
+export function DeliveryFailuresCard({ accountId, startLoad = true }: {
+  accountId?: string | null
+  /*
+   * V8 速さ対応：右の列が見えるまで取得を待つとき false。
+   * 省略時は今までどおりすぐ取る（互換経路は変えない）。
+   */
+  startLoad?: boolean
+}) {
   const [origins, setOrigins] = useState<DeliveryFailureOrigins | null>(null)
   const [failed, setFailed] = useState(false)
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null)
   useEffect(() => {
+    if (!startLoad) return
     if (!accountId) return
     let cancelled = false
     setOrigins(null)
@@ -408,7 +416,7 @@ export function DeliveryFailuresCard({ accountId }: { accountId?: string | null 
     return () => {
       cancelled = true
     }
-  }, [accountId])
+  }, [accountId, startLoad])
 
   const asOf = origins?.asOf ? formatAsOfMonthDay(origins.asOf) : null
   return (
@@ -417,11 +425,11 @@ export function DeliveryFailuresCard({ accountId }: { accountId?: string | null 
       helpTip={asOf
         ? `出どころ：通知の送達台帳・${asOf}時点。同じ失敗は1件として数えています（送り直しは数えません）。`
         : '出どころ：通知の送達台帳。同じ失敗は1件として数えています（送り直しは数えません）。'}
-      freshness={fetchedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {fetchedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}</span> : undefined}
+      freshness={fetchedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {formatTime(fetchedAt)}</span> : undefined}
     >
       {origins ? (
         <p className="text-ink text-2xl leading-9 font-bold tabular-nums">
-          {`${origins.total.toLocaleString('ja-JP')}件`}
+          {`${formatNumber(origins.total)}件`}
         </p>
       ) : failed ? (
         <>
@@ -429,9 +437,10 @@ export function DeliveryFailuresCard({ accountId }: { accountId?: string | null 
           <p className="text-ink-faint mt-1 text-xs leading-relaxed">読み込めませんでした。</p>
         </>
       ) : (
-        <div className="space-y-2">
-          <div className="bg-canvas-sunken h-7 w-20 animate-pulse rounded" />
-        </div>
+        <DelayedSkeleton
+          loading
+          skeleton={<Skeleton className="block h-7 w-20" />}
+        />
       )}
     </SideCard>
   )
@@ -451,23 +460,23 @@ export function FriendStatusCard({ friends, freshness }: { friends: DashboardOve
       <dl className="space-y-2.5 text-sm">
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-ink-secondary text-xs">友だち総数</dt>
-          <dd className="text-ink font-bold tabular-nums">{friends.total.toLocaleString('ja-JP')}人</dd>
+          <dd className="text-ink font-bold tabular-nums">{formatNumber(friends.total)}人</dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-ink-secondary text-xs">有効</dt>
-          <dd className="text-ink font-bold tabular-nums">{friends.active.toLocaleString('ja-JP')}人</dd>
+          <dd className="text-ink font-bold tabular-nums">{formatNumber(friends.active)}人</dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-ink-secondary text-xs">ブロック・非表示</dt>
           <dd className="text-ink font-bold tabular-nums">
-            {blocked.toLocaleString('ja-JP')}人（{rate.toFixed(1)}%）
+            {formatNumber(blocked)}人（{rate.toFixed(1)}%）
           </dd>
         </div>
       </dl>
-      <p className="text-ink-faint mt-3 text-[11px] leading-relaxed">
-        内訳 相手から{friends.blockedByThem.toLocaleString('ja-JP')}人
-        ・自分から{friends.hiddenByUs.toLocaleString('ja-JP')}人
-        ・相互に{friends.blockedBoth.toLocaleString('ja-JP')}人
+      <p className="text-ink-faint mt-3 text-micro leading-relaxed">
+        内訳 相手から{formatNumber(friends.blockedByThem)}人
+        ・自分から{formatNumber(friends.hiddenByUs)}人
+        ・相互に{formatNumber(friends.blockedBoth)}人
       </p>
     </SideCard>
   )

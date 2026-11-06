@@ -8,6 +8,7 @@ import {
   markersOf,
   schemaFromSqliteMaster,
   splitTopLevel,
+  stateForMigration,
   type Schema,
 } from './migrate-state';
 
@@ -161,6 +162,31 @@ describe('当たっているかの判定', () => {
   });
 });
 
+describe('再構築の適用記録による判定', () => {
+  const live = schema({ existing: ['id'] }, ['old_index']);
+  const markers = [
+    { kind: 'table' as const, name: 'existing' },
+    { kind: 'index' as const, name: 'new_index' },
+  ];
+
+  it('未記録の表再構築は既存の表があっても未適用', () => {
+    expect(stateForMigration('-- migration-policy: table-rebuild\n', false, markers, live)).toEqual({ state: 'missing' });
+  });
+
+  it('記録済みの表再構築は現物の目印に依存しない', () => {
+    expect(stateForMigration('-- migration-policy: table-rebuild\n', true, markers, live)).toEqual({ state: 'applied' });
+  });
+
+  it('ledger-only は既存の動作を保つ', () => {
+    expect(stateForMigration('-- migration-state: ledger-only\n', false, markers, live)).toEqual({ state: 'missing' });
+    expect(stateForMigration('-- migration-state: ledger-only\n', true, markers, live)).toEqual({ state: 'applied' });
+  });
+
+  it('通常の一部適用は引き続き停止対象', () => {
+    expect(stateForMigration('CREATE INDEX new_index ON existing(id);', false, markers, live).state).toBe('partial');
+  });
+});
+
 describe('bootstrap.sql の読み取り', () => {
   it('閉じ括弧の書式に関係なく列を取れる', () => {
     // 行末の書式に頼った正規表現で 127 表のうち 24 表を取りこぼし、
@@ -216,7 +242,7 @@ describe('実物で確かめた8件（2026-08-16 の nen-line-stg）', () => {
 });
 
 describe('目印の持ち主寄せ', () => {
-  it('同じ名前は最初に作ったファイルの目印にする', () => {
+  it('同名の目印は最初のファイルに属する', () => {
     const attributed = attributeMarkers([
       { file: '098_a.sql', markers: [{ kind: 'index', name: 'idx_x' }] },
       {
@@ -239,8 +265,8 @@ describe('目印の持ち主寄せ', () => {
   });
 
   it('本番で partial に化けた形を未適用と判定する（324・354・382・409）', () => {
-    // 2026-09-29 の本番D1。古いファイルが作った索引だけが在り、後のファイルが
-    // 足す物は1つも無い。寄せる前は一部だけ在るように見えて partial になった。
+    // 本番D1で古いファイルが作った索引だけが在り、後のファイルが
+    // 足す物は1つも無い場合、目印を誤配分すると partial になる。
     const live = schemaFromSqliteMaster([
       { type: 'table', name: 'event_waitlist', sql: 'CREATE TABLE event_waitlist (id TEXT, slot_id TEXT)' },
       { type: 'table', name: 'event_slots', sql: 'CREATE TABLE event_slots (id TEXT)' },

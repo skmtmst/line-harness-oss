@@ -1,6 +1,6 @@
 // リッチメニューの「土台のレイアウト」。areas は元画像のピクセル座標。
 //
-// クライアントは選んだテンプレを `templateToAreas()` で AreaInput[] に変換し、
+// クライアントは選んだテンプレを `templateToAreas` で AreaInput[] に変換し、
 // 新規作成の初期 areas として送る。
 //
 // サイズは LINE の2種類だけ:

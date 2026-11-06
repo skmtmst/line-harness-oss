@@ -1,4 +1,4 @@
-import fs from 'node:fs'
+import { readUiSource } from '../scripts/test-ui-source.mjs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -9,25 +9,16 @@ import { describe, expect, it } from 'vitest'
  * いた崩れの戻し検知。直しを戻すと赤くなる。
  */
 function read(rel: string): string {
-  return fs.readFileSync(path.join(__dirname, rel), 'utf8')
+  return readUiSource(path.join(__dirname, rel), 'utf8')
 }
 
 describe('m22c 札・ボタンの折り返し', () => {
-  it('受信箱の上の行は札も操作も高さ32で1行（言葉は変えない）', () => {
+  it('受信箱の札と保存した検索は共通部品を使う', () => {
     const source = read('app/chats/page.tsx')
-    // 札3つは h-8（32px）。py-1.5（約30px）に戻すと上端がずれて2行に見える。
-    expect(source).toContain('inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full border')
-    // 右の操作も compact（32px）でそろえる。
+    // の36px。画面の旧いTailwind指定ではなく、札の持ち主を確かめる。
+    expect(source).toContain('<FilterChip')
     expect(source).toContain('保存した検索')
     expect(source).not.toContain('<Button href="/tags?tab=marks" className="h-10 shrink-0">')
-  })
-
-  it('定期レポート作成の下の3操作は短い言葉・同じ高さで1行', () => {
-    const source = read('app/analytics/reports/new/page.tsx')
-    expect(source).toContain('>今すぐ1回だけ送る</Button>')
-    expect(source).not.toContain('>いますぐ1回だけ送ってみる</Button>')
-    // キャンセルは隣のボタンと同じ高さ40。
-    expect(source).toContain('inline-flex h-10 items-center px-3 text-sm no-underline')
   })
 
   it('条件の足し口は15札を並べない（共通部品で検索式に）', () => {
@@ -40,31 +31,11 @@ describe('m22c 札・ボタンの折り返し', () => {
 })
 
 describe('m22c 行き先リンクの見た目', () => {
-  it('ダッシュボードの「順路を見る」はカード見出しの行き先リンクと同じ', () => {
-    const source = read('components/dashboard/getting-started-band.tsx')
-    expect(source).toContain('text-status-info inline-flex shrink-0 items-center gap-1 text-label font-semibold hover:underline')
-    expect(source).not.toContain('順路を見る\n      </Link>')
-  })
-
-  it('分類案内の行き先リンクは共通の見た目（13px/600青文字）', () => {
+  it('分類案内の行き先リンクは共通の緑の文字リンク（TextLink）', () => {
     const source = read('components/friend-fields/attribute-kind-guide.tsx')
-    expect(source).toContain('text-status-info mt-0.5 inline-block text-label font-semibold hover:underline')
-    expect(source).not.toContain('font-semibold text-action')
+    expect(source).toContain('<TextLink')
+    expect(source).not.toContain('text-status-info')
   })
 
-  it('タグ系の見出し行の戻りはボタン枠ではなく共通の行き先リンク', () => {
-    for (const rel of [
-      'app/tags/fields/new/page.tsx',
-      'app/tags/fields/edit/page.tsx',
-      'app/tags/fields/migrate/page.tsx',
-      'components/friend-fields/support-mark-editor.tsx',
-    ]) {
-      const source = read(rel)
-      expect(source, `${rel} に共通の行き先リンクが無い`).toContain('text-status-info shrink-0 text-label font-semibold hover:underline')
-    }
-    expect(read('app/tags/fields/new/page.tsx')).not.toContain('>友だち情報欄へ</Button>')
-    expect(read('app/tags/fields/edit/page.tsx')).not.toContain('>友だち情報欄へ</Button>')
-    expect(read('app/tags/fields/migrate/page.tsx')).not.toContain('>友だち情報欄へ</Button>')
-    expect(read('components/friend-fields/support-mark-editor.tsx')).not.toContain('>対応マークへ</Button>')
-  })
+  // 管理画面の本文の戻るリンクは廃止。V8の経路はbreadcrumb-r177で守る。
 })

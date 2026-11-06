@@ -8,6 +8,8 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatNumber } from '@/lib/format'
+import TextLink from '@/components/shared/text-link'
 
 /**
  * 出荷予定。
@@ -119,14 +121,13 @@ export default function ShipmentPanel({
         title="出荷予定"
         /* 今日・明日以降の予定を、最後に取れた時刻と一緒に示す（IDEA-01）。 */
         meta={dashboardLocalUpdatedAt(fetchedAt) ?? undefined}
-        action={<Link href="/ec-commerce" className="hover:underline">すべて見る →</Link>}
-        actionTone="info"
+        action={<TextLink href="/ec-commerce">出荷予定へ</TextLink>}
       />
-      <div className="px-[18px] pb-[18px]">
+      <div className="px-[16px] pb-[16px]">
         {loading ? (
           <p className="py-6 text-center text-sm text-ink-faint">{STATE_TEXT.loading}…</p>
         ) : error ? (
-          // ★V7：カード内の失敗は小さく1行だけ。赤を使わない。
+          // ★管理画面：カード内の失敗は小さく1行だけ。赤を使わない。
           <p className="text-ink-secondary py-4 text-center text-xs" role="alert">
             出荷予定を読み込めませんでした。
             <button type="button" onClick={() => setAttempt((count) => count + 1)} className="text-action ml-2 font-semibold hover:underline">もう一度読み込む</button>
@@ -144,7 +145,6 @@ export default function ShipmentPanel({
                   // 設計は「今日 / 明日 / 今週 / 遅延」。いまの API は
                   // soon（今日・明日）と later しか返さないので、その2つに寄せる。
                   // 遅延を出すには出荷済みかどうかの判定が要る。
-                  // docs/v025-open-questions.md に残している。
                   { key: 'soon' as const, label: '今日・明日', count: data.soonCount },
                   { key: 'later' as const, label: 'あさって以降', count: data.laterCount },
                 ]
@@ -152,14 +152,14 @@ export default function ShipmentPanel({
                 <button
                   key={key}
                   onClick={() => setBucket(key)}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`inline-flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs font-medium transition-colors ${
                     bucket === key ? 'bg-action text-on-action' : 'bg-canvas-sunken text-ink-secondary'
                   }`}
                 >
                   {label}
                   <span
-                    className={`rounded-full px-1.5 text-[10px] tabular-nums ${
-                      bucket === key ? 'bg-white/25' : 'bg-canvas text-ink-faint'
+                    className={`rounded-pill px-1.5 text-nano tabular-nums ${
+                      bucket === key ? 'bg-canvas/25' : 'bg-canvas text-ink-faint'
                     }`}
                   >
                     {count}
@@ -192,13 +192,13 @@ export default function ShipmentPanel({
                   {rows.map((row) => {
                     const { label, tone } = formatShipDate(row.shipDate, data.today, data.tomorrow)
                     return (
-                      <Tr key={row.id}>
+                      <Tr key={row.id} href={`/chats?friend=${row.friendId}`}>
                         <Td className="text-ink-faint font-mono text-xs whitespace-nowrap">
                           {row.orderNumber || '—'}
                         </Td>
                         <Td className="text-ink whitespace-nowrap">
                           {row.friendId ? (
-                            <Link href={`/chats?friend=${row.friendId}`} className="hover:underline">
+                            <Link href={`/chats?friend=${row.friendId}`} prefetch={false} className="hover:underline">
                               {row.friendName ?? '名前未設定'}
                             </Link>
                           ) : (
@@ -213,10 +213,10 @@ export default function ShipmentPanel({
                         {/*
                           数量は ec_events.payload に入っているが、
                           出荷予定の API が返していない。列だけ出して
-                          入ったら繋ぐ。docs/v025-open-questions.md に残す。
+                          入ったら繋ぐ。
                         */}
                         <Td align="right" className="text-ink-faint tabular-nums">
-                          {row.quantity > 0 ? row.quantity.toLocaleString('ja-JP') : '—'}
+                          {row.quantity > 0 ? formatNumber(row.quantity) : '—'}
                         </Td>
                         <Td className="whitespace-nowrap">
                           <StatusBadge tone={statusTone[tone]} size="compact">{label}</StatusBadge>
@@ -233,7 +233,7 @@ export default function ShipmentPanel({
 
             {/* 走査上限に張り付いているときだけ、取りこぼしがありうる旨を出す。 */}
             {data.scanned >= data.scanLimit && (
-              <p className="text-ink-faint mt-3 text-[11px]">
+              <p className="text-ink-faint mt-3 text-micro">
                 直近{data.scanLimit}件のイベントから算出しています。それより前の予定は含まれません。
               </p>
             )}

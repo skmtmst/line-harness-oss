@@ -1,0 +1,9 @@
+.root, .section { display: flex; flex-direction: column; gap: var(--tpl-bm-16); min-width: 0; }
+.root { gap: var(--tpl-bm-24); }
+.photo { display: grid; place-items: center; aspect-ratio: 3 / 1; overflow: hidden; background: var(--color-surface-pearl); min-width: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--tpl-bm-8); margin-top: var(--tpl-bm-8); }
+
+.storeActions { margin-top: var(--tpl-bm-8); }
+.positionTitle, .position { display: inline-flex; align-items: center; gap: var(--tpl-bm-8); min-width: 0; }
+.positionNumber { color: var(--color-ink-secondary); font-variant-numeric: tabular-nums; }
+.reorderHandle { touch-action: none; }

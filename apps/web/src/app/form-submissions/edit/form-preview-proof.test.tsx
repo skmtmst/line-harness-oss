@@ -1,9 +1,11 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /**
  * N-174: 専用の確認タブではなく、編集画面に常に出ている顧客プレビューと
  * 保存・公開前検査が「出来上がりを予測してから公開する」役目を果たすことを、
  * 本物の React で固定する。
  */
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,6 +24,13 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     fetchApi: vi.fn(async () => ({ success: true, data: [] })),
     api: {
       ...actual.api,
+      // 「予約を入れる」欄のメニュー・担当読み。予約を使わない店では空。
+      // 素通しすると実通信で試験が環境へ依存するので、ここで空を返す。
+      bookingApi: {
+        ...actual.bookingApi,
+        listMenus: async () => ({ menus: [] }),
+        listMenuStaff: async () => ({ staff: [] }),
+      },
       friendFields: { ...actual.api.friendFields, list: async () => ({ success: true, data: [] }) },
       scenarios: { ...actual.api.scenarios, list: async () => ({ success: true, data: [] }) },
       reminders: { ...actual.api.reminders, list: async () => ({ success: true, data: [] }) },
@@ -51,7 +60,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams('id=form-1&tab=basic'),
 }))
@@ -66,7 +76,7 @@ vi.mock('@/contexts/account-context', () => ({
     loading: false,
   }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {} }))
 
 const { default: EditFormPage } = await import('./page')
 
@@ -108,14 +118,14 @@ async function flush() {
 
 async function renderPage() {
   await act(async () => {
-    root.render(<EditFormPage />)
+    root.render(<><EditFormPage /><ToastHost /></>)
   })
   await flush()
 }
 
 function findButton(label: string): HTMLButtonElement {
-  const button = [...container.querySelectorAll('button')]
-    .find((node) => (node.textContent ?? '').includes(label)) as HTMLButtonElement | undefined
+  const button = ([...container.querySelectorAll('button')]
+    .find((node) => (node.textContent ?? '').includes(label)) ?? querySupplementaryPageAction(label)) as HTMLButtonElement | undefined
   if (!button) throw new Error(`button not found: ${label}`)
   return button
 }
@@ -137,6 +147,7 @@ async function inputValue(input: HTMLInputElement, value: string) {
 }
 
 beforeEach(() => {
+  clearToastsForTest()
   net.layout = validLayout()
   net.updates = []
   net.publishCount = 0
@@ -154,22 +165,20 @@ describe('N-174 公開前プレビューと検証の実React対照', () => {
   it('顧客プレビューを常時表示し、質問の編集を保存前に即時反映する', async () => {
     await renderPage()
 
-    const preview = container.querySelector('[data-design="Preview"]')
+    const preview = container.querySelector('[aria-label="お客さまに見える形"]')
     expect(preview).toBeTruthy()
-    expect(preview!.textContent).toContain('実際にお客さまが見る画面です')
+    expect(preview!.textContent).toContain('お客さまに見える形')
     expect(preview!.textContent).toContain('参加方法')
     expect(preview!.textContent).toContain('会場参加')
 
     const title = container.querySelector(
-      '[data-design="Inspector"] input[value="参加方法"]',
+      'input[value="参加方法"]',
     ) as HTMLInputElement | null
     expect(title).toBeTruthy()
     await inputValue(title!, 'ご希望の参加方法')
 
-    const previewParagraphs = [...preview!.querySelectorAll('p')]
-      .map((node) => node.textContent)
-    expect(previewParagraphs).toContain('ご希望の参加方法必須')
-    expect(previewParagraphs).not.toContain('参加方法必須')
+    expect(preview!.textContent).toContain('ご希望の参加方法必須')
+    expect([...preview!.querySelectorAll('span')].map((node) => node.textContent)).not.toContain('参加方法必須')
     expect(net.updates).toHaveLength(0)
   })
 
@@ -217,6 +226,9 @@ describe('N-174 公開前プレビューと検証の実React対照', () => {
   it('正常な定義は更新を1回だけ保存し、その版を1回だけ公開する', async () => {
     await renderPage()
     await click('この版を公開')
+    const confirm = ([...document.body.querySelectorAll('[role="dialog"] button')].find((button) => button.textContent?.trim() === 'この版を公開') ?? querySupplementaryPageAction('この版を公開'))! as HTMLButtonElement
+    await act(async () => confirm.click())
+    await flush()
 
     expect(net.updates).toHaveLength(1)
     expect(net.publishCount).toBe(1)

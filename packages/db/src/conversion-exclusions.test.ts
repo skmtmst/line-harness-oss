@@ -6,12 +6,12 @@ import {
   isExclusionSavable,
   readConversionExclusion,
 } from './conversion-exclusions.js';
-import { previewConversionDefinition } from './conversion-definitions.js';
+import { previewConversionDefinition } from './conversion-definitions/index.js';
 import { recordConversionSourceEvent } from './conversion-event-sources.js';
-import { trackConversion } from './conversions.js';
+import { trackConversion } from './conversions/index.js';
 
 /*
- * R40「数えない条件」・R42「注文金額と金額なし」の回帰試験。
+ * 「数えない条件」・「注文金額と金額なし」の試験。
  *
  * 実SQLite(bootstrap.sql)で、記録と試算の両方を見る。件数だけを見ると
  * 絞り込みを外しても緑のままになる箇所があるため、値・理由文・除外数
@@ -268,6 +268,8 @@ describe('数えない条件の試算(R40・R42)', () => {
     seedPreviewEvents();
     const preview = await previewConversionDefinition(db, previewInput({}));
     expect(preview.matchedCount).toBe(3);
+    expect(preview.uniqueFriendCount).toBe(2);
+    expect(preview.excludedCount).toBe(0);
     expect(preview.excludedReasons).toEqual([
       '金額のない過去の成果1件は金額の試算に入っていません',
     ]);
@@ -282,6 +284,8 @@ describe('数えない条件の試算(R40・R42)', () => {
       db, previewInput({ exclusion: VIP_EXCLUSION }),
     );
     expect(preview.matchedCount).toBe(2);
+    expect(preview.uniqueFriendCount).toBe(1);
+    expect(preview.excludedCount).toBe(1);
     expect(preview.excludedReasons).toContain(
       '「数えない条件」に当てはまる過去の成果1件を除いています',
     );
@@ -294,6 +298,8 @@ describe('数えない条件の試算(R40・R42)', () => {
       db, previewInput({ exclusion: { operator: 'AND' } }),
     );
     expect(preview.matchedCount).toBe(3);
+    expect(preview.uniqueFriendCount).toBe(2);
+    expect(preview.excludedCount).toBe(0);
     expect(preview.excludedReasons).toContain(
       '「数えない条件」が読み取れないため、試算では全件を対象にしています',
     );
@@ -305,6 +311,8 @@ describe('数えない条件の試算(R40・R42)', () => {
       db, previewInput({ excludedCondition: 'テスト注文をのぞく' }),
     );
     expect(preview.matchedCount).toBe(3);
+    expect(preview.uniqueFriendCount).toBe(2);
+    expect(preview.excludedCount).toBe(0);
     expect(preview.excludedReasons).toContain(
       '以前の「数えない条件」のメモは記録に影響しません。条件として効かせるには選び直してください',
     );

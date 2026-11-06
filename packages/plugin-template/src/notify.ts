@@ -10,7 +10,7 @@
 
 import { LineHarness } from '@line-harness/sdk'
 import { MyServiceClient } from './external-api.js'
-import type { Env } from './index.js'
+import type { Env } from './env.js';
 
 /**
  * Check conditions in MyService and send relevant notifications.
@@ -53,7 +53,7 @@ async function sendAppointmentReminders(
       // Check if we already sent a reminder (dedup via tag)
       const friend = await harness.friends.get(appointment.lineHarnessFriendId)
       if (friend.tags.some((t) => t.name === 'myservice:appt-reminded')) {
-        console.log(`[Notify] Skipping (already reminded): ${appointment.lineHarnessFriendId}`)
+        console.log('[Notify] appointment_already_reminded')
         continue
       }
 
@@ -68,9 +68,9 @@ async function sendAppointmentReminders(
           `If you need to reschedule, please contact us.`,
       )
 
-      console.log(`[Notify] Sent reminder to ${appointment.lineHarnessFriendId}`)
-    } catch (error) {
-      console.error(`[Notify] Failed to send reminder:`, error)
+      console.log('[Notify] appointment_reminder_sent')
+    } catch {
+      console.error('[Notify] appointment_reminder_failed')
     }
   }
 }
@@ -99,7 +99,7 @@ async function notifyExpiringMemberships(
       // Check if we already sent a renewal reminder (dedup via tag)
       const friend = await harness.friends.get(membership.lineHarnessFriendId)
       if (friend.tags.some((t) => t.name === 'myservice:renewal-reminder')) {
-        console.log(`[Notify] Skipping (already notified): ${membership.lineHarnessFriendId}`)
+        console.log('[Notify] membership_already_notified')
         continue
       }
 
@@ -149,9 +149,9 @@ async function notifyExpiringMemberships(
         flexMessage,
       )
 
-      console.log(`[Notify] Sent renewal reminder to ${membership.lineHarnessFriendId}`)
-    } catch (error) {
-      console.error(`[Notify] Failed to send renewal reminder:`, error)
+      console.log('[Notify] membership_reminder_sent')
+    } catch {
+      console.error('[Notify] membership_reminder_failed')
     }
   }
 }

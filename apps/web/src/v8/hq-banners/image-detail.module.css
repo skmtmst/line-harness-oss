@@ -1,0 +1,49 @@
+/*
+ * ★V8 画像の詳細。左 300・右 488・間 24、下に生成時の条件（2列）と操作。
+ * 値は globals.css の `--tpl-hb-*`。
+ */
+.body { display: flex; flex-direction: column; gap: var(--tpl-hb-detail-gap); width: 100%; }
+.top { display: flex; align-items: flex-start; gap: var(--tpl-hb-detail-col-gap); }
+.left { display: flex; flex-direction: column; gap: var(--tpl-hb-detail-inner-gap); width: var(--tpl-hb-detail-left-w); flex-shrink: 0; }
+.preview { width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--tpl-hb-tile-radius); background: var(--color-shell-gray); }
+.preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.buttons { display: flex; gap: var(--tpl-hb-actions-gap); }
+.icon { width: var(--tpl-hb-button-icon); height: var(--tpl-hb-button-icon); }
+.starOn { fill: var(--color-status-warn); color: var(--color-status-warn); }
+.spacer { flex: 1; }
+
+.deliver { display: flex; flex-direction: column; gap: var(--tpl-hb-detail-inner-gap); flex: 1; min-width: 0; }
+.sectionTitle { margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; line-height: var(--tpl-hb-label-lh); }
+.note { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); }
+
+
+
+
+.deliverFoot { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
+
+.conditions { display: flex; flex-direction: column; gap: var(--tpl-hb-conditions-gap); }
+.conditionCols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--tpl-hb-detail-col-gap); }
+.conditionCol { display: flex; flex-direction: column; gap: 0; margin: 0; }
+.conditionRow { display: flex; gap: var(--tpl-hb-condition-label-gap); padding: var(--tpl-hb-condition-row-pad); border-top: 1px solid var(--color-hairline); }
+.conditionRow dt { width: var(--tpl-hb-condition-label-w); flex-shrink: 0; color: var(--color-ink-faint); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-hb-small-lh); }
+.conditionRow dd { flex: 1; min-width: 0; margin: 0; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-hb-condition-lh); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* テキストは行ごとに出す（1行目・2行目…）。ほかは1行で切り、全文は title で読む。 */
+.conditionRow dd.multiline { white-space: pre-line; }
+
+
+.remove {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-hb-tool-gap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-status-danger);
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-hb-label-lh);
+  cursor: pointer;
+}
+
+.remove:disabled { opacity: var(--polish-disabled-opacity); }

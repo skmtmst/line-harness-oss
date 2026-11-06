@@ -11,6 +11,7 @@
  *  - 「初期状態に戻す」は確認なしに実行されない（A01-02）
  */
 import { act } from 'react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -19,7 +20,8 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import DashboardPage from './page'
+// 共通ダッシュボード本体の境界/既存カードを検査する。業種の入口分岐はhome.test.tsxが検査する。
+import DashboardPage from '@/v8/dashboard/dashboard'
 
 const fixture = vi.hoisted(() => ({
   accountId: 'account-a' as string | null,
@@ -91,6 +93,7 @@ function installFetch() {
     const raw = typeof input === 'string' ? input : String(input)
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
     net.calls.push(`${init?.method ?? 'GET'} ${path}`)
+    if (path.startsWith('/api/staff/me')) return jsonResponse({ status: 200, body: { success: true, data: { id: 'test-owner', role: 'owner' } } })
     if (path.startsWith('/api/dashboard/overview')) {
       return jsonResponse(await net.overview(path))
     }
@@ -215,6 +218,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   await act(async () => {
     for (const save of net.putSaves) save.resolve(jsonResponse(fail(400)))
     await Promise.resolve()
@@ -236,28 +240,29 @@ async function switchAccount(next: string) {
   await render()
 }
 
-function button(text: string, scope: ParentNode = host): HTMLButtonElement {
+function button(text: string, scope: ParentNode = document.body): HTMLButtonElement {
   const node = Array.from(scope.querySelectorAll('button')).find((item) => item.textContent?.trim() === text)
   if (!node) throw new Error(`Button not found: ${text}`)
   return node
 }
 
 function dialog(): HTMLElement {
-  const node = host.querySelector<HTMLElement>('[role="dialog"]')
+  const node = document.body.querySelector<HTMLElement>('[role="dialog"]')
   if (!node) throw new Error('編集パネルが見つかりません')
   return node
 }
 
 function todayCard(title: string): HTMLElement {
-  const heading = Array.from(host.querySelectorAll('h3')).find((node) => node.textContent?.trim() === title)
+  const heading = Array.from(host.querySelectorAll('[data-kpi-presentation] p[title]')).find((node) => node.textContent?.trim() === title)
   if (!heading) throw new Error(`${title} のカードが見つかりません`)
-  const card = heading.parentElement?.parentElement
+  const card = heading.closest('[data-kpi-presentation]')
   if (!card) throw new Error(`${title} のカード外枠が見つかりません`)
   return card as HTMLElement
 }
 
 async function openEditor() {
-  await act(async () => { button('ダッシュボード編集').click() })
+  await act(async () => { button('表示を変える').click() })
+  await screen.findByRole('dialog', { name: 'ダッシュボード編集' })
 }
 
 describe('DASH-02 アカウント切替後の取得失敗で前の数値が残らない', () => {
@@ -266,11 +271,11 @@ describe('DASH-02 アカウント切替後の取得失敗で前の数値が残�
       query.includes('account_id=account-a') ? overviewFor(111) : fail(500),
     )
     await render()
-    expect(host.textContent).toContain('111')
+    expect(document.body.textContent).toContain('111')
 
     await switchAccount('account-b')
     expect(net.calls.some((call) => call.includes('/api/dashboard/overview') && call.includes('account_id=account-b'))).toBe(true)
-    expect(host.textContent).not.toContain('111')
+    expect(document.body.textContent).not.toContain('111')
   })
 
   it('遅れて届いたAの応答でBの画面を上書きしない', async () => {
@@ -280,11 +285,11 @@ describe('DASH-02 アカウント切替後の取得失敗で前の数値が残�
       : Promise.resolve(overviewFor(7))
     await render()
     await switchAccount('account-b')
-    expect(host.textContent).toContain('7')
+    expect(document.body.textContent).toContain('7')
     // 切替後にAの応答が届いても破棄される
     await act(async () => { resolveA?.(overviewFor(222)) })
-    expect(host.textContent).toContain('7')
-    expect(host.textContent).not.toContain('222')
+    expect(document.body.textContent).toContain('7')
+    expect(document.body.textContent).not.toContain('222')
   })
 })
 
@@ -296,14 +301,17 @@ describe('DASH-03 新アカウントの読込中に前の予約・運用状態�
     expect(todayCard('今日の予約').textContent).toContain('1')
 
     net.bookings = () => new Promise<Json>(() => {})
+    // 待ちは偽の時計で進める（本物の時間を待たない）。骨組みの 0.3 秒は読み始めから数えるので、切り替える前に替える。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await switchAccount('account-b')
     const card = todayCard('今日の予約')
     /*
      * #673 で読込中の件数は「—」ではなく骨組み（スケルトン）に替わった。
-     * 前のアカウントの件数が残らないことは、骨組みと busy 印で確かめる。
+     * ★管理画面 仕上げ §3 で骨組みは 0.3 秒待ってから出るので、待ってから確かめる。
      */
-    expect(card.querySelector('.animate-pulse')).not.toBeNull()
-    expect(card.querySelector('[aria-busy="true"]')).not.toBeNull()
+    await act(async () => { await vi.advanceTimersByTimeAsync(350) })
+    expect(card.getAttribute('aria-busy')).toBe('true')
+    expect(card.querySelector('[data-kpi-number]')).toBeNull()
     expect(card.textContent).not.toContain('1件')
   })
 })
@@ -359,16 +367,16 @@ describe('DASH-15 配置の遅延GETが編集中の変更を上書きしない',
     await render()
     await openEditor()
 
-    const toggle = dialog().querySelector<HTMLInputElement>('input[aria-label="写真審査を非表示にする"]')
-    expect(toggle?.checked).toBe(true)
+    const toggle = await within(dialog()).findByRole('switch', { name: '写真審査を表示' })
+    expect(toggle ? String((toggle.getAttribute('aria-checked') === 'true')) : undefined).toBe('true')
     await act(async () => { toggle!.click() })
-    expect(toggle!.checked).toBe(false)
+    expect(String((toggle!.getAttribute('aria-checked') === 'true'))).toBe('false')
 
     // 遅れて届いたGET（既定配置＝写真審査ON）でdraftを初期化しない
     await act(async () => {
       resolvePreferences?.(ok({ success: true, data: { version: 5, cards: null } }))
     })
-    expect(toggle!.checked).toBe(false)
+    expect(String((toggle!.getAttribute('aria-checked') === 'true'))).toBe('false')
   })
 })
 
@@ -386,7 +394,7 @@ describe('DASH-04 保存完了が別アカウントの配置・版を上書き�
 
     await switchAccount('account-b')
     // 切替でパネルは閉じ、前アカウントの下書きは持ち越さない
-    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
     // Aの保存が完了してもBの表示配置・版は変えない
     await act(async () => {
       net.putSaves[0].resolve(jsonResponse(ok({ success: true, data: { version: 8 } })))
@@ -408,7 +416,7 @@ describe('DASH-05 保存失敗は編集パネルの内側で再試行する', ()
       net.putSaves[0].resolve(jsonResponse(fail(503)))
     })
     const panel = dialog()
-    expect(panel.querySelector('[role="alert"]')?.textContent).toContain('ダッシュボードの配置を保存できませんでした')
+    expect(panel.querySelector('[role="alert"]')?.textContent).toContain('配置を保存できませんでした')
 
     const overviewCallsBefore = net.calls.filter((call) => call.startsWith('GET /api/dashboard/overview')).length
     await act(async () => { button('もう一度保存する', panel).click() })
@@ -417,7 +425,7 @@ describe('DASH-05 保存失敗は編集パネルの内側で再試行する', ()
     await act(async () => {
       net.putSaves[1].resolve(jsonResponse(ok({ success: true, data: { version: 1 } })))
     })
-    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
   })
 })
 
@@ -427,17 +435,20 @@ describe('A01-02 初期状態に戻すは確認なしに実行しない', () => 
     await openEditor()
     await act(async () => { button('初期状態に戻す').click() })
     expect(net.deletes).toBe(0)
-    expect(dialog().textContent).toContain('削除して初期状態へ戻します')
-    await act(async () => { button('やめる').click() })
+    expect(document.body.textContent).toContain('削除して初期状態へ戻します')
+    await act(async () => { button('キャンセル').click() })
     expect(net.deletes).toBe(0)
-    expect(dialog().textContent).not.toContain('削除して初期状態へ戻します')
+    expect(document.body.textContent).not.toContain('削除して初期状態へ戻します')
   })
 
   it('確認するとDELETEを1回だけ実行する', async () => {
     await render()
     await openEditor()
     await act(async () => { button('初期状態に戻す').click() })
-    await act(async () => { button('削除して初期状態へ戻す').click() })
+    await act(async () => { button('削除する').click() })
     expect(net.deletes).toBe(1)
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

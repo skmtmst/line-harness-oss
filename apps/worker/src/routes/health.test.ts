@@ -2,13 +2,14 @@ import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth.js';
 import { health } from './health.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 vi.mock('@line-crm/db', () => ({
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn(async () => null),
   getAccountHealthLogs: vi.fn(async () => []),
   getLatestRiskLevel: vi.fn(async () => null),
-  getLatestRiskLevels: vi.fn(async () => []),
+  getLineAccountListStats: vi.fn(async () => ({})),
   getAccountMigrations: vi.fn(async () => []),
   getAccountMigrationById: vi.fn(async () => null),
   createAccountMigration: vi.fn(),
@@ -49,11 +50,17 @@ function app() {
   return a;
 }
 
-// The liveness endpoints are what `create-line-harness update` and the
-// self-update verify phase probe after a deploy — they must answer 200
-// with no credentials, or every update ends in a bogus health warning
-// (CLI) or rollback (self-update).
+// 配備後の CLI が認証なしで到達を確認できるよう、liveness は資格情報なしで200を返す。
 describe('liveness endpoints are public', () => {
+  test.each(['/health', '/api/health'])('%s returns deployed SHA through auth middleware without secrets', async (path) => {
+    const bindings = { ...env(), BUILD_GIT_COMMIT: 'a'.repeat(40), BUILD_VERSION: '0.24.0', BUILD_RELEASED_AT: '2026-10-09T00:00:00Z' };
+    const res = await app().request(path, {}, bindings);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await res.json()).toEqual({ success: true, data: {
+      status: 'ok', git_commit: bindings.BUILD_GIT_COMMIT, version: '0.24.0', released_at: bindings.BUILD_RELEASED_AT,
+    } });
+  });
   test.each(['/health', '/api/health'])('GET %s → 200 without credentials', async (path) => {
     const res = await app().request(path, {}, env());
     expect(res.status).toBe(200);
@@ -86,11 +93,10 @@ describe('GET /api/accounts/health-summary', () => {
       ids: ['a1', 'a2'],
       isAccountScoped: true,
     });
-    vi.mocked(db.getLatestRiskLevels).mockResolvedValue([
-      { line_account_id: 'a1', risk_level: 'danger' },
-      // 範囲外の行が混ざっても数えない。
-      { line_account_id: 'a9', risk_level: 'warning' },
-    ]);
+    vi.mocked(db.getLineAccountListStats).mockResolvedValue({
+      a1: { connection: { status: 'warn', issues: [{ kind: 'bot_info', httpStatus: 403 }] } },
+      a9: { connection: { status: 'warn' } },
+    } as unknown as Awaited<ReturnType<typeof db.getLineAccountListStats>>);
 
     const res = await app().request(
       '/api/accounts/health-summary',
@@ -98,7 +104,7 @@ describe('GET /api/accounts/health-summary', () => {
       env(),
     );
     expect(res.status).toBe(200);
-    expect(db.getLatestRiskLevels).toHaveBeenCalledWith(expect.anything(), ['a1', 'a2']);
+    expect(db.getLineAccountListStats).toHaveBeenCalledWith(expect.anything(), ['a1', 'a2']);
     const body = (await res.json()) as {
       success: boolean;
       data: {

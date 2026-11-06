@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .overlay {
   position: fixed;
@@ -5,7 +6,9 @@
   z-index: 80;
   display: flex;
   justify-content: flex-end;
-  background: color-mix(in srgb, var(--color-ink) 35%, transparent);
+  background: var(--polish-window-backdrop);
+  -webkit-backdrop-filter: blur(var(--polish-window-blur));
+  backdrop-filter: blur(var(--polish-window-blur));
 }
 
 .panel {
@@ -16,7 +19,7 @@
   flex-direction: column;
   border-left: 1px solid var(--color-hairline);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
+  /* ★管理画面 の影は3段。画面の端から出る引き出しは最前面（段3）。 */
   color: var(--color-ink);
 }
 
@@ -24,15 +27,17 @@
   width: 844px;
   max-width: 100%;
   height: 190px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-card);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
 }
 
 .panel:focus-visible,
 .close:focus-visible {
   outline: revert;
 }
+
+:root .panel[data-design-width] { width: min(var(--drawer-design-width), 100%); }
 
 .header {
   display: flex;
@@ -41,7 +46,7 @@
   justify-content: space-between;
   gap: 16px;
   border-bottom: 1px solid var(--color-hairline);
-  padding: 20px 24px;
+  padding: var(--polish-space-section);
 }
 
 .inline .header {
@@ -58,12 +63,12 @@
   margin: 0;
   color: var(--color-ink);
   font-size: var(--text-lead);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
 }
 
 .inlineTitle {
-  font-size: var(--text-body);
+  font-size: var(--text-callout);
 }
 
 .description {
@@ -93,14 +98,14 @@
 
 .close:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .body {
   min-height: 0;
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: var(--polish-space-section);
 }
 
 .inline .body {
@@ -141,19 +146,10 @@
   font-weight: 600;
 }
 
-.error {
-  margin: 0 24px 16px;
-  border-radius: var(--radius-control);
-  background: var(--color-status-danger-soft);
-  padding: 10px 12px;
-  color: var(--color-status-danger);
-  font-size: var(--text-caption);
-}
-
 .footer {
   flex: 0 0 auto;
   border-top: 1px solid var(--color-hairline);
-  padding: 16px 24px;
+  padding: var(--polish-space-section);
 }
 
 @media (max-width: 560px) {
@@ -164,4 +160,252 @@
     padding-left: 16px;
   }
 }
+
+/*
+ * ★V8 仕上げ（M10）「引き出し」：少し下から浮き上がる（200ms ease-out）。
+ * 閉じるときは逆（150ms）。閉じの印 `data-closing` は drawer.tsx が
+ * V8 のときだけ付ける（管理画面・試験は今までどおり即時に消える）。
+ */
+/*
+ * 開く・閉じるは「移り変わり（transition）」で動かす（フルード・インタラクション ①）。
+ * 決まった動き（keyframes）だと、閉じかけでもう一度開くと最初から出直して飛ぶ。
+ * 移り変わりなら、途中で逆の操作をしてもその位置から滑らかに戻る。
+ * 出始めの形は @starting-style が持つ。動きを減らす設定では動かさない。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  :root .overlay {
+    transition: opacity var(--motion-base) var(--motion-ease-out);
+  }
+
+  :root .panel {
+    transition:
+      opacity var(--motion-base) var(--motion-ease-out),
+      transform var(--motion-base) var(--motion-ease-out);
+  }
+
+  @starting-style {
+    :root .overlay {
+      opacity: 0;
+    }
+
+    :root .panel {
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
+    }
+  }
+
+  :root .overlay[data-closing],
+  :root .panel[data-closing] {
+    transition-duration: var(--motion-exit);
+  }
 }
+
+/* 頭に題の行＋タブなどを縦に積む形（toolbar を渡したときだけ）。 */
+.headerStack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--tpl-de-head-gap);
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tpl-de-head-gap);
+}
+
+/* 下の帯（footer）のすぐ上の知らせ。 */
+.band {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--tpl-de-band-gap);
+  padding: var(--tpl-de-band-pad);
+}
+
+/*
+ * 編集の引き出し（width="editor"・ダッシュボード編集 ）。540・頭 16/20・題 17/600・
+ * 閉じるは枠つき 30・中 12/20・下 14/20。開くのは 200ms（提案 F）。既定と narrow は変えない。
+ */
+:root .panel[data-width='editor'] {
+  width: min(var(--tpl-drawer-editor-w), 100%);
+}
+
+:root .panel[data-width='editor'] .header {
+  padding: var(--tpl-de-head-pad);
+}
+
+:root .panel[data-width='editor'] .title {
+  font-size: var(--tpl-de-title-size);
+  line-height: var(--tpl-de-title-lh);
+}
+
+:root .panel[data-width='editor'] .description {
+  margin-top: var(--tpl-de-desc-gap);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-de-desc-lh);
+}
+
+:root .panel[data-width='editor'] .close {
+  width: var(--tpl-de-close);
+  height: var(--tpl-de-close);
+  flex-basis: var(--tpl-de-close);
+  border-radius: var(--radius-segment);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  color: var(--color-ink-secondary);
+}
+
+:root .panel[data-width='editor'] .close:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+:root .panel[data-width='editor'] .close > svg {
+  width: var(--tpl-de-close-icon);
+  height: var(--tpl-de-close-icon);
+}
+
+:root .panel[data-width='editor'] .body {
+  padding: var(--tpl-de-body-pad);
+}
+
+:root .panel[data-width='editor'] .footer {
+  padding: var(--tpl-de-foot-pad);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root .panel[data-width='editor'] {
+    transition:
+      opacity var(--motion-base) var(--motion-ease-out),
+      transform var(--motion-base) var(--motion-ease-out);
+  }
+
+  :root .panel[data-width='editor'][data-closing] {
+    transition-duration: var(--motion-exit);
+  }
+}
+
+/* 幅の口（width="narrow"）。既定の 660 は変えない。 */
+:root .panel[data-width='narrow'] {
+  width: min(var(--tpl-drawer-narrow-w), 100%);
+}
+
+:root .overlay[data-closing] {
+  opacity: 0;
+  /* 消えていく間は下の画面を押せるようにする（薄い膜が押下を食べない）。 */
+  pointer-events: none;
+}
+
+:root .panel[data-closing] {
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+}
+}
+
+/* 紹介者の620幅の板。外側の余白を型が持つ。 */
+:root .panel[data-layout='inset'] { padding: var(--tpl-af-dr-pad); gap: var(--tpl-af-dr-gap); box-shadow: var(--tpl-af-dr-shadow); }
+:root .panel[data-layout='inset'] .header { padding: 0; gap: var(--tpl-af-dr-gap); }
+:root .panel[data-layout='inset'] .title { font-size: var(--text-heading); font-weight: 700; line-height: var(--tpl-af-dr-title-lh); }
+:root .panel[data-layout='inset'] .description { margin-top: var(--tpl-af-dr-head-gap); font-size: var(--text-caption); line-height: normal; white-space: normal; overflow-wrap: anywhere; }
+:root .panel[data-layout='inset'] .body { padding: 0; }
+:root .panel[data-layout='inset'] .footer { padding: 0; border: 0; gap: var(--tpl-toolbar-gap); }
+:root .panel[data-layout='inset'] .close { width: var(--tpl-af-dr-close); height: var(--tpl-af-dr-close); flex-basis: var(--tpl-af-dr-close); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); color: var(--color-ink-secondary); }
+/* 注文の参照：本文と頭の間16・下の操作は左右。ほかの幅は変えない。 */
+:root .panel[data-width='order'] { width: min(var(--tpl-st2-od-w), 100%); gap: var(--tpl-st2-od-gap); }
+:root .panel[data-width='order'] .header { border: 0; padding: var(--tpl-st2-od-pad) var(--tpl-st2-od-pad) 0; }
+:root .panel[data-width='order'] .title { font-size: var(--tpl-st2-od-title); font-weight: 700; line-height: var(--tpl-st2-od-title-lh); }
+:root .panel[data-width='order'] .description { margin-top: var(--tpl-st2-od-head-text-gap); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-st2-od-text-lh); }
+:root .panel[data-width='order'] .close { width: var(--tpl-st2-od-close); height: var(--tpl-st2-od-close); flex-basis: var(--tpl-st2-od-close); border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+:root .panel[data-width='order'] .body { display: flex; flex-direction: column; gap: var(--tpl-st2-od-gap); padding: 0 var(--tpl-st2-od-pad); }
+:root .panel[data-width='order'] .footer { display: flex; justify-content: space-between; gap: var(--tpl-st2-od-gap); border: 0; padding: 0 var(--tpl-st2-od-pad) var(--tpl-st2-od-pad); }
+/* G-9: メッセージ作成の広い引き出し。ほかの引き出しは変えない。 */
+:root .panel[data-width='composer'] { width: min(var(--tpl-msg-composer-drawer-w), 100%); border-radius: var(--polish-radius-dialog); }
+:root .panel[data-width='composer'] .header { padding: var(--tpl-msg-composer-drawer-head-pad); align-items: center; }
+:root .panel[data-width='composer'] .title { font-size: var(--tpl-msg-composer-drawer-title); line-height: var(--tpl-msg-composer-drawer-title-lh); font-weight: 700; }
+:root .panel[data-width='composer'] .body { padding: 0; }
+:root .panel[data-width='composer'] .footer { padding: var(--tpl-msg-composer-drawer-footer-pad); }
+
+.titleRow { display: flex; align-items: center; gap: var(--tpl-msg-composer-content-gap); flex-wrap: wrap; }
+
+/* ：幅の段は共通部品の指定を最後に適用する。 */
+:root .panel[data-design-width] { width: min(var(--drawer-design-width), 100%); }
+/* ：短い本文は中身の高さで止め、長い本文だけ縦に送る。下の操作は常に板の下端。 */
+:root .panel:not(.inline) { height: auto; max-height: 100dvh; align-self: flex-start; }
+:root .panel:not(.inline) .body { flex: 0 1 auto; }
+
+/* ：浮く面の影と薄い縁を共通化。 */
+:root .panel { border: 0; outline: 1px solid var(--polish-window-edge); outline-offset: -1px; box-shadow: var(--polish-window-shadow); border-radius: var(--polish-radius-dialog); }
+
+/* ：幅の指定がある引き出しでも窓の題の段をそろえる。 */
+:root .panel.panel .title {
+  font-size: var(--detail-title-size);
+  font-weight: var(--polish-value-weight);
+}
+
+html:root .body[data-content-spacing='sections'] { display: flex; flex-direction: column; gap: var(--space-16); }
+html:root .body[data-content-spacing='sections'] > * { flex-shrink: 0; }
+
+html:root .panel[data-viewport-inset] { max-width: calc(100vw - var(--space-16) * 2); }
+
+html:root .panel[data-height-mode='viewport']:not(.inline) {
+  height: 100dvh;
+  align-self: stretch;
+}
+html:root .panel[data-height-mode='viewport']:not(.inline) .body {
+  flex: 1 1 auto;
+}
+
+/* 面そのものへ寄せた板（initialFocus='panel'）。面は Tab では止まらず、開いたときにだけ寄るので輪は出さない。 */
+html:root .panel[data-initial-focus='panel']:focus-visible { outline-color: transparent; }
+
+.heading { display: flex; align-items: flex-start; gap: var(--space-12); min-width: 0; }
+.headingText { min-width: 0; }
+.headerIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--polish-window-icon-size);
+  height: var(--polish-window-icon-size);
+  border-radius: var(--radius-pill);
+  background: var(--polish-window-icon-bg);
+  color: var(--polish-window-icon-ink);
+}
+.headerIcon > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
+
+html:root .panel .close {
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: none;
+}
+html:root .panel .close:focus-visible {
+  outline: var(--polish-focus-width) solid var(--polish-focus);
+  outline-offset: var(--polish-focus-offset);
+}
+html:root .heading { align-items: center; }
+
+html:root .panel .title:has(.headerIcon) { display: flex; align-items: flex-start; gap: var(--space-12); }
+html:root .title .headerIcon { margin-top: calc((1lh - var(--polish-window-icon-size)) / 2); }
+html:root .headingText:has(.headerIcon) .description { margin-inline-start: calc(var(--polish-window-icon-size) + var(--space-12)); }
+
+/* 説明と頭の区切り線の間を、窓と同じ段の余白にそろえる。 */
+html:root .panel:not(.inline):not([data-layout='inset']):not([data-width='order']) .header:has(.description) {
+  padding-block-end: var(--polish-window-divider-space);
+}
+
+/* 区切り線から本文・下の操作までの間隔は窓と同じ値を使う。 */
+html:root .panel:not(.inline):not([data-layout='inset']):not([data-width='order']) :is(.body, .footer) {
+  padding-block-start: var(--polish-window-divider-space);
+}
+
+/* 引き出しの主な操作は共通の中央の並びを使う。 */
+html:root .panel .footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-8); }
+
+/* 題の長さで閉じる操作を押し出さず、全文は title に残す。 */
+html:root .panel .title { display: flex; align-items: center; min-width: 0; }
+.titleText { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
+.actionFooter { flex: none; height: var(--detail-footer-height); border-top: 1px solid var(--color-hairline); }

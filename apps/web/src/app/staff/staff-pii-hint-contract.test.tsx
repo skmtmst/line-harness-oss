@@ -7,23 +7,25 @@
  * 「そのまま見せる」が選択されている行にも常に出るため矛盾して見えた。
  * 現在の見せ方の説明は右欄(aside)が選択値と連動して出す。
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams('tab=members'),
 }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => <nav aria-label="ログインユーザーのタブ" />,
   useMergedTab: () => 'members',
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -57,11 +59,13 @@ const state = {
   ],
 }
 
-vi.mock('@/lib/api', () => {
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
   class ApiError extends Error {}
   return {
+    ...actual,
     ApiError,
-    fetchApi: vi.fn(),
+    fetchApi: vi.fn().mockResolvedValue({ success: true, data: [] }),
     api: {
       staff: {
         list: async () => ({ success: true, data: state.members }),
@@ -95,8 +99,8 @@ const { default: StaffPage } = await import('./page')
 
 async function openPermissionView() {
   await act(async () => { render(<StaffPage />) })
-  await waitFor(() => expect(screen.getByText('対象者')).toBeTruthy())
-  fireEvent.click(within(screen.getByText('対象者').closest('tr') as HTMLTableRowElement).getByRole('button', { name: '中身を見る' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '対象者の中身を見る' })).toBeTruthy())
+  fireEvent.click(within(screen.getByRole('button', { name: '対象者の中身を見る' }).closest('[role="row"]') as HTMLElement).getByRole('button', { name: /の中身を見る$/ }))
   await waitFor(() => expect(screen.getByText('この決め方で、この人にはこう見えます')).toBeTruthy())
 }
 
@@ -133,3 +137,6 @@ describe('個人情報行の注記は選択肢の一般説明と区別できる 
     expect(screen.getByText(/電話番号・住所・メールは伏せて表示します/)).toBeTruthy()
   })
 })
+
+// Self-security loading is covered separately; retain this suite’s original operation assertions.
+vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

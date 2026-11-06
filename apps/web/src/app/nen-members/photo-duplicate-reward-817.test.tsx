@@ -2,8 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PhotoReviewDetail } from './photo-review-detail'
-import { PhotoRewardPolicyCard } from './photo-reward-policy'
+import { PhotoReviewDetail } from '@/v8/nen-posts/detail'
 
 /*
  * #817: 写真の重複と報酬の決まりの版。主な状態を描画で確かめる。
@@ -11,7 +10,9 @@ import { PhotoRewardPolicyCard } from './photo-reward-policy'
  * - 重複なし：帯は出さず、このまま採用が主役。
  * - 重複あり：帯と前の投稿の並びが出て、選べるのは却下か報酬なしで採用。
  *   主役の緑ボタンは1つだけ（報酬なしで採用）。
- * - 報酬の決まり：読み込み中・失敗・正常。
+ *
+ * 2026-10-07：報酬の決まりの小箱（photo-reward-policy.tsx）はどの画面からも描かれないので消し、
+ * その試験も外した。今の投稿画面（photo-review-v8.tsx）は小箱を持たず、外枠の「版の履歴を見る」で版を出す。
  */
 
 vi.mock('next/link', () => ({ default: () => null }))
@@ -143,29 +144,37 @@ describe('#817 重複の表示', () => {
   })
 })
 
-describe('#817 報酬の決まりの小箱', () => {
-  it('正常：いま使っている版の点数と履歴の入り口が出る', async () => {
-    const root = createRoot(host)
-    await act(async () => {
-      root.render(<PhotoRewardPolicyCard />)
-    })
-    expect(host.textContent).toContain('報酬の決まり')
-    expect(host.textContent).toContain('10マイル')
-    expect(host.textContent).toContain('第2版')
-    expect(host.textContent).toContain('版の履歴を見る')
+// 109: 断る側は赤い文字だけ、採用は主（右）。
+describe('109 承認が主・断る側は文字だけ', () => {
+  const variants = () => {
+    const buttons = [...host.querySelectorAll('button')]
+    return {
+      pass: buttons.find((b) => b.textContent === '見送る（理由を選ぶ）'),
+      reject: buttons.find((b) => b.textContent === '却下する'),
+      adopt: buttons.find((b) => b.textContent === 'このまま採用'),
+      adoptFree: buttons.find((b) => b.textContent === '報酬なしで採用'),
+    }
+  }
+  it('重複なし：見送るは文字だけ・このまま採用が主で右', async () => {
+    const root = await renderDetail(basePhoto(), host)
+    const { pass, adopt } = variants()
+    expect(pass?.getAttribute('data-variant')).toBe('text')
+    expect(adopt?.getAttribute('data-variant')).toBe('primary')
+    expect(Boolean(pass!.compareDocumentPosition(adopt!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
     await act(async () => { root.unmount() })
   })
-
-  it('失敗：件数は「—」で、読み直しの入り口が出る', async () => {
-    policyMode = 'error'
-    const root = createRoot(host)
-    await act(async () => {
-      root.render(<PhotoRewardPolicyCard />)
-    })
-    expect(host.textContent).toContain('報酬の決まり')
-    expect(host.textContent).toContain('—')
-    expect(host.textContent).toContain('もう一度読み込む')
-    expect(host.textContent).not.toContain('版の履歴を見る')
+  it('重複あり：却下するは文字だけ・報酬なしで採用が主で右', async () => {
+    const root = await renderDetail({
+      ...basePhoto(),
+      duplicate: {
+        photoId: 'photo-old', imageUrl: 'https://img/photo-old.jpg',
+        petName: 'モカ', createdAt: '2026-08-12T10:00:00+09:00', awardedPoints: 5,
+      },
+    }, host)
+    const { reject, adoptFree } = variants()
+    expect(reject?.getAttribute('data-variant')).toBe('text')
+    expect(adoptFree?.getAttribute('data-variant')).toBe('primary')
+    expect(Boolean(reject!.compareDocumentPosition(adoptFree!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
     await act(async () => { root.unmount() })
   })
 })

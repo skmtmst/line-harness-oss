@@ -8,11 +8,45 @@ const transport = vi.hoisted(() => {
   }
   return { request: vi.fn(), ApiError }
 })
-vi.mock('./api', () => ({ fetchApi: transport.request, ApiError: transport.ApiError }))
-import { hqTemplatesApi, HqTemplatesApiError } from './hq-templates-api'
+vi.mock('./api', async (importOriginal) => ({ ...await importOriginal<typeof import('./api')>(), fetchApi: transport.request, ApiError: transport.ApiError }))
+import { hqTemplatesApi, HqTemplatesApiError, type HqTemplateListItem } from './hq-templates-api'
 const request = transport.request
 beforeEach(() => { request.mockReset(); request.mockResolvedValue({ success: true, data: { value: 'ok' } }) })
 describe('HQ template API transport', () => {
+  it('6種類のフィルタと件数を取得し、リッチ画像の5サイズを同じtransportで送る',async()=>{
+    await hqTemplatesApi.listByKind('carousel')
+    expect(request).toHaveBeenCalledWith('/api/hq/templates?type=template&kind=carousel',{method:'GET'})
+    const counts={message:1,carousel:2,rich_message:3,question:4,coupon:5,research:6}
+    request.mockResolvedValue({success:true,data:counts})
+    expect(await hqTemplatesApi.kindCounts()).toEqual(counts)
+    const file=new File(['fixture'],'rich.png',{type:'image/png'})
+    const uploaded={media:[],payload:{baseSize:{width:1040,height:1040}}}
+    request.mockResolvedValue({success:true,data:uploaded})
+    expect(await hqTemplatesApi.uploadRichMessageImage(file)).toEqual(uploaded)
+    expect(request).toHaveBeenLastCalledWith('/api/hq/templates/media?purpose=rich_message&filename=rich.png',{method:'POST',headers:{'Content-Type':'image/png'},body:file})
+  })
+  it('一覧の配布先名・残り件数・要約を共有型のまま返す', async () => {
+    const rows: HqTemplateListItem[] = [{ id: 't1', name: 'ご案内', description: null, template_type: 'template', revision: 1,
+      updated_at: '2026-10-07T00:00:00Z', distributed_account_names: ['本店','渋谷店','イベント'],
+      distributed_account_more: 2, distributed_account_count: 5, content_summary: '本文・画像 1' }];
+    request.mockResolvedValue({ success: true, data: rows });
+    const list = await hqTemplatesApi.list('template');
+    expect(list).toEqual(rows);
+    expect(request).toHaveBeenCalledWith('/api/hq/templates?type=template', { method: 'GET' });
+    request.mockResolvedValue({ success: true, data: [{ ...rows[0], content_summary: null }] });
+    expect((await hqTemplatesApi.list())[0].content_summary).toBeNull();
+  });
+  it('配布先の版と作った名前を、既存の項目や件数を残して返す', async () => {
+    const preflight = { preflightId: 'p1', expiresAt: '2026-10-07T00:00:00Z', stores: [{ accountId: 'a', accountName: '試験店舗',
+      items: [], targetVersion: { version: 2, latestVersion: 2, status: 'latest', label: '版2（最新）' } }] };
+    request.mockResolvedValue({ success: true, data: preflight });
+    expect(await hqTemplatesApi.preflight('t1', ['a'])).toEqual(preflight);
+    const result = { runId: 'p1', status: 'completed', stores: [{ accountId: 'a', status: 'succeeded',
+      counts: { created: 0, overwritten: 0, aliased: 1 }, createdName: '試験の名前 (2)' }] };
+    request.mockResolvedValue({ success: true, data: result });
+    expect(await hqTemplatesApi.distribute('t1', 'p1', [])).toEqual(result);
+    expect(await hqTemplatesApi.result('t1', 'p1')).toEqual(result);
+  });
   it('画像をJSON化せず認証・CSRF共通transportで送信する', async () => {
     const file = new File(['fixture'], '画像.png', { type: 'image/png' })
     await hqTemplatesApi.uploadImage(file, 'message')
@@ -58,6 +92,13 @@ describe('HQ template API transport', () => {
     await expect(hqTemplatesApi.list('form')).rejects.toThrow('未対応')
     request.mockRejectedValue(new Error('synthetic-private-detail')); await expect(hqTemplatesApi.list('tag')).rejects.toThrow('接続と入力内容')
   })
+  it('保存の欄ごとの理由をエラー変換後も残す', async () => {
+    const rejection = Object.assign(new transport.ApiError(422, '入力を確認してください'), { fields: { name: '名前が重複しています' } })
+    request.mockRejectedValue(rejection)
+    await expect(hqTemplatesApi.get('t1')).rejects.toMatchObject({ status: 422, fields: rejection.fields })
+    request.mockResolvedValue({ success: false, fields: { name: '名前を入力してください' } })
+    await expect(hqTemplatesApi.get('t1')).rejects.toMatchObject({ status: 422, fields: { name: '名前を入力してください' } })
+  })
   it('権限不足と競合を安全な文言へ変換する', async () => {
     request.mockRejectedValue(new transport.ApiError(403)); await expect(hqTemplatesApi.get('t1')).rejects.toThrow('権限')
     request.mockRejectedValue(new transport.ApiError(409, '最新版を読み込んでください。'))
@@ -86,4 +127,36 @@ describe('HQ template API transport', () => {
     expect(error.message).toContain('処理できませんでした')
     expect(error.message).not.toContain('D1_ERROR')
   })
+})
+
+it('統括の版履歴・比較・復元・受取版と件数を認証済みtransportで呼ぶ',async()=>{
+ await hqTemplatesApi.versions('t/1');expect(request).toHaveBeenLastCalledWith('/api/hq/templates/t%2F1/versions',{method:'GET'});
+ await hqTemplatesApi.compareVersions('t1',1,3);expect(request).toHaveBeenLastCalledWith('/api/hq/templates/t1/versions/compare?from=1&to=3',{method:'GET'});
+ await hqTemplatesApi.restoreVersion('t1',2,4);expect(request).toHaveBeenLastCalledWith('/api/hq/templates/t1/versions/2/restore',{method:'POST',body:JSON.stringify({expectedRevision:4})});
+ await hqTemplatesApi.receivedVersions('t1');expect(request).toHaveBeenLastCalledWith('/api/hq/templates/t1/received-versions',{method:'GET'});
+ request.mockResolvedValue({success:true,stats:{thisMonthSentCount:12,outdatedTemplateCount:2}});
+ expect(await hqTemplatesApi.listStats()).toEqual({thisMonthSentCount:12,outdatedTemplateCount:2});
+});
+
+it('ひな形フォルダは色を保存・更新・一覧から読み返す',async()=>{
+ const folder={id:'f',name:'分類',color:'#8b5cf6',revision:1};request.mockResolvedValue({success:true,data:folder});
+ expect(await hqTemplatesApi.folders.create('分類','#8b5cf6')).toEqual(folder);
+ expect(request).toHaveBeenLastCalledWith('/api/hq/templates/folders',{method:'POST',body:JSON.stringify({name:'分類',color:'#8b5cf6'})});
+ await hqTemplatesApi.folders.update('f','改名',1,null);
+ expect(request).toHaveBeenLastCalledWith('/api/hq/templates/folders/f',{method:'PATCH',body:JSON.stringify({name:'改名',expectedRevision:1,color:null})});
+ request.mockResolvedValue({success:true,data:[folder]});expect(await hqTemplatesApi.folders.list()).toEqual([folder]);
+});
+
+it('フォルダ交換は双方の版をまとめて送り、IDをescapeする',async()=>{
+ await hqTemplatesApi.folders.swapOrder('f/1','f/2',3,4);
+ expect(request).toHaveBeenLastCalledWith('/api/hq/templates/folders/f%2F1/swap-order',{method:'POST',body:JSON.stringify({withId:'f/2',expectedRevision:3,withExpectedRevision:4})});
+});
+
+
+it.each([400, 409, 422, 428])('HTTP %s の内部原文をひな形の失敗へ残さない', async status => {
+  request.mockRejectedValue(new transport.ApiError(status, '入力を確認してください D1_ERROR: SELECT secret FROM tenant'))
+  const error = await hqTemplatesApi.get('t1').catch(cause => cause)
+  expect(error).toMatchObject({ status, responseReceived: true, requestNotApplied: true })
+  expect(error.message).toMatch(/[ぁ-んァ-ヶ一-龠]/u)
+  expect(error.message).not.toMatch(/D1_ERROR|SELECT|secret|API error/)
 })

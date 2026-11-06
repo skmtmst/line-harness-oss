@@ -105,6 +105,6 @@ describe('これまでの種別を壊していない', () => {
   })
 
   it('知らない種別はテキストに落とす', () => {
-    expect(buildMessage('imagemap', 'なにか')).toEqual({ type: 'text', text: 'なにか' })
+    expect(buildMessage('unknown_kind', 'なにか')).toEqual({ type: 'text', text: 'なにか' })
   })
 })

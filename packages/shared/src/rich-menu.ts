@@ -14,13 +14,16 @@ export type RichMenuAreaIntent =
   | "tel"
   | "text"
   | "template"
+  | "booking"
+  | "booking_history"
+  | "visit_stamp"
   | "form"
   | "switch"
   | "postback"
   | "datetime"
   | "clipboard";
 
-/** 1つのメニューが持てるページの上限（要件 v6-12 §5-2）。 */
+/** 1つのメニューが持てるページの上限（要件 -12 §5-2）。 */
 export const RICH_MENU_MAX_PAGES = 10;
 
 /** LINEへ登録できるリッチメニュー画像の寸法。 */
@@ -34,6 +37,9 @@ export const RICH_MENU_ACTION_TYPE_BY_INTENT = {
   url: "uri",
   tel: "uri",
   form: "uri",
+  booking: "uri",
+  booking_history: "uri",
+  visit_stamp: "uri",
   text: "message",
   template: "postback",
   switch: "richmenuswitch",
@@ -77,6 +83,9 @@ export const RICH_MENU_DB_ACTION_TYPE_BY_INTENT = {
   url: "uri",
   tel: "uri",
   form: "uri",
+  booking: "uri",
+  booking_history: "uri",
+  visit_stamp: "uri",
   text: "message",
   template: "postback",
   switch: "richmenuswitch",
@@ -84,3 +93,27 @@ export const RICH_MENU_DB_ACTION_TYPE_BY_INTENT = {
   datetime: "postback",
   clipboard: "postback",
 } as const satisfies Record<RichMenuAreaIntent, "uri" | "message" | "postback" | "richmenuswitch">;
+
+/** Portable HQ definition. Account-owned references are resolved when distributing. */
+export interface HqRichMenuDefinition {
+  schemaVersion: 1;
+  richMenu: {
+    id: string; name: string; chatBarText: string; size: RichMenuSize; defaultPageId: string;
+    displayOrder?: number; displayAudience?: 'all' | 'store' | 'tag'; displayTagName?: string; defaultOpen?: boolean;
+    pages: Array<{
+      id: string; name: string; imageR2Key: string;
+      areas: Array<{
+        id: string; bounds: {x:number;y:number;width:number;height:number};
+        actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'; actionData: Record<string,string>;
+        intent?: RichMenuAreaIntent;
+        /** Use the receiving account’s uniquely named menu. */
+        bookingMenuName?: string;
+        /** Create an account-owned measured link when distributing a URI action. */
+        useTrackedLink?: boolean;
+        /** actionData field -> common information name in each receiving account. */
+        dataBindings?: Partial<Record<'uri'|'text'|'initial'|'min'|'max',string>>;
+        label?: string; tagIds?: string[]; formId?: string; templateId?: string; scenarioId?: string;
+      }>;
+    }>;
+  };
+}

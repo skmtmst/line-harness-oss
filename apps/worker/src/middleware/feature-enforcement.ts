@@ -1,14 +1,13 @@
+import { logger } from '@line-crm/shared/server';
+import {appendFeatureScopeMeta} from './feature-scope-response.js';
+import { ACCOUNT_KEYS, bodyAccountIds } from './feature-body-accounts.js';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { FeatureId } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from './auth.js';
-import { getVisibleLineAccountScope } from '../services/account-access.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from './auth/principal/auth.js';
+import { getVisibleLineAccountScope, restrictVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
-import {
-  accountFeatureAvailability,
-  createFeatureAvailabilityRequestContext,
-  type FeatureAvailability,
-} from '../services/feature-enforcement.js';
+import { accountFeatureAvailability, createFeatureAvailabilityRequestContext, type FeatureAvailability } from '../services/feature-enforcement.js';
 
 export type RouteClassification =
   | { kind: 'feature'; featureId: FeatureId }
@@ -63,6 +62,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/support-marks', 'support_marks'),
   feature('/api/saved-searches', 'saved_searches'),
   feature('/api/scenarios', 'scenarios'),
+  feature('/api/scenario-drafts', 'scenarios'),
   // 購読1本への操作（止める・再開・失敗を再送・移す）。アカウントは
   // requestAccountIds が購読→友だちから引く。
   feature('/api/scenario-subscriptions', 'scenarios'),
@@ -76,6 +76,12 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/friend-reminders', 'reminders'),
   feature('/api/reminder-runs', 'reminders'),
   feature('/api/auto-replies', 'auto_replies'),
+  feature('/api/qa-entries', 'auto_replies'),
+  feature('/api/ai-settings', 'auto_replies'),
+  exempt('/api/ai-features','core','Account AI opt-in; explicit account scope, admin role, consent and step-up are checked in the route'),
+  feature('/api/ai-answer-logs','auto_replies'),
+  feature('/api/delivery-purposes','broadcasts'),
+  feature('/api/mcp-connections','external_integrations'),
   feature('/api/auto-reply-runs', 'auto_replies'),
   feature('/api/rich-menus', 'rich_menus'),
   feature('/api/rich-menu', 'rich_menus'),
@@ -86,6 +92,8 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/entry-route-genres', 'inflow_tracking'),
   feature('/api/links', 'inflow_tracking'),
   feature('/api/forms', 'forms'),
+  feature('/api/form-files', 'forms'),
+  feature('/api/postal-code', 'forms'),
   feature('/api/liff/webinars', 'webinars'),
   feature('/api/nen-members/photos', 'photo_review'),
   feature('/api/nen/photo', 'photo_review'),
@@ -95,6 +103,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/webhooks', 'external_integrations'),
   feature('/api/integrations/google-calendar', 'external_integrations'),
   feature('/api/integrations/google-sheets', 'external_integrations'),
+  feature('/api/integrations/tiktok-pnl', 'external_integrations'),
   feature('/api/ad-platforms', 'external_integrations'),
   feature('/api/ad-costs', 'external_integrations'),
   feature('/api/instagram', 'external_integrations'),
@@ -116,21 +125,27 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/site', 'site_tracking'),
   feature('/api/webinars', 'webinars'),
   feature('/api/events', 'events'),
+  exempt('/api/booking/stripe-test/webhook','public','Connect専用の試験署名を検査して未対応はpendingに保存する受信口'),
+  exempt('/api/booking/pass-payments/webhook','public','Stripeの試験署名を確認する券の支払通知'),
   feature('/api/booking', 'booking'),
   feature('/api/meet-consultations', 'booking'),
   feature('/api/conversions', 'affiliates'),
-  // #819: 計測サイトの管理は成果計測(affiliates)の一部。公開口は /api/public で公開分類済み。
+  // 計測サイトの管理は成果計測(affiliates)の一部。公開口は /api/public で公開分類済み。
   feature('/api/measurement-sites', 'affiliates'),
   feature('/api/affiliates', 'affiliates'),
   feature('/api/affiliate-', 'affiliates'),
   feature('/api/affiliates-report', 'affiliates'),
+  feature('/api/member-ranks', 'mileage'),
   feature('/api/mileage', 'mileage'),
   feature('/api/action-scores', 'mileage'),
   feature('/api/scoring-rules', 'mileage'),
+  exempt('/api/ec/events','public','署名で店とEC本人を確認する行動の受信口'),
+  feature('/api/ec/auto-line','ec_commerce'),
   feature('/api/ec-commerce', 'ec_commerce'),
   feature('/api/ec-operations', 'ec_commerce'),
   feature('/api/line-notifications', 'line_notifications'),
   feature('/api/notifications/rules', 'line_notifications'),
+  feature('/api/notifications/teams', 'line_notifications'),
   feature('/api/nen-campaigns', 'nen_campaigns'),
   feature('/api/nen-members', 'photo_review'),
   // 然の会員（ランク・マイル）はECとの連携が前提。EC連携と同じ機能で止める。
@@ -141,13 +156,25 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   // マイペット・健康日記は LINE 側だけで完結する然の機能。投稿（photo_review）と同じ束で止める。
   feature('/api/nen/pets', 'photo_review'),
   feature('/api/nen/health', 'photo_review'),
+  // デリバリー受注の通知受け口。担当者の認証も統括の判定も通らないため、
+  // 機能の入れ/切りでは止めない。route 内でサービスごとの合言葉を照合する。
+  exempt(
+    '/api/restaurant-test/delivery/webhooks',
+    'public',
+    '署名検証する各デリバリーサービスからの通知受信',
+  ),
   feature('/api/restaurant-test', 'restaurant_test'),
+  feature('/api/visit-stamps', 'visit_stamps'),
 
   exempt('/api/settings', 'core', '機能を再度オンにするため停止対象外'),
   exempt('/api/auth', 'core', 'ログインとセッション管理'),
+  exempt('/api/me/presence','core','認証済み本人の在席設定。代理と閲覧専用の変更を拒否する'),
+  exempt('/api/me/push', 'core', '認証済み本人の端末通知。各操作で本人と代理禁止を検証'),
   exempt('/api/staff', 'core', 'ログインユーザーと権限管理'),
   exempt('/api/access', 'core', '権限と監査の共通基盤'),
   exempt('/api/capabilities', 'core', '権限判定の共通基盤'),
+  exempt('/api/line-account-folders', 'core', '統括内のLINEアカウント分類'),
+  exempt('/api/line-account-tags', 'core', '統括内のLINEアカウント分類'),
   exempt('/api/line-accounts', 'core', 'LINEアカウント選択の共通基盤'),
   exempt('/api/friends', 'core', '友だち管理は必須機能'),
   exempt('/api/tags', 'core', 'タグは複数機能が参照する共通基盤'),
@@ -162,19 +189,23 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/health', 'system', '稼働確認'),
   exempt('/api/qr', 'public', '公開QR生成'),
   exempt('/api/liff', 'public', 'LIFF内で個別認証する公開経路'),
+  exempt('/liff', 'public', '本人確認するLIFFへ案内する入口。ファイル本文は返さない'),
   exempt('/api/public', 'public', '公開表示専用経路'),
   exempt('/api/integrations', 'system', '署名検証する外部受信経路'),
   exempt('/api/internal', 'system', '内部サービス間経路'),
   exempt('/api/operations', 'system', '運用状態と監視'),
   exempt('/api/tenants', 'core', '統括管理'),
-  exempt('/api/ops', 'core', '運営コンソール（★V6 37）。ルート内で platform_admins を検証し、統括をまたいで読む'),
+  exempt('/api/ops', 'core', '運営コンソール。ルート内で platform_admins を検証し、統括をまたいで読む'),
+  exempt('/api/hq/style-starter-sets','core','統括の初期セット配布。各口で統括の役割と可視店を検証'),
+  exempt('/api/hq/store-comparison','core','統括の現在の可視店だけの集計とCSV。各口で統括の役割・代理・取得時の店権限を確認'),
   exempt('/api/hq/operator-history', 'core', '契約先から見える運営の操作履歴。ルート内で staff.tenantId に絞る'),
   exempt('/api/setup', 'core', '初期設定'),
   exempt('/api/getting-started', 'core', '初期設定'),
   exempt('/api/hq/banners', 'core', '統括バナー生成。ルート内でtenantと統括編集権限を検証'),
   exempt('/api/hq/billing', 'core', '統括の契約・課金基盤。管理APIはtenant境界と役割、WebhookはStripe署名を検証'),
   exempt('/api/hq/support', 'core', '統括利用者から運営への問い合わせ。ルート内でtenant境界と役割を検証'),
-  exempt('/api/hq/notices', 'core', '運営からのお知らせと契約者専用LINEの登録案内（★V6 37-7）。ルート内で staff.tenantId に絞る'),
+  exempt('/api/hq/notices', 'core', '運営からのお知らせと契約者専用LINEの登録案内。ルート内で staff.tenantId に絞る'),
+  exempt('/api/hq/broadcasts', 'core', '統括全体のowner/adminだけ。店舗の配信停止は通常配信でも検証'),
   exempt('/api/hq/templates', 'core', '統括ひな形。ルート内でtenantと統括編集権限を検証'),
   exempt('/api/recipes', 'core', '設定テンプレート'),
   exempt('/api/manual-links', 'core', 'ヘルプ導線設定'),
@@ -203,15 +234,16 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/admin', 'system', '保守診断と復旧'),
   exempt('/api/meet-callback', 'system', '署名済み外部完了通知'),
 
+  exempt('/mcp','system','接続ごとの鍵と店・操作の段を検証するMCP口'),
   exempt('/webhook', 'public', 'LINE署名で検証する受信経路'),
   exempt('/webhooks', 'public', '外部署名で検証する受信経路'),
   exempt('/openapi.json', 'public', '公開API仕様'),
+  exempt('/robots.txt', 'public', '検索に出さない robots（全部拒否）'),
   exempt('/docs', 'public', '公開API仕様'),
   exempt('/auth', 'public', 'ログイン開始とcallback'),
   exempt('/health', 'system', '稼働確認'),
   exempt('/t', 'public', '計測リンク'),
-  exempt('/r', 'public', '公開流入リンク'),
-  exempt('/o', 'public', '公開流入リンク'),
+  exempt('/r', 'public', '公開流入リンク'), exempt('/o', 'public', '公開流入リンク'),
   exempt('/book', 'public', '公開予約導線'),
   exempt('/pool', 'public', '公開流入プール'),
   exempt('/images', 'public', '署名付き画像配信'),
@@ -226,20 +258,47 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
 /** 同じ prefix 内で公開経路と管理経路が分かれる例外。 */
 export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadata[] = [
   {
+    pattern: /^\/api\/instagram\/(?:connection|oauth\/start|oauth\/callback|refresh)$/,
+    methods: ['GET', 'POST', 'DELETE'],
+    accountResolver: 'none',
+    classification: { kind: 'core', reason: 'SNS連携設定の接続状態・認可・解除は、機能停止中も管理できる。各routeで認証・所属・操作権限を確認する' },
+  },
+  {
+    pattern: /^\/api\/restaurant-test\/google\/(?:connection|connect\/start|connect\/select-location|oauth\/callback|disconnect)$/,
+    methods: ['GET', 'POST'],
+    accountResolver: 'none',
+    classification: { kind: 'core', reason: 'SNS連携設定のGoogle接続管理は、機能停止中も行える。Googleの利用と店舗所属・接続権限はrouteで確認する' },
+  },
+  {
+    pattern: /^\/api\/hq\/style(?:\*|-template-samples|-starter-sets(?:\/[^/]+)?|-attention)$/,
+    methods: ['ALL', 'GET', 'PUT'],
+    accountResolver: 'none',
+    classification: { kind: 'core', reason: '統括の業種設定。ルート内で統括所属とowner/adminを確認し、店舗の機能停止は各予約口で検証する' },
+  },
+  {pattern:/^\/api\/instagram\/webhook$/,methods:['GET','POST'],accountResolver:'none',classification:{kind:'public',reason:'Metaの確認用トークン・HMAC署名で個別認証する受信口'}},
+  {pattern:/^\/internal\/ubereats\/sandbox-token-probe$/,methods:['POST'],accountResolver:'none',classification:{kind:'system',reason:'合言葉の署名で個別認証するUber Sandbox接続確認の一回実行口'}},
+  {
     pattern: /^\/api\/auth\/(?:register|password)\//,
     methods: ['GET', 'POST'],
     accountResolver: 'none',
     classification: { kind: 'public', reason: '登録前・ログイン前にTurnstileと回数制限で守る認証経路' },
   },
   {
-    // 二段階認証の確認と初回設定。セッションはまだ無く、合言葉だけで守る公開経路（N-426）。
-    pattern: /^\/api\/auth\/two-factor\//,
+    // 一次認証の課題で本人確認する。管理セッション発行前の公開経路。
+    pattern: /^\/api\/auth\/passkeys\/login\/(?:options|verify)$/,
+    methods: ['POST'],
+    accountResolver: 'none',
+    classification: { kind: 'public', reason: '一次認証の課題で本人確認するパスキーログインの入口' },
+  },
+  {
+    // 二段階認証の確認と初回設定。セッションはまだ無く、合言葉だけで守る公開経路。
+    pattern: /^\/api\/auth\/two-factor\/(verify|setup(?:\/confirm)?)$/,
     methods: ['POST'],
     accountResolver: 'none',
     classification: { kind: 'public', reason: 'ログイン中の合言葉で本人確認する二段階認証の入口' },
   },
   {
-    // 運営メンバーの招待を受ける口（★V6 37-10-A）。メールの URL のトークンだけで守る
+    // 運営メンバーの招待を受ける口（★37-10-A）。メールの URL のトークンだけで守る
     pattern: /^\/api\/auth\/ops-invite\//,
     methods: ['GET', 'POST'],
     accountResolver: 'none',
@@ -294,7 +353,7 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
     classification: { kind: 'feature', featureId: 'affiliates' },
   },
   {
-    // 管理者確認専用口(#724)。公開の :id 表示と紛らわしいため、固有経路を先に置く。
+    // 管理者確認専用口。公開の :id 表示と紛らわしいため、固有経路を先に置く。
     // requireRole('owner', 'admin') で認証必須。公開口にしない。
     pattern: /^\/api\/forms\/unassigned$/,
     methods: ['GET'],
@@ -308,7 +367,13 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
     classification: { kind: 'public', reason: '回答前に表示する公開フォーム' },
   },
   {
-    pattern: /^\/api\/forms\/[^/]+\/(?:submit|opened|partial)$/,
+    pattern: /^\/api\/forms\/[^/]+\/images\/[^/]+$/,
+    methods: ['GET'],
+    accountResolver: 'none',
+    classification: { kind: 'public', reason: '採用中の公開フォーム版が表示する固定画像' },
+  },
+  {
+    pattern: /^\/api\/forms\/[^/]+\/(?:submit|opened|partial|files)$/,
     methods: ['POST'],
     accountResolver: 'none',
     classification: { kind: 'public', reason: 'LINE利用者が行う公開フォーム操作' },
@@ -322,35 +387,12 @@ function prefixMatches(path: string, prefix: string): boolean {
 }
 
 export function routeClassification(path: string, method = 'GET'): RouteClassification | null {
+  const prefixPath=path.replace(/\*$/, '').replace(/\/$/, '');
   const pattern = FEATURE_ROUTE_PATTERN_MANIFEST.find(
     (item) => item.methods.includes(method.toUpperCase()) && item.pattern.test(path),
   );
   if (pattern) return pattern.classification;
-  return FEATURE_ROUTE_MANIFEST.find((item) => prefixMatches(path, item.prefix))?.classification ?? null;
-}
-
-const ACCOUNT_KEYS = ['account_id', 'accountId', 'line_account_id', 'lineAccountId'] as const;
-
-async function bodyAccountIds(c: Context<Env>): Promise<string[]> {
-  if (!c.req.header('content-type')?.toLowerCase().includes('application/json')) return [];
-  try {
-    const body = await c.req.raw.clone().json() as Record<string, unknown>;
-    for (const key of ACCOUNT_KEYS) {
-      const value = body[key];
-      if (typeof value === 'string' && value.trim()) return [value.trim()];
-    }
-    for (const key of ['accountIds', 'lineAccountIds'] as const) {
-      const values = body[key];
-      if (Array.isArray(values)) {
-        return [...new Set(values.filter(
-          (value): value is string => typeof value === 'string' && Boolean(value.trim()),
-        ).map((value) => value.trim()))];
-      }
-    }
-  } catch {
-    // 入力契約のエラーは route handler に任せる。
-  }
-  return [];
+  return FEATURE_ROUTE_MANIFEST.find((item) => prefixMatches(prefixPath, item.prefix))?.classification ?? null;
 }
 
 /**
@@ -372,37 +414,45 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   /** 本体で行が見つからないときだけ試す予備の照合（新旧の表の同居用）。 */
   fallbackSql?: string;
 }> = [
+  {pattern:/^\/api\/visit-stamps\/entries\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM visit_stamp_entries WHERE id=?'},
+  {pattern:/^\/api\/visit-stamps\/paper-requests\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM visit_stamp_paper_requests WHERE id=?'},
+  {pattern:/^\/api\/visit-stamps\/paper-photos\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM visit_stamp_paper_photos WHERE id=?'},
+  {pattern:/^\/api\/visit-stamps\/visits\/restaurant\/([^/]+)/,sql:'SELECT s.line_account_id AS account_id FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE r.id=?'},
+  {pattern:/^\/api\/visit-stamps\/visits\/booking\/([^/]+)/,sql:'SELECT line_account_id AS account_id FROM bookings WHERE id=?'},
   { pattern: /^\/api\/templates\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM templates WHERE id = ?' },
   { pattern: /^\/api\/scenarios\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM scenarios WHERE id = ?' },
   { pattern: /^\/api\/broadcasts\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcasts WHERE id = ?' },
   { pattern: /^\/api\/broadcast-message-assets\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcast_message_assets WHERE id = ?' },
   { pattern: /^\/api\/reminders\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM reminders WHERE id = ?' },
-  // R348: friend_reminders 表に所属列は無い。友だちの所属で判定する。
+  // friend_reminders 表に所属列は無い。友だちの所属で判定する。
   { pattern: /^\/api\/friend-reminders\/([^/]+)/, sql: 'SELECT f.line_account_id AS account_id FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id WHERE fr.id = ?' },
   { pattern: /^\/api\/reminder-runs\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM reminder_delivery_runs WHERE id = ?' },
   { pattern: /^\/api\/auto-replies\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM auto_replies WHERE id = ?' },
   { pattern: /^\/api\/rich-menu-groups\/([^/]+)/, sql: 'SELECT account_id FROM rich_menu_groups WHERE id = ?' },
+  { pattern: /^\/api\/form-files\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM form_submission_files WHERE id = ?' },
+  { pattern: /^\/api\/forms\/document-settings\/([^/]+)$/, sql: 'SELECT id AS account_id FROM line_accounts WHERE id = ?' },
   { pattern: /^\/api\/media\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM media WHERE id = ?' },
+  { pattern: /^\/api\/common-vars\/exports\/([^/]+)(?:\/|$)/, sql: 'SELECT line_account_id AS account_id FROM common_var_export_jobs WHERE id = ?' },
   { pattern: /^\/api\/common-vars\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_vars WHERE id = ?' },
   { pattern: /^\/api\/common-actions\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_actions WHERE id = ?' },
-  // #942: 一覧が返すidは V6 の automation_definitions。旧 automations 表だけを
-  // 見ると V6 ルールの稼働切替・改訂下書きが全部 LINE_ACCOUNT_REQUIRED で止まる。
+  // 一覧が返すidは の automation_definitions。旧 automations 表だけを
+  // 見ると ルールの稼働切替・改訂下書きが全部 LINE_ACCOUNT_REQUIRED で止まる。
   { pattern: /^\/api\/automations\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM automation_definitions WHERE id = ?', fallbackSql: 'SELECT line_account_id AS account_id FROM automations WHERE id = ?' },
   { pattern: /^\/api\/tracked-links\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM tracked_links WHERE id = ?' },
   { pattern: /^\/api\/entry-routes\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM entry_routes WHERE id = ?' },
-  { pattern: /^\/api\/ad-platforms\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM ad_platforms WHERE id = ?' },
+  { pattern: /^\/api\/ad-platforms\/(?!mappings(?:\/|$))([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM ad_platforms WHERE id = ?' },
   { pattern: /^\/api\/friend-add-rules\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM friend_add_rules WHERE id = ?' },
   { pattern: /^\/api\/conversions\/(?:definitions|points)\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM conversion_points WHERE id = ?' },
-  // R351: 成果の所属は地点表が持つ。イベント表に列は無いので結合して引く。
+  // 成果の所属は地点表が持つ。イベント表に列は無いので結合して引く。
   { pattern: /^\/api\/conversions\/events\/([^/]+)/, sql: 'SELECT cp.line_account_id AS account_id FROM conversion_events ce JOIN conversion_points cp ON cp.id = ce.conversion_point_id WHERE ce.id = ?' },
   { pattern: /^\/api\/events\/admin\/events\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM events WHERE id = ?' },
-  // #1075: たまる決めごとの停止・再開・削除は payload に account を載せない。
+  // たまる決めごとの停止・再開・削除は payload に account を載せない。
   // 照合が無いと PUT/DELETE /api/mileage/rules/:id が全部 LINE_ACCOUNT_REQUIRED で止まる。
   { pattern: /^\/api\/mileage\/rules\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM mileage_rules WHERE id = ?' },
 ];
 
 /**
- * R348/R349: 親ではなく行の送信元アカウントで担当を判定する口。
+ * 親ではなく行の送信元アカウントで担当を判定する口。
  * 履歴・登録の一覧と、登録1件の操作（日時変更・取消・再開）が対象。
  * 行の絞り込み自体は route 側で行い、ここでは「通してよいか」だけ決める。
  */
@@ -491,8 +541,16 @@ async function resourceOwnerAccountId(c: Context<Env>): Promise<string | null> {
 }
 
 async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; accountMismatch: boolean }> {
+  // /api/liff 外の互換予約 URL もイベントの機能判定を通す。所有者は未検証のパラメータや管理セッションでなく、保存済み LIFF 対応から解決する。
+  if (c.req.method === 'POST' && /^\/api\/events\/liff\/bookings\/[^/]+\/change$/.test(c.req.path)) {
+    const liffId = c.req.query('liffId');
+    const account = liffId ? await dbFor(c.env).prepare(
+      'SELECT id FROM line_accounts WHERE liff_id = ? AND is_active = 1',
+    ).bind(liffId).first<{ id: string }>() : null;
+    return { ids: account ? [account.id] : [], accountMismatch: false };
+  }
   /*
-   * R423/R426/R428: 公開受信口は受信口IDから所属を確定する。
+   * 公開受信口は受信口IDから所属を確定する。
    * 画面のコピーURL（queryなし）でも通り、外部指定の account は使わない。
    * 別 account・不存在の指定で所有先の機能停止をすり抜けられない。
    * 有効な所有先の受信を無関係な指定で拒否しない。
@@ -515,7 +573,7 @@ async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; acco
     }
     // 未知の受信口は従来の解決へ（route が 404 を返す）。
   }
-  // R348: query と body の両方に所属があるときは両方を見る。query だけを
+  // query と body の両方に所属があるときは両方を見る。query だけを
   // 見ると、query に旧所属・body に新所属を書いて検査をすり抜けられる。
   // 両方が食い違う入力はどちらを信じるか決められないため断る。
   let queryAccount: string | null = null;
@@ -570,7 +628,7 @@ async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; acco
     if (row?.line_account_id) return { ids: [row.line_account_id], accountMismatch: false };
   }
   // /api/scenario-subscriptions/:id/... は本体に account を載せない。
-  // 購読の友だちが属するアカウントで機能設定を見る（#949 N-054）。
+  // 購読の友だちが属するアカウントで機能設定を見る。
   const subscription = /^\/api\/scenario-subscriptions\/([^/]+)/.exec(c.req.path);
   if (subscription) {
     const row = await dbFor(c.env).prepare(
@@ -591,30 +649,12 @@ async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; acco
   return { ids: [], accountMismatch: false };
 }
 
-async function appendFeatureScopeMeta(c: Context<Env>, excluded: number): Promise<void> {
-  if (excluded < 1 || !c.res.headers.get('content-type')?.includes('application/json')) return;
-  try {
-    const body = await c.res.clone().json() as Record<string, unknown>;
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return;
-    const meta = body.meta && typeof body.meta === 'object' && !Array.isArray(body.meta)
-      ? body.meta as Record<string, unknown>
-      : {};
-    const headers = new Headers(c.res.headers);
-    headers.delete('content-length');
-    c.res = new Response(JSON.stringify({
-      ...body,
-      meta: { ...meta, featureDisabledAccounts: excluded },
-    }), { status: c.res.status, headers });
-  } catch {
-    // JSONでない特殊応答は元のまま返す。
-  }
-}
 
 const BULK_APPROVAL_PATH = '/api/conversions/approvals/bulk';
 const BULK_APPROVAL_MAX_ITEMS = 100;
 
 /**
- * m22u R352・R355：一括承認の対象IDから所属アカウントを引く。
+ * m22u ・：一括承認の対象IDから所属アカウントを引く。
  *
  * 一括の body は items（成果IDの列）だけで、アカウントを載せない。
  * URL にも対象IDが無いため従来の解決では空になり、固定アカウントのない
@@ -679,7 +719,7 @@ async function resolveBulkApprovalScope(
   const staff = c.get('staff');
   if (explicit.length > 0) {
     /*
-     * R355: 指定したアカウントと対象の所属が違うときは全体を拒否する。
+     * 指定したアカウントと対象の所属が違うときは全体を拒否する。
      * A の名前で B の成果を通す抜け道にしない。
      */
     if (union.some((account) => !explicit.includes(account))) {
@@ -774,7 +814,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
     classification = { kind: 'feature', featureId: 'forms' };
   }
   if (!classification) {
-    console.error(JSON.stringify({ event: 'route.feature.unclassified', method: c.req.method, path: c.req.path }));
+    logger.error("route.feature.unclassified");
     return c.json({
       success: false,
       error: 'APIの機能分類が未設定です',
@@ -783,7 +823,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
   }
   if (classification.kind !== 'feature') return next();
 
-  // m22u R352・R355: 一括承認は items の成果IDから所属を引いて判定する。
+  // m22u ・: 一括承認は items の成果IDから所属を引いて判定する。
   // URL に資源が無いため従来の解決では空になり、固定アカウントの無い管理者が
   // LINE_ACCOUNT_REQUIRED で止まる。items の成果IDから所属を引いて判定する。
   if (c.req.method === 'POST' && c.req.path === BULK_APPROVAL_PATH) {
@@ -791,14 +831,14 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
     if (bulk) {
       if (!bulk.ok) return bulk.response;
       const bulkStaff = c.get('staff');
-      if (bulkStaff) c.set('staff', { ...bulkStaff, featureEnabledLineAccountIds: bulk.enabled });
+      if (bulkStaff) c.set('staff', restrictVisibleLineAccountScope(dbFor(c.env), bulkStaff, bulk.enabled));
       return next();
     }
     // 対象が引けない要求は下の従来の解決へ（handler が入力検査で400にする）。
   }
   const staff = c.get('staff');
   const db = dbFor(c.env);
-  // R348/R349: 履歴・登録の口は親の所属だけで閉じない。行の送信元
+  // 履歴・登録の口は親の所属だけで閉じない。行の送信元
   // アカウントのどれかを担当していれば通し、行の絞り込みは route 側で行う。
   const rowScopedReminderId = matchRowScopedReminderId(c.req.path);
   if (rowScopedReminderId) {
@@ -817,7 +857,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
 };
 
 /**
- * 機能設定の強制（本文）。行単位の口（R348/R349）と通常の口で共有する。
+ * 機能設定の強制（本文）。行単位の口と通常の口で共有する。
  * accountIds は「この要求で機能判定する所属」の確定ずみ一覧。
  */
 async function enforceAccounts(
@@ -864,7 +904,7 @@ async function enforceAccounts(
     if (enabledIds.length === 0) {
       return unavailableResponse(c, states[0]!.availability);
     }
-    c.set('staff', { ...staff, featureEnabledLineAccountIds: enabledIds });
+    c.set('staff', restrictVisibleLineAccountScope(db, staff, enabledIds));
     await next();
     await appendFeatureScopeMeta(c, excluded);
     return;

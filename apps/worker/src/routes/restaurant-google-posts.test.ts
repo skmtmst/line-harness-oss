@@ -74,6 +74,50 @@ let googlePostsOnGoogle: Array<Record<string, unknown>>;
 let createFailStatus: number | null;
 let logSpy: ReturnType<typeof vi.spyOn>;
 let createSeq = 0;
+/** Instagram（Graph API）側の呼び出し。本物のMetaへはつながず、ぜんぶここで受ける。 */
+let instagramCalls: Array<{ url: string; init?: RequestInit }>;
+/** null 以外にすると、コンテナ作成（`/media`）がそのHTTP状態で落ちる。 */
+let instagramFailStatus: number | null;
+let instagramPublishFailStatus: number | null;
+let instagramRetryGate: Promise<void> | null;
+let instagramRetryStarted: (() => void) | null;
+/** R2 の `IMAGES` の代わり。キーごとのバイト列を持つだけ。 */
+let imageStore: Map<string, Uint8Array>;
+let cfImagesEnabled: boolean;
+let imageTransforms: unknown[];
+
+/**
+ * instagramConfig の必須条件（v形式のバージョン・base64で32バイトの鍵・httpsのredirect）を
+ * 満たす値にする。接続に使うのは Instagram アプリ側の `INSTAGRAM_*`、Webhook の署名照合に
+ * 使うのが Facebook アプリ側の `META_APP_*` で、番号は互いに別。
+ */
+const META_ENV = {
+  META_APP_ID: '100',
+  META_APP_SECRET: 'secret_mock',
+  INSTAGRAM_APP_ID: '200',
+  INSTAGRAM_APP_SECRET: 'ig_secret_mock',
+  META_REDIRECT_URI: 'https://worker.example.test/api/instagram/oauth/callback',
+  META_GRAPH_API_VERSION: 'v24.0',
+  META_TOKEN_ENCRYPTION_KEY: btoa('x'.repeat(32)),
+} as const;
+
+/** detectImageMeta が読める最小のJPEG（SOI + SOF0 に縦横だけ入れたもの）。 */
+function jpegBytes(width = 1080, height = 1080): Uint8Array {
+  const bytes = new Uint8Array(20);
+  bytes.set([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, height >> 8, height & 0xff, width >> 8, width & 0xff], 0);
+  return bytes;
+}
+
+/** detectImageMeta が読める最小のPNG（署名 + IHDR の縦横だけ）。 */
+function pngBytes(width = 1080, height = 1080): Uint8Array {
+  const bytes = new Uint8Array(24);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+  for (let i = 0; i < 4; i++) {
+    bytes[16 + i] = (width >>> ((3 - i) * 8)) & 0xff;
+    bytes[20 + i] = (height >>> ((3 - i) * 8)) & 0xff;
+  }
+  return bytes;
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -101,10 +145,38 @@ async function seedConnection(): Promise<void> {
     .run('conn-1', 'store-shibuya', 'account-2', 'owner@example.test', LOCATION, 'こもれび食堂 渋谷店', await encryptCredential('refresh-secret', ENC_KEY), await encryptCredential('access-secret', ENC_KEY), '2099-01-01T00:00:00.000Z', 'connected', '2026-09-23T00:00:00.000Z');
 }
 
-function seedMedia(id: string, filename: string, lineAccountId: string): void {
+function seedMedia(id: string, filename: string, lineAccountId: string, bytes: Uint8Array = jpegBytes()): void {
   testDb.raw
     .prepare(`INSERT INTO media (id, kind, filename, mime_type, size_bytes, r2_key, line_account_id) VALUES (?, 'image', ?, 'image/jpeg', 1000, ?, ?)`)
     .run(id, filename, `images/${filename}`, lineAccountId);
+  // Instagram へ出すときは中身まで読むので、R2の代わりにもバイト列を入れておく。
+  imageStore.set(`images/${filename}`, bytes);
+}
+
+/**
+ * Instagram の接続1件。`page_token_encrypted` は META_TOKEN_ENCRYPTION_KEY で包む
+ * （Google側の ENC_KEY とは別の鍵。実装も cfg.encryptionKey で開ける）。
+ */
+async function seedInstagramConnection(options: { scopes?: string; expiresAt?: string; dataAccessExpiresAt?: string | null } = {}): Promise<void> {
+  testDb.raw
+    .prepare(
+      `INSERT INTO instagram_connections
+        (line_account_id, page_id, instagram_id, page_name, username, page_token_encrypted, user_token_encrypted,
+         expires_at, data_access_expires_at, refreshed_at, connected_by, scopes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      'account-2', 'page-1', 'ig-1', 'こもれび食堂 渋谷店', 'komorebi',
+      await encryptCredential('page-secret', META_ENV.META_TOKEN_ENCRYPTION_KEY),
+      await encryptCredential('user-secret', META_ENV.META_TOKEN_ENCRYPTION_KEY),
+      options.expiresAt ?? '2099-01-01T00:00:00.000Z',
+      options.dataAccessExpiresAt === undefined ? '2099-01-01T00:00:00.000Z' : options.dataAccessExpiresAt,
+      '2026-09-23T00:00:00.000Z', 'owner-1',
+      // Instagram直接ログインで保存される許可名。Facebookページ方式の
+      // `instagram_basic` / `pages_show_list` は使わない。
+      options.scopes ??
+        'instagram_business_basic,instagram_business_content_publish',
+    );
 }
 
 function app() {
@@ -156,14 +228,43 @@ beforeEach(async () => {
     { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
     { id: 'account-2', name: '渋谷店', is_active: 1, channel_access_token: 'token-2' },
   ];
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
+  testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`).run(TENANT);
   googleCalls = [];
   googlePostsOnGoogle = [];
   createFailStatus = null;
   createSeq = 0;
+  instagramCalls = [];
+  instagramFailStatus = null;
+  instagramPublishFailStatus = null;
+  instagramRetryGate = null;
+  instagramRetryStarted = null;
+  imageStore = new Map();
+  imageTransforms = [];
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string, init?: RequestInit) => {
+    // instagramGraph は URL オブジェクトを渡してくるので、文字列に正規化してから見分ける。
+    vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      // Instagram直接ログイン方式の投稿は graph.instagram.com へ出る。
+      if (url.startsWith('https://graph.instagram.com/')) {
+        instagramCalls.push({ url, init });
+        const path = new URL(url).pathname;
+        if (path.endsWith('/media')) {
+          if (instagramFailStatus) return jsonResponse({ error: { message: 'メタ側の生の本文', code: 190 } }, instagramFailStatus);
+          if (instagramRetryGate) {
+            instagramRetryStarted?.();
+            await instagramRetryGate;
+          }
+          return jsonResponse({ id: 'ig-container-1' });
+        }
+        if (path.endsWith('/media_publish')) {
+          if (instagramPublishFailStatus) return jsonResponse({ error: { message: '公開結果を受け取れない' } }, instagramPublishFailStatus);
+          return jsonResponse({ id: 'ig-media-1' });
+        }
+        if (url.includes('fields=permalink')) return jsonResponse({ permalink: 'https://www.instagram.com/p/abc123/' });
+        return jsonResponse({}, 404);
+      }
       googleCalls.push({ url, init });
       if (url.endsWith('/localPosts') && init?.method === 'POST') {
         if (createFailStatus) return jsonResponse({ error: { message: 'fail' } }, createFailStatus);
@@ -187,11 +288,20 @@ beforeEach(async () => {
   env = {
     DB: testDb.db,
     API_KEY: 'owner-key',
-    IMAGES: {} as R2Bucket,
+    // instagramImageUrl が元画像を読み、変換後を置き直すので get/put だけ用意する。
+    IMAGES: {
+      get: vi.fn(async (key: string) => {
+        const bytes = imageStore.get(key);
+        return bytes ? { arrayBuffer: async () => bytes.slice().buffer } : null;
+      }),
+      put: vi.fn(async (key: string, value: ArrayBuffer) => {
+        imageStore.set(key, new Uint8Array(value));
+      }),
+    } as unknown as R2Bucket,
     RAW_MAIL: {} as R2Bucket,
     ASSETS: {} as Fetcher,
     AI: { run: vi.fn(async () => ({ response: '' })) } as unknown as Ai,
-    RESTAURANT_TEST_ENABLED: 'true',
+    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true', GOOGLE_BUSINESS_ENABLED: 'true',
     LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',
     LIFF_URL: 'https://example.test', LINE_CHANNEL_ID: 'unused',
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
@@ -201,6 +311,18 @@ beforeEach(async () => {
     GOOGLE_BUSINESS_OAUTH_CLIENT_ID: 'client-id',
     GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET: 'client-secret',
     GOOGLE_BUSINESS_WRITE_ENABLED: 'true',
+    ...META_ENV,
+    // PNG のときだけ通る変換。JPEGのバイト列を返すだけの差し替え。
+    CF_IMAGES: {
+      input: () => ({
+        transform: (options: unknown) => {
+          imageTransforms.push(options);
+          return ({
+          output: async () => ({ image: () => new Blob([jpegBytes()]).stream() }),
+          });
+        },
+      }),
+    } as unknown as Env['Bindings']['CF_IMAGES'],
   } as Env['Bindings'];
   seedStore();
   await seedConnection();
@@ -228,7 +350,7 @@ describe('下書き（GB-4/5/6/7）', () => {
     expect(ok.status).toBe(200);
     const get = await call(`/api/restaurant-test/google/posts/${ok.json.post!.id}`);
     const body = (await get.json()) as { post: { media: Array<{ sourceUrl: string }> } };
-    expect(body.post.media).toEqual([{ mediaId: 'media-1', filename: 'gaikan.jpg', sourceUrl: 'https://worker.example.test/images/images/gaikan.jpg' }]);
+    expect(body.post.media).toMatchObject([{ mediaId: 'media-1', filename: 'gaikan.jpg', sourceUrl: 'https://worker.example.test/images/images/gaikan.jpg' }]);
   });
 });
 
@@ -262,6 +384,39 @@ describe('書き込みガード', () => {
     const r = await publish(draft.json.post!.id, undefined, false);
     expect(r.status).toBe(400);
     expect((r.json as { code?: string }).code).toBe('confirmation_required');
+  });
+
+  it('検証環境では指定アカウントの投稿作成だけを許可し、削除は止める', async () => {
+    env.DEPLOY_ENV = 'staging';
+    env.GOOGLE_BUSINESS_WRITE_ENABLED = 'false';
+    env.GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID = 'account-2';
+    const draft = await createDraft();
+    const detail = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
+    expect(await detail.json()).toMatchObject({ writeEnabled: true });
+    const published = await publish(draft.json.post!.id);
+    expect(published.status).toBe(200);
+    expect(createCalls()).toHaveLength(1);
+    const removed = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}/remove`, {
+      body: { confirmed: true },
+    });
+    expect(removed.status).toBe(403);
+    expect((await removed.json()) as { code: string }).toMatchObject({ code: 'write_disabled' });
+  });
+
+  it.each([
+    ['staging', ''],
+    ['staging', 'account-1'],
+    ['production', 'account-2'],
+  ])('対象外では投稿も停止する（環境=%s、許可先=%s）', async (deployEnv, accountId) => {
+    env.DEPLOY_ENV = deployEnv;
+    env.GOOGLE_BUSINESS_WRITE_ENABLED = 'false';
+    env.GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID = accountId;
+    const draft = await createDraft();
+    const detail = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
+    expect(await detail.json()).toMatchObject({ writeEnabled: false });
+    const result = await publish(draft.json.post!.id);
+    expect(result.status).toBe(403);
+    expect(createCalls()).toHaveLength(0);
   });
 });
 
@@ -397,7 +552,7 @@ describe('取り込み（sync）', () => {
     expect(created).toBeTruthy();
     const get = await call(`/api/restaurant-test/google/posts/${created!.id}`);
     const detail = (await get.json()) as { post: { media: Array<{ sourceUrl: string }> } };
-    expect(detail.post.media).toEqual([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo1' }]);
+    expect(detail.post.media).toMatchObject([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo1' }]);
 
     // 2回目の同期でGoogle側の画像が変わっても最新化される（自己修復）。
     googlePostsOnGoogle = googlePostsOnGoogle.map((p) =>
@@ -407,7 +562,7 @@ describe('取り込み（sync）', () => {
     expect(s2.status).toBe(200);
     const get2 = await call(`/api/restaurant-test/google/posts/${created!.id}`);
     const detail2 = (await get2.json()) as { post: { media: Array<{ sourceUrl: string }> } };
-    expect(detail2.post.media).toEqual([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo2' }]);
+    expect(detail2.post.media).toMatchObject([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo2' }]);
   });
 
   it('アプリ発の投稿がGoogleに反映された後も、登録メディアの参照を保持する（Google側のmedia_jsonで上書きしない）', async () => {
@@ -419,7 +574,289 @@ describe('取り込み（sync）', () => {
     expect(s.status).toBe(200);
     const get = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
     const detail = (await get.json()) as { post: { media: Array<{ mediaId: string; sourceUrl: string }> } };
-    expect(detail.post.media).toEqual([{ mediaId: 'media-own', filename: 'mise.jpg', sourceUrl: 'https://worker.example.test/images/images/mise.jpg' }]);
+    expect(detail.post.media).toMatchObject([{ mediaId: 'media-own', filename: 'mise.jpg', sourceUrl: 'https://worker.example.test/images/images/mise.jpg' }]);
+  });
+});
+
+/**
+ * 本物の Instagram へ送らず、graph.instagram.com への呼出を差し替えて同時投稿を確かめる。設計図 ★V8-B U1X7T2・HEEN9 と照合する。
+ */
+describe('Instagram 同時投稿', () => {
+  const instagramBody = { ...standardBody, mediaId: 'media-ig', instagram: { enabled: true, caption: null } };
+
+  /** Instagram へ出す下書きを作って公開する。既定では接続も画像もそろっている。 */
+  async function publishWithInstagram(body: Record<string, unknown> = instagramBody) {
+    seedMedia('media-ig', 'ig.jpg', 'account-2');
+    const draft = await createDraft(body);
+    expect(draft.status).toBe(200);
+    const p = await publish(draft.json.post!.id);
+    return { id: draft.json.post!.id, status: p.status, json: p.json };
+  }
+
+  /** `publicPost` の instagram 部分。 */
+  async function instagramOf(id: string) {
+    const res = await call(`/api/restaurant-test/google/posts/${id}`);
+    const body = (await res.json()) as { post: { status: string; instagram: Record<string, unknown> } };
+    return body.post;
+  }
+
+  function graphPaths(): string[] {
+    return instagramCalls.map((x) => new URL(x.url).pathname.replace('/v24.0/', ''));
+  }
+
+  it('画像を選ばずにInstagramへ出す設定にすると下書きで止める', async () => {
+    const r = await createDraft({ ...standardBody, mediaId: null, instagram: { enabled: true, caption: null } });
+    expect(r.status).toBe(400);
+    expect(r.json).toMatchObject({ error: expect.any(String), fields: { 'instagram.mediaId': expect.any(String) } });
+    expect(instagramCalls).toHaveLength(0);
+  });
+
+  it.each([
+    [{ enabled: true, caption: '文'.repeat(2201) }, 'instagram.caption'],
+    [{ enabled: 'true', caption: null }, 'instagram.enabled'],
+    [{ enabled: true, caption: 123 }, 'instagram.caption'],
+  ])('Instagram の不正な入力を欄へ返し、下書きを増やさない', async (instagram, key) => {
+    const r = await createDraft({ ...standardBody, mediaId: 'media-ig', instagram });
+    expect(r.status).toBe(400);
+    expect(r.json).toMatchObject({ error: expect.any(String), fields: { [key]: expect.any(String) } });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_posts').get()).toEqual({ n: 0 });
+  });
+
+  it('Googleへの公開が成功すると、同じ写真と文章でInstagramへも出す', async () => {
+    await seedInstagramConnection();
+    const r = await publishWithInstagram();
+    expect(r.status).toBe(200);
+    // コンテナ作成 → 公開 → 見に行く先の取得、の順で呼ぶ。
+    expect(graphPaths()).toEqual(['ig-1/media', 'ig-1/media_publish', 'ig-media-1']);
+    const container = new URL(instagramCalls[0].url);
+    expect(container.searchParams.get('caption')).toBe(standardBody.summary);
+    // Metaが取りに来られる公開URLを渡す（JPEGなので元のURLのまま）。
+    expect(container.searchParams.get('image_url')).toBe('https://worker.example.test/images/images/ig.jpg');
+    const post = await instagramOf(r.id);
+    expect(post.status).toBe('published');
+    expect(post.instagram).toEqual({
+      enabled: true,
+      caption: null,
+      mediaId: 'media-ig',
+      originalMediaId: null,
+      status: 'published',
+      permalink: 'https://www.instagram.com/p/abc123/',
+      error: null,
+    });
+  });
+
+  it('GoogleとInstagramに別の画像を保存し、Instagramには専用画像を送る', async () => {
+    await seedInstagramConnection();
+    seedMedia('media-google', 'google.jpg', 'account-2');
+    seedMedia('media-instagram', 'instagram.jpg', 'account-2');
+    seedMedia('original-google', 'source-google.jpg', 'account-2');
+    seedMedia('original-instagram', 'source-instagram.jpg', 'account-2');
+    const draft = await createDraft({ ...standardBody, mediaId: 'media-google', mediaOriginalId: 'original-google', instagram: { enabled: true, caption: null, mediaId: 'media-instagram', originalMediaId: 'original-instagram' } });
+    expect(draft.status).toBe(200);
+    const detail = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
+    const stored = (await detail.json()) as { post: { media: Array<{ mediaId: string; originalMediaId: string }>; instagram: { mediaId: string; originalMediaId: string } } };
+    expect(stored.post.media[0].mediaId).toBe('media-google');
+    expect(stored.post.media[0].originalMediaId).toBe('original-google');
+    expect(stored.post.instagram.mediaId).toBe('media-instagram');
+    expect(stored.post.instagram.originalMediaId).toBe('original-instagram');
+    const published = await publish(draft.json.post!.id);
+    expect(published.status).toBe(200);
+    expect(new URL(instagramCalls[0].url).searchParams.get('image_url')).toBe('https://worker.example.test/images/images/instagram.jpg');
+  });
+
+  it('Instagram専用画像が別アカウントのものなら下書きを保存しない', async () => {
+    seedMedia('media-google', 'google.jpg', 'account-2');
+    seedMedia('media-other', 'other.jpg', 'account-1');
+    const result = await createDraft({ ...standardBody, mediaId: 'media-google', instagram: { enabled: true, caption: null, mediaId: 'media-other' } });
+    expect(result.status).toBe(404);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_posts').get()).toEqual({ n: 0 });
+  });
+
+  it('再切り取り用の元画像も同じアカウントに属していることを確認する', async () => {
+    seedMedia('media-google', 'google.jpg', 'account-2');
+    seedMedia('media-instagram', 'instagram.jpg', 'account-2');
+    seedMedia('media-other', 'source.jpg', 'account-1');
+    const result = await createDraft({ ...standardBody, mediaId: 'media-google', instagram: { enabled: true, caption: null, mediaId: 'media-instagram', originalMediaId: 'media-other' } });
+    expect(result.status).toBe(404);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_posts').get()).toEqual({ n: 0 });
+  });
+
+  it('検証環境の投稿専用許可でもGoogleとInstagramへ1回ずつ出す', async () => {
+    env.DEPLOY_ENV = 'staging';
+    env.GOOGLE_BUSINESS_WRITE_ENABLED = 'false';
+    env.GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID = 'account-2';
+    await seedInstagramConnection();
+    const result = await publishWithInstagram();
+    expect(result.status).toBe(200);
+    expect(createCalls()).toHaveLength(1);
+    expect(graphPaths()).toEqual(['ig-1/media', 'ig-1/media_publish', 'ig-media-1']);
+    expect((await instagramOf(result.id)).instagram.status).toBe('published');
+  });
+
+  it('Instagram用の文章を入れたときはそちらを使う', async () => {
+    await seedInstagramConnection();
+    const r = await publishWithInstagram({ ...instagramBody, instagram: { enabled: true, caption: '秋のおすすめ定食 #ランチ' } });
+    expect(r.status).toBe(200);
+    expect(new URL(instagramCalls[0].url).searchParams.get('caption')).toBe('秋のおすすめ定食 #ランチ');
+  });
+
+  it('PNGはJPEGへ変換して置き直し、変換後のURLをMetaへ渡す', async () => {
+    await seedInstagramConnection();
+    seedMedia('media-ig', 'ig.png', 'account-2', pngBytes());
+    const draft = await createDraft({ ...standardBody, mediaId: 'media-ig', instagram: { enabled: true, caption: null } });
+    const p = await publish(draft.json.post!.id);
+    expect(p.status).toBe(200);
+    const imageUrl = new URL(instagramCalls[0].url).searchParams.get('image_url')!;
+    expect(imageUrl).toMatch(/^https:\/\/worker\.example\.test\/images\/instagram-jpeg\/[0-9a-f-]+\.jpg$/);
+    // 置き直した先はJPEGとして読める。元のPNGは残したまま。
+    const key = imageUrl.replace('https://worker.example.test/images/', '');
+    expect(imageStore.get(key)?.slice(0, 2)).toEqual(jpegBytes().slice(0, 2));
+    expect(imageStore.has('images/ig.png')).toBe(true);
+    expect((await instagramOf(draft.json.post!.id)).instagram.status).toBe('published');
+  });
+
+  it('縦長JPEGは写真を切らず4:5の余白付き画像にしてMetaへ渡す', async () => {
+    await seedInstagramConnection();
+    seedMedia('media-ig', 'ig-tall.jpg', 'account-2', jpegBytes(1024, 1536));
+    const draft = await createDraft({ ...standardBody, mediaId: 'media-ig', instagram: { enabled: true, caption: null } });
+    const p = await publish(draft.json.post!.id);
+    expect(p.status).toBe(200);
+    expect(imageTransforms).toContainEqual({ width: 1024, height: 1280, fit: 'pad', background: 'white' });
+    expect(new URL(instagramCalls[0].url).searchParams.get('image_url')).toMatch(
+      /^https:\/\/worker\.example\.test\/images\/instagram-jpeg\/[0-9a-f-]+\.jpg$/,
+    );
+    expect(imageStore.has('images/ig-tall.jpg')).toBe(true);
+    expect((await instagramOf(draft.json.post!.id)).instagram.status).toBe('published');
+  });
+
+  it('Instagramだけ失敗してもGoogleの公開は残り、errorには自前のコードだけが入る', async () => {
+    await seedInstagramConnection();
+    instagramFailStatus = 400;
+    const r = await publishWithInstagram();
+    // Google側は成功なので200のまま。
+    expect(r.status).toBe(200);
+    const post = await instagramOf(r.id);
+    expect(post.status).toBe('published');
+    expect(post.instagram).toMatchObject({ enabled: true, status: 'failed', permalink: null, error: 'meta_request_failed' });
+    // Metaの応答本文やトークンを残していないこと。
+    expect(JSON.stringify(post.instagram)).not.toContain('メタ側の生の本文');
+    expect(JSON.stringify(post.instagram)).not.toContain('page-secret');
+  });
+
+  it('Instagramをつないでいないときは instagram_not_connected で失敗に落とす', async () => {
+    const r = await publishWithInstagram();
+    expect((await instagramOf(r.id)).instagram.error).toBe('instagram_not_connected');
+    expect(instagramCalls).toHaveLength(0);
+  });
+
+  it('投稿の許可が無い接続は instagram_publish_not_granted で失敗に落とす', async () => {
+    await seedInstagramConnection({ scopes: 'instagram_business_basic' });
+    const r = await publishWithInstagram();
+    expect((await instagramOf(r.id)).instagram.error).toBe('instagram_publish_not_granted');
+    expect(instagramCalls).toHaveLength(0);
+  });
+
+  it('期限切れの接続は meta_token_expired で失敗に落とす', async () => {
+    await seedInstagramConnection({ expiresAt: '2026-09-01T00:00:00.000Z' });
+    const r = await publishWithInstagram();
+    expect((await instagramOf(r.id)).instagram.error).toBe('meta_token_expired');
+    expect(instagramCalls).toHaveLength(0);
+  });
+
+  it('データを見に行く許可の期限が切れていても meta_token_expired で失敗に落とす', async () => {
+    await seedInstagramConnection({ dataAccessExpiresAt: '2026-09-01T00:00:00.000Z' });
+    const r = await publishWithInstagram();
+    expect((await instagramOf(r.id)).instagram.error).toBe('meta_token_expired');
+    expect(instagramCalls).toHaveLength(0);
+  });
+
+  it('「Instagramへ再送」で送り直せる', async () => {
+    await seedInstagramConnection();
+    instagramFailStatus = 400;
+    const r = await publishWithInstagram();
+    expect((await instagramOf(r.id)).instagram.status).toBe('failed');
+
+    instagramFailStatus = null;
+    instagramCalls = [];
+    const retry = await call(`/api/restaurant-test/google/posts/${r.id}/instagram/retry`, { body: {} });
+    expect(retry.status).toBe(200);
+    const body = (await retry.json()) as { post: { status: string; instagram: Record<string, unknown> } };
+    // Googleは触らない。出すのはInstagramだけ。
+    expect(graphPaths()).toEqual(['ig-1/media', 'ig-1/media_publish', 'ig-media-1']);
+    expect(body.post.status).toBe('published');
+    expect(body.post.instagram).toMatchObject({ status: 'published', permalink: 'https://www.instagram.com/p/abc123/', error: null });
+    expect(testDb.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='restaurant.google.post.instagram_retry'").get()).toEqual({ n: 1 });
+  });
+
+  it('同じ投稿への同時再送は実行権を取った1件だけがMetaへ送る', async () => {
+    await seedInstagramConnection();
+    instagramFailStatus = 400;
+    const r = await publishWithInstagram();
+    instagramFailStatus = null;
+    instagramCalls = [];
+    let release = () => {};
+    let started = () => {};
+    const entered = new Promise<void>((resolve) => { started = resolve });
+    instagramRetryGate = new Promise<void>((resolve) => { release = resolve });
+    instagramRetryStarted = started;
+
+    const first = call(`/api/restaurant-test/google/posts/${r.id}/instagram/retry`, { body: {} });
+    await entered;
+    const second = await call(`/api/restaurant-test/google/posts/${r.id}/instagram/retry`, { body: {} });
+    expect(second.status).toBe(409);
+    release();
+    expect((await first).status).toBe(200);
+    expect(graphPaths()).toEqual(['ig-1/media', 'ig-1/media_publish', 'ig-media-1']);
+  });
+
+  it('公開要求の結果が不明なときは重複防止のため自動再送を拒否する', async () => {
+    await seedInstagramConnection();
+    instagramPublishFailStatus = 503;
+    const r = await publishWithInstagram();
+    expect((await instagramOf(r.id)).instagram).toMatchObject({ status: 'failed', error: 'instagram_publish_result_unknown' });
+    const before = instagramCalls.length;
+    const retry = await call(`/api/restaurant-test/google/posts/${r.id}/instagram/retry`, { body: {} });
+    expect(retry.status).toBe(409);
+    expect(((await retry.json()) as { code: string }).code).toBe('publish_result_unknown');
+    expect(instagramCalls).toHaveLength(before);
+  });
+
+  it('再送できない状態（公開済み・Instagramへ出さない設定・未公開）は409で断る', async () => {
+    await seedInstagramConnection();
+    const ok = await publishWithInstagram();
+    const again = await call(`/api/restaurant-test/google/posts/${ok.id}/instagram/retry`, { body: {} });
+    expect(again.status).toBe(409);
+    expect(((await again.json()) as { code: string }).code).toBe('not_retryable');
+
+    const plain = await createDraft();
+    await publish(plain.json.post!.id);
+    const disabled = await call(`/api/restaurant-test/google/posts/${plain.json.post!.id}/instagram/retry`, { body: {} });
+    expect(disabled.status).toBe(409);
+    expect(((await disabled.json()) as { code: string }).code).toBe('instagram_disabled');
+
+    seedMedia('media-ig2', 'ig2.jpg', 'account-2');
+    const draft = await createDraft({ ...standardBody, mediaId: 'media-ig2', instagram: { enabled: true, caption: null } });
+    const notPublished = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}/instagram/retry`, { body: {} });
+    expect(notPublished.status).toBe(409);
+    expect(((await notPublished.json()) as { code: string }).code).toBe('not_published');
+  });
+
+  it('担当者は再送できない', async () => {
+    await seedInstagramConnection();
+    instagramFailStatus = 400;
+    const r = await publishWithInstagram();
+    useStaffRole('staff');
+    const res = await call(`/api/restaurant-test/google/posts/${r.id}/instagram/retry`, { body: {}, token: 'staff-session' });
+    expect(res.status).toBe(403);
+  });
+
+  it('Instagramへ出さない投稿ではMetaへ一度も通信しない。返り値の形は5つで変わらない', async () => {
+    await seedInstagramConnection();
+    const draft = await createDraft();
+    await publish(draft.json.post!.id);
+    expect(instagramCalls).toHaveLength(0);
+    const post = await instagramOf(draft.json.post!.id);
+    expect(post.instagram).toEqual({ enabled: false, caption: null, mediaId: null, originalMediaId: null, status: 'none', permalink: null, error: null });
   });
 });
 
@@ -432,5 +869,17 @@ describe('削除', () => {
     expect(googleCalls.some((x) => x.init?.method === 'DELETE')).toBe(true);
     const body = (await r.json()) as { post: { status: string } };
     expect(body.post.status).toBe('deleted');
+  });
+
+  it('公開済みの削除も、確認なしは400・担当者は403で、GoogleへDELETEしない', async () => {
+    const draft = await createDraft();
+    await publish(draft.json.post!.id);
+    const unconfirmed = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}/remove`, { body: { confirmed: false } });
+    expect(unconfirmed.status).toBe(400);
+    expect(await unconfirmed.json()).toMatchObject({ code: 'confirmation_required' });
+    useStaffRole('staff');
+    const byStaff = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}/remove`, { body: { confirmed: true }, token: 'staff-session' });
+    expect(byStaff.status).toBe(403);
+    expect(googleCalls.some((x) => x.init?.method === 'DELETE')).toBe(false);
   });
 });

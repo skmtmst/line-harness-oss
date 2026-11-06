@@ -1,5 +1,7 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { logger, traceQueueMessage } from '@line-crm/shared/server';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { verifySupportRelay } from '../services/support-relay.js';
 import {
   handleSlackTaskAction,
@@ -10,19 +12,8 @@ import {
 } from '../services/codex-slack-relay.js';
 import { verifySlackRequest } from '../services/slack-signature.js';
 import { parseCodexAuditApproval } from '../services/codex-auto-merge.js';
-import {
-  hasClaudeToCodexMarker,
-  hasActualSlackMention,
-  isAllowedRelayChannel,
-  isAllowedRelaySource,
-  isAutomaticCodexRelay,
-  isCodexRelayEnabled,
-  markCodexMentionFailed,
-  observeOfficialCodexReply,
-  parseSlackEventEnvelope,
-  recordSlackMention,
-  type CodexMentionQueueMessage,
-} from '../services/codex-cloud-monitor.js';
+import { hasClaudeToCodexMarker, hasActualSlackMention, isAllowedRelayChannel, isAllowedRelaySource, isAutomaticCodexRelay, isCodexRelayEnabled, markCodexMentionFailed, observeOfficialCodexReply, parseSlackEventEnvelope, recordSlackMention } from '../services/codex-cloud-monitor.js';
+import { type CodexMentionQueueMessage } from '../services/codex-cloud-types.js';
 
 const MAX_BODY_BYTES = 32 * 1024;
 const ALLOWED_EVENT_TYPES = new Set(['prompt_submitted', 'turn_completed', 'approval_required']);
@@ -160,12 +151,7 @@ codexSlackEvents.post('/api/integrations/codex-slack/events', async (c) => {
     const result = await relayCodexSlackEvent(c.env, event);
     return c.json({ success: true, ...result });
   } catch (error) {
-    console.error(JSON.stringify({
-      event: 'codex_slack_relay_failed',
-      eventId: event.eventId,
-      sessionId: event.sessionId,
-      error: String(error),
-    }));
+    logger.error("codex_slack.relay_event_failed");
     return c.json({ success: false, error: 'Slack relay failed' }, 502);
   }
 });
@@ -206,7 +192,7 @@ codexSlackEvents.post('/api/integrations/slack/actions', async (c) => {
     if (message.includes('INVALID_')) {
       return c.json({ success: false, error: 'Invalid Slack task action' }, 400);
     }
-    console.error(JSON.stringify({ event: 'slack_task_action_failed', error: message }));
+    logger.error("codex_slack.update_task_failed");
     return c.json({ success: false, error: 'Slack task action failed' }, 502);
   }
 });
@@ -259,19 +245,18 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
   if (event.user === c.env.CODEX_SLACK_USER_ID && event.thread_ts) {
     const observed = await observeOfficialCodexReply(c.env, event.channel, threadTs, event.text);
     if (observed.duplicateRisk) {
-      await c.env.CODEX_MENTION_QUEUE.send({
+      await c.env.CODEX_MENTION_QUEUE.send(traceQueueMessage({
         kind: 'notify_duplicate',
         slackEventId: envelope.event_id,
         channelId: event.channel,
         threadTs,
         officialTaskUrl: observed.taskUrl,
-      });
+      }));
     }
     return c.json({ success: true, observed: observed.tracked });
   }
 
-  // The relay itself contains a real Codex mention. Ignore the explicit marker
-  // before mention detection so the Worker cannot recursively relay its own post.
+  // 中継メッセージの Codex メンションで再起動しないよう、メンション検出より先に中継印を除外する。
   if (isAutomaticCodexRelay(event.text)) {
     return c.json({ success: true, ignored: true });
   }
@@ -282,7 +267,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     autoMergeApproval !== null &&
     isAllowedRelaySource(c.env.CODEX_RELAY_SOURCE_USER_IDS, event.user)
   ) {
-    await c.env.CODEX_MENTION_QUEUE.send({
+    await c.env.CODEX_MENTION_QUEUE.send(traceQueueMessage({
       kind: 'auto_merge',
       slackEventId: envelope.event_id,
       channelId: event.channel,
@@ -290,7 +275,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
       requesterUserId: event.user,
       prNumber: autoMergeApproval.prNumber,
       approvedHeadSha: autoMergeApproval.headSha,
-    });
+    }));
     autoMergeQueued = true;
   }
 
@@ -321,7 +306,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     const delaySeconds = Number.isFinite(configuredGrace)
       ? Math.min(300, Math.max(10, configuredGrace))
       : 30;
-    await c.env.CODEX_MENTION_QUEUE.send(message, { delaySeconds });
+    await c.env.CODEX_MENTION_QUEUE.send(traceQueueMessage(message), { delaySeconds });
   }
   return c.json({ success: true, queued: inserted, autoMergeQueued });
 });
@@ -331,8 +316,7 @@ codexSlackEvents.get('/api/integrations/codex-monitor/status', async (c) => {
   if (!c.env.API_KEY || authorization !== `Bearer ${c.env.API_KEY}`) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
-  const parsedLimit = Number.parseInt(c.req.query('limit') ?? '20', 10);
-  const limit = Number.isFinite(parsedLimit) ? Math.min(100, Math.max(1, parsedLimit)) : 20;
+  const { limit } = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: { format: 'integer-prefix', fallback: 'finite', minimum: 1, maximum: 100 } });
   const result = await c.env.DB.prepare(`
     SELECT slack_event_id, team_id, channel_id, message_ts, thread_ts, status,
            official_task_url, fallback_conversation_url, detected_at, updated_at
@@ -340,5 +324,5 @@ codexSlackEvents.get('/api/integrations/codex-monitor/status', async (c) => {
      ORDER BY detected_at DESC
      LIMIT ?
   `).bind(limit).all();
-  return c.json({ success: true, tasks: result.results });
+  return c.json(buildOffsetListResponse({ success: true, tasks: result.results, items: result.results, total: null, paging: { limit, offset: 0 }, sort: [] }));
 });

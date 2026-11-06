@@ -1,5 +1,6 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 /**
- * 然-NEN- 健康日記の管理画面（★V6 37-4）：記録から「変化」に気づくための計算。
+ * 然-NEN- 健康日記の管理画面（★37-4）：記録から「変化」に気づくための計算。
  *
  * 記録はお客様がマイページで付ける（体重・心拍・呼吸・便・食いつき・皮膚・涙やけ・メモ）。
  * ここでは医療判断はせず、次の 3 つを「気になる変化」として印を付けるだけ：
@@ -47,10 +48,7 @@ export const SKIN_LABELS: Record<string, string> = { normal: '問題なし', itc
 export const TEAR_LABELS: Record<string, string> = { normal: '問題なし', mild: '少し気になる', concern: '気になる' };
 
 /**
- * 「気になる便」の判定。利用者側のケア共有（nen-members.ts の health-logs POST が
- * `stool_status !== 'normal'` で3回連続を立てる）と同じ基準をここでも使う。
- * 以前は管理側だけが下痢・血便に限っていたため、利用者に「要ケアを共有しました」と
- * 出ても管理画面の「気になる変化」が空のままだった（監査 R61）。
+ * 利用者側のケア共有と管理側の気になる変化が食い違わないよう、stool_status !== 'normal' の3回連続を共通の基準とする。
  */
 export function isCareStoolStatus(status: string | null | undefined): boolean {
   return status != null && status !== 'normal';
@@ -71,7 +69,7 @@ export function summarizePetHealth(logs: HealthLogRow[], today: Date): PetHealth
   const sorted = [...logs]
     .filter((log) => /^\d{4}-\d{2}-\d{2}$/.test(log.logged_on))
     .sort((a, b) => (a.logged_on < b.logged_on ? -1 : a.logged_on > b.logged_on ? 1 : 0));
-  const todayIdx = Math.floor(today.getTime() / 86_400_000);
+  const todayIdx = dayIndex(japanDate(today));
   const last = sorted[sorted.length - 1] ?? null;
   const daysSinceLast = last ? todayIdx - dayIndex(last.logged_on) : null;
   const count30d = sorted.filter((log) => todayIdx - dayIndex(log.logged_on) < 30).length;
@@ -130,7 +128,7 @@ export function lastLoggedLabel(summary: PetHealthSummary): string {
 
 /** 診察時に見せる「30 日のまとめ」。医療判断はしない。 */
 export function thirtyDaySummary(logs: HealthLogRow[], today: Date) {
-  const todayIdx = Math.floor(today.getTime() / 86_400_000);
+  const todayIdx = dayIndex(japanDate(today));
   const recent = logs
     .filter((log) => /^\d{4}-\d{2}-\d{2}$/.test(log.logged_on) && todayIdx - dayIndex(log.logged_on) < 30)
     .sort((a, b) => (a.logged_on < b.logged_on ? 1 : -1));

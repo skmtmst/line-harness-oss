@@ -8,10 +8,10 @@
   から呼ぶ。
 
   この試験だけは、書き出した `out` ではなく `next dev` に当てる。理由は、
-  試験が `/api/line-accounts` を `route.fetch()` で**実際に取りに行き**、
+  試験が `/api/line-accounts` を `route.fetch` で**実際に取りに行き**、
   返ってきた中身へ2つめのアカウントを足す作りだから。`out` は
   `NEXT_PUBLIC_API_URL` を組み込み済みで、その宛先は検証環境になる。
-  そのまま当てると `route.fetch()` が検証環境へ出てしまう。試験が書かれた
+  そのまま当てると `route.fetch` が検証環境へ出てしまう。試験が書かれた
   ときの前提どおり、画面確認用のモックAPI（`scripts/visual-qa/mock-api.mjs`）
   へ向けた `next dev` に当てる。`owh-sheets` `owh-slack-order`
   `visual-qa-account` はどれもこのモックの固定値。
@@ -21,11 +21,12 @@
 */
 import { defineConfig, devices } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
+import { allocateTestPort } from '../../../scripts/test-port.mjs'
 
 const HERE = fileURLToPath(new URL('.', import.meta.url))
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url))
-const API_PORT = Number(process.env.WEBHOOK_RUNTIME_API_PORT ?? 8788)
-const PORT = Number(process.env.WEBHOOK_RUNTIME_PORT ?? 3101)
+const API_PORT = await allocateTestPort(process.env.WEBHOOK_RUNTIME_API_PORT)
+const PORT = await allocateTestPort(process.env.WEBHOOK_RUNTIME_PORT)
 const API_BASE = `http://127.0.0.1:${API_PORT}`
 const BASE = process.env.WEBHOOK_RUNTIME_BASE ?? `http://127.0.0.1:${PORT}`
 
@@ -34,6 +35,8 @@ const BASE = process.env.WEBHOOK_RUNTIME_BASE ?? `http://127.0.0.1:${PORT}`
   ワーカー側でも読み込まれるので、ここで入れておけば宛先が揃う。
 */
 process.env.WEBHOOK_RUNTIME_BASE = BASE
+process.env.WEBHOOK_RUNTIME_API_PORT = String(API_PORT)
+process.env.WEBHOOK_RUNTIME_PORT = String(PORT)
 
 export default defineConfig({
   testDir: HERE,

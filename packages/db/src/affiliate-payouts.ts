@@ -165,7 +165,7 @@ export interface AffiliateSettlementPreviewRow {
 /**
  * 締め対象から外れた成果。報酬が0円(以下)の行は支払えないため締めへ
  * 含めないのは仕様どおりだが、件数と対象を運用者が確認できるよう
- * プレビューへ出す(N-219)。
+ * プレビューへ出す。
  */
 export interface AffiliateSettlementExcludedRow {
   conversionEventId: string;
@@ -204,7 +204,7 @@ export interface AffiliateAccountSettlementPreview {
   /** 今回差し引く取消額の合計。 */
   totalDeduction: number;
   /**
-   * R288: 今回引ききれず次回へ繰り越す取消額。次回200円・取消300円なら
+   * 今回引ききれず次回へ繰り越す取消額。次回200円・取消300円なら
    * 200を引き、残り100を繰り越す(正の振込はしない)。
    */
   carriedDeduction: {
@@ -221,7 +221,7 @@ async function sha256(value: string): Promise<string> {
 
 /**
  * 締め対象候補の全行。0円以下の行も含めて返すので、呼び出し側が
- * 「含める行」と「外れた行」を分けて数えられる(N-219)。
+ * 「含める行」と「外れた行」を分けて数えられる。
  */
 async function eligibleRewardRows(
   db: D1Database,
@@ -292,7 +292,7 @@ async function eligibleRewards(
  * プレビュー版の算出。プレビュー表示と全体締めで同じ行集合から同じ版を
  * 作るための共通関数。締めはこの版の照合に使った行集合をそのまま明細へ
  * 書き込む(照合後に取り直さない = TOCTOU排除)。
- * R288: 版は取消の差し引き計画も含める。プレビュー後に新しい取消が
+ * 版は取消の差し引き計画も含める。プレビュー後に新しい取消が
  * 来たら版が変わり、締めは changed で止まる(黙って別額では締めない)。
  */
 export async function accountPreviewVersion(rows: EligibleRewardRow[], deductionFingerprint = ''): Promise<string> {
@@ -314,13 +314,13 @@ type UnappliedDebit = {
 };
 
 /**
- * R288: まだ次の締めへ入れていない取消(debit)を古い順で返す。
+ * まだ次の締めへ入れていない取消(debit)を古い順で返す。
  * 消費の記録は締め明細行(entry_id 参照)。行が付けば適用済みで、
  * もう次の締めには出てこない(二重控除しない)。
  * 台帳が無い環境(移行前)では空を返して既存表示を壊さない。
  */
 /**
- * m22u R358 の回帰用に公開する、未適用の取り立て(clawback)の読み取り。
+ * 試験から確かめるために公開する、未適用の取り立て(clawback)の読み取り。
  * 締め→却下で起こした相殺は、再承認で確定が戻ると取り立て対象から外す。
  */
 export async function unappliedSettlementDebits(
@@ -378,7 +378,7 @@ type DeductionPlan = {
 };
 
 /**
- * R288: 紹介者の今回報酬へ、未適用の古い取消から充てる計画。
+ * 紹介者の今回報酬へ、未適用の古い取消から充てる計画。
  * 同一アカウント・同一紹介者の締めへ一度だけ適用する。
  * 報酬を超える取消は報酬分だけ引き、残りは繰り越す(正の振込はしない)。
  * プレビューと締めはこの同じ計画から作る。
@@ -456,7 +456,7 @@ export async function previewAffiliateAccountSettlement(
       (grossByAffiliate.get(row.affiliate_id) ?? 0) + Math.round(Number(row.reward_amount)),
     );
   }
-  // R288: 締め後の取消は次の締めで差し引く。紹介者ごとに未適用の
+  // 締め後の取消は次の締めで差し引く。紹介者ごとに未適用の
   // 古い取消から充て、引ききれない分は次回へ繰り越す。
   const plan = planDeductionApplication(
     grossByAffiliate,
@@ -545,7 +545,7 @@ export async function closeAffiliateAccountSettlement(
   // 照合後に取り直すと、その隙に承認・締めが変わってheaderと明細がずれる。
   const rows = await eligibleRewards(db, input);
   if (rows.length === 0) return { kind: 'empty' };
-  // R288: プレビューと同じ差し引き計画を作り、版で照合する。
+  // プレビューと同じ差し引き計画を作り、版で照合する。
   // 報酬だけでなく未適用の取消も版に入るため、プレビュー後に来た
   // 取消は changed で止まる(黙って別額では締めない)。
   const grossByAffiliate = new Map<string, number>();
@@ -593,7 +593,7 @@ export async function closeAffiliateAccountSettlement(
       amount: Math.round(Number(row.reward_amount)),
       approvedAt: row.approved_at,
     })),
-    // R288: 取消の消費行。同じ取消を別締めが先に付けたら書かず、
+    // 取消の消費行。同じ取消を別締めが先に付けたら書かず、
     // 巻き戻しで締めごと消える(部分適用は残らない)。
     expectedDebitEntryIds: plan.lines.map((line) => line.debitId),
     debitLines: plan.lines,
@@ -695,7 +695,7 @@ export async function createAffiliatePayoutBatch(
     return { kind: 'changed' };
   }
   const lines = await db.prepare(
-    `SELECT sl.id AS settlement_line_id, sl.affiliate_id, sl.amount_minor,
+    `SELECT sl.id AS settlement_line_id, COALESCE(sl.affiliate_id, sl.affiliate_id_history) AS affiliate_id, sl.amount_minor,
             bp.bank_code, bp.bank_name, bp.branch_code, bp.branch_name, bp.account_type,
             bp.account_number_encrypted, bp.account_last4, bp.account_holder_name
        FROM affiliate_settlement_lines sl
@@ -761,11 +761,11 @@ export async function getAffiliatePayoutBatchExport(
   ).bind(input.batchId, input.tenantId, input.lineAccountId).first<PayoutBatchRow>();
   if (!batch) return null;
   const result = await db.prepare(
-    `SELECT affiliate_id, SUM(amount_minor) AS amount_minor, bank_code, bank_name,
+    `SELECT COALESCE(affiliate_id, affiliate_id_history) AS affiliate_id, SUM(amount_minor) AS amount_minor, bank_code, bank_name,
             branch_code, branch_name, account_type, account_number_encrypted,
             account_last4, account_holder_name
        FROM affiliate_payout_batch_lines WHERE batch_id = ?
-      GROUP BY affiliate_id, bank_code, bank_name, branch_code, branch_name,
+      GROUP BY COALESCE(affiliate_id, affiliate_id_history), bank_code, bank_name, branch_code, branch_name,
                account_type, account_number_encrypted, account_last4, account_holder_name
       ORDER BY affiliate_id`,
   ).bind(input.batchId).all<{
@@ -844,23 +844,23 @@ export async function markAffiliatePayoutExported(
 export async function getAffiliatePayoutDownload(
   db: D1Database,
   input: { tenantId: string; lineAccountId: string; batchId: string; tokenHash: string; now?: string },
-): Promise<{ objectKey: string; fileChecksum: string | null } | null> {
+): Promise<{ objectKey: string; fileChecksum: string | null; lineCount: number } | null> {
   const row = await db.prepare(
-    `SELECT export_object_key, file_checksum FROM affiliate_payout_batches
+    `SELECT export_object_key, file_checksum, line_count FROM affiliate_payout_batches
       WHERE id = ? AND organization_id = ? AND line_account_id = ?
         AND state = 'exported' AND download_token_hash = ? AND export_expires_at > ?`,
   ).bind(
     input.batchId, input.tenantId, input.lineAccountId, input.tokenHash,
     input.now ?? new Date().toISOString(),
-  ).first<{ export_object_key: string; file_checksum: string | null }>();
-  return row ? { objectKey: row.export_object_key, fileChecksum: row.file_checksum } : null;
+  ).first<{ export_object_key: string; file_checksum: string | null; line_count: number }>();
+  return row ? { objectKey: row.export_object_key, fileChecksum: row.file_checksum, lineCount: row.line_count } : null;
 }
 
 export interface AffiliateStatementSnapshot {
   settlementId: string; settlementVersion: number; affiliateId: string;
   affiliateName: string; affiliateCode: string; periodFrom: string; periodTo: string;
   totalAmount: number; currency: string; lineCount: number;
-  /** R288: 明細でも元報酬・差し引きを分けて見せる。無いときは 0。 */
+  /** 明細でも元報酬・差し引きを分けて見せる。無いときは 0。 */
   grossAmount: number;
   deductionAmount: number;
 }
@@ -871,16 +871,17 @@ export async function prepareAffiliateStatement(
 ): Promise<AffiliateStatementSnapshot | null> {
   const row = await db.prepare(
     `SELECT s.id AS settlement_id, s.version, s.period_from, s.period_to, s.currency,
-            a.id AS affiliate_id, a.name AS affiliate_name, a.code AS affiliate_code,
+            COALESCE(sl.affiliate_id, sl.affiliate_id_history) AS affiliate_id,
+            COALESCE(a.name, '削除済みのお客さま') AS affiliate_name, COALESCE(a.code, '') AS affiliate_code,
             COALESCE(SUM(sl.amount_minor), 0) AS total_amount,
             COALESCE(SUM(CASE WHEN sl.amount_minor > 0 THEN sl.amount_minor ELSE 0 END), 0) AS gross_amount,
             COALESCE(SUM(CASE WHEN sl.amount_minor < 0 THEN -sl.amount_minor ELSE 0 END), 0) AS deduction_amount,
             COUNT(sl.id) AS line_count
        FROM affiliate_settlements s
-       JOIN affiliate_settlement_lines sl ON sl.settlement_id = s.id AND sl.affiliate_id = ?
-       JOIN affiliates a ON a.id = sl.affiliate_id AND a.tenant_id = s.organization_id
+       JOIN affiliate_settlement_lines sl ON sl.settlement_id = s.id AND COALESCE(sl.affiliate_id, sl.affiliate_id_history) = ?
+       LEFT JOIN affiliates a ON a.id = sl.affiliate_id AND a.tenant_id = s.organization_id
       WHERE s.id = ? AND s.organization_id = ? AND s.line_account_id = ? AND s.state = 'closed'
-      GROUP BY s.id, s.version, s.period_from, s.period_to, s.currency, a.id, a.name, a.code`,
+      GROUP BY s.id, s.version, s.period_from, s.period_to, s.currency, COALESCE(sl.affiliate_id, sl.affiliate_id_history), a.name, a.code`,
   ).bind(input.affiliateId, input.settlementId, input.tenantId, input.lineAccountId).first<{
     settlement_id: string; version: number; period_from: string; period_to: string; currency: string;
     affiliate_id: string; affiliate_name: string; affiliate_code: string;
@@ -896,7 +897,7 @@ export async function prepareAffiliateStatement(
 }
 
 type StatementRow = {
-  id: string; line_account_id: string; affiliate_id: string; settlement_id: string;
+  id: string; line_account_id: string; affiliate_id: string | null; affiliate_id_history?: string | null; settlement_id: string;
   total_amount_minor: number; status: string; version: number; pdf_object_key: string;
   idempotency_key: string | null; request_fingerprint: string | null;
   snapshot_json: string; file_checksum: string | null; expires_at: string | null; created_at: string;
@@ -909,7 +910,7 @@ export interface AffiliateStatement {
 
 function affiliateStatement(row: StatementRow): AffiliateStatement {
   return {
-    id: row.id, lineAccountId: row.line_account_id, affiliateId: row.affiliate_id,
+    id: row.id, lineAccountId: row.line_account_id, affiliateId: row.affiliate_id ?? row.affiliate_id_history ?? '',
     settlementId: row.settlement_id, totalAmount: Number(row.total_amount_minor),
     status: row.status, version: Number(row.version), expiresAt: row.expires_at, createdAt: row.created_at,
   };
@@ -940,12 +941,12 @@ export async function createAffiliateStatement(
   const now = input.now ?? new Date().toISOString();
   await db.prepare(
     `INSERT INTO affiliate_statements
-       (id, organization_id, line_account_id, affiliate_id, settlement_id,
+       (id, organization_id, line_account_id, affiliate_id, affiliate_id_history, settlement_id,
         total_amount_minor, status, version, pdf_object_key, generated_by,
         expires_at, created_at, idempotency_key, request_fingerprint, snapshot_json, file_checksum)
-     VALUES (?, ?, ?, ?, ?, ?, 'generated', 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, (SELECT id FROM affiliates WHERE id = ?), ?, ?, ?, 'generated', 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
-    id, input.tenantId, input.lineAccountId, input.snapshot.affiliateId,
+    id, input.tenantId, input.lineAccountId, input.snapshot.affiliateId, input.snapshot.affiliateId,
     input.snapshot.settlementId, input.snapshot.totalAmount, input.objectKey,
     input.actorId, input.expiresAt, now, input.idempotencyKey, input.requestFingerprint,
     JSON.stringify(input.snapshot), input.checksum,
@@ -977,7 +978,7 @@ export async function getAffiliateStatementDownload(
   const row = await db.prepare(
     `SELECT * FROM affiliate_statements
       WHERE id = ? AND organization_id = ? AND line_account_id = ? AND affiliate_id = ?
-        AND status = 'generated' AND (expires_at IS NULL OR expires_at > ?)`,
+        AND status = 'generated' AND expires_at IS NOT NULL AND expires_at > ?`,
   ).bind(
     input.statementId, input.tenantId, input.lineAccountId, input.affiliateId,
     input.now ?? new Date().toISOString(),
@@ -986,7 +987,7 @@ export async function getAffiliateStatementDownload(
 }
 
 /**
- * R43: 締め済み台帳の再開情報。画面を離れても `closed` 状態が消えるだけで
+ * 締め済み台帳の再開情報。画面を離れても `closed` 状態が消えるだけで
  * 台帳自体は残るため、期間で引き直して明細発行・CSV準備を再開できる
  * ようにする。
  */
@@ -1036,22 +1037,23 @@ export async function getClosedAccountSettlement(
   if (!settlement) return null;
 
   const lines = await db.prepare(
-    `SELECT sl.affiliate_id, a.name AS affiliate_name, a.code AS affiliate_code,
+    `SELECT COALESCE(sl.affiliate_id, sl.affiliate_id_history) AS affiliate_id,
+            COALESCE(a.name, '削除済みのお客さま') AS affiliate_name, COALESCE(a.code, '') AS affiliate_code,
             SUM(sl.amount_minor) AS amount,
             COUNT(CASE WHEN sl.amount_minor > 0 THEN 1 END) AS line_count,
             MAX(EXISTS(
               SELECT 1 FROM affiliate_statements st
                WHERE st.settlement_id = sl.settlement_id
-                 AND st.affiliate_id = sl.affiliate_id
+                 AND COALESCE(st.affiliate_id, st.affiliate_id_history) = COALESCE(sl.affiliate_id, sl.affiliate_id_history)
                  AND st.status = 'generated')) AS statement_issued,
             MAX(bp.version IS NOT NULL) AS bank_profile_registered
        FROM affiliate_settlement_lines sl
-       JOIN affiliates a ON a.id = sl.affiliate_id
+       LEFT JOIN affiliates a ON a.id = sl.affiliate_id
        LEFT JOIN affiliate_bank_profiles bp
          ON bp.affiliate_id = sl.affiliate_id
         AND bp.organization_id = ? AND bp.line_account_id = ?
       WHERE sl.settlement_id = ? AND sl.status = 'included'
-      GROUP BY sl.affiliate_id
+      GROUP BY COALESCE(sl.affiliate_id, sl.affiliate_id_history)
       ORDER BY a.name, sl.affiliate_id`,
   ).bind(input.tenantId, input.lineAccountId, settlement.id).all<{
     affiliate_id: string; affiliate_name: string; affiliate_code: string;

@@ -1,3 +1,4 @@
+import { formatNumber } from '@/lib/format'
 export type TestSendView = {
   kind: 'success' | 'partial' | 'error'
   message: string
@@ -14,13 +15,13 @@ export function testSendResult(sent: number, failed: number, at: string): TestSe
   if (sent <= 0 && failed > 0) {
     return {
       kind: 'error',
-      message: `${at} テスト送信できませんでした (${failed}名すべてに届きませんでした)`,
+      message: `${at} テスト送信できませんでした (${formatNumber(failed)}名すべてに届きませんでした)`,
     }
   }
   if (failed > 0) {
     return {
       kind: 'partial',
-      message: `${at} 一部を送信できませんでした (${sent}名成功, ${failed}名失敗)`,
+      message: `${at} 一部を送信できませんでした (${formatNumber(sent)}名成功, ${formatNumber(failed)}名失敗)`,
     }
   }
   if (sent <= 0) {
@@ -29,7 +30,7 @@ export function testSendResult(sent: number, failed: number, at: string): TestSe
       message: `${at} テスト送信できませんでした（送信先を確認してください）`,
     }
   }
-  return { kind: 'success', message: `${at} テスト送信済み (${sent}名成功)` }
+  return { kind: 'success', message: `${at} テスト送信済み (${formatNumber(sent)}名成功)` }
 }
 
 export function testSendFailure(at: string): TestSendView {

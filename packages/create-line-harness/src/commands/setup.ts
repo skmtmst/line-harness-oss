@@ -1,3 +1,4 @@
+import { writePrivateState } from '../lib/private-state.js';
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { readFileSync, writeFileSync, existsSync, rmSync, unlinkSync } from "node:fs";
@@ -97,7 +98,7 @@ function loadState(repoDir: string): SetupState {
 }
 
 function saveState(repoDir: string, state: SetupState): void {
-  writeFileSync(getStatePath(repoDir), JSON.stringify(state, null, 2) + "\n");
+  writePrivateState(repoDir, getStatePath(repoDir), JSON.stringify(state, null, 2) + "\n");
 }
 
 function removeStateFile(repoDir: string): void {
@@ -331,7 +332,7 @@ export async function runSetup(
   // Resume hygiene: a previous (possibly aborted) run may have left
   // wrangler.toml patched and cached the now-stale baseline in state.json.
   // Roll the file back to that baseline first, then forget it — the next
-  // applyPatchedConfig() will re-capture the current (possibly git-pulled)
+  // applyPatchedConfig will re-capture the current (possibly git-pulled)
   // version. Without this, resuming overwrites a freshly-pulled toml with
   // the stale snapshot.
   if (state.originalWranglerToml !== undefined) {
@@ -340,7 +341,7 @@ export async function runSetup(
     saveState(repoDir, state);
   }
 
-  // process.exit() skips the finally block in Node, and clack's p.cancel()
+  // process.exit skips the finally block in Node, and clack's p.cancel
   // inside runSetupInner can call it too. Centralise restore + persist into
   // one helper so every exit path runs it before exiting.
   // Critically: also clear originalWranglerToml in state so a future rerun
@@ -358,7 +359,7 @@ export async function runSetup(
   };
 
   // Best-effort restore on SIGINT (Ctrl-C). Without this the user's repo
-  // is left dirty and `ensureRepo()` next time can't ff-only.
+  // is left dirty and `ensureRepo` next time can't ff-only.
   const onSignal = (sig: NodeJS.Signals) => {
     cleanupFailure();
     process.exit(sig === "SIGINT" ? 130 : 143);
@@ -686,7 +687,7 @@ async function runSetupInner(
 
     try {
       const id = randomUUID();
-      // Use the same timestamp format the rest of the app writes via jstNow()
+      // Use the same timestamp format the rest of the app writes via jstNow
       // — ISO 8601 with an explicit '+09:00' suffix. Relying on table defaults
       // or raw strftime(...) drops the timezone marker, which makes the row
       // sort inconsistently with rows written by the worker.
@@ -713,7 +714,7 @@ ON CONFLICT(channel_id) DO UPDATE SET
   channel_secret_encrypted = excluded.channel_secret_encrypted,
   updated_at = ${q(jstNowStr)};
 `;
-      // Restrict to the owner — os.tmpdir() can be a shared directory
+      // Restrict to the owner — os.tmpdir can be a shared directory
       // (Linux /tmp), and the file holds plaintext channel secrets.
       writeFileSync(insertSqlFile, insertSql, { mode: 0o600 });
       try {
@@ -727,7 +728,7 @@ ON CONFLICT(channel_id) DO UPDATE SET
         ]);
       } finally {
         // Remove the secrets-bearing file before any further work (including
-        // a possible exit). Don't wait for an outer finally that exit() skips.
+        // a possible exit). Don't wait for an outer finally that exit skips.
         try { rmSync(insertSqlFile, { force: true }); } catch { /* best-effort */ }
       }
     } catch (err) {

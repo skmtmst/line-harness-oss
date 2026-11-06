@@ -1,27 +1,12 @@
-/**
- * musubo LIFF — The single entry point
- *
- * This URL IS the friend-add URL. Every user enters through here.
- *
- * Flow:
- *   LIFF URL → LINE Login (auto in LINE app) → UUID issued
- *   → friendship check → not friend? show add button → friend added → Webhook → scenario enroll
- *   → already friend? → show completion
- *
- * Query params:
- *   ?ref=xxx          — attribution tracking (which LP/campaign)
- *   ?redirect=x       — redirect after linking (for wrapped URLs)
- *   ?page=book        — booking page (calendar slot picker, Google Calendar)
- *   ?page=salon-book  — salon booking flow (React, dynamic-imported)
- *   ?page=affiliate   — affiliate self-serve page (React, dynamic-imported)
- *   ?page=webinar     — auto-webinar pseudo-live viewer (React, dynamic-imported; &slug=)
- *   ?page=nen-member  — NEN customer member/pet/health portal
- */
+import { escapeHtml } from '../lib/html-escape.js';
+/** LIFF の共通入口でログイン・UUID 発行・友だち確認を済ませてから各画面へ渡す。ref は流入元、redirect は結び付け後の移動先、page は予約・フォーム・アフィリエイト・ウェビナー・会員画面を選ぶ。 */
 
 import { initBooking } from './booking.js';
+import {applyCustomerLook} from './customer-look.js';
 import { initForm } from './form.js';
-import { safeRedirectTarget } from '../lib/safe-redirect.js';
+import { safeRedirectTarget, attributedRedirectTarget } from '../lib/safe-redirect.js';
 import { restoreLiffStateInCurrentUrl } from './liff-query.js';
+import { customerMessage } from './customer-message.js';
 
 declare const liff: {
   init(config: { liffId: string }): Promise<void>;
@@ -37,11 +22,10 @@ declare const liff: {
   logout(): void;
 };
 
-// LINE returns the rich-menu query string inside `liff.state`. Restore it
-// before any routing or LIFF ID detection reads window.location.search.
+// LINE はクエリを liff.state に入れるため、経路や LIFF ID を判定する前に window.location.search へ戻す。
 restoreLiffStateInCurrentUrl();
 
-// Resolve LIFF ID: ?liffId= param (from endpoint URL) > env var (fallback to ①)
+// 接続先を正しく選ぶため、URL の liffId を環境変数より優先する。
 function detectLiffId(): string {
   const fromParam = new URLSearchParams(window.location.search).get('liffId');
   if (fromParam) return fromParam;
@@ -52,8 +36,9 @@ if (!LIFF_ID) {
   throw new Error('LIFF ID not found. Set ?liffId= in LIFF endpoint URL or VITE_LIFF_ID env.');
 }
 const UUID_STORAGE_KEY = 'lh_uuid';
-// Bot basic ID — resolved dynamically from API after liff.init()
+// 複数アカウントに対応するため、Bot の基本 ID は liff.init 後に API から解決する。
 let BOT_BASIC_ID = '';
+let signedRedirectTarget: string | null = null;
 
 function apiCall(path: string, options?: RequestInit): Promise<Response> {
   return fetch(path, {
@@ -68,17 +53,16 @@ function apiCall(path: string, options?: RequestInit): Promise<Response> {
 function getPage(): string | null {
   const path = window.location.pathname.replace(/^\/+/, '');
   if (path === 'book') return 'book';
+  if (path === 'booking' || path === 'booking/history') return 'salon-book';
+  if (/^restaurant\/reserve\/[^/]+$/.test(path)) return 'restaurant';
   const params = new URLSearchParams(window.location.search);
   return params.get('page');
 }
 
 function getRedirectUrl(): string | null {
   const params = new URLSearchParams(window.location.search);
-  // Guard the client-side navigation sink (window.location.href below) against
-  // open-redirect / javascript: abuse, mirroring the server-side /auth/callback
-  // guard. A directly-crafted LIFF URL never reaches the server route, so the
-  // client must validate too.
-  return safeRedirectTarget(params.get('redirect'));
+  // 直接作られた LIFF URL はサーバーのコールバックを通らないため、クライアントでも移動先を検査し、任意サイトへの転送や javascript: を防ぐ。
+  return safeRedirectTarget(params.get('redirect'), window.location.origin) || signedRedirectTarget;
 }
 
 function getRef(): string | null {
@@ -102,15 +86,12 @@ function saveUuid(uuid: string): void {
   }
 }
 
-function escapeHtml(str: string): string {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+
 
 // ─── UI States ──────────────────────────────────────────
 
 function showFriendAdd(profile: { displayName: string; pictureUrl?: string }) {
+  const returnUrl = window.location.href;
   const container = document.getElementById('app')!;
   const friendAddUrl = BOT_BASIC_ID
     ? `https://line.me/R/ti/p/${BOT_BASIC_ID}`
@@ -132,18 +113,20 @@ function showFriendAdd(profile: { displayName: string; pictureUrl?: string }) {
 
   // 友だち追加後に戻ってきたら自動で再チェック
   // 一度発火したら listener を外して、ユーザーが LIFF をフォアグラウンド復帰するたびに
-  // 重複 push が走らないようにする（送信後にアプリ切り替えで再発火する事故を防ぐ）
+  // 送信後のアプリ切り替えで再発火しても、同じ push を二度実行しない。
   let formLinkSent = false;
+  let checking = false;
   const onVisibilityChange = async () => {
-    if (document.visibilityState !== 'visible') return;
+    if (document.visibilityState !== 'visible' || checking) return;
+    checking = true;
     try {
       const { friendFlag } = await liff.getFriendship();
       if (!friendFlag) return;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      // 入口と引数を追加前のまま戻す。各画面の読み出しは通常の入口に任せる。
+      window.history.replaceState(window.history.state, '', returnUrl);
 
-      // Re-link now that the friends row exists. For first-time users the
-      // pre-add POST in linkAndAddFlow ran before the follow webhook created
-      // the friends row (404), dropping ref/ig/iga/igan attribution on the
-      // no-form path — this retry persists it once friendship is confirmed.
+      // 初回の友だち追加前は行が存在しない場合があるため、友だち確認後にも結び付けを試し、ref/ig/iga/igan の帰属を保存する。
       try {
         const idToken = liff.getIDToken();
         if (idToken) {
@@ -169,7 +152,7 @@ function showFriendAdd(profile: { displayName: string; pictureUrl?: string }) {
         }
       } catch { /* best-effort */ }
 
-      // Send form link if form param exists (was lost during friend-add flow)
+      // 友だち追加を挟んでもフォーム案内を失わないよう、form 指定を引き継ぐ。
       const formParam = new URLSearchParams(window.location.search).get('form');
       if (formParam && !formLinkSent) {
         formLinkSent = true;
@@ -193,10 +176,12 @@ function showFriendAdd(profile: { displayName: string; pictureUrl?: string }) {
           });
         } catch { /* best-effort */ }
       }
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      showCompletion(profile, false);
-    } catch {
-      // ignore
+      if (getPage() || new URLSearchParams(window.location.search).get('couponRef')) await openPage();
+      else showCompletion(profile, false);
+    } catch (err) {
+      showError(customerMessage(err, '画面を開けませんでした。LINE から、もう一度開いてください。'));
+    } finally {
+      checking = false;
     }
   };
   document.addEventListener('visibilitychange', onVisibilityChange);
@@ -251,7 +236,7 @@ async function linkAndAddFlow() {
   try {
     const existingUuid = getSavedUuid();
 
-    // Get profile, ID token, and friendship status in parallel
+
     const [profile, rawIdToken, friendship] = await Promise.all([
       liff.getProfile(),
       Promise.resolve(liff.getIDToken()),
@@ -283,7 +268,7 @@ async function linkAndAddFlow() {
       // Silent fail — UUID linking is best-effort
     });
 
-    // 2. Attribution tracking
+
     if (ref) {
       apiCall('/api/affiliates/click', {
         method: 'POST',
@@ -291,34 +276,39 @@ async function linkAndAddFlow() {
       }).catch(() => {});
     }
 
-    // 3. Redirect flow (for wrapped URLs)
+
     if (redirectUrl) {
       await Promise.race([
         linkPromise,
         new Promise((r) => setTimeout(r, 500)),
       ]);
-      // Append LINE userId to tracking links so clicks are attributed
-      if (redirectUrl.includes('/t/')) {
-        const sep = redirectUrl.includes('?') ? '&' : '?';
-        window.location.href = `${redirectUrl}${sep}lu=${encodeURIComponent(profile.userId)}`;
-      } else {
-        window.location.href = redirectUrl;
+      let identityToken = '';
+      const target = new URL(redirectUrl, window.location.origin);
+      if (target.origin === window.location.origin && target.pathname.startsWith('/t/') && rawIdToken) {
+        try {
+          const response = await apiCall('/api/liff/tracked-link-identity', {
+            method: 'POST', body: JSON.stringify({ linkId: decodeURIComponent(target.pathname.slice(3)), idToken: rawIdToken }),
+          });
+          const result = await response.json() as { data?: { token?: string } };
+          if (response.ok) identityToken = result.data?.token || '';
+        } catch { /* 本人を確認できなくても匿名でリンク先を開く。 */ }
       }
+      window.location.href = attributedRedirectTarget(redirectUrl, window.location.origin, identityToken);
       return;
     }
 
-    // 4. Wait for UUID linking to complete
+    // 結び付けの完了前に後続処理を始めない。
     await linkPromise;
 
-    // 5. Friendship check — the key decision point
+
     if (!friendship.friendFlag) {
-      // Not a friend yet → show friend-add button
+
       showFriendAdd(profile);
     } else {
-      // Already a friend — check for form param
+
       const formParam = new URLSearchParams(window.location.search).get('form');
       if (formParam) {
-        // Send form link via push message, then show completion
+
         try {
           const idToken = liff.getIDToken();
           const params = new URLSearchParams(window.location.search);
@@ -347,14 +337,16 @@ async function linkAndAddFlow() {
     if (redirectUrl) {
       window.location.href = redirectUrl;
     } else {
-      showError(err instanceof Error ? err.message : 'エラーが発生しました');
+      showError(customerMessage(err, 'うまくいきませんでした。時間をおいて、もう一度お試しください。'));
     }
   }
 }
 
 // ─── Salon Booking (React, dynamic-imported) ─────────────
 
-async function initSalonBooking(): Promise<void> {
+export async function initRestaurantForm(): Promise<void> { await initSalonBooking('form'); }
+
+async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-coupon' | 'restaurant' | 'form' = 'salon-book'): Promise<void> {
   // 既存 linkAndAddFlow と同じ初期化シーケンスを踏む:
   //   ① profile + idToken + friendFlag を並列取得
   //   ② /api/liff/link で UUID 確定 (ref/ig 含む) — booking エンドポイントが
@@ -382,7 +374,7 @@ async function initSalonBooking(): Promise<void> {
 
   // ② Silent UUID linking (fire-and-forget; booking API は id_token verify で
   //    認証するので待つ必要はない)。
-  apiCall('/api/liff/link', {
+  const linked = apiCall('/api/liff/link', {
     method: 'POST',
     body: JSON.stringify({
       idToken,
@@ -399,10 +391,9 @@ async function initSalonBooking(): Promise<void> {
         const data = (await res.json()) as { success: boolean; data?: { userId?: string } };
         if (data?.data?.userId) saveUuid(data.data.userId);
       }
+      return res.ok;
     })
-    .catch(() => {
-      /* silent */
-    });
+    .catch(() => false);
 
   // ③ Affiliate click 計測 (linkAndAddFlow と同等)。
   if (ref) {
@@ -428,11 +419,33 @@ async function initSalonBooking(): Promise<void> {
     showError('mount target #app が見つかりません');
     return;
   }
+  if (page === 'restaurant' || page === 'form') {
+    if (!await linked) { showError('画面を開けませんでした。もう一度お試しください。'); return; }
+    const { mountRestaurant } = await import('./restaurant/main.js');
+    mountRestaurant(container,{liffId:LIFF_ID,lineUserId:profile.userId,idToken,sdk:liff},page);
+    return;
+  }
+  if (page === 'entry-coupon') {
+    if (!await linked) { showError('クーポンを開けませんでした。時間をおいて、もう一度開いてください。'); return; }
+    const { mountEntryRouteCoupon } = await import('./entry-route-coupon/main.js');
+    mountEntryRouteCoupon(container, { liffId: LIFF_ID, lineUserId: profile.userId, idToken });
+    return;
+  }
+  if (page === 'visit-stamps') {
+    if (!await linked) {
+      showError('来店スタンプを開けませんでした。時間をおいて、もう一度開いてください。');
+      return;
+    }
+    const { mountVisitStamps } = await import('./visit-stamps/main.js');
+    mountVisitStamps(container, { liffId: LIFF_ID, lineUserId: profile.userId, idToken });
+    return;
+  }
   const { mountSalonBooking } = await import('./salon-booking/main.js');
   mountSalonBooking(container, {
     liffId: LIFF_ID,
     lineUserId: profile.userId,
     idToken,
+    sdk: liff,
   });
 }
 
@@ -455,7 +468,7 @@ async function initEventBooking(initialKind: 'detail' | 'history'): Promise<void
   const ref = getRef();
   const eventParams = new URLSearchParams(window.location.search);
 
-  // UUID linking (best-effort)
+  // 結び付けの失敗だけでは画面表示を止めない。
   apiCall('/api/liff/link', {
     method: 'POST',
     body: JSON.stringify({
@@ -561,6 +574,20 @@ async function initWebinar(): Promise<void> {
   mountWebinar(container, { liffId: LIFF_ID, lineUserId: profile.userId, idToken }, slug);
 }
 
+async function initResearch(): Promise<void> {
+  const [profile, friendship] = await Promise.all([liff.getProfile(), liff.getFriendship()]);
+  const idToken = liff.getIDToken();
+  if (!idToken) throw new Error('LINE から、もう一度開いてください');
+  if (!friendship.friendFlag) { showFriendAdd(profile); return; }
+  const linked = await apiCall('/api/liff/link', { method: 'POST', body: JSON.stringify({ idToken, displayName: profile.displayName, existingUuid: getSavedUuid(), ref: getRef() || undefined }) });
+  if (!linked.ok) throw new Error('LINE から、もう一度開いてください');
+  const container = document.getElementById('app');
+  const researchId = new URLSearchParams(window.location.search).get('researchId');
+  if (!container || !researchId) throw new Error('回答画面が見つかりませんでした');
+  const { mountResearch } = await import('../../../liff/src/research-entry.js');
+  await mountResearch(container, { liffId: LIFF_ID, lineUserId: profile.userId, idToken }, researchId);
+}
+
 // ─── Affiliate self-serve (React, dynamic-imported) ──────
 
 async function initAffiliate(): Promise<void> {
@@ -568,7 +595,7 @@ async function initAffiliate(): Promise<void> {
   // 取得し、未友達なら friend-add gate、友達なら React mount。
   //
   // booking 系は id_token で verify するが、affiliate API は LINE access token
-  // (liff.getAccessToken()) を /oauth2/v2.1/verify + /v2/profile で検証するため
+  // (liff.getAccessToken) を /oauth2/v2.1/verify + /v2/profile で検証するため
   // ここでは accessToken を取り出して mount context に渡す。
   const [profile, accessToken, friendship] = await Promise.all([
     liff.getProfile(),
@@ -584,6 +611,12 @@ async function initAffiliate(): Promise<void> {
   const ref = getRef();
   const affParams = new URLSearchParams(window.location.search);
 
+  const crossAccountToken = affParams.get('crossAccountToken');
+  let confirmedCrossAccount = false;
+  if (crossAccountToken && friendship.friendFlag) {
+    try { confirmedCrossAccount = window.confirm('この公式アカウントと、先ほど開いたアカウントのお客さま情報・マイルを結び付けますか？'); } catch { /* Confirmation unavailable: keep identities separate. */ }
+  }
+
   // Wallet取得より先にUUID連携を確定する。初回表示でここを待たないと、
   // 未登録アカウント用の署名付きリンクを生成できず、別財布になる余地がある。
   try {
@@ -597,7 +630,8 @@ async function initAffiliate(): Promise<void> {
         ig: affParams.get('ig') || undefined,
         iga: affParams.get('iga') || undefined,
         igan: affParams.get('igan') || undefined,
-        crossAccountToken: affParams.get('crossAccountToken') || undefined,
+        crossAccountToken: confirmedCrossAccount ? crossAccountToken : undefined,
+        confirmCrossAccountLink: confirmedCrossAccount || undefined,
       }),
     });
     if (res.ok) {
@@ -625,6 +659,7 @@ async function initAffiliate(): Promise<void> {
     liffId: LIFF_ID,
     lineUserId: profile.userId,
     lineAccessToken: accessToken,
+    idToken: liff.getIDToken() ?? undefined,
   });
 }
 
@@ -651,17 +686,13 @@ async function initNenMember(): Promise<void> {
 
 // ─── Entry Point ────────────────────────────────────────
 
-// External-browser LIFF sessions persist in localStorage, and the SDK keeps
-// returning the cached id_token without refreshing it. LINE id_tokens expire
-// after 1h, so a returning PC visitor gets 401 from every verify-backed API
-// (/api/liff/link, webinar load, forms). In-client (LINE app) sessions get a
-// fresh token on every launch and never hit this.
+// 外部ブラウザでは SDK が保存済みの id_token を返し続けるため、1時間の有効期限を超えたトークンを再認証する。LINE アプリ内では起動ごとに新しい値になる。
 function isIdTokenStale(idToken: string | null): boolean {
   if (!idToken) return true;
   try {
     const payloadB64 = idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
     const payload = JSON.parse(atob(payloadB64)) as { exp?: number };
-    // 60s margin so a token about to expire mid-flow also counts as stale
+    // 処理中の失効も避けるため、期限まで60秒未満なら古いトークンと扱う。
     return typeof payload.exp !== 'number' || payload.exp * 1000 < Date.now() + 60_000;
   } catch {
     return true;
@@ -673,9 +704,7 @@ const RELOGIN_GUARD_KEY = 'lh_relogin_at';
 function forceReloginForStaleToken(): boolean {
   if (liff.isInClient()) return false;
   if (!isIdTokenStale(liff.getIDToken())) return false;
-  // Loop guard: if we already round-tripped through LINE Login within the
-  // last minute and the token is still stale (clock skew, login cancelled),
-  // fall through instead of redirecting forever.
+  // 時計のずれやログイン取消で無限に再認証しないよう、直近1分で認証を往復していればそのまま進める。
   let lastAttempt = 0;
   try {
     lastAttempt = Number(sessionStorage.getItem(RELOGIN_GUARD_KEY) || 0);
@@ -691,6 +720,39 @@ function forceReloginForStaleToken(): boolean {
   return true;
 }
 
+async function openPage(): Promise<void> {
+    const page = getPage();
+    if (new URLSearchParams(window.location.search).get('couponRef')) {
+      await initSalonBooking('entry-coupon');
+    } else if (page === 'book') {
+      await initBooking();
+    } else if (page === 'restaurant') {
+      await initSalonBooking('restaurant');
+    } else if (page === 'salon-book') {
+      await initSalonBooking();
+    } else if (page === 'visit-stamps') {
+      await initSalonBooking('visit-stamps');
+    } else if (page === 'event') {
+      await initEventBooking('detail');
+    } else if (page === 'event-me') {
+      await initEventBooking('history');
+    } else if (page === 'webinar') {
+      await initWebinar();
+    } else if (page === 'research') {
+      await initResearch();
+    } else if (page === 'affiliate') {
+      await initAffiliate();
+    } else if (page === 'nen-member') {
+      await initNenMember();
+    } else if (page === 'form') {
+      await initForm(new URLSearchParams(window.location.search).get('id'), initRestaurantForm);
+    } else if (!page) {
+      await linkAndAddFlow();
+    } else {
+      await linkAndAddFlow();
+    }
+}
+
 async function main() {
   try {
     await liff.init({ liffId: LIFF_ID });
@@ -702,10 +764,15 @@ async function main() {
 
     if (forceReloginForStaleToken()) return;
 
-    // Resolve bot basic ID from API (multi-account support)
+    // 複数アカウントに対応するため、Bot の基本 ID を API で解決する。
+    applyCustomerLook(undefined);
     try {
-      const configRes = await fetch(`/api/liff/config?liffId=${encodeURIComponent(LIFF_ID)}`);
-      const configJson = await configRes.json() as { success: boolean; data?: { botBasicId?: string } };
+      const redirectParams = new URLSearchParams(window.location.search);
+      const configQuery = new URLSearchParams({ liffId: LIFF_ID, redirect: redirectParams.get('redirect') || '', redirectProof: redirectParams.get('redirectProof') || '' });
+      const configRes = await fetch(`/api/liff/config?${configQuery}`);
+      const configJson = await configRes.json() as { success: boolean; data?: { botBasicId?: string; customerLook?: unknown; redirectTarget?: string | null } };
+      if (configJson.success && configJson.data?.customerLook) applyCustomerLook(configJson.data.customerLook);
+      if (configJson.success) signedRedirectTarget = configJson.data?.redirectTarget || null;
       if (configJson.success && configJson.data?.botBasicId) {
         BOT_BASIC_ID = configJson.data.botBasicId;
       }
@@ -713,32 +780,9 @@ async function main() {
       // fallback: BOT_BASIC_ID remains empty, friend-add URL won't auto-redirect
     }
 
-    const page = getPage();
-    if (page === 'book') {
-      await initBooking();
-    } else if (page === 'salon-book') {
-      await initSalonBooking();
-    } else if (page === 'event') {
-      await initEventBooking('detail');
-    } else if (page === 'event-me') {
-      await initEventBooking('history');
-    } else if (page === 'webinar') {
-      await initWebinar();
-    } else if (page === 'affiliate') {
-      await initAffiliate();
-    } else if (page === 'nen-member') {
-      await initNenMember();
-    } else if (page === 'form') {
-      const params = new URLSearchParams(window.location.search);
-      const formId = params.get('id');
-      await initForm(formId);
-    } else if (!page) {
-      await linkAndAddFlow();
-    } else {
-      await linkAndAddFlow();
-    }
+    await openPage();
   } catch (err) {
-    showError(err instanceof Error ? err.message : 'LIFF初期化エラー');
+    showError(customerMessage(err, '画面を開けませんでした。LINE から、もう一度開いてください。'));
   }
 }
 

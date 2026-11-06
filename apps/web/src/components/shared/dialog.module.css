@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .overlay {
   position: fixed;
@@ -7,25 +8,23 @@
   align-items: center;
   justify-content: center;
   overflow-y: auto;
-  background: color-mix(in srgb, var(--color-ink) 40%, transparent);
+  background: var(--polish-window-backdrop);
+  -webkit-backdrop-filter: blur(var(--polish-window-blur));
+  backdrop-filter: blur(var(--polish-window-blur));
   padding: 16px;
 }
 
-/* ★V6 の短い確認窓は、一覧の内容を隠しすぎない固定位置に置く。 */
+/* 確認の窓は本文の有無によらず上寄せし、短い画面にも収める。 */
 .confirmationOverlay {
   align-items: flex-start;
-  padding-top: 280px;
+  padding-top: clamp(var(--space-16), 260px, calc(50dvh - var(--space-16)));
 }
-
-@media (max-height: 640px) {
-  .confirmationOverlay {
-    padding-top: 80px;
-  }
+.confirmationOverlay:not([data-design-top]) > .panel {
+  max-height: calc(100dvh - clamp(var(--space-16), 260px, calc(50dvh - var(--space-16))) - var(--space-16));
 }
 
 .panel {
   display: flex;
-  width: min(844px, 100%);
   /*
    * R283: 縦に長い窓でも見出し・閉じる・保存/取消に到達できる。
    * 面の高さを画面内に収め、中身だけを送る。見出し行と操作は
@@ -33,31 +32,19 @@
    */
   max-height: calc(100dvh - 32px);
   flex-direction: column;
-  gap: 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-panel);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-card);
-  padding: 18px;
+  /* ★管理画面 の影は3段。画面の真ん中に開く窓は最前面（段3）。 */
   color: var(--color-ink);
 }
 
 .standardPanel {
-  padding: 18px;
+  padding: 24px;
 }
 
 /* Pencil の確認窓。説明は帯で囲まず、見出し・本文・操作を同じ面に置く。 */
 .confirmationPanel {
   gap: 16px;
   padding: 24px;
-}
-
-.compactConfirmation {
-  width: min(600px, 100%);
-}
-
-.destructiveConfirmation {
-  width: min(720px, 100%);
 }
 
 .confirmationPanel .title {
@@ -72,7 +59,7 @@
 }
 
 .confirmationPanel .titleIcon {
-  color: var(--color-accent-deep);
+  color: var(--color-ink-secondary);
 }
 
 .confirmationPanel[role='alertdialog'] .titleIcon {
@@ -84,12 +71,17 @@
 }
 
 /* 見出しと右上の×を1行に並べる。中身は今までどおり縦に積む。 */
+.headerAction {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
 .headerRow {
   display: flex;
   /* R283: 中身が長くても見出し行は縮めない（上に固定）。 */
   flex: 0 0 auto;
   align-items: flex-start;
-  gap: 8px;
 }
 
 .headerContent {
@@ -97,7 +89,6 @@
   flex: 1;
   min-width: 0;
   flex-direction: column;
-  gap: 12px;
 }
 
 .confirmationPanel .headerContent {
@@ -110,17 +101,20 @@
 
 .title {
   margin: 0;
-  font-weight: 700;
-  line-height: 1.5;
 }
 
 .standardTitle {
   color: var(--color-ink);
-  font-size: var(--text-lead);
+  font-size: var(--text-heading);
 }
 
 .destructiveTitle {
-  font-size: var(--text-body);
+  font-size: var(--text-callout);
+}
+
+/* 題の下の補足（titleNote を渡した窓だけ出る）。渡さない窓の並びは変わらない。 */
+.titleNote {
+  margin: 0;
 }
 
 /* 見出しの左に絵を置くとき（危険な操作の確認）だけ使う行。 */
@@ -139,35 +133,23 @@
   padding-top: 2px;
 }
 
-.callout .titleIcon {
-  color: var(--color-status-danger);
-}
-
 .description {
   margin: 0;
-  color: var(--color-ink-faint);
-  font-size: var(--text-caption);
-  line-height: 1.5;
 }
 
-.callout {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border: 1px solid var(--color-status-danger-soft);
-  border-radius: var(--radius-card);
-  background: var(--color-status-danger-soft);
-  padding: 16px;
-}
+/*
+ * 琥珀の呼びかけ（ 送受信を止める・ 解除：説明文を帯で囲む）。
+ * 互換経路は変えない。地はトークン表の warn-soft（#fdf3e1。板  #fff4e0
+ * とほぼ同じ。--color-warning-bg #faf0dc は濃すぎるため使わない）。
+ * 板どおり角丸 8・内側 10/12・文 11px/17px。枠は地と同色で見せない。
+ */
 
-.callout .title,
-.callout .description {
-  color: var(--color-status-danger);
-}
-
-.callout .title {
-  font-size: var(--text-body);
-}
+/*
+ * 桃の呼びかけ（ 解除：説明文だけを桃箱で囲む。題は箱の外）。
+ * 板どおり地 #fdecea≒--color-danger-bg（#fce9e7）・文 #b42318≒--color-danger
+ * （#b3261e）・角丸 8・内側 10/12・文 11px/17px。枠は地と同色で見せない。
+ * 互換経路は変えない。 式（箱なし）の既定の破壊的トーンはそのまま。
+ */
 
 .content {
   min-width: 0;
@@ -176,13 +158,12 @@
   overflow-y: auto;
 }
 
-.error {
-  border-radius: var(--radius-control);
-  background: var(--color-status-danger-soft);
-  padding: 10px 12px;
-  color: var(--color-status-danger);
-  font-size: var(--text-caption);
-  line-height: 1.5;
+/* 子のボタンの輪・影がスクロール窓の下端に触れない内側の逃げ。 */
+.content::after {
+  content: '';
+  grid-column: 1 / -1;
+  flex: 0 0 var(--space-8);
+  block-size: var(--space-8);
 }
 
 .actions {
@@ -190,8 +171,7 @@
   /* R283: 中身が長くても操作は縮めない（下に固定）。 */
   flex: 0 0 auto;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
+  justify-content: center;
 }
 
 /*
@@ -207,7 +187,6 @@
 }
 
 .designButton {
-  min-width: 112px;
   width: auto;
   white-space: nowrap;
 }
@@ -221,9 +200,373 @@
     width: 100%;
   }
 
+
   /* 狭い画面ではボタンを縦に積み、指で押せる幅を確保する。 */
   .designButton {
     width: 100%;
   }
 }
+
+/*
+ * ★V8「ダイアログ」（q3DPdz）：大きさは 800 / 560 の2段にそろえ、
+ * 余白は 24。角丸は --radius-panel が v8 で 16 になるのでそのまま。
+ */
+:root .panel {
+  width: min(var(--tpl-dialog-large-width), 100%);
+  padding: 24px;
 }
+
+:root .compactConfirmation,
+:root .destructiveConfirmation {
+  width: min(560px, 100%);
+}
+
+/*
+ * ★V8 仕上げ（M10）「窓」：開くとき背景が薄く出て、窓は少し下から
+ * ふわっと（opacity＋translateY 4px→0、scale 0.98→1、200ms ease-out）。
+ * 閉じるときは逆（150ms）。閉じの印 `data-closing` は dialog.tsx が
+ * V8 のときだけ付ける（管理画面・試験は今までどおり即時に消える）。
+ */
+/*
+ * 開く・閉じるは「移り変わり（transition）」で動かす（フルード・インタラクション ①）。
+ * 決まった動き（keyframes）だと、閉じかけでもう一度開くと最初から出直して飛ぶ。
+ * 移り変わりなら、途中で逆の操作をしてもその位置から滑らかに戻る。
+ * 出始めの形は @starting-style が持つ。動きを減らす設定では動かさない。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  :root .overlay {
+    transition: opacity var(--motion-base) var(--motion-ease-out);
+  }
+
+  :root .panel {
+    transition:
+      opacity var(--motion-base) var(--motion-ease-out),
+      transform var(--motion-base) var(--motion-ease-out);
+  }
+
+  @starting-style {
+    :root .overlay {
+      opacity: 0;
+    }
+
+    :root .panel {
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
+    }
+  }
+
+  :root .overlay[data-closing],
+  :root .panel[data-closing] {
+    transition-duration: var(--motion-exit);
+  }
+}
+
+:root .overlay[data-closing] {
+  opacity: 0;
+  /* 消えていく間は下の画面を押せるようにする（薄い膜が押下を食べない）。 */
+  pointer-events: none;
+}
+
+:root .panel[data-closing] {
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+}
+
+/* ★V8（夕13）：重なる物の外縁は border-soft（TOKENS-20261001）。 */
+:root .panel {
+  border-color: var(--color-border-soft);
+}
+}
+/* 正本 q3DPdz：枠560、頭・手順・中身・下を独立した段にする。 */
+:root .panel {
+  width: min(var(--tpl-dialog-width), 100%); padding: 0; gap: 0; overflow: hidden;
+  border: 0; border-radius: var(--polish-radius-dialog); outline: 1px solid var(--polish-window-edge); outline-offset: -1px;
+  box-shadow: var(--polish-window-shadow);
+  font-family: var(--font-sans);
+}
+:root .panel[data-size='large'] { width: min(var(--tpl-dialog-large-width), 100%); }
+/* 絵の窓の幅・上からの位置を画面が渡したとき（designWidth・designTop）。狭い画面では画面の幅まで。
+   層（@layer components）の中に置くと、この層の外の「幅 560」に負けて効かない。必ずこの後ろに置く。 */
+:root .panel[data-design-width] { width: min(var(--dialog-design-width), 100%); }
+:root .overlay[data-design-top] { align-items: flex-start; padding-top: var(--dialog-design-top); }
+:root .overlay[data-viewport-fit][data-design-top] {
+  padding-top: clamp(var(--space-16), var(--dialog-design-top), calc(50dvh - var(--space-16)));
+}
+:root .overlay[data-viewport-fit][data-design-top] > .panel {
+  max-height: calc(100dvh - clamp(var(--space-16), var(--dialog-design-top), calc(50dvh - var(--space-16))) - var(--space-16));
+}
+:root .headerRow { width: 100%; padding: 20px 24px 8px; gap: 12px; }
+/* 絵の頭の余白・高さを画面が渡したとき（designHeaderPadding・designHeaderHeight）。上の共通の値の後ろに置く。 */
+:root .panel[data-design-header-padding] > .headerRow { padding: var(--dialog-design-header-padding); }
+:root .panel[data-design-header-height] > .headerRow { height: var(--dialog-design-header-height); min-height: 0; box-sizing: border-box; }
+:root .headerContent { gap: 2px; }
+:root .title { font-size: var(--tpl-dialog-title-size); font-weight: var(--tpl-dialog-title-weight); line-height: 24px; }
+/*
+ * 題の下の補足（絵 hjdqV「12:02 受信・受け取り希望 12:15」）。
+ * 絵は題 y120-147・補足 y151-169 で間4。共通の題は行の高さ24で y120-144 なので、
+ * 段の間2＋ここの5＝7 を足して補足の上端を y151 にそろえる。
+ */
+:root .titleNote {
+  margin-top: 4px;
+  font-size: var(--text-caption);
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+}
+/*
+ * 題の段の形を絵の値にする窓だけ（designTitleRow="mark"）。
+ * 絵（dgeTy・XCVGd）は左の丸い印と題が縦の中央でそろい、間は12（左24＋印36＋間12＝題72）。
+ * 題は 18/700。渡さない窓は上の既定（上そろえ・間8・太さ600）のまま。
+ */
+:root .panel[data-design-title-row='mark'] .titleRow {
+  align-items: center;
+  gap: 12px;
+}
+
+:root .panel[data-design-title-row='mark'] .titleIcon {
+  padding-top: 0;
+}
+
+:root .panel[data-design-title-row='mark'] .title {
+  font-size: var(--text-lead);
+  font-weight: 700;
+}
+
+:root .description { font-size: 13px; line-height: 20px; font-weight: var(--font-weight-ui); color: var(--color-ink-secondary); }
+/* 注意帯の説明は 1 行で本文いっぱいに使う。字体が変わって文が少し広く出ても折り返さないよう、横の内側を 8px に締める（上下はそのまま）。 */
+:root .panel[data-description-band='danger'] > .headerRow { padding-bottom: 0; }
+:root .descriptionBand {
+  flex: none;
+  padding: 0 var(--polish-space-section);
+  margin: var(--polish-space-field) 0 var(--polish-space-card);
+}
+:root .panel[data-design-layout='stacked'] > .descriptionBand { padding: 0; margin: 0; }
+:root .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+:root .close svg { width: 16px; height: 16px; }
+:root .content { width: 100%; padding: 24px; }
+:root .panel[data-design-content-padding] > .content { padding: var(--dialog-design-content-padding); }
+:root .footer { display: block; width: 100%; flex-shrink: 0; }
+:root .footer:empty { display: none; }
+/* 画面がボタンを直に渡した下の段（footer）も、並びの間 8・高さの中心をそろえる。
+   直に並べると行の中の inline のボタンになり、間 0・上下がずれていた。包みを渡す画面は変わらない。 */
+:root .footer:has(> :is(button, a)) { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* 確認の操作は中央にそろえる。 */
+:root .actions { width: 100%; padding: 14px 24px; gap: 8px; align-items: center; border-top: 1px solid var(--color-hairline); }
+:root .actions[data-dialog-action-pair] { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+html:root .actions[data-padding='none'] { padding: 0; border: 0; }
+/* 下のボタンを中央に置く口（footerAlign="center"）。既定の右寄せは変えない。 */
+:root .panel[data-footer-align='center'] .actions[data-dialog-action-pair] { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+:root .footerLead { grid-column: 1; min-width: 0; font-family: var(--font-sans); font-size: 13px; line-height: 20px; color: var(--color-ink-faint); }
+:root .buttonPair { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+:root .designButton { min-width: 0; font-family: inherit; line-height: 20px; }
+:root .designButton[data-dialog-action='secondary'] { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -1px; }
+:root .designButton[data-dialog-action='primary'] { border: 0; }
+:root .buttonIcon svg { width: 16px; height: 16px; }
+:root .steps { width: 100%; flex-shrink: 0; padding: 10px 24px; border-block: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
+.stepItems { display: flex; align-items: center; gap: 10px; }
+.stepItem { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; min-height: 0; font-family: inherit; color: var(--color-ink); font-size: 13px; font-weight: 600; line-height: 20px; }
+.stepItem:disabled { opacity: 1; }
+.stepItem:focus-visible .stepCircle { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+.stepCircle { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 22px; height: 22px; border-radius: 999px; background: var(--color-shell-gray); font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 12px; line-height: 17px; font-weight: 600; }
+.stepDone { background: var(--color-accent-deep); color: var(--color-canvas); }
+.stepCurrent { background: var(--color-ink); color: var(--color-canvas); }
+.stepLine { width: 28px; height: 1.5px; background: var(--color-accent-deep); }
+:root .panel[style*='--dialog-design-footer-padding'] .actions { padding: var(--dialog-design-footer-padding); }
+:root .panel[data-footer-align='start'] .actions[data-dialog-action-pair] { grid-template-columns: auto minmax(0, 1fr); }
+:root .panel[data-footer-align='start'] .buttonPair { grid-column: 2; justify-self: start; }
+:root .panel[data-confirm-placement='start'] .buttonPair { display: contents; }
+:root .panel[data-footer-divider='none'] .actions { border-top: 0; }
+:root .panel[data-footer-lead='fixed'] .footerLead { flex: none; margin-right: var(--tpl-sb-group-gap); }
+
+:root .headerContent { align-items: flex-start; }
+:root .steps { display: flex; align-items: center; gap: 10px; }
+:root .content { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+:root .content > * { flex-shrink: 0; }
+:root .designButton[data-dialog-action='primary'] { box-shadow: var(--v8-parts-primary-shadow); }
+
+/* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
+
+/* 個別の板が指定した短い確認窓。既定の段の余白は変えない。 */
+:root .panel[data-design-layout='stacked'] { --dialog-stack-gap: 14px; padding: 24px; gap: var(--dialog-stack-gap); }
+:root .panel[data-design-layout='stacked'] > .headerRow { padding: 0; align-items: center; }
+:root .panel[data-design-layout='stacked'] .title { font-size: 17px; line-height: 26px; font-weight: 700; }
+:root .panel[data-design-layout='stacked'] > .description { margin: 0; width: 100%; line-height: 22px; }
+:root .panel[data-design-layout='stacked'] > .content { padding: 0; align-items: stretch; }
+:root .panel[data-design-layout='stacked'] .actions { padding: 0; border: 0; }
+:root .panel[data-confirm-first] .actions .buttonPair > button:last-of-type { order: -1; }
+
+:root .panel[data-design-layout='stacked'] .close { width: var(--control-icon-size); height: var(--control-icon-size); min-height: 0; padding: 0; }
+
+:root .panel[data-footer-align='start'] .actions[data-dialog-action-pair] { grid-template-columns: auto minmax(0, 1fr); }
+:root .panel[data-design-footer-gap] .actions { gap: var(--dialog-footer-gap); }
+/*  の続いた窓。呼び出し側が選んだときだけ、既定の段の帯を外す。 */
+:root .panel[data-layout='continuous'] { padding: 20px 24px; gap: 14px; }
+:root .panel[data-layout='continuous'] > .headerRow { padding: 0; align-items: center; }
+:root .panel[data-layout='continuous'] .title { font-size: 16px; font-weight: 700; line-height: 23px; }
+:root .panel[data-layout='continuous'] .description { font-size: 12px; line-height: 17px; }
+:root .panel[data-layout='continuous'] > .steps { padding: 0; border: 0; background: transparent; }
+:root .panel[data-layout='continuous'] > .content { padding: 0; }
+:root .panel[data-layout='continuous'] .actions { padding: 6px 0 0; border: 0; }
+
+/* アカウントの窓は頭・本文・操作を同じ余白で続ける。既定の窓は変えない。 */
+:root .panel[data-layout='account-inset'] { padding: var(--tpl-acd-dlg-pad); gap: var(--tpl-acd-dlg-gap); }
+:root .panel[data-layout='account-inset'] > .headerRow,
+:root .panel[data-layout='account-inset'] > .content { padding: 0; }
+:root .panel[data-layout='account-inset'] .title { font-size: var(--tpl-acd-dlg-title-size); line-height: var(--tpl-acd-dlg-title-lh); }
+:root .panel[data-layout='account-inset'] .insetActions { display: flex; justify-content: center; align-items: center; gap: var(--tpl-acd-actions-gap); padding: var(--tpl-acd-dlg-foot-pad); box-shadow: var(--tpl-acd-line-top); }
+
+html:root .stepCurrent { background: var(--color-selection-border); color: var(--color-canvas); }
+
+/* 入力を含む確認窓は、欄を本文幅にそろえる。 */
+html:root .content[data-content-layout='form'] { align-items: stretch; }
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  gap: var(--space-8);
+}
+
+html:root .panel[data-layout='inset'] { padding: var(--polish-space-section); gap: var(--space-16); }
+html:root .panel[data-layout='inset'] > .headerRow,
+html:root .panel[data-layout='inset'] > .content { padding: 0; }
+html:root .panel[data-layout='inset'] .headerContent { gap: var(--tpl-hb-dialog-head-gap); }
+html:root .panel[data-layout='inset'] .content { align-items: stretch; }
+html:root .panel[data-layout='inset'] .actions { padding: var(--polish-window-divider-space) 0 0; }
+.actionLead { display: flex; flex-wrap: wrap; gap: var(--space-8); min-width: 0; margin-right: auto; }
+.actionStart { grid-column: 1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); min-width: 0; }
+/* 左の操作1つ分を左右とも確保し、足りない幅は中央の組で折り返す。 */
+html:root .actions[data-dialog-action-pair]:has(> [data-dialog-action-leading]) {
+  grid-template-columns: minmax(var(--dialog-leading-min, 0px), 1fr) minmax(min-content, auto) minmax(var(--dialog-leading-min, 0px), 1fr);
+  align-items: start;
+}
+html:root .actions > [data-dialog-action-leading] { align-self: start; min-height: var(--control-h); }
+html:root .actions[data-dialog-action-pair] > .buttonPair { min-width: 0; }
+html:root .actions[data-dialog-action-pair][data-dialog-actions-stacked]:has(> [data-dialog-action-leading]) { grid-template-columns: minmax(0, 1fr); }
+html:root .actions[data-dialog-actions-stacked] > .buttonPair { grid-column: 1; }
+@media (min-width: 561px) {
+  html:root .actions[data-dialog-action-pair] > .buttonPair { align-items: flex-start; }
+  html:root .actions > .buttonPair > :is(button, a) { align-self: flex-start; }
+}
+
+html:root .panel[data-confirm-placement='start'] .actions[data-dialog-action-pair] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+html:root .panel[data-confirm-placement='start'] .actions .buttonPair > button:first-of-type {
+  grid-area: 1 / 2;
+}
+html:root .panel[data-confirm-placement='start'] .actions .buttonPair > button:last-of-type {
+  grid-area: 1 / 1;
+  justify-self: start;
+}
+
+:root .footer :is(button, a) { border-radius: var(--radius-primary-action); }
+
+/* 余白は各段だけが持ち、本文との境目で重ねない。個別指定の窓はその口を保つ。 */
+html:root .panel:not([data-design-header-padding]):not([data-design-header-height]):not([data-layout]):not([data-design-layout]) > .headerRow {
+  padding: var(--polish-space-section) var(--polish-space-section) 0;
+}
+html:root .panel:not([data-layout]):not([data-design-layout]):not([style*='--dialog-design-footer-padding']) > .footer > .actions:not([data-padding='none']) {
+  padding: var(--polish-window-divider-space) var(--polish-space-section) var(--polish-space-section);
+}
+.headerIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--polish-window-icon-size);
+  height: var(--polish-window-icon-size);
+  border-radius: var(--radius-pill);
+  background: var(--polish-window-icon-bg);
+  color: var(--polish-window-icon-ink);
+}
+.headerIcon > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
+
+/* 窓内の装飾は共通部品が持つ。段の順・幅と操作の位置は変えない。 */
+html:root .panel .close {
+  width: var(--polish-window-close-size);
+  height: var(--polish-window-close-size);
+  min-height: 0;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  box-shadow: none;
+}
+html:root .headerContent { gap: var(--space-4); }
+/* 題の実際の行高を継ぎ、説明の行数に関係なく最初の行へそろえる。 */
+html:root .title[data-has-heading-icon] { display: flex; align-items: flex-start; gap: var(--space-12); }
+html:root .title[data-has-heading-icon] > span:last-child { min-width: 0; }
+html:root .title .headerIcon { align-self: flex-start; margin-top: calc((1lh - var(--polish-window-icon-size)) / 2); }
+html:root .headerContent:has(.headerIcon) .description,
+html:root .headerContent:has(.headerIcon) .titleNote { margin-inline-start: calc(var(--polish-window-icon-size) + var(--space-12)); }
+html:root .panel[data-description-band='warning'] .headerIcon {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+html:root .panel[role='alertdialog'] .headerIcon {
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+}
+html:root .panel .titleRow { align-items: center; }
+html:root .titleIcon {
+  justify-content: center;
+  width: var(--polish-window-icon-size);
+  height: var(--polish-window-icon-size);
+  padding: 0;
+  border-radius: var(--radius-pill);
+  background: var(--polish-window-icon-bg);
+  color: var(--polish-window-icon-ink);
+}
+html:root .panel[role='alertdialog'] .titleIcon {
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+}
+html:root .footer :is(button, a)[data-dialog-action='secondary'] {
+  outline-color: transparent;
+  background: var(--polish-window-cancel-bg);
+  box-shadow: none;
+}
+html:root .footer :is(button, a)[data-dialog-action='secondary']:hover:not(:disabled) {
+  background: var(--polish-hover);
+}
+html:root .footer :is(button, a)[data-dialog-action='secondary']:focus-visible {
+  outline: var(--polish-focus-width) solid var(--polish-focus);
+  outline-offset: var(--polish-focus-offset);
+}
+
+/* 区切り線のある次の段までの余白は頭が持ち、説明の行数で変えない。 */
+html:root .panel:not([data-layout]):not([data-design-layout]) > .headerRow:has(.description):has(+ .steps),
+html:root .panel:not([data-confirmation='compact']):not([data-layout]):not([data-design-layout]) > .headerRow:has(.description):has(+ .footer .actions:not([data-padding='none'])) {
+  padding-block-end: var(--polish-window-divider-space);
+  height: auto;
+  min-height: var(--dialog-design-header-height, 0px);
+}
+
+/* 個別の左右・下の余白を保ち、線から操作までの上だけ共通化する。 */
+html:root .panel:not([data-layout]):not([data-design-layout]) > .footer > .actions:not([data-padding='none']) {
+  padding-block-start: var(--polish-window-divider-space);
+}
+
+/* 短い確認は説明から操作までを一続きにし、間は操作側だけが持つ。 */
+html:root .panel[data-confirmation='compact']:not([data-layout]):not([data-design-layout]) > .headerRow {
+  padding-block-end: 0;
+}
+html:root .panel[data-confirmation='compact'][data-design-layout='stacked'] > .footer {
+  margin-block-start: calc(var(--polish-window-divider-space) - var(--dialog-stack-gap));
+}
+
+@media (max-width: 560px) {
+  html:root .actions[data-dialog-action-pair]:has(> [data-dialog-action-leading]) { grid-template-columns: minmax(0, 1fr); }
+  :root .actions[data-dialog-action-pair] { grid-template-columns: minmax(0, 1fr); }
+  :root .actions[data-dialog-action-pair] .buttonPair { grid-column: 1; width: 100%; flex-direction: column; }
+  :root .panel[data-footer-align='start'] .actions[data-dialog-action-pair] { grid-template-columns: minmax(0, 1fr); }
+  :root .panel[data-footer-align='start'] .actions[data-dialog-action-pair] .buttonPair { grid-column: 1; justify-self: stretch; }
+}
+
+.confirmReason { grid-column: 1 / -1; margin: 0; min-width: 0; text-align: center; color: var(--color-ink-secondary); font-size: var(--text-caption); overflow-wrap: anywhere; }
+
+/* 表示を指定した題だけ、親の内容幅を使わず省略できる幅へ縮める。 */
+html:root .panel[data-title-content] .headerContent { align-items: stretch; }
+html:root .panel[data-title-content] .title { min-width: 0; }
+html:root .panel[data-title-content] .title > span:last-child { min-width: 0; flex: 1; }

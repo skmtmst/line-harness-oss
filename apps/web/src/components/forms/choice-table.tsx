@@ -12,12 +12,17 @@
  *   動作           … 選択肢ごとに、送る・付ける・開始するを組む
  */
 
+import CloseButton from '@/components/shared/close-button'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useState } from 'react'
 import { newBlockId, type FormChoice, type FormInputBlock, type FormSection } from '@line-crm/shared'
 import ActionEditor from './action-editor'
 import Checkbox from '@/components/shared/checkbox'
-import Select from '@/components/shared/select'
+
 import { cellInput, miniButton, type FormRefs } from './form-refs'
+import Button from '@/components/shared/button'
+import { formatNumber } from '@/lib/format'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 const MODES: { value: NonNullable<FormInputBlock['choiceMode']>; label: string }[] = [
   { value: 'tag', label: 'タグ追加' },
@@ -96,13 +101,13 @@ export default function ChoiceTable({
         </div>
 
         {mode === 'friendField' && (
-          <Select
+          <EntitySelect
             value={block.choiceFriendFieldId ?? ''}
             onChange={(value) => onChange({ choiceFriendFieldId: value || null })}
             aria-label="登録する友だち情報欄"
             options={[
               { value: '', label: '— 情報欄を選ぶ —' },
-              ...refs.friendFields.map((f) => ({
+              ...refs.friendFields.map((f) => ({ ...entityOptionMetadata(f),
                 value: f.id,
                 label: `${f.name}${f.ecIsMaster ? '（EC側が正）' : ''}`,
                 disabled: f.ecIsMaster,
@@ -125,7 +130,7 @@ export default function ChoiceTable({
           {choices.map((choice) => (
             <li key={choice.id} className="px-3 py-2">
               <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
-                <input
+                <SharedTextField
                   type="text"
                   value={choice.label}
                   onChange={(e) => patchChoice(choice.id, { label: e.target.value })}
@@ -134,19 +139,19 @@ export default function ChoiceTable({
                 />
 
                 {mode === 'tag' && (
-                  <Select
+                  <EntitySelect kind="tag"
                     value={choice.tagId ?? ''}
                     onChange={(value) => patchChoice(choice.id, { tagId: value || null })}
                     aria-label="付けるタグ"
                     options={[
                       { value: '', label: '— 付けない —' },
-                      ...refs.tags.map((t) => ({ value: t.id, label: t.name })),
+                      ...refs.tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name })),
                     ]}
                   />
                 )}
 
                 {mode === 'friendField' && (
-                  <input
+                  <SharedTextField
                     type="text"
                     value={choice.value ?? ''}
                     onChange={(e) => patchChoice(choice.id, { value: e.target.value })}
@@ -156,16 +161,13 @@ export default function ChoiceTable({
                 )}
 
                 {mode === 'action' && (
-                  <button
-                    onClick={() =>
+                  <Button variant="secondary" className={(`${miniButton} border-hairline rounded-control border px-2 py-1.5 text-left`) + ' h-auto whitespace-normal'} onClick={() =>
                       setOpenChoiceId(openChoiceId === choice.id ? null : choice.id)
-                    }
-                    className={`${miniButton} border-hairline rounded-control border px-2 py-1.5 text-left`}
-                  >
+                    }>
                     {choice.actions?.length
-                      ? `${choice.actions.length}件の動作`
+                      ? `${formatNumber(choice.actions.length)}件の動作`
                       : '動作を決める'}
-                  </button>
+                  </Button>
                 )}
 
                 <div className="flex items-center gap-1 whitespace-nowrap">
@@ -195,13 +197,7 @@ export default function ChoiceTable({
                   >
                     複製
                   </button>
-                  <button
-                    onClick={() => removeChoice(choice.id)}
-                    className="text-danger px-1 text-xs"
-                    aria-label="削除"
-                  >
-                    ×
-                  </button>
+                  <CloseButton aria-label="削除" onClick={() => removeChoice(choice.id)} />
                 </div>
               </div>
 
@@ -257,7 +253,7 @@ export default function ChoiceTable({
 
                     {choice.capacity?.enabled && (
                       <label className="text-ink-secondary flex items-center gap-1 text-xs">
-                        <input
+                        <SharedTextField
                           type="number"
                           min={1}
                           step={1}
@@ -310,7 +306,7 @@ export default function ChoiceTable({
                       <span className="text-ink-secondary mb-1 block text-xs font-medium">
                         選んだ人を飛ばすページ
                       </span>
-                      <Select
+                      <EntitySelect
                         value={choice.jumpToSectionId ?? ''}
                         onChange={(value) =>
                           patchChoice(choice.id, { jumpToSectionId: value || null })
@@ -318,7 +314,7 @@ export default function ChoiceTable({
                         aria-label="選んだ人を飛ばすページ"
                         options={[
                           { value: '', label: '— 次のページへ進む —' },
-                          ...sections.map((s, i) => ({ value: s.id, label: `${i + 1}. ${s.name}` })),
+                          ...sections.map((s, i) => ({ ...entityOptionMetadata(s), value: s.id, label: `${i + 1}. ${s.name}` })),
                         ]}
                       />
                       <span className="text-ink-faint mt-1 block text-xs">
@@ -334,21 +330,21 @@ export default function ChoiceTable({
 
         <div className="border-hairline flex flex-wrap gap-2 border-t p-2">
           <button onClick={() => addChoice()} className={miniButton}>
-            ＋ 選択肢を追加
+            ＋ 選択肢を追加する
           </button>
           <button
             onClick={() => addChoice(choices[choices.length - 1])}
             disabled={choices.length === 0}
-            className={`${miniButton} disabled:opacity-40`}
+            className={`${miniButton} `}
           >
             ＋ 最後の選択肢を複製
           </button>
           <button
             onClick={addOther}
             disabled={choices.some((c) => c.isOther)}
-            className={`${miniButton} disabled:opacity-40`}
+            className={`${miniButton} `}
           >
-            ＋「その他」を追加
+            ＋「その他」を追加する
           </button>
         </div>
       </div>
@@ -357,7 +353,7 @@ export default function ChoiceTable({
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-ink-secondary text-xs font-medium">選べる数</span>
           <label className="text-ink-secondary flex items-center gap-1 text-xs">
-            <input
+            <SharedTextField
               type="number"
               min={0}
               value={block.selectionLimit?.min ?? ''}
@@ -375,7 +371,7 @@ export default function ChoiceTable({
             つ以上
           </label>
           <label className="text-ink-secondary flex items-center gap-1 text-xs">
-            <input
+            <SharedTextField
               type="number"
               min={0}
               value={block.selectionLimit?.max ?? ''}

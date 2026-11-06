@@ -1,7 +1,11 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { fail } from '../lib/fail.js';
+import { logger } from '@line-crm/shared/server';
+import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { DEFAULT_TENANT_ID, getFriendBulkRunDetail } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import {
@@ -12,19 +16,24 @@ import {
   requireFriendBulkRunAccess,
   retryFriendBulkRun,
   startFriendBulkRun,
-} from '../services/friend-bulk-runs.js';
+} from '../features/friends/friend-bulk-runs/index.js';
+
+import { approveBulkMessage, getBulkMessageApproval } from '../features/friends/friend-bulk-message-approval/index.js';
 
 export const friendBulkRuns = new Hono<Env>();
 
+function bulkErrorFields(code: string): string[] {
+  if (['invalid_selection', 'selection_empty', 'saved_search_invalid', 'conditions_invalid', 'no_targets'].includes(code)) return ['selection'];
+  if (code === 'invalid_operation' || code === 'invalid_datetime' || code.startsWith('common_action_')) return ['operation'];
+  if (code.startsWith('preview_')) return ['previewToken'];
+  return [];
+}
+
 function errorResponse(c: Context<Env>, error: unknown) {
   if (error instanceof FriendBulkRunError) {
-    return c.json(
-      { success: false, error: error.message, code: error.code },
-      error.status as ContentfulStatusCode,
-    );
+    return fail(c, error.status as ContentfulStatusCode, error.code, { error: error.message }, bulkErrorFields(error.code));
   }
-  console.error('friend bulk run error:', error);
-  return c.json({ success: false, error: '一括操作を処理できませんでした' }, 500);
+  throw error;
 }
 
 function idempotencyKey(c: { req: { header(name: string): string | undefined } }): string {
@@ -39,7 +48,7 @@ function keepRunning(c: { executionCtx: ExecutionContext }, promise: Promise<unk
   try {
     c.executionCtx.waitUntil(promise);
   } catch {
-    void promise.catch((error) => console.error('friend bulk background error:', error));
+    void promise.catch((error) => logger.error("friend_bulk_runs.keep_running_failed"));
   }
 }
 
@@ -55,7 +64,7 @@ async function parseJsonBody<T>(c: Context<Env>): Promise<T> {
   }
 }
 
-friendBulkRuns.post('/api/friends/bulk-runs/preview', requireRole('owner', 'admin'), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/preview', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: 1024 * 1024, tooLarge: { code: 'request_too_large', error: '一括操作の指定が大きすぎます' } }), async (c) => {
   try {
     const body = await parseJsonBody<{ selection?: unknown; operation?: unknown }>(c);
     const result = await previewFriendBulkRun(c.env.DB, c.get('staff')!, body.selection, body.operation);
@@ -65,7 +74,7 @@ friendBulkRuns.post('/api/friends/bulk-runs/preview', requireRole('owner', 'admi
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs', requireRole('owner', 'admin'), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: 1024 * 1024, tooLarge: { code: 'request_too_large', error: '一括操作の指定が大きすぎます' } }), async (c) => {
   try {
     const body = await parseJsonBody<{ selection?: unknown; operation?: unknown; scheduledAt?: unknown }>(c);
     const result = await startFriendBulkRun(c.env.DB, c.get('staff')!, {
@@ -80,7 +89,7 @@ friendBulkRuns.post('/api/friends/bulk-runs', requireRole('owner', 'admin'), asy
         executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY },
       }));
     }
-    return c.json({ success: true, data: result.run }, result.created ? 202 : 200);
+    return c.json({ success: true, data: { ...result.run, approval: await getBulkMessageApproval(c.env.DB, result.run.id) } }, result.created ? 202 : 200);
   } catch (error) {
     return errorResponse(c, error);
   }
@@ -95,18 +104,17 @@ friendBulkRuns.get('/api/friends/bulk-runs/:id', requireRole('owner', 'admin'), 
       c.req.param('id'),
       staff.tenantId ?? DEFAULT_TENANT_ID,
       {
-        page: Number(c.req.query('page') ?? 1),
-        limit: Number(c.req.query('limit') ?? 50),
+        ...parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') }, { defaultLimit: 50, limitPolicy: {}, pagePolicy: {} }),
       },
     );
     if (!detail) return c.json({ success: false, error: '一括操作が見つかりません' }, 404);
-    return c.json({ success: true, data: detail });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...detail, approval: await getBulkMessageApproval(c.env.DB, detail.id), paging: { limit: detail.limit }, sort: [{ field: 'ordinal', direction: 'asc' }] }) });
   } catch (error) {
     return errorResponse(c, error);
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs/:id/retry', requireRole('owner', 'admin'), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/:id/retry', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: 1024 * 1024, tooLarge: { code: 'request_too_large', error: '一括操作の指定が大きすぎます' } }), async (c) => {
   try {
     const staff = c.get('staff')!;
     const count = await retryFriendBulkRun(
@@ -123,7 +131,7 @@ friendBulkRuns.post('/api/friends/bulk-runs/:id/retry', requireRole('owner', 'ad
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs/:id/undo', requireRole('owner', 'admin'), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/:id/undo', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: 1024 * 1024, tooLarge: { code: 'request_too_large', error: '一括操作の指定が大きすぎます' } }), async (c) => {
   try {
     const result = await createFriendBulkUndoRun(
       c.env.DB,
@@ -133,6 +141,19 @@ friendBulkRuns.post('/api/friends/bulk-runs/:id/undo', requireRole('owner', 'adm
     );
     if (result.created) keepRunning(c, processFriendBulkRun(c.env.DB, result.run.id));
     return c.json({ success: true, data: result.run }, result.created ? 202 : 200);
+  } catch (error) {
+    return errorResponse(c, error);
+  }
+});
+
+friendBulkRuns.post('/api/friends/bulk-runs/:id/approve', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: 1024 * 1024, tooLarge: { code: 'request_too_large', error: '一括操作の指定が大きすぎます' } }), async (c) => {
+  try {
+    const body = await parseJsonBody<{ confirmedRecipientCount?: unknown }>(c);
+    const approval = await approveBulkMessage(c.env.DB, c.get('staff')!, c.req.param('id'), body.confirmedRecipientCount);
+    keepRunning(c, processFriendBulkRun(c.env.DB, c.req.param('id'), {
+      executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY },
+    }));
+    return c.json({ success: true, data: { approval } }, 202);
   } catch (error) {
     return errorResponse(c, error);
   }

@@ -1,5 +1,11 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { tracedFetch as fetch } from '@line-crm/shared/server';
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { LineClient, type Message } from '@line-crm/line-sdk';
+
 import {
   LineNotificationError,
   createCustomerNotificationDefinition,
@@ -20,6 +26,7 @@ import {
   insertNotificationResendDelivery,
   finishNotificationResendDelivery,
   createCustomerTestInstance,
+  failCustomerTestInstance,
   recordCustomerTestDelivery,
   recordCustomerTestAudit,
   jstDateString,
@@ -29,14 +36,15 @@ import {
   type NotificationDeliveryListRow,
   type NotificationDeliveryAttemptRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+
+import type { Env } from '../worker-env.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 import {
   releaseQuotaSlot,
   tryReserveQuotaSlot,
-} from '../services/broadcast-quota-guard.js';
+} from '../features/broadcasts/broadcast-quota-guard/index.js';
 
 const lineNotifications = new Hono<Env>();
 
@@ -190,8 +198,8 @@ lineNotifications.get(
 
 lineNotifications.post(
   '/api/line-notifications/customer-definitions',
-  requireRole('owner', 'admin'),
-  async (c) => {
+  requireDeliveryAccess('lineNotifications'),
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const key = bodyString(body?.key);
@@ -200,10 +208,10 @@ lineNotifications.post(
     const sourceEventType = bodyString(body?.sourceEventType);
     const draft = bodyDraft(body?.draft);
     if (!lineAccountId || !key || !name || !category || !sourceEventType || !draft) {
-      return c.json({ success: false, error: 'LINEアカウント、キー、名前、区分、きっかけ、下書きは必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウント、キー、名前、区分、きっかけ、下書きは必須です' }, 400, ["lineAccountId","key","name","category","sourceEventType","draft"]);
     }
     const draftError = validateCustomerDraft(draft);
-    if (draftError) return c.json({ success: false, error: draftError }, 400);
+    if (draftError) return inputError(c, { success: false, error: draftError }, 400, ["draft"]);
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
     try {
@@ -228,8 +236,8 @@ lineNotifications.post(
 
 lineNotifications.patch(
   '/api/line-notifications/customer-definitions/:id/draft',
-  requireRole('owner', 'admin'),
-  async (c) => {
+  requireDeliveryAccess('lineNotifications'),
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const expectedVersion = bodyVersion(body?.expectedVersion);
@@ -238,10 +246,10 @@ lineNotifications.patch(
     const sourceEventType = bodyString(body?.sourceEventType);
     const draft = bodyDraft(body?.draft);
     if (!lineAccountId || !expectedVersion || !name || !category || !sourceEventType || !draft) {
-      return c.json({ success: false, error: 'LINEアカウント、現在の版、名前、区分、きっかけ、下書きは必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウント、現在の版、名前、区分、きっかけ、下書きは必須です' }, 400, ["lineAccountId","expectedVersion","name","category","sourceEventType","draft"]);
     }
     const draftError = validateCustomerDraft(draft);
-    if (draftError) return c.json({ success: false, error: draftError }, 400);
+    if (draftError) return inputError(c, { success: false, error: draftError }, 400, ["draft"]);
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
     try {
@@ -267,13 +275,13 @@ lineNotifications.patch(
 
 lineNotifications.post(
   '/api/line-notifications/customer-definitions/:id/publish',
-  requireRole('owner', 'admin'),
-  async (c) => {
+  requireDeliveryAccess('lineNotifications'),
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const expectedVersion = bodyVersion(body?.expectedVersion);
     if (!lineAccountId || !expectedVersion) {
-      return c.json({ success: false, error: 'LINEアカウントと現在の版は必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントと現在の版は必須です' }, 400, ["lineAccountId","expectedVersion"]);
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
@@ -281,8 +289,8 @@ lineNotifications.post(
     if (!current) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
     const draft = jsonObject(current.definition.draft_config_json) as CustomerDraft;
     const draftError = validateCustomerDraft(draft);
-    if (draftError) return c.json({ success: false, error: draftError }, 400);
-    // N-330 (#943): ECイベントがきっかけの定義は、送信文面をイベント内容
+    if (draftError) return inputError(c, { success: false, error: draftError }, 400, ["lineAccountId"]);
+    //  ECイベントがきっかけの定義は、送信文面をイベント内容
     // から組み立てる(ecFlexMessage)ので、静的なLINEテンプレートは要らない。
     // それ以外の定義は、送る中身が無いまま公開できないようテンプレートを必須にする。
     if (!current.definition.source_event_type.startsWith('ec.')
@@ -305,13 +313,13 @@ lineNotifications.post(
 
 lineNotifications.post(
   '/api/line-notifications/customer-definitions/:id/stop',
-  requireRole('owner', 'admin'),
-  async (c) => {
+  requireDeliveryAccess('lineNotifications'),
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const expectedVersion = bodyVersion(body?.expectedVersion);
     if (!lineAccountId || !expectedVersion) {
-      return c.json({ success: false, error: 'LINEアカウントと現在の版は必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントと現在の版は必須です' }, 400, ["lineAccountId","expectedVersion"]);
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
@@ -391,17 +399,14 @@ function serializeDeliveryItem(
 export async function notificationDeliveriesResponse(c: Context<Env>): Promise<Response> {
   const lineAccountId = c.req.query('lineAccountId')?.trim();
   if (!lineAccountId) {
-    return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
   }
   const denied = await requireAccount(c, lineAccountId);
   if (denied) return denied;
-  const rawLimit = Number(c.req.query('limit') ?? '20');
-  const rawOffset = Number(c.req.query('offset') ?? '0');
-  const limit = Number.isInteger(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 20;
-  const offset = Number.isInteger(rawOffset) ? Math.max(rawOffset, 0) : 0;
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 20, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'integer', minimum: 0 } });
   const view = c.req.query('view') ?? 'all';
   if (view !== 'all' && view !== 'failures') {
-    return c.json({ success: false, error: '表示条件が正しくありません' }, 400);
+    return inputError(c, { success: false, error: '表示条件が正しくありません' }, 400, ["view"]);
   }
   const result = await listNotificationDeliveries(c.env.DB, { lineAccountId, view, limit, offset });
   const attempts = await listNotificationDeliveryAttempts(
@@ -420,8 +425,7 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
     : null;
   return c.json({
     success: true,
-    data: {
-      items: result.items.map((row) => serializeDeliveryItem(row, attemptsByDelivery.get(row.id) ?? [])),
+    data: buildOffsetListResponse({ items: result.items.map((row) => serializeDeliveryItem(row, attemptsByDelivery.get(row.id) ?? [])),
       summary: result.summary,
       coverage: {
         source: 'notification_delivery_ledger',
@@ -429,8 +433,7 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
         attemptHistoryAvailable: true,
         retryAvailable: true,
       },
-      ...(quota ? { quota } : {}),
-    },
+      ...(quota ? { quota } : {}), total: result.total, paging: { limit, offset }, sort: [] }),
     pagination: { total: result.total, limit, offset },
   });
 }
@@ -518,10 +521,9 @@ lineNotifications.get(
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
-    const date = /^\d{4}-\d{2}-\d{2}$/;
     const from = c.req.query('from')?.trim();
     const to = c.req.query('to')?.trim();
-    if ((from && !date.test(from)) || (to && !date.test(to)) || (from && to && from > to)) {
+    if ((from && !isExistingCalendarDate(from)) || (to && !isExistingCalendarDate(to)) || (from && to && from > to)) {
       return c.json({ success: false, error: '集計期間が正しくありません' }, 400);
     }
     const items = await listNotificationMetrics(c.env.DB, { lineAccountId, from, to });
@@ -576,7 +578,7 @@ lineNotifications.get(
     const today = jstDateString(0);
     const tomorrow = nextDateString(today);
     const windowStart = jstDateString(-29);
-    const rows = await c.env.DB.prepare(
+    const [rows, failures] = await Promise.all([c.env.DB.prepare(
       `SELECT i.source_event_type AS event_type,
          SUM(CASE WHEN d.accepted_at >= ? AND d.accepted_at < ? THEN 1 ELSE 0 END) AS today_count,
          SUM(CASE WHEN d.accepted_at >= ? AND d.accepted_at < ? THEN 1 ELSE 0 END) AS last_30d_count
@@ -589,7 +591,15 @@ lineNotifications.get(
       GROUP BY i.source_event_type
       ORDER BY last_30d_count DESC, event_type ASC`,
     ).bind(today, tomorrow, windowStart, tomorrow, lineAccountId)
-      .all<{ event_type: string; today_count: number; last_30d_count: number }>();
+      .all<{ event_type: string; today_count: number; last_30d_count: number }>(),
+      c.env.DB.prepare(`SELECT COUNT(*) AS total,
+        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+        SUM(CASE WHEN status = 'retry_wait' THEN 1 ELSE 0 END) AS retry_waiting
+        FROM notification_deliveries
+        WHERE line_account_id = ? AND audience_type = 'customer'
+          AND execution_mode != 'test' AND status IN ('failed', 'retry_wait')`)
+        .bind(lineAccountId).first<{ total: number; failed: number; retry_waiting: number }>(),
+    ]);
     const byEventType = rows.results.map((row) => ({
       eventType: row.event_type,
       today: Number(row.today_count ?? 0),
@@ -598,6 +608,8 @@ lineNotifications.get(
     return c.json({
       success: true,
       data: {
+        failures: { scope: 'all_time_unresolved' as const, total: Number(failures?.total ?? 0),
+          failed: Number(failures?.failed ?? 0), retryWaiting: Number(failures?.retry_waiting ?? 0) },
         sentToday: byEventType.reduce((sum, item) => sum + item.today, 0),
         sentLast30d: byEventType.reduce((sum, item) => sum + item.last30d, 0),
         byEventType,
@@ -620,13 +632,13 @@ function lineErrorStatus(error: unknown): number | null {
 
 lineNotifications.post(
   '/api/line-notifications/deliveries/:id/retry',
-  requireRole('owner', 'admin'),
-  async (c) => {
+  requireDeliveryAccess('lineNotifications'),
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const expectedVersion = bodyVersion(body?.expectedVersion);
     if (!lineAccountId || !expectedVersion) {
-      return c.json({ success: false, error: 'LINEアカウントと現在の版は必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントと現在の版は必須です' }, 400, ["lineAccountId","expectedVersion"]);
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
@@ -646,7 +658,7 @@ lineNotifications.post(
       return c.json({ success: true, data: { id: c.req.param('id'), resolved, version: expectedVersion + 1 } });
     }
     if (action !== null) {
-      return c.json({ success: false, error: '操作の種類が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '操作の種類が正しくありません' }, 400, ["action"]);
     }
     if (c.get('staff').role !== 'owner') {
       return c.json({ success: false, error: '送信の再試行は店長だけができます' }, 403);
@@ -728,11 +740,11 @@ lineNotifications.post(
           nextRetryAt,
         });
         if (!finished) throw new Error('notification retry result was not recorded');
-        return c.json({
+        return inputError(c, {
           success: false,
           code: transient ? 'retry_scheduled' : 'retry_failed',
           error: transient ? '一時的な失敗のため、再試行待ちに戻しました' : '再試行できませんでした',
-        }, transient ? 503 : 422);
+        }, transient ? 503 : 422, []);
       }
       const finished = await finishNotificationDeliveryRetry(c.env.DB, {
         delivery,
@@ -770,7 +782,7 @@ function bodyFriendIds(value: unknown): string[] | null {
 }
 
 /**
- * 要件 v6-24 §6 `GET deliveries/:id`。一覧と同じ1件の形で返す。
+ * 要件 -24 §6 `GET deliveries/:id`。一覧と同じ1件の形で返す。
  * アカウント境界の外側は 404 に倒して存在を明かさない。
  */
 lineNotifications.get(
@@ -791,7 +803,7 @@ lineNotifications.get(
 );
 
 /**
- * 要件 v6-24 §6 `GET quota`。一覧の `includeQuota=1` と同じ送信枠を単体で返す。
+ * 要件 -24 §6 `GET quota`。一覧の `includeQuota=1` と同じ送信枠を単体で返す。
  */
 lineNotifications.get(
   '/api/line-notifications/quota',
@@ -809,24 +821,24 @@ lineNotifications.get(
 );
 
 /**
- * 要件 v6-24 §6 `POST deliveries/:id/resend`。
+ * 要件 -24 §6 `POST deliveries/:id/resend`。
  * retry（未完了の試行を続ける）と分け、新規通知として送り直す。
  * 元の行は残し、新しい送達行・新しい冪等キーで送る。理由は必須で監査に残す。
  * 除外（送信対象外）の記録は送り直さない。対象外の判定を覆す操作だからだ。
  */
 lineNotifications.post(
   '/api/line-notifications/deliveries/:id/resend',
-  requireRole('owner', 'admin'),
-  async (c) => {
+  requireDeliveryAccess('lineNotifications'),
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const expectedVersion = bodyVersion(body?.expectedVersion);
     const reason = bodyReason(body?.reason);
     if (!lineAccountId || !expectedVersion) {
-      return c.json({ success: false, error: 'LINEアカウントと現在の版は必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントと現在の版は必須です' }, 400, ["lineAccountId","expectedVersion"]);
     }
     if (!reason) {
-      return c.json({ success: false, error: '再送する理由を1〜200文字で入力してください' }, 400);
+      return inputError(c, { success: false, error: '再送する理由を1〜200文字で入力してください' }, 400, ["reason"]);
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
@@ -889,7 +901,23 @@ lineNotifications.post(
       ? await tryReserveQuotaSlot(c.env.DB, lineAccountId, reservationId, 1, quota.used, quota.total)
       : false;
     if (quota.state === 'available' && !reserved) {
-      return c.json({ success: false, code: 'quota_insufficient', error: '同時送信を含めると送信枠が足りないため、再送できません' }, 409);
+      // 枠の予約より先に作った再送行を、未送信のまま(pending)に残さない。
+      // 送らなかった理由つきの失敗で確定し、履歴に残す。
+      const finalized = await finishNotificationResendDelivery(c.env.DB, {
+        id: created.id,
+        lineAccountId,
+        idempotencyKey: created.idempotencyKey,
+        outcome: 'failed',
+        errorCode: 'quota_insufficient',
+        errorMessageSafe: '同時送信を含めると送信枠が足りないため、再送できません',
+      });
+      if (!finalized) throw new Error('notification resend result was not recorded');
+      return c.json({
+        success: false,
+        code: 'quota_insufficient',
+        error: '同時送信を含めると送信枠が足りないため、再送できません',
+        data: { id: created.id },
+      }, 409);
     }
     try {
       let result: { data: unknown; requestId: string | null };
@@ -916,12 +944,12 @@ lineNotifications.post(
           nextRetryAt,
         });
         if (!finished) throw new Error('notification resend result was not recorded');
-        return c.json({
+        return inputError(c, {
           success: false,
           code: transient ? 'resend_scheduled' : 'resend_failed',
           error: transient ? '一時的な失敗のため、新しい送信を再試行待ちにしました' : '再送できませんでした',
           data: { id: created.id },
-        }, transient ? 503 : 422);
+        }, transient ? 503 : 422, []);
       }
       const finished = await finishNotificationResendDelivery(c.env.DB, {
         id: created.id,
@@ -946,23 +974,23 @@ const CUSTOMER_TEST_SEND_NOTICE =
   '【テスト送信】公開前の確認用です。実際の注文情報は含みません。';
 
 /**
- * 要件 v6-24 §6 `POST customer-definitions/:id/test`。
+ * 要件 -24 §6 `POST customer-definitions/:id/test`。
  * いま編集中の下書き文面を、指定した友だちだけに試し送りする。
  * 実注文・住所・クーポンは使わず、先頭に確認用の断りを付けて送る。
  * 記録は `test` 扱いで、再試行の対象にしない。
  */
 lineNotifications.post(
   '/api/line-notifications/customer-definitions/:id/test',
-  requireRole('owner', 'admin'),
-  async (c) => {
+  requireDeliveryAccess('lineNotifications'),
+  inputJsonBoundary(), async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     const lineAccountId = bodyString(body?.lineAccountId);
     const friendIds = bodyFriendIds(body?.friendIds);
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     }
     if (!friendIds) {
-      return c.json({ success: false, error: '試し送りする友だちを1〜5人選んでください' }, 400);
+      return inputError(c, { success: false, error: '試し送りする友だちを1〜5人選んでください' }, 400, ["friendIds"]);
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
@@ -973,12 +1001,12 @@ lineNotifications.post(
     if (!Array.isArray(template) || template.length === 0) {
       return c.json({ success: false, code: 'incomplete_draft', error: '試し送りする前にLINEで送る内容を設定してください' }, 409);
     }
-    const placeholders = friendIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(friendIds).sql;
     const recipients = await c.env.DB.prepare(`
       SELECT id, line_user_id FROM friends
        WHERE line_account_id = ? AND id IN (${placeholders})
          AND is_following = 1 AND line_user_id IS NOT NULL AND line_user_id != ''
-    `).bind(lineAccountId, ...friendIds).all<{ id: string; line_user_id: string }>();
+    `).bind(lineAccountId, ...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; line_user_id: string }>();
     const recipientById = new Map(recipients.results.map((row) => [row.id, row.line_user_id]));
     const missing = friendIds.filter((id) => !recipientById.has(id));
     if (missing.length > 0) {
@@ -1022,7 +1050,27 @@ lineNotifications.post(
             c.env.DB, lineAccountId, reservationId, 1, quota.used, quota.total,
           );
           if (!reserved) {
-            return c.json({ success: false, code: 'quota_insufficient', error: '同時送信を含めると送信枠が足りないため、試し送りできません' }, 409);
+            // 枠の予約より先に作った記録先を、送達のない成功前提のままに
+            // 残さない。失敗で確定し、送れなかった理由を監査に残す。
+            const finalized = await failCustomerTestInstance(c.env.DB, {
+              lineAccountId, instanceId,
+            });
+            if (!finalized) throw new Error('customer test instance was not recorded');
+            await recordCustomerTestAudit(c.env.DB, {
+              definitionId: found.definition.id,
+              lineAccountId,
+              staffId: c.get('staff').id,
+              sourceEventId,
+              recipientIds: friendIds,
+              outcome: 'quota_insufficient',
+              errorMessage: '同時送信を含めると送信枠が足りないため、試し送りできません',
+            });
+            return c.json({
+              success: false,
+              code: 'quota_insufficient',
+              error: '同時送信を含めると送信枠が足りないため、試し送りできません',
+              data: { instanceId },
+            }, 409);
           }
           reservedIds.push(reservationId);
         }

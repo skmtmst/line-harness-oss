@@ -1,3 +1,4 @@
+import { globalTokens, resolveValue } from '../../scripts/card-shape-contract.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -6,37 +7,33 @@ import { describe, expect, it } from 'vitest'
 const WEB = path.join(__dirname, '..', '..')
 const CSS = fs.readFileSync(path.join(WEB, 'src', 'app', 'globals.css'), 'utf8')
 
+const CURRENT_TOKENS = globalTokens(CSS)
 function token(name: string): string {
-  const hit = CSS.match(new RegExp(`--${name}:\\s*([^;]+);`))
-  return hit ? hit[1].trim() : '(未定義)'
+  if (!CURRENT_TOKENS.has(`--${name}`)) throw new Error(`Missing CSS token: ${name}`)
+  return resolveValue(`var(--${name})`, CURRENT_TOKENS).trim()
 }
 
-/**
- * **カードと窓を同じ角丸にしない。**
- *
- * 以前は `--radius-card` も `--radius-panel` も 12px で、1つの値が
- * 「画面のカード」と「モーダルの外枠」の両方を指していた。設計では
- * 別物で、カードは `$radius-md`(10)、窓は `$radius-panel`(12)。
- * 片方に合わせるともう片方がずれるので、用途で分けてある。
- */
-describe('カードと窓の角丸を用途で分ける', () => {
-  it('カードは設計の10px', () => {
-    // pRHvc 検索と絞り込み / k4Hz0X 友だち一覧カード / eHPwj 一括操作バー
-    expect(token('radius-card')).toBe('10px')
+/** V8 §6: 中身のカードは12、窓は16。役割を混ぜない。 */
+describe('カードと窓の角丸を役割ごとに分ける', () => {
+  it('カードは12px', () => {
+    // ★管理画面: 丸みは 6 / 8 / 12 / 999 の4段。カードは 12px。
+    expect(token('radius-card')).toBe('12px')
   })
 
-  it('窓は設計の12px', () => {
+  it('窓は16px', () => {
     // J6x4Q 標準確認モーダル / z7O873 友だち 詳細検索モーダル
-    expect(token('radius-panel')).toBe('12px')
+    expect(token('radius-panel')).toBe('16px')
   })
 
-  it('同じ値へ戻していない', () => {
-    expect(token('radius-card')).not.toBe(token('radius-panel'))
+  it('用途の名前を別のまま残す', () => {
+    // 2つの名前があるので、将来片方だけを変えられる。
+    expect(token('radius-card')).not.toBe('(未定義)')
+    expect(token('radius-panel')).not.toBe('(未定義)')
   })
 
   it('窓の外枠がカードの角丸を使っていない', () => {
     const dialogs = [
-      'app/mileage/friends/detail/mileage-adjustment-dialog.tsx',
+      'v8/mileage/adjust-dialog.tsx',
       'components/forms/options-dialog.tsx',
       'components/shared/folder-add-dialog.tsx',
       'components/dashboard/qr-dialog.tsx',

@@ -1,0 +1,62 @@
+/* 運営の監査ログ V8。値は --tpl-op-*。 */
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.dateLabel {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.dateGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+  flex-shrink: 0;
+}
+
+.date {
+  width: var(--tpl-op-audit-date-w);
+}
+
+.date :global(*) {
+  max-width: 100%;
+}
+
+.colAt {
+  width: var(--tpl-op-audit-at-w);
+}
+
+/* 日時は1行（10/01 15:20）。行の中の上下中央は表の共通部品が持つ。 */
+.atCell {
+  white-space: nowrap;
+}
+
+.colWho {
+  width: var(--tpl-op-mem-state-w);
+}
+
+.colWhat {
+  width: var(--tpl-op-audit-what-w);
+}
+
+/* 操作の名前は1行。長いと「…」で切り、乗せると全文（絵の「代理ログイン（書き…」）。 */
+.colWhat.colWhat {
+  padding-right: var(--tpl-op-audit-what-pad);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.colTenant {
+  width: var(--tpl-op-audit-tenant-w);
+}
+.dateGroup { display: flex; align-items: center; gap: var(--tpl-op-me-gap); white-space: nowrap; }

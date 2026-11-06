@@ -1,3 +1,4 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
   ACCESS_ROLE_BUNDLES,
@@ -9,7 +10,8 @@ import {
   type AuditEventGroup,
   type AuditResult,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -25,7 +27,7 @@ const AUDIT_SORTS = ['asc', 'desc'] as const;
 
 function hasPermission(c: Context<Env>, permission: string): boolean {
   const staff = c.get('staff');
-  // N-424: 「見えるだけ」のキーは GET 系だけを許可する。
+  // 「見えるだけ」のキーは GET 系だけを許可する。
   const safeRead = c.req.method === 'GET' || c.req.method === 'HEAD';
   return staff.role === 'owner' || staff.role === 'admin'
     || staff.permissionKeys?.includes(permission) === true
@@ -39,12 +41,6 @@ function requirePermission(permission: string) {
     }
     return next();
   };
-}
-
-function integerQuery(raw: string | undefined, fallback: number, min: number, max: number): number | null {
-  if (raw === undefined || raw === '') return fallback;
-  const value = Number(raw);
-  return Number.isInteger(value) && value >= min && value <= max ? value : null;
 }
 
 function enumQuery<T extends string>(raw: string | undefined, allowed: readonly T[]): T | undefined | null {
@@ -74,6 +70,7 @@ function maskEmail(email: string | null): string | null {
 async function visibleScope(c: Context<Env>) {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const lineAccountId = c.req.query('lineAccountId')?.trim() || undefined;
+  if (scope.isAccountScoped && !lineAccountId) return c.json({ success: false, error: 'アカウントを指定してください' }, 403);
   if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
     return c.json({ success: false, error: '対象が見つかりません' }, 404);
   }
@@ -87,15 +84,15 @@ access.get(
   async (c) => {
     const status = enumQuery(c.req.query('status'), USER_STATUSES);
     const roleBundle = enumQuery(c.req.query('roleBundle'), ROLE_BUNDLES);
-    const limit = integerQuery(c.req.query('limit'), 50, 1, 200);
-    const offset = integerQuery(c.req.query('offset'), 0, 0, 100_000);
-    if (status === null || roleBundle === null || limit === null || offset === null) {
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 50, limitPolicy: {}, offsetPolicy: {} });
+    const invalidPaging = !Number.isInteger(limit) || limit < 1 || limit > 200 || !Number.isInteger(offset) || offset < 0 || offset > 100_000;
+    if (status === null || roleBundle === null || invalidPaging) {
       return c.json({ success: false, error: '絞り込み条件を確認してください' }, 400);
     }
     const accessScope = await visibleScope(c);
     if (accessScope instanceof Response) return accessScope;
     try {
-      // N-424: 保存されたメール見せ方(email_mask)が正本。
+      // 保存されたメール見せ方(email_mask)が正本。
       // 未設定の人だけ従来の access.user.email.view 判定へ落とす。
       const viewer = c.get('staff');
       const emailLevel = viewer.emailMask === 'full' || viewer.emailMask === 'masked' || viewer.emailMask === 'none'
@@ -115,18 +112,15 @@ access.get(
       });
       return c.json({
         success: true,
-        data: {
-          items: result.items.map((item) => ({
+        data: buildOffsetListResponse({ items: result.items.map((item) => ({
             ...item,
             email: emailLevel === 'full' ? item.email : emailLevel === 'masked' ? maskEmail(item.email) : null,
           })),
           summary: result.summary,
-          pagination: { total: result.total, limit: result.limit, offset: result.offset },
-        },
+          pagination: { total: result.total, limit: result.limit, offset: result.offset }, total: result.total, paging: { limit: result.limit, offset: result.offset }, sort: [{ field: 'last_login_at', direction: 'desc' }, { field: 'created_at', direction: 'asc' }] }),
       });
     } catch (error) {
-      console.error('GET /api/access/users error:', error instanceof Error ? error.name : 'unknown');
-      return c.json({ success: false, error: 'ログインユーザーを取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -157,8 +151,7 @@ access.get(
         },
       });
     } catch (error) {
-      console.error('GET /api/access/roles error:', error instanceof Error ? error.name : 'unknown');
-      return c.json({ success: false, error: '権限のかたまりを取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -168,6 +161,9 @@ access.get(
   requireRole('owner', 'admin', 'staff'),
   requirePermission('access.audit.view'),
   async (c) => {
+    if (!c.req.query('lineAccountId')?.trim()) {
+      return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    }
     const category = enumQuery(c.req.query('category'), AUDIT_CATEGORIES);
     const result = enumQuery(c.req.query('result'), AUDIT_RESULTS);
     const attention = booleanQuery(c.req.query('attention'));
@@ -175,9 +171,9 @@ access.get(
     const sort = enumQuery(c.req.query('sort'), AUDIT_SORTS);
     const from = dateQuery(c.req.query('from'));
     const to = dateQuery(c.req.query('to'));
-    const limit = integerQuery(c.req.query('limit'), 20, 1, 200);
-    const offset = integerQuery(c.req.query('offset'), 0, 0, 100_000);
-    if (category === null || result === null || attention === null || group === null || sort === null || from === null || to === null || limit === null || offset === null) {
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 20, limitPolicy: {}, offsetPolicy: {} });
+    const invalidPaging = !Number.isInteger(limit) || limit < 1 || limit > 200 || !Number.isInteger(offset) || offset < 0 || offset > 100_000;
+    if (category === null || result === null || attention === null || group === null || sort === null || from === null || to === null || invalidPaging) {
       return c.json({ success: false, error: '絞り込み条件を確認してください' }, 400);
     }
     if (from && to && Date.parse(from) > Date.parse(to)) {
@@ -189,7 +185,6 @@ access.get(
       const audit = await listAuditEvents(c.env.DB, {
         tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID,
         allowedLineAccountIds: accessScope.scope.allowedAccountIds,
-        includeTenantWide: !accessScope.scope.isAccountScoped,
         lineAccountId: accessScope.lineAccountId,
         category,
         result,
@@ -206,15 +201,12 @@ access.get(
       });
       return c.json({
         success: true,
-        data: {
-          items: audit.items,
+        data: buildOffsetListResponse({ items: audit.items,
           summary: audit.summary,
-          pagination: { total: audit.total, limit: audit.limit, offset: audit.offset },
-        },
+          pagination: { total: audit.total, limit: audit.limit, offset: audit.offset }, total: audit.total, paging: { limit: audit.limit, offset }, sort: [{field:'created_at',direction:sort ?? 'desc'},{field:'id',direction:sort ?? 'desc'}] }),
       });
     } catch (error) {
-      console.error('GET /api/audit/events error:', error instanceof Error ? error.name : 'unknown');
-      return c.json({ success: false, error: '操作記録を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );

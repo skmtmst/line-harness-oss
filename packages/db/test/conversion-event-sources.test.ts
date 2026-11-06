@@ -1,9 +1,8 @@
 /*
- * コンバージョン起点の実イベント接続 (#648 / N-253)。
+ * コンバージョン起点の実イベント接続。
  *
- * 以前この試験は apps/worker 側にあり、作りものの D1 で動いていた。その
- * 作りものが地点の絞り込みを自分で書き直していたため、**本物の SQL を壊しても
- * 緑のまま**になっていた(2026-09-11 の逆変異で判明)。ここでは bootstrap.sql を
+ * 作りものの D1 で動かすと、作りものが地点の絞り込みを自分で書き直すため、
+ * **本物の SQL を壊しても緑のまま**になる。ここでは bootstrap.sql を
  * 流した実 SQLite に当てる。
  *
  * 数を数えるだけでなく、返り値の `matched`(= 地点を引く SQL が何件拾ったか)を
@@ -70,7 +69,7 @@ function addPoint(
 ): void {
   const accountId = over.accountId === undefined ? 'account-1' : over.accountId;
   /*
-   * 実装は地点作成時に tenant_id を必ず埋める(N-263)。試験データも同じ形にする:
+   * 実装は地点作成時に tenant_id を必ず埋める。試験データも同じ形にする:
    * アカウントを絞る地点はそのアカウントの統括、絞らない地点は既定の統括。
    */
   const tenantId = over.tenantId !== undefined
@@ -127,7 +126,7 @@ describe('コンバージョン起点の実イベント接続', () => {
   });
 
   it('全店共通の地点は同じ統括の友だちだけを拾い、別統括をまたがない', async () => {
-    // アカウントを絞らない地点は既定の統括に属する(N-263)。
+    // アカウントを絞らない地点は既定の統括に属する。
     // tenant-1 の友だちには反応せず、既定統括の友だちには反応する。
     addPoint('point-common', 'form_submitted', { accountId: null });
 
@@ -203,7 +202,10 @@ describe('コンバージョン起点の実イベント接続', () => {
     // 捨てずに記録が残る。運用者が後から辿れること。
     expect(log).toHaveBeenCalledTimes(1);
     expect(String(log.mock.calls[0][0])).toContain('conversion_source_unmatched');
-    expect(String(log.mock.calls[0][0])).toContain('mystery_future_event');
+    expect(JSON.parse(String(log.mock.calls[0][0]))).toEqual({ code: 'conversion_source_unmatched', timestamp: expect.any(String), level: 'info', requestId: null, invocationId: null, source: 'background' });
+    for (const value of ['mystery_future_event', 'account-1', 'friend-1', 'x-1']) {
+      expect(String(log.mock.calls[0][0])).not.toContain(value);
+    }
   });
 
   it('停止中の地点は数えない', async () => {

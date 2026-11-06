@@ -1,4 +1,4 @@
-/** Recursively find the first text element in a Flex Message for altText */
+
 export function extractFlexAltText(obj: unknown, depth = 0): string {
   if (depth > 10 || !obj || typeof obj !== 'object') return 'お知らせ';
   const node = obj as Record<string, unknown>;

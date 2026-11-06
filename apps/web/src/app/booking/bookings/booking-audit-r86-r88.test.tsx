@@ -103,3 +103,35 @@ describe('監査 R87: 重ならない空き枠の入口は残す', () => {
     expect(screen.queryByLabelText(/空きあり/)).toBeNull()
   })
 })
+it('空き枠0・未設定・取得失敗を同じ0枠とせず、失敗はその場で読み直す', () => {
+  const retry = vi.fn()
+  const props = { mode: 'day' as const, items: [], onOpen: vi.fn(), staffNames: ['山田'], canCreate: true, anchorDay: '2026-09-28', onAnchorChange: vi.fn(), onRetryAvailability: retry }
+  const v = render(<BookingCalendar {...props} availability={{ status: 'unconfigured', slots: [] }} />)
+  expect(screen.getByText(/担当者または予約メニューがまだ設定されていません/)).toBeTruthy()
+  v.rerender(<BookingCalendar {...props} availability={{ status: 'error', slots: [] }} />)
+  const button = screen.getByRole('button', { name: 'もう一度読み込む' })
+  button.click()
+  expect(retry).toHaveBeenCalledOnce()
+  expect(screen.queryByText(/担当者または予約メニューがまだ設定されていません/)).toBeNull()
+})
+it('残り0の枠は予約入口を作らず、取れる枠のURLは担当・メニュー・実時刻を渡す', () => {
+  const v = show([], [slot({ remaining: 0 })])
+  expect(screen.queryByLabelText(/空きあり/)).toBeNull()
+  v.unmount()
+  show([], [slot()])
+  const link = screen.getByLabelText(/10:30.*山田.*空きあり/)
+  const url = new URL(link.getAttribute('href')!, 'http://localhost')
+  expect(Object.fromEntries(url.searchParams)).toMatchObject({ date: '2026-09-28', time: '10:30', staff: '山田', menu: 'm1' })
+})
+it('閲覧のみには取れる枠があっても予約入口を作らない', () => {
+  render(<BookingCalendar mode="day" items={[]} onOpen={vi.fn()} staffNames={['山田']} canCreate={false} anchorDay="2026-09-28" onAnchorChange={vi.fn()} availability={{ status: 'ready', slots: [slot()] }} />)
+  expect(document.querySelector('a[href*="/booking/bookings/new"]')).toBeNull()
+})
+it('週の稼働率は実際の予約30分と受付枠30分で50%、受付時間0は割合を出さない', () => {
+  const props = { mode: 'week' as const, onOpen: vi.fn(), staffNames: ['山田'], canCreate: true, anchorDay: '2026-09-28', onAnchorChange: vi.fn() }
+  const v = render(<BookingCalendar {...props} items={[booking()]} availability={{ status: 'ready', slots: [slot()] }} />)
+  expect(screen.getByText('50%')).toBeTruthy()
+  v.rerender(<BookingCalendar {...props} items={[]} availability={{ status: 'ready', slots: [] }} />)
+  expect(screen.queryByText('50%')).toBeNull()
+  expect(screen.getAllByText('受付可能な時間がありません').length).toBeGreaterThan(0)
+})

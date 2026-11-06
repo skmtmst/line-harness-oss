@@ -1,3 +1,5 @@
+import { loginMfaChallenge, mfaAudit } from '../services/login-mfa.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -10,14 +12,14 @@ import {
   toJstString,
   updateStaffMember,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
-import { clientIp, issueSession } from '../services/admin-session.js';
+import { clientIp } from '../services/admin-session.js';
 import { hashPassword, validatePasswordPolicy } from '../services/password-hash.js';
 
 /**
- * 運営メンバーの招待を受ける（★V6 37-10-A）。ログイン前に開く公開の口。
+ * 運営メンバーの招待を受ける（★37-10-A）。ログイン前に開く公開の口。
  *
  * 流れ: メールの URL（#invite=…）→ check で状態を見る → accept で
  *   - パスワード未設定の人: 名前とパスワードを設定してログイン
@@ -57,7 +59,7 @@ function readToken(c: Context<Env>, body?: Record<string, unknown>): string {
 opsInvite.get('/api/auth/ops-invite/check', async (c) => {
   const { state, staff } = await loadInvite(c, readToken(c));
   if (state !== 'valid' || !staff) {
-    return c.json({ success: false, error: STATE_MESSAGE[state as Exclude<InviteState, 'valid'>], code: state }, state === 'invalid' ? 404 : 410);
+    return inputError(c, { success: false, error: STATE_MESSAGE[state as Exclude<InviteState, 'valid'>], code: state }, state === 'invalid' ? 404 : 410, []);
   }
   return c.json({
     success: true,
@@ -70,13 +72,13 @@ opsInvite.get('/api/auth/ops-invite/check', async (c) => {
   });
 });
 
-opsInvite.post('/api/auth/ops-invite/accept', async (c) => {
+opsInvite.post('/api/auth/ops-invite/accept', inputJsonBoundary(), async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
   const { state, invite, staff } = await loadInvite(c, readToken(c, body));
   if (state !== 'valid' || !staff || !invite) {
-    return c.json({ success: false, error: STATE_MESSAGE[state as Exclude<InviteState, 'valid'>], code: state }, state === 'invalid' ? 404 : 410);
+    return inputError(c, { success: false, error: STATE_MESSAGE[state as Exclude<InviteState, 'valid'>], code: state }, state === 'invalid' ? 404 : 410, []);
   }
 
   const now = new Date();
@@ -95,7 +97,7 @@ opsInvite.post('/api/auth/ops-invite/accept', async (c) => {
     else if (name.length > NAME_MAX) errors.name = `お名前は${NAME_MAX}文字以内で入力してください`;
     const passwordError = validatePasswordPolicy(password);
     if (passwordError) errors.password = passwordError;
-    if (Object.keys(errors).length) return c.json({ success: false, error: Object.values(errors)[0], errors }, 400);
+    if (Object.keys(errors).length) return inputError(c, { success: false, error: Object.values(errors)[0], errors }, 400, []);
     updates.name = name;
     updates.password_hash = await hashPassword(password);
     updates.password_updated_at = toJstString(now);
@@ -109,19 +111,8 @@ opsInvite.post('/api/auth/ops-invite/accept', async (c) => {
   if (!updated) return c.json({ success: false, error: '登録を進められませんでした' }, 500);
   await setPlatformAdminActivationState(c.env.DB, staff.id, 'awaiting_totp');
 
-  const session = await issueSession(c, staff.id, config.sameSite);
-  await recordLoginAudit(c.env.DB, {
-    adminUserId: staff.id,
-    action: 'login',
-    ip: clientIp(c),
-    userAgent: c.req.header('user-agent') ?? null,
-  });
-  return c.json({
-    success: true,
-    data: {
-      next: 'two-factor-setup',
-      sessionToken: config.crossSite ? session.sessionToken : undefined,
-    },
-    csrfToken: session.csrfToken,
-  });
+  const challenge = await loginMfaChallenge(c, updated, false, true);
+  await mfaAudit(c, staff.id, 'auth.invite.accept', 'success');
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, data: { next: 'two-factor-setup', ...challenge } });
 });

@@ -1,0 +1,126 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/*
+ * チェックのカード（Pencil ★V8 `w6uYMd`・`RRxK5`）。
+ *
+ *   カード：高さ 68・余白 14・間隔 12・角丸 card・枠 1px
+ *     オフ＝canvas 地＋hairline 枠、オン＝accent-soft 地＋accent-deep 枠
+ *   箱：共通の CheckboxControl（checkbox.tsx）。大きさ・角丸・線・選んだ時の動きは
+ *     チェックボックスと同じ1種類
+ *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない
+ */
+
+.card {
+  display: flex;
+  min-height: 68px;
+  background: var(--color-canvas);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.card:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.checked,
+.checked:hover {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-deep);
+}
+
+.boxWrap {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.disabled {
+  cursor: not-allowed;
+}
+
+.body {
+  min-width: 0;
+}
+
+.title {
+  color: var(--color-ink);
+}
+
+}
+
+/* 正本 w6uYMd / RRxK5：枠を寸法に足さず、上端にチェックをそろえる。 */
+:root .card {
+  align-items: flex-start; border: 0; border-radius: var(--polish-radius-card);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  font-family: var(--font-sans);
+}
+:root .checked, :root .checked:hover { outline-color: var(--color-accent-deep); }
+:root .body { display: flex; flex: 1; flex-direction: column; gap: 2px; }
+:root .title { line-height: 20px; }
+:root .note { line-height: 18px; font-weight: var(--font-weight-ui); }
+
+:root .body { align-items: flex-start; }
+:root .note { width: 100%; }
+
+/* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
+
+/* 誤りの口を渡した選択欄だけ。フォーカスしても赤い枠を残す。 */
+:root .invalid,
+:root .invalid:hover { outline-color: var(--color-danger); }
+
+/* ★V8 J5DH6o（統括の一括配信「送るアカウント」）：高さ 56・左右 12・間 10・角丸 10、題 13/600・補足 11、印は真ん中にそろえる。 */
+:root .compact { align-items: center; gap: 10px; min-height: 56px; padding: 0 12px; border-radius: var(--radius-control); }
+:root .compact .title { font-size: 13px; font-weight: 600; line-height: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root .compact .note { font-size: 12px; line-height: 16px; white-space: nowrap; }
+
+/* 単独の確認行。既定のカード寸法は変えない。 */
+:root .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; border-radius: var(--radius-control); }
+:root .row .title { font-size: 13px; font-weight: 500; line-height: 20px; }
+
+/* ①：チェック付きカードも内側16。 */
+:root .card { padding: var(--polish-space-card); gap: var(--polish-space-field); }
+
+/* ②：役割ごとの文字の段。 */
+:root .title, html:root .card:is(.compact, .row) .title { font-size: var(--text-body); font-weight: var(--polish-weight-label); line-height: 20px; }
+:root .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); color: var(--color-ink-faint); }
+
+
+/* ⑩：説明文は省略せず、必要な行数で読む。 */
+:root .note, html:root .card:is(.compact, .row) .note { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+
+/* ⑦：カード全体の地と濃さをそろえ、箱を二重に薄くしない。 */
+:root .card {
+  --polish-overlay-strength: var(--polish-overlay-idle);
+  background-image: linear-gradient(color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent), color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent));
+  transition-property: background-color, border-color, outline-color, opacity, --polish-overlay-strength;
+  transition-duration: var(--polish-interaction-duration);
+}
+:root .card:not(.disabled):hover { --polish-overlay-strength: var(--polish-hover-opacity); }
+:root .card:not(.checked):not(.disabled):hover { background-color: var(--color-canvas); }
+:root .card:not(.disabled):active { --polish-overlay-strength: var(--polish-active-opacity); }
+:root .card:has(input:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+:root .disabled { opacity: var(--polish-disabled-opacity); }
+
+:root .card { padding: var(--tpl-card-pad); }
+
+/* ・・：10-10 に採用した共通の形。 */
+:root .card { outline: 1px solid var(--color-choice-border); outline-offset: -1px; }
+:root .checked, :root .checked:hover { outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; background: var(--color-choice-selected); }
+html:root .boxWrap { display: block; width: var(--choice-size); height: var(--choice-size); line-height: 0; }
+html:root .card:has(input:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+html:root .invalid { outline-color: var(--color-danger); }
+/* 誤り＋焦点は赤1本（青を重ねない）。 */
+html:root .card.invalid:has(input:focus-visible) { outline: var(--polish-focus-width) solid var(--color-danger); outline-offset: var(--polish-focus-offset); }
+
+/* 単独の確認行（・ の担当の札）：上の共通の内側16（--tpl-card-pad）に負けないよう、高さ36・内側 8/10・印は真ん中。 */
+html:root .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; }
+
+/* 箱と説明のかたまりを、カードの高さの中央にそろえる。 */
+html:root .card { align-items: center; }
+
+/* カード内の四角は輪を持たず、カードを焦点の持ち主にする。層の外で共通チェックの輪だけを抑える。 */
+html:root .card input:focus-visible + span { outline: var(--polish-choice-ring) solid var(--polish-choice-border); outline-offset: calc(-1 * var(--polish-choice-ring)); }
+html:root .card input:is(:checked, :indeterminate):focus-visible + span { outline-color: transparent; }
+html:root .card input[aria-invalid="true"]:focus-visible + span { outline-color: var(--color-status-danger); }
+html:root .card input:focus-visible { outline: var(--polish-focus-width) solid transparent; }

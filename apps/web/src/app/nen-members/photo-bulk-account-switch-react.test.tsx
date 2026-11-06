@@ -30,6 +30,7 @@ function installFetch() {
   vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : String(input)
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
+    if (path === '/api/staff/me') return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     net.calls.push({ path, init })
     const body = await net.handler(path, init)
     return new Response(JSON.stringify(body), {
@@ -129,7 +130,7 @@ async function click(label: string, index = 0) {
  */
 function bulkButton(): HTMLButtonElement {
   const found = Array.from(host.querySelectorAll('button')).find(
-    (item) => ['まとめて採用', '処理中...'].includes(item.textContent?.trim() ?? ''),
+    (item) => ['まとめて採用', '処理中…'].includes(item.textContent?.trim() ?? ''),
   )
   if (!found) throw new Error(`一括のボタンが見つかりません: ${host.textContent}`)
   return found as HTMLButtonElement

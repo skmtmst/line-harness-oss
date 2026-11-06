@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import Database from 'better-sqlite3';
+import { asD1 } from './d1-test-helper.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ensureAnalyticsEventCoverage, recordAnalyticsEvent } from '../src/analytics-events.js';
@@ -25,37 +26,6 @@ import {
 import { getLegacyFunnels } from '../src/funnels.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-
-function asD1(sqlite: Database.Database): D1Database {
-  function prepare(query: string): D1PreparedStatement {
-    const statement = sqlite.prepare(query);
-    const make = (params: unknown[]): D1PreparedStatement => ({
-      bind: (...next: unknown[]) => make(next),
-      async all<T>() {
-        return { results: statement.all(...params) as T[], success: true, meta: {} };
-      },
-      async first<T>() {
-        return (statement.get(...params) as T | undefined) ?? null;
-      },
-      async run<T>() {
-        const info = statement.run(...params);
-        return { success: true, meta: { changes: info.changes }, results: [] } as T;
-      },
-      raw: async () => [],
-    } as unknown as D1PreparedStatement);
-    return make([]);
-  }
-  return {
-    prepare,
-    async batch<T>(statements: D1PreparedStatement[]) {
-      const results: unknown[] = [];
-      sqlite.transaction(() => {
-        for (const statement of statements) results.push(statement.run());
-      })();
-      return Promise.all(results) as T;
-    },
-  } as unknown as D1Database;
-}
 
 const STEPS: V6FunnelStep[] = [
   { stepOrder: 1, label: '友だち追加', kind: 'friend_add', match: {} },
@@ -83,7 +53,7 @@ function event(
   return { id, friendId, eventType, occurredAt, dimensions };
 }
 
-describe('V6時系列ファネルの判定', () => {
+describe('時系列ファネルの判定', () => {
   it('前段より後のイベントだけを数え、購入段も実行する', () => {
     const result = evaluateChronologicalFunnel({
       steps: STEPS,
@@ -162,7 +132,7 @@ describe('V6時系列ファネルの判定', () => {
   });
 });
 
-describe('V6ファネルの版・結果・一時対象者', () => {
+describe('ファネルの版・結果・一時対象者', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -182,7 +152,7 @@ describe('V6ファネルの版・結果・一時対象者', () => {
     sqlite.prepare(
       `INSERT INTO forms (id, name, fields) VALUES ('form-1', '申込', '[]')`,
     ).run();
-    // N-282 (#802): 未割当legacyの参照は拒否が正本。STEPSで使うform-1はaccount-aへ割当てる。
+    // 未割当legacyの参照は拒否が正本。STEPSで使うform-1はaccount-aへ割当てる。
     sqlite.prepare(
       `INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-1', 'account-a')`,
     ).run();
@@ -191,7 +161,7 @@ describe('V6ファネルの版・結果・一時対象者', () => {
 
   afterEach(() => sqlite.close());
 
-  it('V6の版付き定義を現行画面の一覧へ混ぜない', async () => {
+  it('の版付き定義を現行画面の一覧へ混ぜない', async () => {
     sqlite.prepare(
       `INSERT INTO funnels (id, line_account_id, name, segment_json, window_days, created_at)
        VALUES ('legacy-1', 'account-a', '現行ファネル', NULL, 30, '2026-08-01T00:00:00.000Z')`,
@@ -416,7 +386,7 @@ describe('V6ファネルの版・結果・一時対象者', () => {
   });
 });
 
-describe('V6ファネルの運用状態（停止・保管・編集）', () => {
+describe('ファネルの運用状態（停止・保管・編集）', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -610,4 +580,18 @@ describe('V6ファネルの運用状態（停止・保管・編集）', () => {
       createdAt: '2026-08-03T00:00:00.000Z',
     })).rejects.toThrow('analytics_funnel_version_conflict');
   });
+  it('PKG45: 保存直前の保管が勝ったら新版と名前を一切保存しない', async () => {
+    const created = await makeFunnel('Original');
+    const batch = db.batch.bind(db); let interleaved = false;
+    db.batch = async statements => {
+      if (!interleaved) { interleaved=true; sqlite.prepare("UPDATE funnels SET status='archived' WHERE id=?").run(created.funnelId); }
+      return batch(statements);
+    };
+    await expect(createFunnelVersion(db,{ lineAccountId: 'account-a', funnelId: created.funnelId,
+      windowDays: 14, steps: STEPS, name: 'Stale', expectedVersionNumber: 1, createdAt: '2026-08-02T00:00:00Z' }))
+      .rejects.toThrow('analytics_funnel_not_active');
+    expect(sqlite.prepare('SELECT status,name FROM funnels WHERE id=?').get(created.funnelId)).toEqual({ status: 'archived', name: 'Original' });
+    expect(sqlite.prepare('SELECT COUNT(*) n FROM analytics_funnel_versions WHERE funnel_id=?').get(created.funnelId)).toEqual({ n: 1 });
+  });
+
 });

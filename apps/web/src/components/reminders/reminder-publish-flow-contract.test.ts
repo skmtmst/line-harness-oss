@@ -1,23 +1,20 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { readImplementationSource } from '../../../../worker/src/test-utils/implementation-source'
 
 const ROOT = process.cwd()
-const FLOW = readFileSync(join(ROOT, 'src/components/reminders/reminder-publish-flow.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(ROOT, 'src/app/reminders/new/page.tsx'), 'utf8')
-const STEP_EDITOR = readFileSync(join(ROOT, 'src/app/reminders/edit/issue469-reminder-screens.tsx'), 'utf8')
-const EDIT_PAGE = readFileSync(join(ROOT, 'src/app/reminders/edit/page.tsx'), 'utf8')
-const DETAIL_PAGE = readFileSync(join(ROOT, 'src/app/reminders/detail/page.tsx'), 'utf8')
-const API = readFileSync(join(ROOT, 'src/lib/api.ts'), 'utf8')
-const WORKER_ROUTE = readFileSync(join(ROOT, '../worker/src/routes/reminders.ts'), 'utf8')
+const FLOW = readUiSource(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
+const NEW_PAGE = readFileSync(join(ROOT, 'src/v8/reminders/new/new.tsx'), 'utf8')
+const STEP_EDITOR = readUiSource(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
+const EDIT_PAGE = readUiSource(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
+const DETAIL_PAGE = readFileSync(join(ROOT, 'src/v8/reminders/detail.tsx'), 'utf8')
+const API = readApiSource(join(ROOT, 'src/lib/api.ts'), 'utf8')
+const WORKER_ROUTE = readImplementationSource(join(ROOT, '../worker/src/routes/reminders.ts'))
 
-describe('V6 リマインダの公開フロー', () => {
-  it('未実装だった5画面を実Node IDで接続する', () => {
-    for (const nodeId of ['s7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo']) {
-      expect(FLOW).toContain(`data-design-node="${nodeId}"`)
-    }
-  })
-
+describe('リマインダの公開フロー', () => {
   it('作成時に公開せず、下書きから対象確認へ進む', () => {
     expect(NEW_PAGE).toContain('api.reminders.createDraft(settings)')
     expect(NEW_PAGE).toContain('&stage=target')
@@ -30,7 +27,7 @@ describe('V6 リマインダの公開フロー', () => {
     expect(API).toContain('/api/reminders/${id}/test-send')
     expect(API).toContain('/api/reminders/${id}/validate')
     expect(API).toContain('/api/reminders/${id}/publish')
-    expect(FLOW).toContain("draft.lastTestStatus !== 'succeeded'")
+    expect(FLOW).toContain("draft?.lastTestStatus !== 'succeeded'")
     expect(FLOW).toContain('!validation?.valid')
   })
 
@@ -40,14 +37,11 @@ describe('V6 リマインダの公開フロー', () => {
     expect(FLOW).toContain("audience.excluded")
   })
 
-  it('本文に大見出しを重ねず、共通トップバーへ任せる', () => {
-    expect(FLOW).not.toContain('<Header')
-    expect(FLOW).not.toContain('<h1')
-  })
-
-  it('配信予定は仮の基準日を明示する', () => {
-    expect(FLOW).toContain('preview.targetDate')
-    expect(FLOW).toContain('とした場合の送信予定です')
+  it('V8の配信予定は取得した予定と人数を使い、仮の日付を作らない', () => {
+    expect(FLOW).toContain('api.reminders.previewDraft(reminderId)')
+    expect(FLOW).toContain('preview?.items')
+    expect(FLOW).toContain('preview.summary.audience')
+    expect(FLOW).toContain('onRetry={onRetryPreview}')
   })
 
   it('押しても動かないボタンは描かない（出す＝使える）', () => {
@@ -57,10 +51,11 @@ describe('V6 リマインダの公開フロー', () => {
      * 「隠すのではなく、そもそも描かない」を完了条件にしている。
      * 動くまで描かず、押せるのに何も起きない状態を作らない。
      */
-    for (const label of ['条件を編集', '＋ アクションを追加']) {
+    for (const label of ['条件を編集', '＋ アクションを追加する']) {
       expect(FLOW, `${label} が公開フローに描かれています`).not.toContain(`>${label}<`)
     }
-    for (const label of ['＋ フォルダを追加', 'ひな形を管理', 'このひな形を使う']) {
+    /* 「このひな形を使う」は #996 で実装済み（ひな形適用の入口）。押すと置き換え確認が出て実際に動く。 */
+    for (const label of ['＋ フォルダを追加する', 'ひな形を管理']) {
       expect(NEW_PAGE, `${label} が新規作成に描かれています`).not.toContain(`>${label}<`)
     }
     /*
@@ -68,7 +63,7 @@ describe('V6 リマインダの公開フロー', () => {
      * 動作は reminder-step-editor.react.test.tsx が保証する。
      * まだ動かない「複製」「通知イメージを見る」は描かないままにする。
      */
-    for (const label of ['この通知を複製', '通知イメージを見る', '＋ アクションを追加']) {
+    for (const label of ['この通知を複製', '通知イメージを見る', '＋ アクションを追加する']) {
       expect(STEP_EDITOR, `${label} が通知編集に描かれています`).not.toContain(`>${label}<`)
     }
   })
@@ -99,10 +94,10 @@ describe('V6 リマインダの公開フロー', () => {
 
   it('押しても動かないボタンを残さない', () => {
     // 完了画面の主ボタンは詳細画面への実リンクを持つ。
-    expect(FLOW).toContain('/reminders/detail?id=${draft.reminderId}')
-    expect(FLOW).toContain('>通知予定を確認<')
+    expect(FLOW).toContain('/reminders/detail?id=${encodeURIComponent(reminderId)}')
+    expect(FLOW).toContain('配信予定を見る')
     // 絞り込みボタンは state を実際に切り替える。
-    expect(FLOW).toContain('setRange(')
+    expect(FLOW).toContain('onChange={setRange}')
     // 「戻って修正」は編集画面への実遷移を持つ。
     expect(FLOW).not.toContain("secondary={{ label: '戻って修正' }}")
     // テスト段のフッターは固定日時ではなく下書きの記録を見る。

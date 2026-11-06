@@ -1,5 +1,6 @@
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import ChatsPage from './page'
@@ -11,7 +12,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
-  selectedAccountId: fixture.accountId, selectedAccount: null, loading: false,
+  selectedAccountId: fixture.accountId, selectedAccount: { emailInboxEnabled: true }, loading: false,
 }) }))
 
 type Channel = 'line' | 'email'
@@ -90,19 +91,10 @@ async function click(text: string) {
   await act(async () => { button!.click() })
 }
 async function selectAssignee(value: string) {
-  if (!document.querySelector('[aria-label="担当者で絞り込む（パネル）"]')) await click('絞り込み')
+  if (!document.querySelector('[aria-label="担当者で絞り込む"]')) await click('絞り込み')
   // 担当者の選択は候補つき入力へ移した。表示名を打って候補を押す。
-  const label = value === 'unassigned' ? '未割り当て' : '担当T'
-  await act(async () => {
-    const field = document.querySelector<HTMLInputElement>('[aria-label="担当者で絞り込む（パネル）"]')!
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, label)
-    field.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-  await act(async () => {
-    const option = [...document.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes(label))
-    expect(option, label).toBeTruthy()
-    ;(option as HTMLElement).click()
-  })
+  const label = value === 'unassigned' ? '未割り当て' : '担当T（0）'
+  await pickEntity('担当者で絞り込む', label, '選ぶ', '担当者を選ぶ')
 }
 const listCalls = (channel: Channel) => calls.filter(url => listChannel(url) === channel)
 
@@ -159,7 +151,7 @@ describe.each(['line', 'email'] as const)('%s 一覧の条件変更', channel =>
     await act(async () => { old.resolve(failed ? response({ success: false }, 503) : response(payload(channel, ['stale-result']))) })
     expect(host.textContent).toContain('new-current')
     expect(host.textContent).not.toContain('stale-result')
-    expect(host.textContent).not.toContain('読み込みに失敗')
+    expect(host.textContent).not.toContain('読み込めませんでした')
     expect(host.textContent).not.toContain('追加読み込みに失敗')
   })
 
@@ -171,6 +163,6 @@ describe.each(['line', 'email'] as const)('%s 一覧の条件変更', channel =>
     expect(host.textContent).toContain('old-before-failure')
     await click('1時間以上待ち')
     expect(host.textContent).not.toContain('old-before-failure')
-    expect(host.textContent).toContain('読み込みに失敗')
+    expect(host.textContent).toContain('読み込めませんでした')
   })
 })

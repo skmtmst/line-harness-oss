@@ -1,2 +1,7 @@
-import RestaurantConsole from '../restaurant-console'
-export default function Page() { return <RestaurantConsole view="reservations" /> }
+'use client'
+
+import ReservationsPage from '@/v8/restaurant/reservations/reservations'
+
+export default function Page() {
+  return <ReservationsPage />
+}

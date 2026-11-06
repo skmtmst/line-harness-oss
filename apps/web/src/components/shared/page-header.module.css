@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * ページヘッダー。★V5 227枚すべての先頭にある帯。
@@ -13,32 +14,87 @@
   display: flex;
   align-items: center; /* alignItems: center */
   justify-content: space-between; /* justifyContent: space_between */
-  gap: 16px;
 }
 
 .heading {
   display: flex;
-  flex-direction: column; /* layout: vertical */
-  gap: 5px; /* gap: 5 */
+  flex-direction: column; /* layout: vertical */ /* gap: 5 */
   min-width: 0;
 }
 
 .title {
-  color: var(--color-ink); /* fill: $ink */
-  font-size: var(--text-display); /* fontSize: $size-display */
-  font-weight: 700; /* fontWeight: 700 */
+  color: var(--color-ink); /* fill: $ink */ /* fontSize: $size-display */ /* fontWeight: 600 */
 }
 
-.description {
-  color: var(--color-ink-secondary); /* fill: $ink-secondary */
-  font-size: var(--text-body); /* fontSize: $size-body */
-  font-weight: 500; /* fontWeight: 500 */
+.description { /* fill: $ink-secondary */ /* fontSize: $size-body */ /* fontWeight: 500 */
 }
 
 .actions {
   display: flex;
-  align-items: center;
-  gap: 8px; /* gap: 8 */
+  align-items: center; /* gap: 8 */
   flex: none;
 }
+
+/*
+ * ★V8「板の頭」：既定は 379 板の多数派（：題 22/700/32・間 4・
+ * 説明 13/19・余白 20/24/12・枠なし）。値は --tpl-* で読む。
+ * data-header-size="compact" は部品 EnlYo どおりの小さい形。
+ * 互換経路は変えない。
+ */
+:root .header {
+  gap: 12px;
+  padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom);
+  background: var(--color-canvas);
+  border: 0;
+  outline-color: transparent;
+}
+
+:root .heading {
+  flex: 1;
+  gap: var(--tpl-head-gap);
+}
+
+:root .heading > nav { display: none; }
+
+:root .title {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
+  line-height: var(--tpl-title-lh);
+}
+
+:root .description {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-desc-size);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--tpl-desc-lh);
+}
+
+:root .actions { gap: 12px; }
+
+:root .header[data-header-size='compact'] .title {
+  font-size: var(--tpl-compact-title-size);
+  font-weight: var(--tpl-compact-title-weight);
+  line-height: var(--tpl-compact-title-lh);
+}
+
+:root .header[data-header-size='compact'] .heading {
+  gap: var(--tpl-compact-gap);
+}
+
+:root .header[data-header-size='compact'] .description {
+  line-height: var(--tpl-compact-desc-lh);
+}
+
+
+:root .title, :root .description { width: fit-content; }
+:root .actions button { border: 0; }
+:root .actions button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+:root .actions button[class*="button_primary"]:not(:focus-visible) { outline-color: transparent; }
+
 }

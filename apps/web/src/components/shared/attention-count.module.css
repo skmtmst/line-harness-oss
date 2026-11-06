@@ -1,0 +1,16 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.count {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: var(--polish-weight-label);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.count:hover { text-decoration: underline; }
+.count:focus-visible { outline: var(--focus-ring); outline-offset: var(--polish-focus-offset); }
+.none { color: var(--color-ink-faint); }
+}

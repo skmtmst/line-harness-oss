@@ -1,6 +1,7 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const marks = {
   getSupportMarksWithUsage: vi.fn(),
@@ -8,6 +9,12 @@ const marks = {
   getSupportMarkById: vi.fn(),
   createSupportMark: vi.fn(),
   createSupportMarkWithAutomationRules: vi.fn(),
+  createSupportMarkIdempotent: vi.fn(),
+  SupportMarkCreateError: class SupportMarkCreateError extends Error {
+    constructor(public readonly code: string, message: string) {
+      super(message);
+    }
+  },
   updateSupportMark: vi.fn(),
   replaceAndArchiveSupportMark: vi.fn(),
   archiveSupportMarkWithReplacement: vi.fn(),
@@ -64,6 +71,12 @@ const supportMarkAutomation = {
   listSupportMarkAutomationRules: vi.fn(),
   listSupportMarkAutomationRulesForAccount: vi.fn(),
   createSupportMarkAutomationRule: vi.fn(),
+  createSupportMarkAutomationRuleIdempotent: vi.fn(),
+  SupportMarkRuleCreateError: class SupportMarkRuleCreateError extends Error {
+    constructor(public readonly code: string, message: string) {
+      super(message);
+    }
+  },
   updateSupportMarkAutomationRule: vi.fn(),
   archiveSupportMarkAutomationRule: vi.fn(),
   validateSupportMarkAutomationRuleInput: vi.fn(),
@@ -80,7 +93,7 @@ const folders = {
   getWebinarFolderCounts: vi.fn(),
   getFolderItemCounts: vi.fn().mockResolvedValue(undefined),
   isFolderKind: (v: unknown) =>
-    typeof v === 'string' && ['tag', 'template', 'media', 'webinar', 'reminder', 'scenario', 'auto_reply', 'broadcast'].includes(v),
+    typeof v === 'string' && ['tag', 'template', 'media', 'webinar', 'reminder', 'scenario', 'auto_reply', 'broadcast', 'automation', 'common_action', 'webhook', 'conversion'].includes(v),
 };
 vi.mock('@line-crm/db', () => ({ ...marks, ...searches, ...folders }));
 vi.mock('../services/account-access.js', () => accountAccess);
@@ -97,6 +110,7 @@ function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner') {
     return next();
   });
   app.route('/', friendAttributes);
+  app.onError(unhandledWorkerError);
   return app;
 }
 const env = { DB: {} as D1Database };
@@ -125,6 +139,7 @@ const MARK = {
   is_default: 1,
   auto_on_inbound: 1,
   display_order: 0,
+  display_locations_json: '["inbox","friends","friend_detail"]',
   created_at: '2026-08-16',
   revision: 1,
   updated_by: 'u-1',
@@ -190,6 +205,7 @@ beforeEach(() => {
   marks.getSupportMarkById.mockResolvedValue(MARK);
   marks.createSupportMark.mockResolvedValue(MARK);
   marks.createSupportMarkWithAutomationRules.mockResolvedValue(MARK);
+  marks.createSupportMarkIdempotent.mockResolvedValue({ mark: MARK, replayed: false });
   marks.updateSupportMark.mockResolvedValue(MARK);
   marks.getDefaultSupportMark.mockResolvedValue(MARK);
   marks.replaceAndArchiveSupportMark.mockResolvedValue(0);
@@ -209,6 +225,14 @@ beforeEach(() => {
     id: 'rule-1', name: '担当者が決まったら対応中へ', markId: 'm-1', event: 'staff_assigned',
     condition: null, priority: 100, manualProtectionMinutes: 60, isActive: true,
     version: 1, updatedAt: '2026-09-04T09:00:00+09:00',
+  });
+  supportMarkAutomation.createSupportMarkAutomationRuleIdempotent.mockResolvedValue({
+    rule: {
+      id: 'rule-1', name: '担当者が決まったら対応中へ', markId: 'm-1', event: 'staff_assigned',
+      condition: null, priority: 100, manualProtectionMinutes: 60, isActive: true,
+      version: 1, updatedAt: '2026-09-04T09:00:00+09:00',
+    },
+    replayed: false,
   });
   supportMarkAutomation.updateSupportMarkAutomationRule.mockResolvedValue({
     id: 'rule-1', version: 2,
@@ -274,6 +298,7 @@ describe('対応マーク', () => {
       return next();
     });
     app.route('/', friendAttributes);
+  app.onError(unhandledWorkerError);
     const res = await app.fetch(
       new Request('https://example.com/api/support-marks?lineAccountId=account-1'),
       env,
@@ -291,7 +316,7 @@ describe('対応マーク', () => {
     expect(marks.getSupportMarksWithUsage).toHaveBeenCalledWith(env.DB, {
       tenantId: 'tenant-1',
       lineAccountId: 'account-1',
-    });
+    }, false);
   });
 
   it('一覧に自動変更・表示先・版を実データから返す', async () => {
@@ -316,17 +341,98 @@ describe('対応マーク', () => {
       name: '期限超過で要確認', event: 'response_overdue', condition: null,
       priority: 100, manualProtectionMinutes: 60, isActive: true,
     }];
-    const res = await req('/api/support-marks?lineAccountId=account-1', 'POST', {
-      name: '要確認', color: '#EF4B55', displayOrder: 2, automationRules,
-    });
+    const res = await req(
+      '/api/support-marks?lineAccountId=account-1',
+      'POST',
+      { name: '要確認', color: '#EF4B55', displayOrder: 2, automationRules },
+      'owner',
+      { 'Idempotency-Key': 'create-request-1' },
+    );
     expect(res.status).toBe(201);
-    expect(marks.createSupportMarkWithAutomationRules).toHaveBeenCalledWith(
+    expect(marks.createSupportMarkIdempotent).toHaveBeenCalledWith(
       env.DB,
       { tenantId: 'tenant-1', lineAccountId: 'account-1' },
       expect.objectContaining({ name: '要確認', color: '#EF4B55', displayOrder: 2 }),
       'u-1',
       automationRules,
+      'create-request-1',
     );
+  });
+
+  it('R512: 要求キーなしの作成は実行しない', async () => {
+    const res = await req('/api/support-marks?lineAccountId=account-1', 'POST', {
+      name: '要確認',
+    });
+    expect(res.status).toBe(400);
+    expect(marks.createSupportMarkIdempotent).not.toHaveBeenCalled();
+  });
+
+  it('R512: 同じ要求キーの再送は保存済みを200で返す', async () => {
+    marks.createSupportMarkIdempotent.mockResolvedValue({ mark: MARK, replayed: true });
+    const res = await req(
+      '/api/support-marks?lineAccountId=account-1',
+      'POST',
+      { name: '要確認' },
+      'owner',
+      { 'Idempotency-Key': 'create-request-1' },
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { id: 'm-1' } });
+  });
+
+  it('R512: 同じ要求キーに異なる内容は409で止める', async () => {
+    marks.createSupportMarkIdempotent.mockRejectedValue(
+      new marks.SupportMarkCreateError('idempotency_conflict', '同じ要求キーに異なる内容が指定されました'),
+    );
+    const res = await req(
+      '/api/support-marks?lineAccountId=account-1',
+      'POST',
+      { name: '別の名前' },
+      'owner',
+      { 'Idempotency-Key': 'create-request-1' },
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'idempotency_conflict' });
+  });
+
+  it('R513: 読んだ版を送り、合えば保存する', async () => {
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'PATCH', {
+      name: '新しい名前', expectedVersion: 1,
+    });
+    expect(res.status).toBe(200);
+    expect(marks.updateSupportMark).toHaveBeenCalledWith(
+      env.DB,
+      'm-2',
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      expect.objectContaining({ name: '新しい名前', expectedVersion: 1 }),
+    );
+  });
+
+  it('R513: 古い版の保存は409で止めて最新を返す', async () => {
+    marks.updateSupportMark.mockResolvedValue('conflict');
+    marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', name: 'Bの名前', version: 2 });
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'PATCH', {
+      name: 'Aの名前', expectedVersion: 1,
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'SUPPORT_MARK_VERSION_CONFLICT',
+      data: { latest: { id: 'm-2', name: 'Bの名前', version: 2 } },
+    });
+    expect(marks.updateSupportMark).toHaveBeenCalledWith(
+      env.DB,
+      'm-2',
+      expect.anything(),
+      expect.objectContaining({ expectedVersion: 1 }),
+    );
+  });
+
+  it('R513: 版の形が違えば400で止める', async () => {
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'PATCH', {
+      name: '新しい名前', expectedVersion: 0,
+    });
+    expect(res.status).toBe(400);
+    expect(marks.updateSupportMark).not.toHaveBeenCalled();
   });
 
   it('スタッフは複合作成できない', async () => {
@@ -587,15 +693,31 @@ describe('対応マーク', () => {
       '/api/support-marks/m-1/automation-rules?lineAccountId=account-1',
       'POST',
       input,
+      'owner',
+      { 'Idempotency-Key': 'test-key-1' },
     );
     expect(res.status).toBe(201);
-    expect(supportMarkAutomation.createSupportMarkAutomationRule).toHaveBeenCalledWith(
+    expect(supportMarkAutomation.createSupportMarkAutomationRuleIdempotent).toHaveBeenCalledWith(
       env.DB,
       { tenantId: 'tenant-1', lineAccountId: 'account-1' },
       'm-1',
       'u-1',
       input,
+      'test-key-1',
     );
+  });
+
+  it('自動変更ルールの作成は要求キーが無いと作らない', async () => {
+    const res = await req(
+      '/api/support-marks/m-1/automation-rules?lineAccountId=account-1',
+      'POST',
+      {
+        name: '受信で未対応へ', event: 'message_received', condition: null,
+        priority: 10, manualProtectionMinutes: 0, isActive: true,
+      },
+    );
+    expect(res.status).toBe(400);
+    expect(supportMarkAutomation.createSupportMarkAutomationRuleIdempotent).not.toHaveBeenCalled();
   });
 
   it('版競合を成功扱いにせず409で読み直しを促す', async () => {
@@ -637,7 +759,7 @@ describe('対応マーク', () => {
       priority: 10, manualProtectionMinutes: 0, isActive: true,
     }, 'staff');
     expect(res.status).toBe(403);
-    expect(supportMarkAutomation.createSupportMarkAutomationRule).not.toHaveBeenCalled();
+    expect(supportMarkAutomation.createSupportMarkAutomationRuleIdempotent).not.toHaveBeenCalled();
   });
 
   it('保管は読み込んだ版を必須にし、競合を409で返す', async () => {
@@ -1116,6 +1238,16 @@ describe('フォルダ', () => {
     expect(folders.getFolders).toHaveBeenCalledWith(env.DB, 'template', undefined, expect.objectContaining({ allowedAccountIds: ['account-1'] }));
   });
 
+  it('F-13 の新しい種類でも絞れる（件数は数えていない）', async () => {
+    // 中身の folder_id 列が無い3種別。箱の一覧は返り、件数は省かれる。
+    for (const kind of ['automation', 'common_action', 'webhook', 'conversion']) {
+      folders.getFolders.mockResolvedValue([]);
+      const res = await req(`/api/folders?kind=${kind}`, 'GET');
+      expect(res.status).toBe(200);
+      expect(folders.getFolders).toHaveBeenCalledWith(env.DB, kind, undefined, expect.objectContaining({ allowedAccountIds: ['account-1'] }));
+    }
+  });
+
   it('ウェビナーフォルダは閲覧可能なアカウント内の件数を返す', async () => {
     folders.getFolders.mockResolvedValue([{
       ...FOLDER, id: 'fo-webinar', kind: 'webinar', account_id: 'account-1',
@@ -1159,7 +1291,7 @@ describe('フォルダ', () => {
       kind: 'webinar', accountId: 'account-1', name: 'セミナー',
     }));
     expect(folders.updateFolder).toHaveBeenCalledWith(env.DB, 'fo-webinar', { name: '商品説明' });
-    expect(folders.deleteFolder).toHaveBeenCalledWith(env.DB, 'fo-webinar');
+    expect(folders.deleteFolder).toHaveBeenCalledWith(env.DB, 'fo-webinar', undefined);
   });
 
   it('別アカウントのウェビナーフォルダを更新・削除できない', async () => {

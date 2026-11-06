@@ -1,17 +1,17 @@
 import { FEATURE_CATALOG, FEATURE_IDS } from '@line-crm/shared'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { FeatureGroup } from '@/lib/feature-settings'
+import { MANUAL_LINKS } from '../../../../../scripts/visual-qa/fixtures.mjs'
 import {
   CATALOG_DEFAULT_FEATURES,
   FEATURE_SETTINGS_CONFLICT_MESSAGE,
   applyItemOrder,
   featureSettingsAreDirty,
   featureSettingsErrorMessage,
+  featureSettingsSaveConflictMessage,
   normalizeFeatureSettings,
   splitFeatureGroups,
-} from './feature-settings-view'
+} from '@/v8/settings/features/feature-settings-view'
 
 const groups: FeatureGroup[] = [
   { id: 'a', label: 'A', items: [{ id: 'a1', label: 'A1', note: '', keys: ['scenarios'] }] },
@@ -62,21 +62,27 @@ describe('機能設定の画面契約', () => {
     expect(featureSettingsErrorMessage(403, 'save')).toContain('変更する権限')
   })
 
-  it('撮影用の機能設定も本物と同じ版・全キー・既定オフを返す', () => {
-    const mock = readFileSync(resolve(process.cwd(), '../../scripts/visual-qa/mock-api.mjs'), 'utf8')
-    const featureSection = mock.slice(mock.indexOf('const FEATURES = {'), mock.indexOf('/** 設計 `bfB50`'))
-    for (const { featureId } of FEATURE_CATALOG) expect(featureSection).toContain(`${featureId}:`)
-    for (const { featureId } of FEATURE_CATALOG.filter((item) => !item.defaultEnabled)) {
-      expect(featureSection).toContain(`${featureId}: false`)
-    }
-    expect(mock.slice(mock.indexOf("'/api/settings/features':"))).toContain('version: 1')
+  it('読み込めていないのに保存で弾かれたら競合ではなく本当の理由を出す (D019)', () => {
+    // 読み込めているときの競合は従来どおり。
+    expect(featureSettingsSaveConflictMessage({ loadFailed: false, loadForbidden: false }))
+      .toBe(FEATURE_SETTINGS_CONFLICT_MESSAGE)
+    // 読み込みが権限で失敗していたら、保存の失敗も権限の理由にする。
+    expect(featureSettingsSaveConflictMessage({ loadFailed: true, loadForbidden: true }))
+      .toContain('変更する権限')
+    expect(featureSettingsSaveConflictMessage({ loadFailed: true, loadForbidden: true }))
+      .not.toContain('ほかの管理者')
+    // 読み込みが通信・サーバーで失敗していたら、汎用の保存失敗にする。
+    expect(featureSettingsSaveConflictMessage({ loadFailed: true, loadForbidden: false }))
+      .toContain('保存できませんでした')
+    expect(featureSettingsSaveConflictMessage({ loadFailed: true, loadForbidden: false }))
+      .not.toContain('ほかの管理者')
   })
 
+  // 撮影用の全機能・版の確認は mock-api-method-contract.test.ts のHTTP試験へ移した。
+
   it('マニュアル一覧の固定件数は固定行数と一致する', () => {
-    const fixtures = readFileSync(resolve(process.cwd(), '../../scripts/visual-qa/fixtures.mjs'), 'utf8')
-    const start = fixtures.indexOf('export const MANUAL_LINKS')
-    const section = fixtures.slice(start, fixtures.indexOf('const booking', start))
-    expect(section.match(/key: '[^']+'/g)).toHaveLength(5)
-    expect(section).toContain('total: 5')
+    expect(MANUAL_LINKS.items).toHaveLength(3)
+    expect(MANUAL_LINKS.total).toBe(MANUAL_LINKS.items.length)
+    expect(MANUAL_LINKS.brokenCount).toBe(MANUAL_LINKS.items.filter((item) => item.status === 'broken').length)
   })
 })

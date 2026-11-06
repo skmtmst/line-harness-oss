@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { webMeasurement } from './web-measurement.js';
 import { conversions } from './conversions.js';
 
 /*
- * #819: Web計測の公開口。
+ * Web計測の公開口。
  * - 許可ドメイン以外からの成果は数えない(件数と最後の来た先だけ残す)
  * - 同意が無い送信は数えない
  * - 友だちと結び付かない成果は地点の「匿名を数える」設定のときだけ日別集計
@@ -109,7 +109,7 @@ async function req(handler: Hono<Env>, db: SqliteD1, path: string, init?: Reques
 }
 
 function eventCount(db: SqliteD1): number {
-  // `.get() as T` の直後に `.n` を書くとトランスパイルでプロパティ参照が落ちるため、一度変数に置く。
+  // `.get as T` の直後に `.n` を書くとトランスパイルでプロパティ参照が落ちるため、一度変数に置く。
   const row = db.raw.prepare('SELECT COUNT(*) AS n FROM conversion_events').get() as { n: number } | undefined;
   return Number(row?.n ?? 0);
 }
@@ -471,4 +471,20 @@ describe('成果の取消・取消の取消', () => {
     });
     expect(noReason.status).toBe(400);
   });
+});
+
+it('サイトごとの同意済み受信時刻を返し、対象外送信では書き換えない', async () => {
+ const testDb = createTestD1();
+ try {
+  seed(testDb); const siteId = seedSite(testDb);
+  const read = () => testDb.raw.prepare('SELECT last_received_at FROM measurement_sites WHERE id=?').get(siteId) as {last_received_at:string|null};
+  await postConversion(testDb,{siteId,host:'example.com',path:'/not-a-conversion',consent:'granted'});
+  const accepted = read().last_received_at;
+  expect(accepted).toBeTruthy();
+  await postConversion(testDb,{siteId,host:'bad.example.org',consent:'granted'});
+  await postConversion(testDb,{siteId,host:'example.com',consent:'declined'});
+  expect(read().last_received_at).toBe(accepted);
+  const list = await req(app(staff('owner-1','tenant-1')),testDb,'/api/measurement-sites?accountId=a1');
+  expect((await list.json() as any).data[0].lastReceivedAt).toBe(accepted);
+ } finally { testDb.raw.close(); }
 });

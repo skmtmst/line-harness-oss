@@ -1,3 +1,4 @@
+import Notice from '@/components/shared/notice'
 import { Check } from 'lucide-react'
 import type { ApiBroadcast, BroadcastApprovalState, BroadcastDisplayStatus, BroadcastLedger } from '@/lib/api'
 
@@ -17,6 +18,7 @@ export function isApprovalInvolved(
 }
 import Chip from '@/components/shared/chip'
 import HelpTip from '@/components/shared/help-tip'
+import { formatNumber } from '@/lib/format'
 
 export type StatusRailStatus = BroadcastDisplayStatus
 
@@ -95,7 +97,7 @@ export default function BroadcastStatusRail({
   const finished = FINISHED.has(displayStatus)
 
   return (
-    <section aria-label="配信の状態" className="bg-canvas rounded-card border-hairline border p-5">
+    <section aria-label="配信の状態" className="bg-canvas rounded-card content-card border p-5">
       <ol className="flex flex-wrap items-center gap-x-2 gap-y-2">
         {steps.map((step, index) => {
           const done = finished ? index <= currentIndex : index < currentIndex
@@ -106,13 +108,13 @@ export default function BroadcastStatusRail({
               <span className="flex items-center gap-1.5">
                 <span
                   aria-hidden="true"
-                  className={`flex h-5 w-5 items-center justify-center rounded-full border text-micro ${done ? 'border-accent-deep bg-accent-soft text-accent-deep' : current ? 'border-accent-deep text-accent-deep' : 'border-hairline text-ink-faint'}`}
+                  className={`flex h-5 w-5 items-center justify-center rounded-pill border text-micro ${done ? 'border-accent-deep bg-accent-soft text-accent-deep' : current ? 'border-accent-deep text-accent-deep' : 'border-hairline text-ink-faint'}`}
                 >
-                  {done ? <Check size={12} strokeWidth={3} /> : null}
+                  {done ? <Check size={16} strokeWidth={3} /> : null}
                 </span>
                 <span
                   aria-current={current ? 'step' : undefined}
-                  className={current ? 'text-ink text-sm font-bold' : 'text-ink-faint text-xs'}
+                  className={current ? 'text-ink text-sm font-medium' : 'text-ink-faint text-xs'}
                 >
                   {step.label}
                 </span>
@@ -129,9 +131,10 @@ export default function BroadcastStatusRail({
           </li>
         ) : null}
       </ol>
-      <p className="bg-info-bg text-ink-secondary mt-3 rounded-control px-3 py-2 text-xs leading-relaxed">
+      {/* 一部失敗・失敗は注意以上の組（青にしない）。 */}
+      <Notice tone={displayStatus === 'failed' ? 'danger' : displayStatus === 'partial_failed' ? 'warn' : 'info'}>
         {bandText(displayStatus, ledger, total, scheduledAt, formatDateTime)}
-      </p>
+      </Notice>
       {displayStatus === 'partial_failed' || displayStatus === 'failed' ? (
         <p className="mt-2 text-xs">
           <HelpTip label="失敗の内訳の説明">
@@ -152,7 +155,7 @@ function bandText(
   formatDateTime: (value: string | null | undefined) => string,
 ): string {
   const sent = ledger?.sent ?? 0
-  const totalText = total.toLocaleString('ja-JP')
+  const totalText = formatNumber(total)
   switch (displayStatus) {
     case 'draft':
       return 'まだ送っていません'
@@ -164,18 +167,18 @@ function bandText(
       return '送信の準備をしています'
     case 'sending': {
       const remaining = Math.max(0, total - sent)
-      return `送信中 ${sent.toLocaleString('ja-JP')} / ${totalText}人に送りました。止めると、まだの${remaining.toLocaleString('ja-JP')}人には送りません。`
+      return `送信中 ${formatNumber(sent)} / ${totalText}人に送りました。止めると、まだの${formatNumber(remaining)}人には送りません。`
     }
     case 'sent':
-      return `${sent.toLocaleString('ja-JP')} / ${totalText}人に届きました`
+      return `${formatNumber(sent)} / ${totalText}人に届きました`
     case 'partial_failed': {
       const retryable = ledger?.retryableCount ?? 0
-      return `${sent.toLocaleString('ja-JP')} / ${totalText}人に届きました。${retryable.toLocaleString('ja-JP')}人は送り直せます。`
+      return `${formatNumber(sent)} / ${totalText}人に届きました。${formatNumber(retryable)}人は送り直せます。`
     }
     case 'failed': {
       const retryable = ledger?.retryableCount ?? 0
       return retryable > 0
-        ? `届けられませんでした。一時的な失敗 ${retryable.toLocaleString('ja-JP')}人は送り直せます。`
+        ? `届けられませんでした。一時的な失敗 ${formatNumber(retryable)}人は送り直せます。`
         : '届けられませんでした。送り直せる相手はいません。'
     }
     case 'stopped':

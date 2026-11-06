@@ -3,12 +3,16 @@ import React from 'react'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { NenOverview, type NenCoupon, type NenTab } from './nen-overview'
+
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+import NenOverview from '@/v8/nen-campaigns/list'
+import { type NenCoupon, type NenTab } from '@/v8/nen-campaigns/display'
 
 /*
  * 419: 誕生日クーポン設定の「2月29日生まれの子」3択が
  * 保存値を表示し、変更がそのまま onCouponChange へ流れること。
- * ★V6 37-6 では誕生日配信の行から開く右パネル（Drawer は body 直下に描く）。
+ * ★管理画面 37-6 では誕生日配信の行から開く右パネル（Drawer は body 直下に描く）。
  */
 
 let container: HTMLDivElement

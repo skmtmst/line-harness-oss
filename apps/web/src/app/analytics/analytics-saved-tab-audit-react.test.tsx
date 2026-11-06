@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -31,8 +32,8 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/analytics',
+  useSearchParams: () => new URLSearchParams({ tab: 'saved' }),
 }))
 
 vi.mock('@/components/layout/merged-tabs', () => ({
@@ -106,6 +107,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   fixture.accountId = 'account-a'
   fixture.role = 'owner'
   net.calls.length = 0
@@ -127,6 +129,16 @@ afterEach(async () => {
 
 async function render() {
   await act(async () => { root.render(<AnalyticsPage />) })
+}
+
+/** 定期レポートの行の「…」を開き、中の項目を返す（行の右端は「…」1つ・）。 */
+async function scheduleMenuItem(label: string): Promise<HTMLElement> {
+  const trigger = Array.from(host.querySelectorAll('button')).find((item) => item.getAttribute('aria-label')?.startsWith('定期レポート「'))
+  if (!trigger) throw new Error('定期レポートの「…」が見つからない')
+  await act(async () => { trigger.click() })
+  const found = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((item) => item.textContent?.trim() === label)
+  if (!found) throw new Error(`メニューの項目が見つからない: ${label}`)
+  return found
 }
 
 function button(label: string): HTMLButtonElement {
@@ -173,7 +185,7 @@ describe('R462 履歴の失敗は一覧を隠さず回復したら消える', ()
     expect(host.textContent).toContain('結果の履歴を読み込めませんでした')
     expect(host.textContent).toContain('保存した分析')
     // 「—・読み込めませんでした」のままにならない（件数が出る）
-    expect(host.textContent).not.toMatch(/保存した結果\s*—/)
+    expect(host.textContent).not.toMatch(/保存結果数\s*—/)
 
     // もう一度で履歴200が返ると古い案内が消える
     await act(async () => { button('もう一度').click() })
@@ -186,24 +198,23 @@ describe('R463 履歴から固定結果を開ける', () => {
     const state = { snapshotsMode: 'ok' as const, snapshotsFailedOnce: true, recentOneTime: [] }
     net.handler = listHandler(state)
     await render()
-    expect(host.textContent).toContain('この時点の結果を見る')
+    expect(host.textContent).toContain('結果を見る')
     // 開くと固定結果の数値が出る
-    const details = host.querySelector('details') as HTMLDetailsElement
-    expect(details.open).toBe(false)
-    const summary = host.querySelector('details summary') as HTMLElement
-    await act(async () => { summary.click() })
-    expect(details.open).toBe(true)
-    expect(host.textContent).toContain('129,001')
-    expect(host.textContent).toContain('2026/9/21〜2026/9/27')
+    const open = host.querySelector('[aria-label="結果の履歴"] button') as HTMLButtonElement
+    await act(async () => { open.click() })
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(document.body.textContent).toContain('129,001')
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('9月21日（月）〜9月27日（日）')
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('データ締切')
     // 未取得の区別も出る
-    expect(host.textContent).toContain('未取得')
+    expect(document.body.textContent).toContain('未取得')
     // 保存結果のCSVは一覧のCSVと別の入口
-    expect(host.textContent).toContain('この分析の結果をCSVで書き出す')
+    expect(host.querySelector('section[aria-labelledby="saved-history-title"]')?.textContent).toContain('CSVで書き出す')
   })
 })
 
 describe('R456 アカウント切替後に旧応答で置き換えない', () => {
-  it('再読込中にBへ移ると遅いA応答を捨て、しまう確認も閉じる', async () => {
+  it('再読込中にBへ移ると遅いA応答を捨てる', async () => {
     const state = { snapshotsMode: 'ok' as const, snapshotsFailedOnce: true, recentOneTime: [] }
     const base = listHandler(state)
     let releaseA: ((value: unknown) => void) | null = null
@@ -222,15 +233,10 @@ describe('R456 アカウント切替後に旧応答で置き換えない', () =>
     await render()
     expect(host.textContent).toContain('Aのレポート')
 
-    // しまう確認を開いておく（確認窓はポータルのため document 全体で見る）
-    await act(async () => { button('しまう').click() })
-    expect(document.body.textContent).toContain('定期レポートをしまいますか')
-
     // 止める→失敗→再読込が始まる（応答はまだ返さない）
-    await act(async () => { button('止める').click() })
+    await act(async () => { (await scheduleMenuItem('止める')).click() })
     expect(releaseA).not.toBeNull()
 
-    // しまう確認を開いたままBへ切り替える
     fixture.accountId = 'account-b'
     await render()
     expect(host.textContent).toContain('Bのレポート')
@@ -246,6 +252,18 @@ describe('R456 アカウント切替後に旧応答で置き換えない', () =>
     })
     expect(host.textContent).toContain('Bのレポート')
     expect(host.textContent).not.toContain('Aのレポート')
+  })
+
+  it('Aのしまう確認を開いてBへ切り替えると確認窓を閉じる', async () => {
+    net.handler = listHandler({ snapshotsMode: 'ok', snapshotsFailedOnce: true, recentOneTime: [] })
+    await render()
+    await act(async () => { (await scheduleMenuItem('しまう')).click() })
+    expect(document.body.textContent).toContain('定期レポートをしまいますか')
+    fixture.accountId = 'account-b'
+    await render()
+    expect(host.textContent).toContain('Bのレポート')
+    expect(document.body.textContent).not.toContain('定期レポートをしまいますか')
+    expect(net.calls.filter(call => call.method === 'PUT')).toHaveLength(0)
   })
 })
 

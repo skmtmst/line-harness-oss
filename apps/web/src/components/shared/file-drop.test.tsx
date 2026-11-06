@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V7 添付ファイルの行・ファイルを落とす場所（NQMnx）。
+ * 添付ファイルの行・ファイルを落とす場所（Pencil ★V8「ファイルを落とす欄」）。
  * 行の 3 状態（通常／送り途中／誤りと選び直し）と、落とす場所の 4 状態
  * （ふだん／上に来た／形式違い／取り込み中）、キーボードの「ファイルを選ぶ」を見る。
  */
@@ -15,7 +15,7 @@ function dropFiles(element: Element, files: File[]) {
   fireEvent.drop(element, { dataTransfer: { files, items: [] } })
 }
 
-describe('添付ファイルの行（★V7 NQMnx）', () => {
+describe('添付ファイルの行（★V8 ファイルを落とす欄）', () => {
   it('名前は 1 行で全文は title、× は「外す」', () => {
     const onRemove = vi.fn()
     render(<AttachmentRow name="商品写真_秋.jpg" meta="JPEG・1.2MB" onRemove={onRemove} />)
@@ -54,7 +54,7 @@ describe('添付ファイルの行（★V7 NQMnx）', () => {
   })
 })
 
-describe('ファイルを落とす場所（★V7 NQMnx）', () => {
+describe('ファイルを落とす場所（★管理画面 NQMnx）', () => {
   it('ふだんは見出し・種類の説明・「ファイルを選ぶ」ボタン', () => {
     render(<FileDropzone title="ここに画像を落とす" hint="JPEG・PNG、10MB まで" onFiles={() => {}} />)
     expect(screen.getByText('ここに画像を落とす')).not.toBeNull()
@@ -145,5 +145,30 @@ describe('ファイルを落とす場所（★V7 NQMnx）', () => {
     expect(screen.getByText('3件を取り込んでいます…')).not.toBeNull()
     expect(screen.getByText('この画面を閉じても止まりません')).not.toBeNull()
     expect(screen.queryByRole('button', { name: 'ファイルを選ぶ' })).toBeNull()
+  })
+})
+
+
+describe('欄全体から追加するファイル選択', () => {
+  it('内側ボタンなしでクリック・Enter・Spaceから同じ選択口を開く', () => {
+    const { container } = render(<FileDropzone variant="upload" title="CSVを追加" onFiles={vi.fn()} />)
+    const zone = screen.getByRole('button', { name: 'CSVを追加' })
+    expect(zone.querySelector('button')).toBeNull()
+    expect(zone.tabIndex).toBe(0)
+    const input = container.querySelector('input')!
+    const opened = vi.fn(); input.addEventListener('click', opened)
+    fireEvent.click(zone); fireEvent.keyDown(zone, { key: 'Enter' }); fireEvent.keyDown(zone, { key: ' ' })
+    expect(opened).toHaveBeenCalledTimes(3)
+  })
+  it('取り込み中・無効時はキーとドロップから追加しない', () => {
+    const onFiles = vi.fn()
+    const { container, rerender } = render(<FileDropzone variant="upload" title="CSVを追加" disabled onFiles={onFiles} />)
+    const input = container.querySelector('input')!; const opened = vi.fn(); input.addEventListener('click', opened)
+    const zone = screen.getByRole('group', { name: 'CSVを追加' })
+    fireEvent.keyDown(zone, { key: 'Enter' }); dropFiles(zone, [new File(['a'], 'a.csv')])
+    expect(zone.getAttribute('aria-disabled')).toBe('true')
+    rerender(<FileDropzone variant="upload" title="CSVを追加" busy onFiles={onFiles} />)
+    fireEvent.click(zone); fireEvent.keyDown(zone, { key: ' ' }); dropFiles(zone, [new File(['a'], 'a.csv')])
+    expect(opened).not.toHaveBeenCalled(); expect(onFiles).not.toHaveBeenCalled()
   })
 })

@@ -19,6 +19,11 @@ routes = [
   { pattern = "stg-api.musubo.jp", custom_domain = true }
 ]
 
+# 検証環境だけ、失敗したときのサーバー記録を後から読めるようにする。
+# （本番 wrangler.toml には入れない。ここは検証用の設定ファイル。）
+[observability]
+enabled = true
+
 [assets]
 directory = "dist/client"
 binding = "ASSETS"
@@ -42,7 +47,8 @@ binding = "AI"
 
 # バナー生成の用途寸法への整形（Cloudflare Images・R120）。
 # R2 の `IMAGES` と名前が重なるため `CF_IMAGES` にしている。
-# 注意: Images の有効化が必要か・変換回ごとの料金を、配備の前にオーナーへ確認する。
+# 2026-10-08 利用者承認: staging の既存プラン範囲で Images 画像変換を使用する。
+# 購入・プラン変更・本番環境への有効化はこの承認の対象外。
 [images]
 binding = "CF_IMAGES"
 
@@ -59,9 +65,17 @@ retry_delay = 60
 
 [vars]
 DEPLOY_ENV = "staging"
+# Q-75 is opened deliberately by the staging operator; enabling it forces the outbound stop.
+STAGING_QA_ENABLED = "false"
+STAGING_QA_OUTBOUND_DISABLED = "false"
 RESTAURANT_TEST_ENABLED = "true"
+GOOGLE_BUSINESS_ENABLED = "true"
+RT_DELIVERY_UBEREATS_ENVIRONMENT = "sandbox"
 GOOGLE_BUSINESS_OAUTH_CLIENT_ID = "904803281314-ufqj5bmmhqnl9hv58uigo4ct6jvfmdkg.apps.googleusercontent.com"
 GOOGLE_BUSINESS_WRITE_ENABLED = "false"
+# 通常のGoogle書き込みは止めたまま、承認済みの1アカウントだけ投稿テストを許可する。
+# 対象は「然-NEN- TEST」。口コミ返信・店舗情報変更・削除は引き続き停止。
+GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID = "b9dac3d2-b9a7-44b8-bdcf-6d466fd3fb51"
 WORKER_NAME = "nen-line-stg"
 ADMIN_PAGES_PROJECT = "nen-line-stg-admin"
 LIFF_PAGES_PROJECT = ""
@@ -69,7 +83,11 @@ D1_DATABASE_ID = "00bd7aca-950b-4d67-b865-fd7427b9c43f"
 MANIFEST_URL = "https://github.com/Shudesu/line-harness-oss/releases/latest/download/release-manifest.json"
 WORKER_PUBLIC_URL = "https://stg-api.musubo.jp"
 WORKER_URL = "https://stg-api.musubo.jp"
+# 同じ検証Workerに届く別の入口。LINE の Webhook がこちらで登録されていても「この環境」と判定する。
+WORKER_ALIAS_URLS = "https://nen-line-stg.skmtmst.workers.dev"
 ADMIN_PUBLIC_URL = "https://stg-admin.musubo.jp"
+META_GRAPH_API_VERSION = "v24.0"
+META_REDIRECT_URI = "https://stg-api.musubo.jp/api/instagram/oauth/callback"
 ADMIN_ORIGIN = "https://stg-admin.musubo.jp,https://nen-line-stg-admin.pages.dev"
 ADMIN_ALLOW_CROSS_SITE = "true"
 LIFF_PUBLIC_URL = "https://stg-api.musubo.jp"

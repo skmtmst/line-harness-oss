@@ -16,7 +16,7 @@ import {
   scheduleToPayload,
   tagIdFromCondition,
   type FirstStepSchedule,
-} from './first-step-form'
+} from '@/v8/scenario-first-step/first-step-form'
 
 function step(partial: Partial<ScenarioStep>): ScenarioStep {
   return {

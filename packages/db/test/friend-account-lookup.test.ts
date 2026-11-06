@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { getFriendByLineUserIdForAccount, upsertFriend } from '../src/friends.js';
+import { getFriendByLineUserIdForAccount, upsertFriend } from '../src/friends/index.js';
 
 function asD1(sqlite: Database.Database): D1Database {
   const wrap = (sql: string, params: unknown[]) => ({
@@ -25,6 +25,8 @@ let db: D1Database;
 beforeEach(() => {
   sqlite = new Database(':memory:');
   sqlite.exec(`
+    CREATE TABLE line_accounts(id TEXT PRIMARY KEY, tenant_id TEXT);
+    INSERT INTO line_accounts(id,tenant_id) VALUES ('account-a',NULL),('account-b',NULL);
     CREATE TABLE friends (
       id TEXT PRIMARY KEY,
       line_user_id TEXT NOT NULL,
@@ -69,7 +71,7 @@ describe('getFriendByLineUserIdForAccount', () => {
   });
 
   test('他アカウント所有の行しか無い場合は null を返す（跨ぎフォールバック廃止）', async () => {
-    // Issue #961: account-missing に該当者が無くても account-a/b の行を
+    // account-missing に該当者が無くても account-a/b の行を
     // 返してはいけない。返すと「friend=別アカウント・送信元=受信アカウント」の
     // 履歴が作られる。
     const friend = await getFriendByLineUserIdForAccount(db, 'U-shared', 'account-missing');
@@ -78,17 +80,23 @@ describe('getFriendByLineUserIdForAccount', () => {
   });
 
   test('未割当 (line_account_id IS NULL) の行は指定アカウントの解決に含める', async () => {
-    // 未割当行は「どのアカウントのものでもない」ため、アカウントスコープの
-    // 解決対象に含める。引き当てるかは呼出側の判断（webhook は受信時に引き当てる）。
+    // 未割当は従来の既定統括の行。既定統括のアカウントだけが引き当てる。
     const friend = await getFriendByLineUserIdForAccount(db, 'U-free', 'account-a');
 
     expect(friend?.id).toBe('friend-u');
   });
+  test('S15 another tenant cannot adopt an unassigned legacy friend or its private data', async () => {
+    sqlite.prepare("UPDATE line_accounts SET tenant_id='foreign-tenant' WHERE id='account-b'").run();
+    expect(await getFriendByLineUserIdForAccount(db, 'U-free', 'account-b')).toBeNull();
+    expect((await getFriendByLineUserIdForAccount(db, 'U-free', 'account-a'))?.id).toBe('friend-u');
+    expect((await getFriendByLineUserIdForAccount(db, 'U-shared', 'account-b'))?.id).toBe('friend-b');
+    expect(await getFriendByLineUserIdForAccount(db, 'U-free', 'unknown-account')).toBeNull();
+  });
 
-  test('lineAccountId 未指定はアカウント文脈なしのレガシー呼出として先頭一致を返す', async () => {
+  test('SEC-04 lineAccountId 未指定では他店の行を返さない', async () => {
     const friend = await getFriendByLineUserIdForAccount(db, 'U-shared', null);
 
-    expect(friend).not.toBeNull();
+    expect(friend).toBeNull();
   });
 
   test('同一アカウントにも未割当にも無い場合は null を返す', async () => {

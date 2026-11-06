@@ -1,0 +1,159 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--grid-table-row-gap, 0);
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--grid-table-padding, 0);
+}
+.table[data-framed] {
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: var(--card-shadow);
+}
+.row {
+  display: grid;
+  grid-template-columns: var(--grid-table-content-columns, var(--grid-table-columns));
+  align-items: center;
+  column-gap: var(--grid-table-gap);
+  min-width: 0;
+  padding: var(--grid-table-row-padding);
+  box-shadow: var(--shadow-row-line);
+  color: var(--grid-table-color, var(--color-ink));
+  line-height: var(--grid-table-line-height, inherit);
+}
+.row[data-head] {
+  padding: var(--grid-table-head-padding, var(--grid-table-row-padding));
+  color: var(--grid-table-head-color, var(--color-ink-secondary));
+  line-height: var(--grid-table-head-line-height, var(--grid-table-line-height, inherit));
+  white-space: nowrap;
+}
+.row[data-broken] { background: var(--color-status-danger-soft); }
+.row:last-child:not([data-head]) { box-shadow: none; }
+.cell { min-width: 0; }
+}
+
+/* ・仕上げ3 */
+:root .row { height: var(--polish-table-row); min-height: var(--polish-table-row); font-size: var(--polish-text-body); padding-block: 0; }
+:root .row[data-head] { min-height: var(--polish-table-head); height: var(--polish-table-head); padding-block: 0; background: var(--polish-table-head-bg); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
+:root .row:not([data-head]):hover { background: var(--polish-table-hover); }
+:root .cell[data-align='right'] { text-align: right; font-family: var(--font-sans); font-variant-numeric: var(--font-numeric); }
+:root .cell[data-align='right'] + .cell { padding-inline-start: var(--polish-table-number-gap); }
+
+/* ：格子の表も一覧の型で同じ行高にする。 */
+:root [data-list-skeleton] .row { height: var(--list-content-row-h, var(--tpl-list-row-h)); min-height: var(--list-content-row-h, var(--tpl-list-row-h)); padding-block: 0; padding-inline: var(--tpl-list-cell-pad); }
+:root [data-list-skeleton] .row[data-head] { height: var(--tpl-list-head-h); min-height: var(--tpl-list-head-h); }
+
+/* ・：枠と影なし、色と線を端まで。 */
+html:root .table { padding: 0; gap: 0; border-radius: var(--radius-flat); outline-color: transparent; box-shadow: none; }
+html:root .table .row { padding-inline: var(--tpl-list-inset); }
+html:root .table [data-list-name-cell] { color: var(--color-ink); font-weight: 700; white-space: nowrap; }
+html:root .row[data-broken]:hover { background: var(--color-status-danger-soft); }
+
+/* : one rendered line is 52; two or three are 60. The table sets the count. */
+html:root .table .row[data-list-content-lines] {
+  --list-content-row-h: var(--tpl-list-row-h);
+  height: var(--list-content-row-h); min-height: var(--list-content-row-h);
+}
+html:root .table .row[data-list-content-lines]:is([data-list-content-lines='2'], [data-list-content-lines='3']) {
+  --list-content-row-h: var(--tpl-list-row-multi-h);
+}
+
+html:root .table[data-list-density-scope='general'] .row:not([data-head]) {
+  height: var(--polish-table-row); min-height: var(--polish-table-row);
+}
+
+/*
+ * 設定の板（SettingsPage）の中の表は、絵（・・・）どおり影のカードで囲む
+ * （§6.2・§6.18。2026-10-15 判定役）。一覧の型の平らな表は外側の白い板の端まで
+ * 伸びるが、設定の板では中のメニューの右に置く本文の1段なので、外枠が無いと区切りが見えない。
+ * 枠を外したい表は framed={false} を渡す（はじめの設定・健全性チェック）。
+ */
+html:root :global([data-page-template='settings']) .table[data-framed] {
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: var(--card-shadow);
+}
+
+/* 時刻×担当の表もカレンダー型の枠を部品が持つ。通常の一覧は変えない。 */
+html:root .table[data-table-presentation='calendar'] {
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+/* ダッシュボードの一覧。板の寸法はdesign、線・地・省略は共通で持つ。 */
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .row {
+  height: auto; min-height: var(--grid-table-row-height);
+  padding: var(--grid-table-row-padding); font-size: var(--grid-table-font-size);
+  line-height: var(--grid-table-line-height, inherit); box-shadow: none;
+  border-block-end: 1px solid var(--color-hairline);
+}
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .row[data-head] {
+  height: auto; min-height: var(--grid-table-head-height);
+  border-block-end: 0; border-radius: var(--radius-control);
+}
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .row[data-head] .cell {
+  color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .cell {
+  display: flex; flex-direction: column; justify-content: center;
+}
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .cell[data-align='right'] {
+  align-items: flex-end;
+}
+html:root .table[data-table-presentation='dashboard'] .row[data-selected] { background: var(--polish-selection-bg); }
+/* 分析の列幅は見出しと全行の内容から一度だけ決める。 */
+html:root .table[data-table-presentation='metrics'] { display: grid; grid-template-columns: var(--grid-table-content-columns, var(--grid-table-columns)); }
+html:root .table[data-table-presentation='metrics'] .row { display: contents; }
+html:root .table[data-table-presentation='metrics'] .row > * {
+  min-height: var(--grid-table-row-height); border-block-end: 1px solid var(--color-hairline);
+}
+html:root .table[data-table-presentation='metrics'] .row[data-head] > * {
+  min-height: var(--grid-table-head-height); border-block-end: 0; background: var(--polish-table-head-bg);
+}
+html:root .table[data-table-presentation='metrics'] .row > :first-child { padding-inline-start: var(--grid-table-row-padding); }
+html:root .table[data-table-presentation='metrics'] .row > * + * { padding-inline-start: var(--grid-table-gap); }
+html:root .table[data-table-presentation='metrics'] .row > :last-child { padding-inline-end: var(--grid-table-row-padding); }
+html:root .table[data-table-presentation='metrics'] .row[data-head] > :first-child { border-start-start-radius: var(--radius-control); border-end-start-radius: var(--radius-control); }
+html:root .table[data-table-presentation='metrics'] .row[data-head] > :last-child { border-start-end-radius: var(--radius-control); border-end-end-radius: var(--radius-control); }
+
+html:root .cell[data-list-action-cell] { display: flex; align-items: center; justify-content: flex-end; gap: var(--tpl-toolbar-gap); }
+html:root .cell[data-tone='danger'] { color: var(--color-danger); }
+
+html:root .table [data-list-name-cell] { font-weight: var(--polish-value-weight); }
+html:root .row[data-head] { background: var(--color-canvas); border-block-start: 0; font-size: var(--polish-text-support); font-weight: var(--polish-control-weight); }
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .row[data-head] { border-radius: 0; border-block-end: 1px solid var(--color-hairline); }
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .row[data-head] .cell { font-size: var(--polish-text-support); font-weight: var(--polish-control-weight); }
+
+:root .row:not([data-head]):hover { background: var(--polish-table-hover); box-shadow: var(--shadow-row-line), var(--polish-band-shadow); }
+
+/*
+ * 名前の列（1列目）が細すぎる幅では、行を2段にする：1段目に名前、2段目にほかの列。
+ * 見出しの行も同じ形にして列をそろえる。幅ではなく表に入りきるかで決める（use-grid-table-stack）。
+ */
+html:root .table[data-stacked][data-stacked] .row {
+  grid-template-columns: var(--grid-table-content-rest-columns, var(--grid-table-rest-columns));
+  row-gap: var(--space-4);
+  height: auto;
+  min-height: var(--polish-table-row);
+  padding-block: var(--polish-space-row);
+}
+html:root .table[data-stacked][data-stacked] .row[data-head] { min-height: var(--polish-table-head); }
+html:root .table[data-stacked] .row > :first-child { grid-column: 1 / -1; }
+
+/* 内容の最小幅が入らない時も、既存の段組みで全列を残す。 */
+html:root .table[data-stacked][data-stacked] { display: flex; flex-direction: column; }
+html:root .table[data-stacked][data-stacked] .row { display: grid; }
+
+/* 複数段の選択欄は内容を切らず、行の最小の高さだけを保つ。 */
+html:root .table[data-row-sizing='content'] .row:not([data-head]) {
+  height: auto;
+  min-height: var(--polish-table-row);
+  padding: var(--grid-table-row-padding);
+}

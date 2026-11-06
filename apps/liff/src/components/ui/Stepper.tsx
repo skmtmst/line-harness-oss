@@ -1,34 +1,29 @@
-import Icon from './Icon.js';
-
 /**
- * ★V7 の手順の番号 (予約は4つ: メニュー・担当・日時・確認)。
- * 済みはチェック、今は番号＋濃い緑、これからは灰色の番号。
+ * ★V8 の手順の印 (予約は4つ: メニュー・担当・日時・確認)。
+ * 済みと今は濃い緑の短い棒、これからは灰色。棒の下に「N 名前」。
+ * 段が増えても (支払い段など) steps を足すだけで同じ形になる。
  */
-export default function Stepper({ steps, current }: { steps: string[]; current: number }) {
+export default function Stepper({ steps, current, appearance }: { steps: string[]; current: number; appearance?: 'restaurant' }) {
+  if (appearance === 'restaurant') return <ol className="flex gap-2" aria-label="予約の手順">{steps.map((label,i)=><li key={label} aria-current={i===current?'step':undefined} className={`rounded-full px-2 py-0.5 text-[11px] leading-[17px] font-semibold ${i===current?'bg-liff-primary text-(--liff-on-primary)':'bg-liff-chip text-liff-sub'}`}>{`${i+1} ${label}`}</li>)}</ol>;
   return (
-    <ol className="flex items-center gap-1" aria-label="予約の手順">
+    <ol className="flex gap-1 px-4 pt-3 pb-1" aria-label="予約の手順">
       {steps.map((label, i) => {
         const done = i < current;
         const now = i === current;
         return (
-          <li key={label} className="flex min-w-0 flex-1 items-center gap-1 last:flex-none">
+          <li key={label} className="min-w-0 flex-1">
             <span
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                done || now ? 'bg-accent-deep text-white' : 'bg-ground text-ink-faint'
-              }`}
+              className={`block h-[3px] rounded-full ${done || now ? 'bg-liff-primary' : 'bg-liff-line'}`}
               aria-hidden="true"
-            >
-              {done ? <Icon name="check" className="h-3 w-3" /> : i + 1}
-            </span>
+            />
             <span
-              className={`truncate text-xs whitespace-nowrap ${
-                now ? 'font-bold text-ink' : 'text-ink-faint'
+              className={`mt-1 block truncate text-[10px] whitespace-nowrap ${
+                now ? 'font-bold text-ink' : done ? 'font-medium text-liff-sub' : 'font-medium text-liff-idle'
               }`}
               aria-current={now ? 'step' : undefined}
             >
-              {label}
+              {i + 1} {label}
             </span>
-            {i < steps.length - 1 && <span className="mx-1 h-px flex-1 bg-hairline" aria-hidden="true" />}
           </li>
         );
       })}

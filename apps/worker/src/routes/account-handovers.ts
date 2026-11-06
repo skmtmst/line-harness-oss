@@ -1,3 +1,5 @@
+import { logger } from '@line-crm/shared/server';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   cancelHandover,
@@ -20,14 +22,15 @@ import {
   type HandoverRow,
   type MatchBucket,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 
 /**
- * LINEアカウントの乗り換え（引き継ぎ）。設計 ★V6 33-4（`nx3XW`）。台帳 #133。
+ * LINEアカウントの乗り換え（引き継ぎ）。設計 ★33-4（`nx3XW`）。台帳。
  *
  * 5段の流れ。
  *   1 引き継ぎコードを出す   POST /api/account-handovers
@@ -99,11 +102,11 @@ async function loadAccessible(
 }
 
 /** 段1。引き継ぎコードを出す。 */
-accountHandovers.post('/api/account-handovers', requireRole('owner', 'admin'), async (c) => {
+accountHandovers.post('/api/account-handovers', requireRole('owner', 'admin'), inputJsonBoundary({"fromAccountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ fromAccountId?: string }>();
     if (!body.fromAccountId) {
-      return c.json({ success: false, error: 'fromAccountId が要ります' }, 400);
+      return inputError(c, { success: false, error: 'fromAccountId が要ります' }, 400, ["fromAccountId"]);
     }
     if (!(await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.fromAccountId]))) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -115,17 +118,16 @@ accountHandovers.post('/api/account-handovers', requireRole('owner', 'admin'), a
     });
     return c.json({ success: true, data: serialize(handover) }, 201);
   } catch (err) {
-    console.error('POST /api/account-handovers error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 /** 段2。受け取り先でコードを読む。 */
-accountHandovers.post('/api/account-handovers/link', requireRole('owner', 'admin'), async (c) => {
+accountHandovers.post('/api/account-handovers/link', requireRole('owner', 'admin'), inputJsonBoundary({"code":["string"],"toAccountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ code?: string; toAccountId?: string }>();
     if (!body.code || !body.toAccountId) {
-      return c.json({ success: false, error: 'code と toAccountId が要ります' }, 400);
+      return inputError(c, { success: false, error: 'code と toAccountId が要ります' }, 400, ["code","toAccountId"]);
     }
     if (!(await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.toAccountId]))) {
       return c.json({ success: false, error: 'Not found' }, 404);
@@ -149,11 +151,10 @@ accountHandovers.post('/api/account-handovers/link', requireRole('owner', 'admin
       toAccountId: body.toAccountId,
       providerMatch: compareProviders(fromProvider, toProvider),
     });
-    if (!linked.ok) return c.json({ success: false, error: linked.error }, 422);
+    if (!linked.ok) return inputError(c, { success: false, error: linked.error }, 422, ["code","toAccountId"]);
     return c.json({ success: true, data: serialize(linked.handover) });
   } catch (err) {
-    console.error('POST /api/account-handovers/link error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -170,8 +171,7 @@ accountHandovers.get('/api/account-handovers/:id', requireRole('owner', 'admin',
       },
     });
   } catch (err) {
-    console.error('GET /api/account-handovers/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -184,8 +184,7 @@ accountHandovers.get('/api/line-accounts/:id/handovers', requireRole('owner', 'a
     const rows = await listHandoversForAccount(c.env.DB, accountId);
     return c.json({ success: true, data: rows.map(serialize) });
   } catch (err) {
-    console.error('GET /api/line-accounts/:id/handovers error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -197,12 +196,12 @@ accountHandovers.get('/api/line-accounts/:id/handovers', requireRole('owner', 'a
  * **ここでは `friends` に一切書かない**（設計の「ここで止めても、元の
  * アカウントは何も変わりません」）。
  */
-accountHandovers.post('/api/account-handovers/:id/preview', requireRole('owner', 'admin'), async (c) => {
+accountHandovers.post('/api/account-handovers/:id/preview', requireRole('owner', 'admin'), inputJsonBoundary({"sourceFriendTotal":["number"],"counts":["object"],"declaredFriendTotal":["null","number"]}), async (c) => {
   try {
     const handover = await loadAccessible(c.env.DB, c.get('staff'), c.req.param('id'));
     if (!handover) return c.json({ success: false, error: 'Not found' }, 404);
     if (!handover.to_account_id) {
-      return c.json({ success: false, error: '受け取り先がまだ決まっていません' }, 422);
+      return inputError(c, { success: false, error: '受け取り先がまだ決まっていません' }, 422, []);
     }
     const body = await c.req.json<{
       sourceFriendTotal?: number;
@@ -212,11 +211,11 @@ accountHandovers.post('/api/account-handovers/:id/preview', requireRole('owner',
     const total = body.sourceFriendTotal;
     const counts = body.counts;
     if (typeof total !== 'number' || !counts) {
-      return c.json({ success: false, error: 'sourceFriendTotal と counts が要ります' }, 400);
+      return inputError(c, { success: false, error: 'sourceFriendTotal と counts が要ります' }, 400, ["sourceFriendTotal","counts"]);
     }
     for (const bucket of MATCH_BUCKETS) {
       if (typeof counts[bucket] !== 'number') {
-        return c.json({ success: false, error: `${bucket} の人数が要ります` }, 400);
+        return inputError(c, { success: false, error: `${bucket} の人数が要ります` }, 400, ["counts"]);
       }
     }
     const value = {
@@ -226,10 +225,7 @@ accountHandovers.post('/api/account-handovers/:id/preview', requireRole('owner',
       lookalike: counts.lookalike,
     };
     if (!countsAddUp(value, total)) {
-      return c.json(
-        { success: false, error: '区分の合計が元の友だち数と合いません' },
-        422,
-      );
+      return inputError(c, { success: false, error: '区分の合計が元の友だち数と合いません' }, 422, ["counts","sourceFriendTotal"]);
     }
     /*
       **申告の人数をうのみにしない。** 画面の表示数・手作り呼び出しが
@@ -241,31 +237,27 @@ accountHandovers.post('/api/account-handovers/:id/preview', requireRole('owner',
     ).bind(handover.from_account_id).first<{ count: number }>();
     const actualTotal = actual?.count ?? 0;
     if (total !== actualTotal) {
-      return c.json(
-        { success: false, error: `元の友だち数が変わっています（今は${actualTotal}人）。事前確認をやり直してください` },
-        422,
-      );
+      return inputError(c, { success: false, error: `元の友だち数が変わっています（今は${actualTotal}人）。事前確認をやり直してください` }, 422, ["sourceFriendTotal"]);
     }
     const declaredTotal = body.declaredFriendTotal;
     if (declaredTotal !== undefined && declaredTotal !== null
       && (!Number.isInteger(declaredTotal) || declaredTotal < 0)) {
-      return c.json({ success: false, error: 'declaredFriendTotal は0以上の整数で入れてください' }, 422);
+      return inputError(c, { success: false, error: 'declaredFriendTotal は0以上の整数で入れてください' }, 422, ["declaredFriendTotal"]);
     }
     const saved = await savePreview(c.env.DB, handover.id, {
       sourceFriendTotal: total,
       counts: value,
       declaredFriendTotal: declaredTotal ?? null,
     });
-    if (!saved.ok) return c.json({ success: false, error: saved.error }, 422);
+    if (!saved.ok) return inputError(c, { success: false, error: saved.error }, 422, ["sourceFriendTotal","counts","declaredFriendTotal"]);
     return c.json({ success: true, data: serialize((await getHandoverById(c.env.DB, handover.id))!) });
   } catch (err) {
-    console.error('POST /api/account-handovers/:id/preview error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 /** 段4。競合の判断を保存する。 */
-accountHandovers.put('/api/account-handovers/:id/decisions', requireRole('owner', 'admin'), async (c) => {
+accountHandovers.put('/api/account-handovers/:id/decisions', requireRole('owner', 'admin'), inputJsonBoundary({"decisions":["array"]}), async (c) => {
   try {
     const handover = await loadAccessible(c.env.DB, c.get('staff'), c.req.param('id'));
     if (!handover) return c.json({ success: false, error: 'Not found' }, 404);
@@ -280,25 +272,30 @@ accountHandovers.put('/api/account-handovers/:id/decisions', requireRole('owner'
     }>();
     const decisions = body.decisions ?? [];
     if (decisions.length === 0) {
-      return c.json({ success: false, error: 'decisions が要ります' }, 400);
+      return inputError(c, { success: false, error: 'decisions が要ります' }, 400, ["decisions"]);
+    }
+    for (const d of decisions) {
+      const source = await c.env.DB.prepare('SELECT id FROM friends WHERE id=? AND line_account_id=?').bind(d.fromFriendId ?? '', handover.from_account_id).first();
+      const target = !d.toFriendId || await c.env.DB.prepare('SELECT id FROM friends WHERE id=? AND line_account_id=?').bind(d.toFriendId, handover.to_account_id).first();
+      if (!source || !target) return c.json({ success: false, error: 'Not found' }, 404);
     }
     const staff = c.get('staff');
     for (const d of decisions) {
       if (!d.fromFriendId) {
-        return c.json({ success: false, error: 'fromFriendId が要ります' }, 400);
+        return inputError(c, { success: false, error: 'fromFriendId が要ります' }, 400, ["decisions"]);
       }
       if (d.decision !== 'link' && d.decision !== 'new' && d.decision !== 'skip') {
-        return c.json({ success: false, error: '決めたことを確認してください' }, 400);
+        return inputError(c, { success: false, error: '決めたことを確認してください' }, 400, ["decisions"]);
       }
       /*
         **「同じ人として結びつける」のに相手がいない、を通さない。**
         通すと本実行で行き先の無い人ができ、静かに消える。
       */
       if (d.decision === 'link' && !d.toFriendId) {
-        return c.json({ success: false, error: '結びつける相手が要ります' }, 422);
+        return inputError(c, { success: false, error: '結びつける相手が要ります' }, 422, ["decisions"]);
       }
       if (!MATCH_BUCKETS.includes(d.bucket as MatchBucket)) {
-        return c.json({ success: false, error: '区分を確認してください' }, 400);
+        return inputError(c, { success: false, error: '区分を確認してください' }, 400, ["decisions"]);
       }
       await saveDecision(c.env.DB, {
         handoverId: handover.id,
@@ -320,8 +317,7 @@ accountHandovers.put('/api/account-handovers/:id/decisions', requireRole('owner'
       },
     });
   } catch (err) {
-    console.error('PUT /api/account-handovers/:id/decisions error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -331,7 +327,7 @@ accountHandovers.put('/api/account-handovers/:id/decisions', requireRole('owner'
  * **「要確認」を全部決めるまで通さない。** 決めていない人がいるまま進めると、
  * その人がどちらにも入らずに消える。
  */
-accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner', 'admin'), async (c) => {
+accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const handover = await loadAccessible(c.env.DB, c.get('staff'), c.req.param('id'));
     if (!handover) return c.json({ success: false, error: 'Not found' }, 404);
@@ -340,10 +336,10 @@ accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner',
       return stepUpRequiredResponse(c, '引き継ぎの本実行には本人確認が必要です');
     }
     if (handover.source_friend_total === null) {
-      return c.json({ success: false, error: '先に事前確認をしてください' }, 422);
+      return inputError(c, { success: false, error: '先に事前確認をしてください' }, 422, []);
     }
     /*
-      件数照合（X-3、v6-33 §12-6）。移し元システム側の申告件数が
+      件数照合（X-3、-33 §12-6）。移し元システム側の申告件数が
       事前確認の合計と違うままでは本実行しない。
     */
     if (
@@ -351,20 +347,14 @@ accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner',
       && handover.declared_friend_total !== undefined
       && handover.declared_friend_total !== handover.source_friend_total
     ) {
-      return c.json(
-        {
+      return inputError(c, {
           success: false,
           error: `申告された友だち数（${handover.declared_friend_total}人）と事前確認の合計（${handover.source_friend_total}人）が違います。差の理由を確かめてから、件数を直して進めてください`,
-        },
-        422,
-      );
+        }, 422, []);
     }
     const unresolved = await unresolvedReviewCount(c.env.DB, handover.id);
     if (unresolved !== null && unresolved > 0) {
-      return c.json(
-        { success: false, error: `要確認が${unresolved}件のこっています。全部決めてから実行してください` },
-        422,
-      );
+      return inputError(c, { success: false, error: `要確認が${unresolved}件のこっています。全部決めてから実行してください` }, 422, []);
     }
     if (handover.status === 'completed' || handover.status === 'executing') {
       return c.json({ success: false, error: 'その引き継ぎはもう実行されています' }, 409);
@@ -377,12 +367,14 @@ accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner',
     let failed = 0;
     for (const d of moving) {
       try {
-        await c.env.DB.prepare(`UPDATE friends SET line_account_id = ? WHERE id = ?`)
-          .bind(handover.to_account_id, d.from_friend_id)
+        const result = await c.env.DB.prepare(`UPDATE friends SET line_account_id = ? WHERE id = ? AND line_account_id = ?
+          AND (? IS NULL OR EXISTS(SELECT 1 FROM friends target WHERE target.id=? AND target.line_account_id=?))`)
+          .bind(handover.to_account_id, d.from_friend_id, handover.from_account_id, d.to_friend_id, d.to_friend_id, handover.to_account_id)
           .run();
-        moved += 1;
+        if (result.meta.changes === 1) moved += 1;
+        else failed += 1;
       } catch (err) {
-        console.error('handover move failed:', d.from_friend_id, err);
+        logger.error("account_handovers.by_id_execute_create_failed");
         failed += 1;
       }
     }
@@ -405,12 +397,11 @@ accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner',
       },
     });
   } catch (err) {
-    console.error('POST /api/account-handovers/:id/execute error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-accountHandovers.post('/api/account-handovers/:id/cancel', requireRole('owner', 'admin'), async (c) => {
+accountHandovers.post('/api/account-handovers/:id/cancel', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const handover = await loadAccessible(c.env.DB, c.get('staff'), c.req.param('id'));
     if (!handover) return c.json({ success: false, error: 'Not found' }, 404);
@@ -420,16 +411,15 @@ accountHandovers.post('/api/account-handovers/:id/cancel', requireRole('owner', 
     await cancelHandover(c.env.DB, handover.id);
     return c.json({ success: true, data: serialize((await getHandoverById(c.env.DB, handover.id))!) });
   } catch (err) {
-    console.error('POST /api/account-handovers/:id/cancel error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 /**
- * 段6。切り戻し（X-3、v6-33 §12-2）。
+ * 段6。切り戻し（X-3、-33 §12-2）。
  * 本実行から7日間だけ。動かした友だちを元のアカウントへ戻す。
  */
-accountHandovers.post('/api/account-handovers/:id/rollback', requireRole('owner', 'admin'), async (c) => {
+accountHandovers.post('/api/account-handovers/:id/rollback', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const handover = await loadAccessible(c.env.DB, c.get('staff'), c.req.param('id'));
     if (!handover) return c.json({ success: false, error: 'Not found' }, 404);
@@ -444,7 +434,7 @@ accountHandovers.post('/api/account-handovers/:id/rollback', requireRole('owner'
       rolledBackBy: c.get('staff')?.id ?? null,
       note: typeof body.note === 'string' ? body.note : null,
     });
-    if (!result.ok) return c.json({ success: false, error: result.error }, 422);
+    if (!result.ok) return inputError(c, { success: false, error: result.error }, 422, ["note"]);
     auditLog(c, 'account_handover.rollback', { id: handover.id, kind: 'account_handover' });
     return c.json({
       success: true,
@@ -454,8 +444,7 @@ accountHandovers.post('/api/account-handovers/:id/rollback', requireRole('owner'
       },
     });
   } catch (err) {
-    console.error('POST /api/account-handovers/:id/rollback error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

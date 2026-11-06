@@ -11,7 +11,7 @@ import {
   scopeLevelsToKeys,
 } from './staff-permissions.js';
 
-describe('一斉配信の操作キー（v6-06 §6）', () => {
+describe('一斉配信の操作キー（-06 §6）', () => {
   it('運用の配信editには下書き・テスト・送信・CSVが組で付く', async () => {
     const { edit } = scopeLevelsToKeys(BUNDLE_PRESETS.operations.levels);
     expect(edit).toContain('/broadcasts');

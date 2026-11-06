@@ -4,12 +4,7 @@ import { getMileageAdminHistory, getMileageFriendsV6 } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /*
- * V6R-CX-e: マイルの友だち詳細は、名前ではなく友だちIDで1人を取る（実SQLite）。
- *
- * 以前は表示名で探して100件まで取り、その中から友だちIDで拾っていた。
- * 同じ名前の友だちが100人を超えると、本人の行と履歴がこぼれて出なかった。
- * また履歴は「代表の友だちID」と一致するものしか残さなかったため、
- * 名寄せした人を副アカウントから開くと履歴が空になっていた。
+ * 同名の友だちの人数によらず本人と履歴を取得できるよう、名前検索でなく友だち ID で照合する。名寄せした友だちは副アカウントからも履歴を取得する。
  */
 let fixture: SqliteD1;
 
@@ -32,6 +27,22 @@ beforeEach(async () => {
 afterEach(() => fixture.raw.close());
 
 describe('マイルの友だち詳細を友だちIDで取る（V6R-CX-e）', () => {
+  it('最終行動の名前・増減・日時は同じ1件から返し、記録なしはnull',async()=>{
+    friend('me','本人');friend('empty','記録なし');friend('other','別の人');
+    grant('first','me',null,100);grant('latest','me',null,-50);grant('unrelated','other',null,999);
+    fixture.raw.exec("UPDATE mileage_ledger SET entry_type='spend',reason='送料無料クーポン',occurred_at='2026-10-02T10:00:00' WHERE id='latest'");
+    const result=await getMileageFriendsV6(fixture.db,{lineAccountId:'acc',visibleAccountIds:['acc'],search:'',limit:100,offset:0});
+    expect(result.items.find(r=>r.friendId==='me')?.lastAction).toEqual({name:'送料無料クーポン',amount:-50,occurredAt:'2026-10-02T10:00:00',entryType:'spend',status:'available'});
+    expect(result.items.find(r=>r.friendId==='empty')?.lastAction).toBeNull();
+  });
+  it('名寄せした相手の最終行動でも、担当外の店舗の中身は返さない',async()=>{
+    fixture.raw.exec("INSERT INTO users(id,display_name) VALUES('user','本人');INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token) VALUES('hidden','担当外','hidden','s','t')");
+    friend('me','本人','user');friend('elsewhere','本人','user');fixture.raw.exec("UPDATE friends SET line_account_id='hidden' WHERE id='elsewhere'");
+    grant('visible','me','user',10);grant('hidden-action','elsewhere','user',999);
+    fixture.raw.exec("UPDATE mileage_ledger SET reason='担当外の購入',occurred_at='2026-10-03' WHERE id='hidden-action'");
+    const result=await getMileageFriendsV6(fixture.db,{lineAccountId:'acc',visibleAccountIds:['acc'],search:'',limit:1,offset:0});
+    expect(result.items[0].lastAction).toMatchObject({name:'購入',amount:10});
+  });
   it('同じ名前が101人いても、友だちIDで本人の1行を返す', async () => {
     for (let i = 0; i < 101; i += 1) friend(`f-${String(i).padStart(3, '0')}`, '佐藤');
     // 本人は残高が一番少ない（名前で探した100件の枠からこぼれる並び）
@@ -58,5 +69,49 @@ describe('マイルの友だち詳細を友だちIDで取る（V6R-CX-e）', () 
     expect(fromSub.items.map((item) => item.id).sort()).toEqual(['h1', 'h2']);
     const other = await getMileageAdminHistory(fixture.db, { accountId: 'acc', visibleAccountIds: ['acc'], friendId: 'c-other', limit: 100 });
     expect(other.items.map((item) => item.id)).toEqual(['h3']);
+  });
+});
+
+
+describe('WEB074 type filtering before pagination', () => {
+  it('finds spending past 101 grants and reports the filtered total across pages', async () => {
+    friend('me', '本人');
+    for (let i = 0; i < 101; i++) grant(`g-${i}`, 'me', null, 10);
+    for (const [id, type] of [['s1','spend'], ['s2','spend'], ['r1','reversal']] as const) {
+      grant(id, 'me', null, -1);
+      fixture.raw.prepare("UPDATE mileage_ledger SET entry_type=?,occurred_at='2026-08-01' WHERE id=?").run(type,id);
+    }
+    const opts = { accountId: 'acc', entryTypes: ['spend', 'reversal'] as const };
+    const first = await getMileageAdminHistory(fixture.db, { ...opts, entryTypes: [...opts.entryTypes], limit: 2 });
+    const next = await getMileageAdminHistory(fixture.db, { ...opts, entryTypes: [...opts.entryTypes], limit: 2, offset: 2 });
+    expect(first.items).toHaveLength(2);
+    expect(next.items).toHaveLength(1);
+    expect(first.pagination.total).toBe(3);
+    expect(next.pagination.total).toBe(3);
+    expect([...first.items,...next.items].every(row => row.entryType !== 'grant')).toBe(true);
+  });
+});
+
+
+describe('WEB075 paginated personal ledger and full personal metrics', () => {
+  it('counts all 105 grants beyond the page and searches reasons for the selected friend only', async () => {
+    friend('me','同名'); friend('other','同名');
+    const thisMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0,7) + '-01T00:00:00Z';
+    for (let i=0;i<105;i++) {
+      grant(`me-${i}`,'me',null,2);
+      fixture.raw.prepare('UPDATE mileage_ledger SET occurred_at=?,reason=?,status=? WHERE id=?')
+        .run(thisMonth,'本人の購入',i === 0 ? 'pending' : 'available',`me-${i}`);
+    }
+    grant('other-grant','other',null,999);
+    grant('used','me',null,-3);
+    fixture.raw.prepare("UPDATE mileage_ledger SET entry_type='spend',reason='交換' WHERE id='used'").run();
+    const opts = { accountId: 'acc', friendId: 'me', visibleAccountIds: ['acc'], limit: 2 };
+    const result = await getMileageAdminHistory(fixture.db, { ...opts, kind: 'earned', search: '本人の購入', offset: 100 });
+    expect(result.items).toHaveLength(2);
+    expect(result.pagination.total).toBe(105);
+    expect(result.friendSummary).toMatchObject({ scope: 'visible_accounts', counts: { all: 106, earned: 105, spent: 1, voided: 0 }, pendingCount: 1, earnedThisMonth: 210, earnedCountThisMonth: 105 });
+    const spent = await getMileageAdminHistory(fixture.db, { ...opts, kind: 'spent' });
+    expect(spent.items.map(row=>row.id)).toEqual(['used']);
+    expect(spent.friendSummary).toEqual(result.friendSummary);
   });
 });

@@ -1,10 +1,15 @@
 // @vitest-environment happy-dom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { OperationHealthSnapshot } from '@/lib/api'
-import EmergencyPage from './page'
+import EmergencyPageInner from '@/v8/settings/emergency/screen'
+import { HealthPanelV8 as HealthPanel } from '@/v8/settings/emergency/health'
+
+vi.mock('@/contexts/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner', useStaffIdentity: () => ({ role: 'owner', readOnly: false }) }))
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -57,9 +62,9 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-const { EmergencyPageInner, HealthPanel } = EmergencyPage.__test
 
-function snapshot(summary: string): { success: true, data: OperationHealthSnapshot } {
+function snapshot(summary: string, status: 'normal' | 'warning' = 'normal'): { success: true, data: OperationHealthSnapshot } {
+  const now = new Date().toISOString()
   return {
     success: true,
     data: {
@@ -68,25 +73,25 @@ function snapshot(summary: string): { success: true, data: OperationHealthSnapsh
         lineAccountId: account.id,
         source: 'manual',
         status: 'completed',
-        overallStatus: 'normal',
-        startedAt: '2026-09-16T00:00:00.000Z',
-        completedAt: '2026-09-16T00:00:00.000Z',
+        overallStatus: status,
+        startedAt: now,
+        completedAt: now,
         results: [{
           id: 'result-1',
           runId: 'run-1',
           checkKey: 'webhook',
-          status: 'normal',
+          status,
           summary,
           value: null,
           threshold: null,
           source: 'manual',
-          observedAt: '2026-09-16T00:00:00.000Z',
+          observedAt: now,
         }],
       },
-      overallStatus: 'normal',
-      lastCheckedAt: '2026-09-16T00:00:00.000Z',
+      overallStatus: status,
+      lastCheckedAt: now,
       nextCheckAt: null,
-      serverNow: '2026-09-16T00:00:00.000Z',
+      serverNow: now,
     },
   }
 }
@@ -107,12 +112,22 @@ afterEach(() => {
 })
 
 describe('手動ヘルス確認の二重実行防止(N-458)', () => {
+  it('下の3つの数は未取得でも題を保ち、意味のない印を足さない', async () => {
+    const view = render(<HealthPanel canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
+    await flush()
+    const labels = Array.from(view.container.querySelectorAll('[data-kpi-label]'))
+    expect(labels.map(label => label.textContent)).toEqual(['止めた回数', 'いちばん長かった停止', 'いまの版'])
+    expect(view.container.querySelectorAll('[data-kpi-icon]')).toHaveLength(0)
+    expect(view.container.querySelectorAll('[data-kpi-number]')).toHaveLength(3)
+    expect(deferredList.run).toHaveLength(0)
+  })
+
   it('同一レンダーでの連打・ダブルクリックは1リクエストだけ送り、処理中は無効化する', async () => {
     render(<EmergencyPageInner />)
     deferredList.read[0]?.resolve(snapshot('初回の確認'))
     await flush()
 
-    const button = screen.getByRole('button', { name: '↻ いますぐ確かめる' })
+    const button = screen.getByRole('button', { name: 'いますぐ確かめる' })
     fireEvent.click(button)
     fireEvent.click(button)
     fireEvent.click(button)
@@ -120,10 +135,10 @@ describe('手動ヘルス確認の二重実行防止(N-458)', () => {
 
     expect(deferredList.run).toHaveLength(1)
     expect(deferredList.run[0]?.accountId).toBe('account-1')
-    expect((screen.getByRole('button', { name: '↻ 確認中…' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '確認中…' }) as HTMLButtonElement).disabled).toBe(true)
 
     // 別レンダー(応答待ちの間)に押しても増えない
-    fireEvent.click(screen.getByRole('button', { name: '↻ 確認中…' }))
+    fireEvent.click(screen.getByRole('button', { name: '確認中…' }))
     await flush()
     expect(deferredList.run).toHaveLength(1)
   })
@@ -133,15 +148,15 @@ describe('手動ヘルス確認の二重実行防止(N-458)', () => {
     deferredList.read[0]?.resolve(snapshot('初回の確認'))
     await flush()
 
-    fireEvent.click(screen.getByRole('button', { name: '↻ いますぐ確かめる' }))
+    fireEvent.click(screen.getByRole('button', { name: 'いますぐ確かめる' }))
     await flush()
     expect(deferredList.run).toHaveLength(1)
 
     await act(async () => { deferredList.run[0]?.resolve(snapshot('手動の確認1')) })
     await flush()
-    expect(((await screen.findByRole('button', { name: '↻ いますぐ確かめる' })) as HTMLButtonElement).disabled).toBe(false)
+    expect(((await screen.findByRole('button', { name: 'いますぐ確かめる' })) as HTMLButtonElement).disabled).toBe(false)
 
-    fireEvent.click(screen.getByRole('button', { name: '↻ いますぐ確かめる' }))
+    fireEvent.click(screen.getByRole('button', { name: 'いますぐ確かめる' }))
     await flush()
     expect(deferredList.run).toHaveLength(2)
   })
@@ -151,13 +166,13 @@ describe('手動ヘルス確認の二重実行防止(N-458)', () => {
     deferredList.read[0]?.resolve(snapshot('初回の確認'))
     await flush()
 
-    fireEvent.click(screen.getByRole('button', { name: '↻ いますぐ確かめる' }))
+    fireEvent.click(screen.getByRole('button', { name: 'いますぐ確かめる' }))
     await flush()
     await act(async () => { deferredList.run[0]?.reject(new Error('network down')) })
     await flush()
 
-    expect(((await screen.findByRole('button', { name: '↻ いますぐ確かめる' })) as HTMLButtonElement).disabled).toBe(false)
-    fireEvent.click(screen.getByRole('button', { name: '↻ いますぐ確かめる' }))
+    expect(((await screen.findByRole('button', { name: 'いますぐ確かめる' })) as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'いますぐ確かめる' }))
     await flush()
     expect(deferredList.run).toHaveLength(2)
   })
@@ -167,7 +182,7 @@ describe('手動ヘルス確認の二重実行防止(N-458)', () => {
     deferredList.read[0]?.resolve(snapshot('初回の確認'))
     await flush()
 
-    fireEvent.click(screen.getByRole('button', { name: '↻ いますぐ確かめる' }))
+    fireEvent.click(screen.getByRole('button', { name: 'いますぐ確かめる' }))
     await flush()
     expect(deferredList.run).toHaveLength(1)
 
@@ -184,16 +199,17 @@ describe('手動ヘルス確認の二重実行防止(N-458)', () => {
     await flush()
     expect(screen.queryByText('旧アカウントの結果')).toBeNull()
 
-    await act(async () => { deferredList.read.at(-1)?.resolve(snapshot('新アカウントの結果')) })
-    expect(await screen.findByText('新アカウントの結果')).toBeTruthy()
+    // 新アカウントの応答（注意）だけが帯に出る。板に実測の文は出さない。
+    await act(async () => { deferredList.read.at(-1)?.resolve(snapshot('新アカウントの結果', 'warning')) })
+    expect(await screen.findByText('全体の状態：注意 1 件')).toBeTruthy()
 
     // 手動実行が落ち着いたのでボタンは使える
-    expect(((await screen.findByRole('button', { name: '↻ いますぐ確かめる' })) as HTMLButtonElement).disabled).toBe(false)
+    expect(((await screen.findByRole('button', { name: 'いますぐ確かめる' })) as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('タブ往復の再マウントで処理済みの要求番号を手動実行として扱わない', async () => {
     // 以前クリックで3まで進んだ番号のまま HealthPanel が再マウントされた状況
-    render(<HealthPanel
+    render(<HealthPanel canManage
       accountId="account-1"
       manualRunRequest={3}
       onSeverity={vi.fn()}
@@ -206,7 +222,7 @@ describe('手動ヘルス確認の二重実行防止(N-458)', () => {
 
   it('確認中にアンマウントしてもロック解放コールバックが呼ばれ、例外にならない', async () => {
     const onSettled = vi.fn()
-    const view = render(<HealthPanel
+    const view = render(<HealthPanel canManage
       accountId="account-1"
       manualRunRequest={0}
       onSeverity={vi.fn()}
@@ -214,7 +230,7 @@ describe('手動ヘルス確認の二重実行防止(N-458)', () => {
     />)
     await flush()
     expect(deferredList.run).toHaveLength(0)
-    view.rerender(<HealthPanel
+    view.rerender(<HealthPanel canManage
       accountId="account-1"
       manualRunRequest={1}
       onSeverity={vi.fn()}

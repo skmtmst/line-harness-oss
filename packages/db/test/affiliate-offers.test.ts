@@ -13,7 +13,7 @@ import {
   setConversionApproval,
   getConversionApprovalNotifyInfo,
 } from '../src/affiliate-offers.js';
-import { trackConversion } from '../src/conversions.js';
+import { trackConversion } from '../src/conversions/index.js';
 import {
   getMileageHistoryForFriend,
   getMileageSummaryForFriend,
@@ -21,7 +21,7 @@ import {
   processPendingMileageEvents,
   recordEngagementEvent,
   syncAffiliateConversionMileage,
-} from '../src/mileage.js';
+} from '../src/mileage/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
@@ -486,6 +486,8 @@ describe('mileage foundation', () => {
   beforeEach(() => {
     sqlite = setupDb();
     db = asD1(sqlite);
+    sqlite.prepare("INSERT INTO line_accounts (id,channel_id,name,channel_secret,channel_access_token) VALUES ('non-ec-1','mileage-ch-1','店1','s','t'),('non-ec-2','mileage-ch-2','店2','s','t')").run();
+    sqlite.prepare("INSERT INTO account_settings(id,line_account_id,key,value) VALUES ('catalog-non-ec-1','non-ec-1','feature.specialized.catalog','[]'),('catalog-non-ec-2','non-ec-2','feature.specialized.catalog','[]')").run();
     sqlite
       .prepare(
         `INSERT INTO users (id, display_name, created_at, updated_at)
@@ -494,6 +496,7 @@ describe('mileage foundation', () => {
       .run();
     insertFriend(sqlite, 'friend-aff', 'U-AFF');
     insertFriend(sqlite, 'friend-customer', 'U-CUSTOMER');
+    sqlite.prepare("UPDATE friends SET line_account_id='non-ec-1' WHERE id IN ('friend-aff','friend-customer')").run();
     sqlite.prepare(`UPDATE friends SET user_id = 'user-aff' WHERE id = 'friend-aff'`).run();
     insertAffiliate(sqlite, 'aff-mile', 'friend-aff');
     insertConversionPoint(sqlite, 'cp-mile');
@@ -528,7 +531,7 @@ describe('mileage foundation', () => {
       lifetimeEarned: 750,
     });
     expect(await getMileageHistoryForFriend(db, 'friend-aff')).toHaveLength(1);
-    // 直接付与の台帳イベント + ルール適用キュー用の正規化イベント（N-238）の2行。
+    // 直接付与の台帳イベント + ルール適用キュー用の正規化イベントの2行。
     // 同じ承認を再送しても、どちらも冪等キーで増えない。
     expect(
       (sqlite.prepare(`SELECT COUNT(*) AS count FROM engagement_events`).get() as { count: number }).count,
@@ -547,7 +550,7 @@ describe('mileage foundation', () => {
     expect(history.map((item) => item.amount).sort((a, b) => a - b)).toEqual([-750, 750]);
   });
 
-  // N-238: 承認された紹介成果は「たまる決めごと」のきっかけとして選べる。
+  // 承認された紹介成果は「たまる決めごと」のきっかけとして選べる。
   // キューへ乗ったイベントが、対応するルールへ実際に届くことを確かめる。
   test('an approved conversion is queued so an affiliate_conversion_approved rule can grant', async () => {
     sqlite
@@ -653,7 +656,7 @@ describe('mileage foundation', () => {
 
   test('a linked user sees mileage earned from another LINE-account friend row', async () => {
     insertFriend(sqlite, 'friend-aff-2', 'U-AFF-SECOND');
-    sqlite.prepare(`UPDATE friends SET user_id = 'user-aff' WHERE id = 'friend-aff-2'`).run();
+    sqlite.prepare(`UPDATE friends SET user_id = 'user-aff', line_account_id = 'non-ec-2' WHERE id = 'friend-aff-2'`).run();
     await postMileageEntry(db, {
       beneficiaryUserId: 'user-aff',
       beneficiaryFriendId: 'friend-aff',

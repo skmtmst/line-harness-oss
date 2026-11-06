@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const db = {
+  hasSavedFeatureConfiguration: vi.fn(async () => false),
   resolveLineCredential: vi.fn(async () => 'token'),
   hasFirstDeliveredMessage: vi.fn(async () => true),
+  firstDeliveredMessageAt: vi.fn(async () => null),
+  toJstString: (date: Date) => date.toISOString(),
 };
 vi.mock('@line-crm/db', () => db);
 
@@ -41,7 +44,7 @@ const state = {
   }],
 };
 
-const accountRows = [{
+let accountRows = [{
   id: 'account-1',
   is_active: 1,
   channel_access_token: 'token',
@@ -101,6 +104,11 @@ function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: st
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  accountRows = [{
+    id: 'account-1', is_active: 1, channel_access_token: 'token',
+    channel_access_token_encrypted: null, channel_secret: 'secret', channel_secret_encrypted: null,
+  }];
   state.tags = 1;
   state.dismissedAt = null;
   state.fields = 0;
@@ -140,18 +148,18 @@ describe('GET /api/getting-started', () => {
     expect(body.data.steps.map((step) => step.state)).toEqual(['done', 'done', 'done', 'done', 'done']);
   });
 
-  it('Webhookを確認できない段を完了にしない', async () => {
+  it('登録済みならLINE側のWebhookを確認できなくても完了にする', async () => {
     webhook.fetchWebhookEndpoint.mockRejectedValue(new Error('temporary'));
     const response = await makeApp().fetch(
       new Request('https://example.com/api/getting-started?account_id=account-1'),
       { DB: database() },
     );
     const body = await response.json() as { data: { steps: Array<{ key: string; state: string }> } };
-    expect(body.data.steps.find((step) => step.key === 'accounts')?.state).toBe('stalled');
+    expect(body.data.steps.find((step) => step.key === 'accounts')?.state).toBe('done');
+    expect(webhook.fetchWebhookEndpoint).not.toHaveBeenCalled();
   });
 
-  it('R74: URL一致でもWebhook利用オフは完了にしない', async () => {
-    // 監査の再現: endpoint一致・active=false の実応答で usable=1 になっていた。
+  it('登録済みならLINE側のWebhook利用がオフでも完了にする', async () => {
     webhook.fetchWebhookEndpoint.mockResolvedValue({
       expectedUrl: 'https://worker.example.com/webhook',
       actualUrl: 'https://worker.example.com/webhook',
@@ -164,23 +172,17 @@ describe('GET /api/getting-started', () => {
     );
     const body = await response.json() as {
       data: {
-        steps: Array<{ key: string; state: string; reason: string | null; webhook: Array<{ id: string; active: boolean | null }> }>;
+        steps: Array<{ key: string; state: string; reason: string | null; webhook?: unknown }>;
       };
     };
     const accounts = body.data.steps.find((step) => step.key === 'accounts');
-    expect(accounts?.state).toBe('stalled');
-    expect(accounts?.reason).toContain('利用設定');
-    expect(accounts?.webhook).toEqual([{ id: 'account-1', status: 'matched', active: false }]);
+    expect(accounts?.state).toBe('done');
+    expect(accounts?.reason).toBeNull();
+    expect(accounts?.webhook).toBeUndefined();
   });
 
-  it('R74: 利用の読み取りが空でも一致は完了のままにする', async () => {
-    // `active: null`（読めなかった）を利用オフと混ぜない。従来どおり完了に数える。
-    webhook.fetchWebhookEndpoint.mockResolvedValue({
-      expectedUrl: 'https://worker.example.com/webhook',
-      actualUrl: 'https://worker.example.com/webhook',
-      active: null,
-      status: 'matched',
-    });
+  it('登録済みなら停止中のアカウントも段1は完了にする', async () => {
+    accountRows[0].is_active = 0;
     const response = await makeApp().fetch(
       new Request('https://example.com/api/getting-started?account_id=account-1'),
       { DB: database() },
@@ -189,19 +191,14 @@ describe('GET /api/getting-started', () => {
     expect(body.data.steps.find((step) => step.key === 'accounts')?.state).toBe('done');
   });
 
-  it('R74: URL一致かつWebhook利用オンは完了になる', async () => {
-    webhook.fetchWebhookEndpoint.mockResolvedValue({
-      expectedUrl: 'https://worker.example.com/webhook',
-      actualUrl: 'https://worker.example.com/webhook',
-      active: true,
-      status: 'matched',
-    });
+  it('アカウント未登録なら段1は未完了にする', async () => {
+    accountRows = [];
     const response = await makeApp().fetch(
       new Request('https://example.com/api/getting-started?account_id=account-1'),
       { DB: database() },
     );
     const body = await response.json() as { data: { steps: Array<{ key: string; state: string }> } };
-    expect(body.data.steps.find((step) => step.key === 'accounts')?.state).toBe('done');
+    expect(body.data.steps.find((step) => step.key === 'accounts')?.state).toBe('todo');
   });
 
   it('設定が空なら未完了と理由を返す', async () => {
@@ -282,3 +279,15 @@ describe('POST /api/getting-started/dismiss', () => {
     expect(state.dismissedAt).not.toBeNull();
   });
 });
+
+ it('V8 inserts saved feature configuration as step 2 and keeps delivery as step 6', async () => {
+  db.hasSavedFeatureConfiguration.mockResolvedValue(false);
+  const request = () => makeApp().request('/api/getting-started?account_id=account-1&version=v8', {}, { DB: database() });
+  const first = await (await request()).json() as {data:{steps:Array<{key:string;state:string}>;total:number;allDone:boolean}};
+  expect(first.data.total).toBe(6); expect(first.data.steps[1]).toMatchObject({key:'featureSet',state:'todo'});
+  expect(first.data.allDone).toBe(false);
+  db.hasSavedFeatureConfiguration.mockResolvedValue(true);
+  db.hasFirstDeliveredMessage.mockResolvedValue(false);
+  const saved = await (await request()).json() as typeof first;
+  expect(saved.data.steps[1].state).toBe('done'); expect(saved.data.steps[5]).toMatchObject({key:'firstMessage',state:'todo'});
+ });

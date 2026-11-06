@@ -1,5 +1,5 @@
 /**
- * ログインユーザーの権限モデル正本（N-424 / v6-30 §6-7）。
+ * ログインユーザーの権限モデル正本（docs/v6-requirements/v6-30-login-users-requirements-draft.md §6-7）。
  *
  * 画面の「項目ごとに決める」3択（変えられる=edit / 見えるだけ=view /
  * 出さない=none）と、役割bundleの初期値をここに置く。
@@ -36,7 +36,7 @@ export const ACCESS_USER_VIEW_KEY = 'access.user.view';
 export const ACCESS_AUDIT_VIEW_KEY = 'access.audit.view';
 
 /**
- * 一斉配信の操作キー（v6-06 §6 が正本）。
+ * 一斉配信の操作キー（-06 §6 が正本）。
  * 下書き作成・編集／テスト送信／予約・即時送信／緊急停止／失敗再送／CSV。
  */
 export const BROADCAST_DEFINITION_EDIT_KEY = 'broadcast.definition.edit';
@@ -46,7 +46,7 @@ export const BROADCAST_JOB_STOP_KEY = 'broadcast.job.stop';
 export const BROADCAST_JOB_RETRY_KEY = 'broadcast.job.retry';
 export const BROADCAST_RESULT_EXPORT_KEY = 'broadcast.result.export';
 /**
- * 一斉配信の承認キー（v6-06 §6 の二者承認）。
+ * 一斉配信の承認キー（-06 §6 の二者承認）。
  * 1,000通以上の送信を、送る人とは別の人が確かめるための鍵。
  * owner・admin は常に通る（role-guard の hasStaffPermission）。
  * 止める・送り直すと同じく束には入れず、管理者が個別に付ける。
@@ -64,8 +64,61 @@ export const BROADCAST_EDIT_OPERATION_KEYS: readonly string[] = [
   BROADCAST_RESULT_EXPORT_KEY,
 ];
 
+/** 束の鍵・APIの入口・画面の操作判定が読む共通の表。 */
+export const DELIVERY_FEATURE_POLICIES = {
+  broadcasts: { key: '/broadcasts', api: ['/api/broadcasts', '/api/broadcast-message-assets/upload-sessions'], edit: BROADCAST_DEFINITION_EDIT_KEY, test: BROADCAST_TEST_SEND_KEY, export: BROADCAST_RESULT_EXPORT_KEY, bundled: BROADCAST_EDIT_OPERATION_KEYS },
+  scenarios: { key: '/scenarios', api: ['/api/scenarios', '/api/scenario-drafts'], edit: 'scenario.definition.edit', test: 'scenario.definition.edit', publish: 'scenario.definition.publish', managersOnly: ['publish'], bundled: ['scenario.definition.edit'] },
+  reminders: { key: '/reminders', api: ['/api/reminders', '/api/friend-reminders', '/api/reminder-runs'], edit: '/reminders' },
+  autoReplies: { key: '/auto-replies', api: ['/api/auto-replies', '/api/auto-reply-runs'], edit: '/auto-replies' },
+  friendAdd: { key: '/friend-add-settings', api: ['/api/friend-add', '/api/friend-add-rules', '/api/friend-add-runs'], edit: '/friend-add-settings', publish: 'friend_add.definition.publish', managersOnly: ['publish'] },
+  templates: { key: '/templates', api: ['/api/templates'], edit: '/templates' },
+  richMenus: { key: '/rich-menus', api: ['/api/rich-menu', '/api/rich-menus', '/api/rich-menu-groups', '/api/rich-menu-images'], edit: '/rich-menus', test: '/rich-menus', publish: 'richmenu.definition.publish', archive: 'richmenu.definition.archive', managersOnly: ['edit', 'publish', 'archive'] },
+  lineNotifications: { key: '/line-notifications', api: ['/api/line-notifications'], edit: '/line-notifications' },
+  nenCampaigns: { key: '/nen-campaigns', api: ['/api/nen-campaigns'], edit: '/nen-campaigns' },
+  nenMembers: { key: '/nen-members', api: ['/api/nen-members'], edit: '/nen-members' },
+  webinars: { key: '/webinars', api: ['/api/webinars'], edit: '/webinars', export: 'administrator' },
+  contents: { key: '/contents', api: ['/api/contents', '/api/media', '/api/file-scans'], edit: '/contents' },
+  commonVars: { key: '/contents/vars', api: ['/api/common-vars'], edit: '/contents/vars', export: 'administrator' },
+  forms: { key: '/form-submissions', api: ['/api/forms'], edit: '/form-submissions', publish: 'form.definition.publish', archive: 'form.definition.archive', export: 'form.submission.export', managersOnly: ['publish', 'archive'] },
+} satisfies Record<string, { key: string; api: string[]; edit: string; test?: string; export?: string; publish?: string; archive?: string; managersOnly?: readonly StaffFeatureOperation[]; bundled?: readonly string[] }>;
+
+export type DeliveryFeature = keyof typeof DELIVERY_FEATURE_POLICIES;
+export type StaffFeatureOperation = 'view' | 'edit' | 'test' | 'export' | 'publish' | 'archive';
+export interface StaffAccessSubject {
+  role?: string | null;
+  permissionKeys?: readonly string[];
+  viewPermissionKeys?: readonly string[];
+  readOnly?: boolean;
+}
+
+export function deliveryPermissionKey(feature: DeliveryFeature, operation: StaffFeatureOperation): string {
+  const policy: { key: string; edit: string; test?: string; export?: string; publish?: string; archive?: string } = DELIVERY_FEATURE_POLICIES[feature];
+  if (operation === 'view') return policy.key;
+  return operation === 'edit' ? policy.edit : policy[operation] ?? policy.edit;
+}
+
+export function hasStaffAccess(subject: StaffAccessSubject | null | undefined, key: string, read = false): boolean {
+  if (!subject?.role || (!read && subject.readOnly)) return false;
+  if (subject.role === 'owner' || subject.role === 'admin') return true;
+  if (subject.role !== 'staff' || key === 'administrator') return false;
+  return subject.permissionKeys?.includes(key) === true
+    || (read && subject.viewPermissionKeys?.includes(key) === true);
+}
+
+export function hasDeliveryAccess(subject: StaffAccessSubject | null | undefined, feature: DeliveryFeature, operation: StaffFeatureOperation): boolean {
+  if (operation === 'export' && subject?.readOnly) return false;
+  const policy: { key: string; managersOnly?: readonly StaffFeatureOperation[] } = DELIVERY_FEATURE_POLICIES[feature];
+  if (policy.managersOnly?.includes(operation) && subject?.role !== 'owner' && subject?.role !== 'admin') return false;
+  const read = operation === 'view';
+  return hasStaffAccess(subject, DELIVERY_FEATURE_POLICIES[feature].key, read)
+    && hasStaffAccess(subject, deliveryPermissionKey(feature, operation), read);
+}
+
+export const DELIVERY_API_PERMISSIONS: Array<[string, string]> = Object.values(DELIVERY_FEATURE_POLICIES)
+  .flatMap((policy) => policy.api.map((prefix): [string, string] => [prefix, policy.key]));
+
 /**
- * 予約の細かい権限（N-411 / v6-30 §7-2「予約管理editでも予約設定は別permission」）。
+ * 予約の細かい権限（同じ要件の §7-2「予約管理editでも予約設定は別permission」）。
  * - `/booking/menus`: メニューと担当割当の編集・閲覧
  * - `booking.settings`: 予約設定（受付枠・資源・例外・予約スタッフ登録）の変更
  * - `booking.staff.own`: 本人に紐づく予約スタッフの勤務（シフト・休憩・連携）
@@ -102,7 +155,7 @@ export const SCOPE_ITEMS: readonly ScopeItem[] = [
     kind: 'email_mask',
     keys: [],
     /*
-     * LAY-09: この注記は現在の状態の説明ではなく「伏せて見せる」を選んだときの
+     * この注記は現在の状態の説明ではなく「伏せて見せる」を選んだときの
      * 一般説明。「そのまま見せる」の選択と併存しても矛盾しないよう、
      * 選択肢への条件付きの文にする（現在の見せ方の説明は画面右欄が出す）。
      */
@@ -113,22 +166,7 @@ export const SCOPE_ITEMS: readonly ScopeItem[] = [
     label: '配信',
     note: '一斉配信・シナリオ・リマインダ',
     kind: 'feature',
-    keys: [
-      '/broadcasts',
-      '/scenarios',
-      '/reminders',
-      '/auto-replies',
-      '/friend-add-settings',
-      '/templates',
-      '/rich-menus',
-      '/line-notifications',
-      '/nen-campaigns',
-      '/nen-members',
-      '/webinars',
-      '/contents',
-      '/contents/vars',
-      '/form-submissions',
-    ],
+    keys: Object.values(DELIVERY_FEATURE_POLICIES).map((policy) => policy.key),
     hint: '誤送信を防ぐためです',
   },
   {
@@ -199,6 +237,7 @@ export const SCOPE_ITEMS: readonly ScopeItem[] = [
     kind: 'feature',
     keys: ['/health'],
   },
+  { id: 'visit_stamps', label: '来店スタンプ', note: 'カード・押印・紙の移行', kind: 'feature', keys: ['/visit-stamps'] },
 ];
 
 export const SCOPE_ITEM_IDS: readonly string[] = SCOPE_ITEMS.map((item) => item.id);
@@ -212,7 +251,7 @@ export interface BundlePreset {
 }
 
 /**
- * bundle の初期権限（v6-30 §6 が正本）。
+ * bundle の初期権限（-30 §6 が正本）。
  *
  * - 管理者: 全機能 edit（実際の判定は role=owner/admin が全通過）
  * - 運用: 配信・予約・コンテンツ・受信箱・友だちを edit、分析・運用状態は view
@@ -238,6 +277,7 @@ export const BUNDLE_PRESETS: Record<Exclude<AccessRoleBundleId, 'custom'>, Bundl
       analytics: 'view',
       settings: 'none',
       operations: 'view',
+      visit_stamps: 'edit',
     },
     emailMask: 'masked',
   },
@@ -254,6 +294,7 @@ export const BUNDLE_PRESETS: Record<Exclude<AccessRoleBundleId, 'custom'>, Bundl
       analytics: 'none',
       settings: 'none',
       operations: 'view',
+      visit_stamps: 'edit',
     },
     emailMask: 'masked',
   },
@@ -274,7 +315,11 @@ export function scopeLevelsToKeys(levels: ScopeLevels): { edit: string[]; view: 
       edit.push(...item.keys);
       // 配信を変えられる人は、下書き・テスト・送信・CSVも組で付ける。
       // 止める・送り直すは指定者のみ（ここには入れない）。
-      if (item.id === 'delivery') edit.push(...BROADCAST_EDIT_OPERATION_KEYS);
+      if (item.id === 'delivery') {
+        for (const policy of Object.values(DELIVERY_FEATURE_POLICIES)) {
+          if ('bundled' in policy) edit.push(...policy.bundled);
+        }
+      }
     } else if (level === 'view') view.push(...item.keys);
   }
   return { edit, view };
@@ -294,3 +339,15 @@ export function keysToScopeLevels(editKeys: string[], viewKeys: string[]): Scope
   }
   return levels;
 }
+
+/** 既存の「配信=edit」の完全な束も、同じ表の操作鍵に展開する（DB更新不要）。 */
+export function effectiveStaffEditKeys(keys: readonly string[]): string[] {
+  if (!Array.isArray(keys)) return [];
+  keys = keys.filter((key): key is string => typeof key === 'string');
+  const delivery = SCOPE_ITEMS.find((item) => item.id === 'delivery')!;
+  return [...new Set(delivery.keys.every((key) => keys.includes(key))
+    ? [...keys, ...scopeLevelsToKeys({ delivery: 'edit' }).edit]
+    : keys)];
+}
+export const SCOPE_OPERATION_KEYS: readonly string[] = Object.values(DELIVERY_FEATURE_POLICIES)
+  .flatMap((policy) => 'bundled' in policy ? [...policy.bundled] : []);

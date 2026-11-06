@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar';
 
@@ -32,11 +33,7 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-/**
- * Mint a short-lived OAuth token from an instance-level Google service account.
- * The private key never enters D1 or the admin browser. Calendar owners only
- * need to share their calendar with the service-account email and save its ID.
- */
+/** 共有の Google サービスアカウントから短期トークンを発行する。秘密鍵は D1・ブラウザへ渡さず、利用者はカレンダーをサービスアカウントへ共有して ID だけを保存する。 */
 export async function getGoogleServiceAccountToken(
   credentials: GoogleServiceAccountCredentials,
   scopes: string | string[] = CALENDAR_SCOPE,
@@ -77,7 +74,7 @@ export async function getGoogleServiceAccountToken(
   const assertion = `${unsigned}.${base64Url(new Uint8Array(signature))}`;
 
   const response = await fetch(TOKEN_URL, {
-    method: 'POST',
+    method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(10_000),
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
@@ -85,8 +82,8 @@ export async function getGoogleServiceAccountToken(
     }),
   });
   if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(`google_service_account_token_failed:${response.status}:${detail.slice(0, 300)}`);
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error(`google_service_account_token_failed:${response.status}`);
   }
   const data = await response.json<{ access_token?: string; expires_in?: number }>();
   if (!data.access_token) throw new Error('google_service_account_token_missing');

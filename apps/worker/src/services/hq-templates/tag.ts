@@ -1,8 +1,19 @@
 import { normalizeScopedTagName, type HqTemplateStatement } from '@line-crm/db';
+
 import { unsupportedHqTemplateAdapter, type HqTemplateResolution, type HqTemplateAdapter, type HqTemplateAuthority } from './contract.js';
 
 export class HqTemplateError extends Error {
-  constructor(public code: string, public status: 400 | 403 | 404 | 409 | 422 | 500 = 400) { super(code); }
+  readonly fields: Record<string, string>;
+  constructor(public code: string, public status: 400 | 403 | 404 | 409 | 422 | 500 = 400, fieldKeys?: readonly string[]) {
+    super(code);
+    const keys: Record<string, string[]> = {
+      INVALID_VERSION: ['version'], INVALID_IMAGE: ['definition'], INVALID_TYPE: ['type'], INVALID_KIND: ['kind'], INVALID_REQUEST_ID: ['requestId'],
+      INVALID_DEFINITION: ['definition'], UNSUPPORTED_REFERENCE: ['definition'], UNSUPPORTED: ['definition'],
+      INVALID_FOLDER_COLOR: ['color'], INVALID_FOLDER: ['folderId'], INVALID_NAME: ['name'], INVALID_REVISION: ['expectedRevision'],
+      INVALID_ACCOUNTS: ['accountIds'], INVALID_SELECTION: ['preflightId', 'resolutions'],
+    };
+    this.fields = Object.fromEntries((fieldKeys ?? keys[code] ?? []).map(key => [key, '入力内容を確認してください']));
+  }
 }
 export type TagDefinition = {
   schemaVersion: 1;
@@ -25,8 +36,8 @@ function object(v: unknown): Record<string, unknown> {
   if (!v || typeof v !== 'object' || Array.isArray(v)) throw new HqTemplateError('INVALID_DEFINITION');
   return v as Record<string, unknown>;
 }
-export function boundedText(v: unknown, max = 200): string {
-  if (typeof v !== 'string' || !v.trim() || v.length > max) throw new HqTemplateError('INVALID_DEFINITION');
+export function boundedText(v: unknown, max = 200, field = 'definition'): string {
+  if (typeof v !== 'string' || !v.trim() || v.length > max) throw new HqTemplateError('INVALID_DEFINITION', 400, [field]);
   return v.trim();
 }
 function color(v: unknown): string | null {
@@ -92,7 +103,7 @@ export function parseTagDefinition(v: unknown): TagDefinition {
   const allowedTagKeys = new Set(['name','color','description','folderId','isStarred','manualAssignmentAllowed','reapplyPolicy','linkedEnabled','mileage','actions']);
   if (Object.keys(tag).some(key => !allowedTagKeys.has(key))) throw new HqTemplateError('UNSUPPORTED_REFERENCE');
   return { schemaVersion: 1, tag: {
-    name: boundedText(tag.name), color: color(tag.color) ?? '#3B82F6',
+    name: boundedText(tag.name), color: color(tag.color) ?? '#94a3b8',
     description: tag.description == null || tag.description === '' ? null : boundedText(tag.description, 2000), folderId,
     ...(tag.isStarred === undefined ? {} : { isStarred: boolean(tag.isStarred, false) }),
     ...(tag.manualAssignmentAllowed === undefined ? {} : { manualAssignmentAllowed: boolean(tag.manualAssignmentAllowed, true) }),
@@ -107,7 +118,7 @@ export function parseTagDefinition(v: unknown): TagDefinition {
     ...(parsedActions === undefined ? {} : { actions: parsedActions }),
   }, folders: ordered };
 }
-// This same projection is checked inside the write batch, closing the read/write race.
+// 確認後の競合を防ぐため、書込 batch 内でも同じ状態を照合する。
 const SNAPSHOT_SQL = `SELECT json_object(
  'tags',json((SELECT json_group_array(json_object('id',t.id,'name',t.name,'normalized_name',t.normalized_name,'color',t.color,'description',t.description,'folder_id',t.folder_id,'updated_at',t.updated_at,'version',t.version,'status',t.status,'action_id',(SELECT ca.id FROM common_action_bindings b JOIN common_actions ca ON ca.id=b.common_action_id AND ca.line_account_id=b.line_account_id WHERE b.line_account_id=? AND b.consumer_type='tag' AND b.consumer_id=t.id AND b.consumer_path='tag.added' ORDER BY ca.updated_at DESC,ca.id DESC LIMIT 1),'draft_id',(SELECT ca.current_draft_version_id FROM common_action_bindings b JOIN common_actions ca ON ca.id=b.common_action_id AND ca.line_account_id=b.line_account_id WHERE b.line_account_id=? AND b.consumer_type='tag' AND b.consumer_id=t.id AND b.consumer_path='tag.added' ORDER BY ca.updated_at DESC,ca.id DESC LIMIT 1),'binding_version_id',(SELECT b.common_action_version_id FROM common_action_bindings b JOIN common_actions ca ON ca.id=b.common_action_id AND ca.line_account_id=b.line_account_id WHERE b.line_account_id=? AND b.consumer_type='tag' AND b.consumer_id=t.id AND b.consumer_path='tag.added' ORDER BY ca.updated_at DESC,ca.id DESC LIMIT 1),'action_count',(SELECT COUNT(*) FROM common_action_bindings b WHERE b.line_account_id=? AND b.consumer_type='tag' AND b.consumer_id=t.id AND b.consumer_path='tag.added'))) FROM (SELECT * FROM tags WHERE line_account_id=? ORDER BY id) t)),
  'folders',json((SELECT json_group_array(json_object('id',id,'name',name,'parent_id',parent_id,'color',color,'updated_at',updated_at)) FROM (SELECT * FROM folders WHERE kind='tag' AND account_id=? ORDER BY id)))
@@ -187,7 +198,7 @@ export function planTags(input: { accountId: string; actorId: string; definition
 }
 export const tagHqTemplateAdapter = unsupportedHqTemplateAdapter('tag');
 
-/** A fresh adapter per store; no tenant, definition or snapshot is kept globally. */
+/** 店舗ごとに新しいアダプターを作り、統括・定義・写しをグローバルへ残さない。 */
 export function createTagHqTemplateAdapter(db: D1Database, authority: HqTemplateAuthority): HqTemplateAdapter {
   let definition: TagDefinition | null = null, snapshot: string | null = null;
   let plan: ReturnType<typeof planTags> | null = null;

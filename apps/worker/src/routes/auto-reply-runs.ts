@@ -1,3 +1,8 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { parseExecutionDateRange, type ExecutionRunStatus } from '@line-crm/shared';
+
 import { Hono } from 'hono';
 import {
   getAutoReplies,
@@ -7,24 +12,16 @@ import {
   type AutoReplyEvaluationStatus,
   type AutoReplyRunListRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   AutoReplyActionRetryError,
   retryAutoReplyActionRuns,
-} from '../services/auto-reply.js';
+} from '../features/auto-replies/auto-reply/index.js';
 
 const autoReplyRuns = new Hono<Env>();
-
-type ExecutionRunStatus =
-  | 'queued'
-  | 'claimed'
-  | 'succeeded'
-  | 'skipped'
-  | 'retry_wait'
-  | 'permanent_failed'
-  | 'cancelled';
 
 interface AutoReplyRun {
   id: string;
@@ -48,6 +45,7 @@ interface AutoReplyRun {
   inputPreview: string | null;
   matchedKeyword: string | null;
   versionNumber: number | null;
+  errorCode: string | null;
   domainStatus: AutoReplyEvaluationStatus;
   replyStatus: 'not_attempted' | 'accepted' | 'failed';
   actionSummary: Record<string, number>;
@@ -116,6 +114,7 @@ const SKIP_LABELS: Record<string, string> = {
   outside_active_window: '応答する時間帯の外でした',
   weekday_not_allowed: '応答しない曜日でした',
   operator_handling: '担当者が対応中のため何もしませんでした',
+  partial_failure_requires_retry: '前の返信は受理済みです。前の実行結果から失敗した処理だけを再実行してください',
   already_replied_once: '1人1回の設定により何もしませんでした',
   cooldown_active: '連続返信を防ぐため何もしませんでした',
   friend_conditions_not_met: '友だちの条件に合いませんでした',
@@ -136,8 +135,11 @@ function detail(row: AutoReplyRunListRow, status: AutoReplyEvaluationStatus): st
     } catch {
       candidateReason = null;
     }
-    return SKIP_LABELS[candidateReason ?? row.skip_reason ?? ''] ?? '条件に合わず何もしませんでした';
+    const reason = row.candidate_result === 'skipped'
+      ? candidateReason ?? row.skip_reason : row.skip_reason ?? candidateReason;
+    return SKIP_LABELS[reason ?? ''] ?? '条件に合わず何もしませんでした';
   }
+  if (row.error_code === 'delayed_delivery_unknown') return '届いたか分からないため要確認です。自動では送り直しません';
   if (row.status === 'reply_failed') return 'LINEへの返信を受け付けてもらえませんでした';
   if (row.status === 'partial_failed') return '返信または一部の処理だけ完了しました';
   if (row.status === 'failed') return '自動応答を完了できませんでした';
@@ -181,7 +183,7 @@ function serializeRun(
     // 返信の失敗だけ・成功・処理中・見送り（選択ルールの見送り表示を含む）には出さない。
     // ただし途中で止まった再実行（actions_running のまま失敗行が残り、
     // 確保済みの行が無い）は再実行の入口が通るのでボタンを出す。
-    canRetry: row.has_failed_action_run === 1 && (
+    canRetry: row.error_code !== 'delayed_delivery_unknown' && row.has_failed_action_run === 1 && (
       RETRYABLE_DOMAIN_STATUSES.has(domainStatus)
       || (row.status === 'actions_running' && row.has_inflight_action_run === 0)
     ),
@@ -193,17 +195,12 @@ function serializeRun(
     inputPreview: canViewInput ? row.input_preview_masked : null,
     matchedKeyword: row.matched_keyword,
     versionNumber: row.version_number,
+    errorCode: row.error_code,
     domainStatus,
     replyStatus: row.reply_status,
     actionSummary: parseActionSummary(row.action_summary),
     lineRequestId: row.line_request_id,
   };
-}
-
-function boundedInteger(raw: string | undefined, fallback: number, max: number): number {
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 0) return fallback;
-  return Math.min(value, max);
 }
 
 async function normalizedSearchHash(value: string): Promise<string> {
@@ -214,7 +211,7 @@ async function normalizedSearchHash(value: string): Promise<string> {
 
 /** UTCで保存した受信時刻を、日本の月境界に合わせて集計する。 */
 function currentJstMonthUtcRange(now: Date): { from: string; to: string } {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(now);
   const year = jst.getUTCFullYear();
   const month = jst.getUTCMonth();
   const from = new Date(Date.UTC(year, month, 1) - 9 * 60 * 60 * 1000).toISOString();
@@ -227,6 +224,9 @@ autoReplyRuns.get(
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
     try {
+      let range;
+      try { range = parseExecutionDateRange({ from: c.req.query('from'), to: c.req.query('to') }); }
+      catch (error) { return c.json({ success: false, error: (error as Error).message }, 400); }
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       const requestedRuleId = c.req.query('rule_id') || c.req.query('ruleId') || undefined;
       const allRules = await getAutoReplies(c.env.DB);
@@ -246,12 +246,13 @@ autoReplyRuns.get(
       const status = statusRaw && DOMAIN_STATUSES.has(statusRaw as AutoReplyEvaluationStatus)
         ? statusRaw as AutoReplyEvaluationStatus
         : undefined;
-      const limit = Math.max(1, boundedInteger(c.req.query('limit'), 20, 100));
-      const offset = boundedInteger(c.req.query('offset'), 0, 1_000_000);
+      const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: { fallback: 'nonnegative-integer', minimum: 1, maximum: 100 } }).limit;
+      const offset = parseOffsetPaging({ offset: c.req.query('offset') }, { offsetPolicy: { fallback: 'nonnegative-integer', maximum: 1_000_000 } }).offset;
       const search = c.req.query('search')?.trim() || undefined;
       const staff = c.get('staff');
       const canViewInput = staff.role !== 'staff' || staff.permissionKeys?.includes('/chats') === true;
       const shared = {
+        ...range,
         ruleId: selectedRule?.id,
         lineAccountIds: scope.allowedAccountIds,
         includeUnassigned: scope.canSeeUnassigned,
@@ -312,27 +313,27 @@ autoReplyRuns.get(
         )),
         pagination: { total: runs.total, limit, offset },
       };
-      return c.json({ success: true, data });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: runs.total, paging: { limit, offset }, sort: [{ field: 'evaluatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
     } catch (error) {
-      console.error('GET /api/auto-reply-runs failed', error);
-      return c.json({ success: false, error: '自動応答の実行結果を表示できませんでした' }, 500);
+      throw error;
     }
   },
 );
 
 /*
- * N-081: permanent_failed の処理行だけを、保存済みの写しでやり直す。
+ * permanent_failed の処理行だけを、保存済みの写しでやり直す。
  * LINE の返信・受信イベント・現在のルール定義は一切触らない。
  * 更新系なのでオーナー・管理者だけ。スタッフは403。
  */
 autoReplyRuns.post(
   '/api/auto-reply-runs/:id/retry',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       const outcome = await retryAutoReplyActionRuns(c.env.DB, {
         evaluationId: c.req.param('id'),
+        operatorMailEnv: c.env,
         allowedAccountIds: scope.allowedAccountIds,
         canSeeUnassigned: scope.canSeeUnassigned,
       });
@@ -340,10 +341,9 @@ autoReplyRuns.post(
     } catch (error) {
       if (error instanceof AutoReplyActionRetryError) {
         const status = error.code === 'not_found' ? 404 : 409;
-        return c.json({ success: false, error: error.message, code: error.code }, status);
+        return inputError(c, { success: false, error: error.message, code: error.code }, status);
       }
-      console.error('POST /api/auto-reply-runs/:id/retry failed', error);
-      return c.json({ success: false, error: '失敗した処理をもう一度実行できませんでした' }, 500);
+      throw error;
     }
   },
 );

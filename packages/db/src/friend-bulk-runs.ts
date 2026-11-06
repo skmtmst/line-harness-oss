@@ -7,6 +7,7 @@ import type {
   FriendBulkRunSummary,
   FriendBulkSelection,
 } from '@line-crm/shared';
+import { idChunks } from './id-queries.js';
 
 interface RunRow {
   id: string;
@@ -114,6 +115,7 @@ export async function createFriendBulkRun(
     idempotencyKey: string;
     scheduledAt?: string | null;
     undoOfRunId?: string | null;
+    messageApprovalThreshold?: number;
     now: string;
   },
 ): Promise<{ run: FriendBulkRunSummary; created: boolean }> {
@@ -164,8 +166,17 @@ export async function createFriendBulkRun(
       input.now,
     ),
   ];
-  for (let offset = 0; offset < input.targets.length; offset += 50) {
-    const chunk = input.targets.slice(offset, offset + 50);
+  if (input.messageApprovalThreshold !== undefined) {
+    statements.push(db.prepare(`INSERT INTO friend_bulk_message_approvals
+      (run_id, status, recipient_count, threshold, requested_by, requested_at)
+      VALUES (?, 'pending', ?, ?, ?, ?)`)
+      .bind(runId, input.targets.length, input.messageApprovalThreshold, input.createdBy, input.now));
+    statements.push(db.prepare(`INSERT INTO friend_bulk_message_approval_events
+      (id, run_id, actor_staff_id, action, created_at) VALUES (?, ?, ?, 'requested', ?)`)
+      .bind(crypto.randomUUID(), runId, input.createdBy, input.now));
+  }
+  let offset = 0;
+  for (const chunk of idChunks(input.targets, 0, 7)) {
     const values: unknown[] = [];
     const rows = chunk.map((target, index) => {
       const ordinal = offset + index;
@@ -180,11 +191,12 @@ export async function createFriendBulkRun(
          (id, run_id, friend_id, line_account_id, ordinal, status, idempotency_key, updated_at)
        VALUES ${rows.join(',')}`,
     ).bind(...values));
+    offset += chunk.length;
   }
   statements.push(db.prepare(
-    `UPDATE friend_bulk_runs SET status = 'queued', target_count = ?, updated_at = ?
+    `UPDATE friend_bulk_runs SET status = ?, target_count = ?, updated_at = ?
       WHERE id = ? AND status = 'preparing'`,
-  ).bind(input.targets.length, input.now, runId));
+  ).bind(input.messageApprovalThreshold === undefined ? 'queued' : 'waiting', input.targets.length, input.now, runId));
   try {
     // D1 の batch は全体が1トランザクションになる。実行台帳だけ、または対象の
     // 一部だけが残る中間状態を外から観測させない。
@@ -373,6 +385,8 @@ export async function listDueFriendBulkRunIds(
        FROM friend_bulk_runs r
        JOIN friend_bulk_run_items i ON i.run_id = r.id
       WHERE r.status IN ('queued','running','waiting')
+        AND NOT EXISTS (SELECT 1 FROM friend_bulk_message_approvals a
+          WHERE a.run_id = r.id AND a.status IN ('pending', 'expired'))
         AND (r.scheduled_at IS NULL OR r.scheduled_at <= ?)
         AND (
           i.status = 'queued'

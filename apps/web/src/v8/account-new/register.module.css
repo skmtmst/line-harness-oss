@@ -1,0 +1,336 @@
+/* ★V8-B LINEアカウントを登録（・・・・・）。
+   寸法は app/globals.css の [data-theme="v8"] の --tpl-htn-* に1か所。ここには数字を書かない。 */
+
+.body {
+  display: flex; flex-direction: column; gap: var(--tpl-htn-gap);
+  padding: var(--tpl-acct-register-body-pad); min-width: 0; color: var(--color-ink);
+}
+
+.column { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-panel-gap); }
+
+.panel {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
+
+}
+.panelTitle {
+  width: fit-content; max-width: 100%;
+  margin: 0; padding: 0; font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink);
+}
+/* 右の案内は共通の Card が地と角を持つ。画面CSSは置き場所だけ（★V8 §24）。 */
+.aside { align-self: flex-start; }
+/* 中の字は Card ではなく中の h2・p に直接あてる。Card へ渡す .aside には見た目を書かない。 */
+.asideH2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
+.asideP { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
+/* 正本 v07 ②の右の列（RtWJZ）の小さな題（右題3）と、その上の細い区切り（sKgxt／D4k4qv）。 */
+.asideH3 { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
+.asideLine { height: 1px; background: var(--color-hairline); }
+
+/* 案内の一文を囲む箱と、横並びのボタン（②③で使う） */
+.noteBox {
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary);
+}
+.noteBox p, .noteBox ul { margin: 0; }
+.buttonRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-htn-gap-s); }
+
+/* ② チャネル設定 */
+.groupLabel { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink-secondary); }
+.field { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); min-width: 0; }
+.label { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 600; color: var(--color-ink); }
+.fieldError { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-danger); }
+.help { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+.inputWarning { margin: 0; color: var(--color-warning); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); }
+.secretRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-panel-gap); }
+.secretNote {
+  display: inline-flex; align-items: center; gap: var(--tpl-htn-gap-s);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint);
+}
+
+/* ③ 基本情報 */
+.tagRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-htn-chip-gap); }
+/* タグの選ぶ欄は残りの幅いっぱい、［タグを追加］は同じ行の右。 */
+.tagPick { flex: 1 1 0; min-width: 0; }
+/* 表示名・LINE ID の2列と［LINEから取得］を1行に。ボタンは欄の下端にそろえる。 */
+.idRow { display: flex; align-items: flex-end; gap: var(--tpl-htn-chip-gap); min-width: 0; }
+.idRow > :first-child { flex: 1 1 0; min-width: 0; }
+.tagAdd { display: inline-flex; align-items: center; gap: var(--tpl-htn-chip-gap); width: var(--tpl-htn-tag-input-w); }
+.infoBox {
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary);
+}
+.infoBox p { margin: 0; min-width: 0; }
+.moreBox { display: flex; flex-direction: column; gap: var(--tpl-htn-panel-gap); }
+.endpointValue {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary);
+}
+
+.progressHead {
+  display: flex; justify-content: space-between; gap: var(--tpl-htn-panel-gap);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink);
+}
+.progressHead strong { font-weight: 700; }
+.progressWarn { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-status-warn-deep); }
+.progressNote { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
+
+/* 下の帯：本文のすぐ下に置き、長いときは画面の下に追従する。ボタンは中央。 */
+
+/* 結果の窓 */
+.result {
+  align-self: stretch; display: flex; flex-direction: column; gap: var(--tpl-htn-result-gap);
+  margin: var(--tpl-htn-result-pull-top) 0 var(--tpl-htn-result-pull-bottom);
+}
+.dialogFooter {
+  display: flex; justify-content: flex-end; align-items: center; gap: var(--tpl-htn-gap-s);
+  padding: var(--tpl-htn-dialog-footer-pad); box-shadow: var(--tpl-htn-line-top);
+}
+.resultLead { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
+
+.manualAck { padding: var(--tpl-htn-ack-pad); }
+
+/* ===== ここから v07（p6zMkA・Fqy29・Lwxyh・X0pGdw・Plmq1）。寸法は globals.css の --tpl-htn6-*。 ===== */
+
+/* ②③の段の札（Step 2 / 4 など） */
+.subBadge {
+  align-self: flex-start; padding: var(--tpl-htn-chip-pad); border-radius: var(--tpl-htn-radius-pill);
+  background: var(--color-surface-pearl); box-shadow: var(--tpl-htn-ring);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); font-weight: 700; color: var(--color-ink-secondary);
+}
+
+/* ① 事前確認（p6zMkA）。カードの頭は 題・？・のび・札 の順（B2SpuV）。 */
+/* 字の塊の初期余白はここで一度だけ消す。段ごとに margin: 0 を書くと
+   画面側の余白の数が増える（apps/web/scripts/screen-css-budget.mjs）。 */
+.precheckLead,
+.precheckSummaryText,
+.precheckQuestionTitle,
+.precheckNote p,
+.precheckNoteTitle,
+.precheckResultHeading,
+.precheckResultTitle,
+.precheckResultBody,
+.outlineTitle,
+.outlineCount,
+.outlineText p,
+.outlineAuto p,
+.webhookUrlTitle,
+.ackNote { margin: 0; }
+.precheckHead { display: flex; align-items: center; gap: var(--tpl-htn6-pre-head-gap); }
+.precheckHead .subBadge { margin-inline-start: auto; }
+.precheckHelpMark { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--color-ink-faint); }
+.precheckLead { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
+
+/* 承認済み v07 の Ds3E2「musubo の Webhook URL」。白い枠の中にURL、右に［コピー］。 */
+.webhookUrlTitle {
+  display: flex; align-items: center; gap: var(--tpl-htn-chip-gap);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17);
+  font-weight: 700; color: var(--color-ink);
+}
+.webhookUrlRow { display: flex; align-items: center; gap: var(--tpl-htn6-pre-head-gap); min-width: 0; }
+.webhookUrlRow > :first-child { flex: 1 1 0; min-width: 0; }
+
+/* 答えた質問の一覧。1行ずつ「ラベル　→　答え」と「変更」。 */
+.precheckSummary { display: flex; flex-direction: column; gap: var(--tpl-htn6-pre-row-gap); }
+.precheckSummaryRow {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-gap-s);
+  padding: var(--tpl-htn6-pre-row-pad); border-radius: var(--tpl-htn-radius-m);
+  background: var(--color-surface-pearl);
+}
+.precheckSummaryText { min-width: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink); }
+
+/* いまの質問。題・補足・選択肢・案内・チェックを縦に積む。 */
+.precheckQuestion { display: flex; flex-direction: column; gap: var(--tpl-htn6-pre-group-gap); }
+.precheckQuestionTitle { width: fit-content; max-width: 100%; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
+
+/* 選択肢の下の案内。v07 は白地の案内（SwjOv・細枠あり）と砂色の注意（Z0v3c・枠なし）で地が違う。 */
+.precheckNote {
+  display: flex; flex-direction: column; border-radius: var(--radius-control);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink);
+}
+.precheckNote p { min-width: 0; }
+.precheckNoteInfo {
+  padding: var(--tpl-htn-note-pad); gap: var(--tpl-htn6-pre-note-gap);
+  background: var(--color-canvas); border: 1px solid var(--color-hairline);
+}
+.precheckNoteInfo .precheckNoteTitle { color: var(--color-accent-deep); }
+.precheckNoteTitle { font-weight: 700; }
+.precheckNoteLink { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-htn6-pre-link-gap); }
+.precheckAck { padding: var(--tpl-htn-ack-pad); }
+
+/* チェック結果（eOQAo）。印の箱と文を横に並べる。字と色は行ごとに持つ。 */
+.precheckResultHeading { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
+.precheckResultItem { display: flex; align-items: flex-start; gap: var(--tpl-htn6-pre-mark-gap); }
+.precheckResultMark {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: var(--tpl-htn6-pre-mark); height: var(--tpl-htn6-pre-mark);
+  border-radius: var(--tpl-htn-radius-pill); background: var(--color-canvas);
+  box-shadow: var(--tpl-htn-ring); color: var(--color-accent-deep);
+}
+.precheckResultText { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); }
+.precheckResultTitle { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); font-weight: 700; color: var(--color-ink); }
+.precheckResultBody { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
+
+/* ② 確認のチェック。印の下に理由の一文を置く。 */
+.ackList { display: flex; flex-direction: column; gap: var(--tpl-htn6-ack-gap); }
+.ackNote {
+  padding-inline-start: var(--tpl-htn6-ack-note-pad);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary);
+}
+
+/* ③Step1 止まったときの赤い案内箱。カードのいちばん上。 */
+/* Webhook が「オフ」のときは失敗ではなく案内なので青で出す（絵 Lwxyh の案内の箱）。 */
+
+
+/* ③Step1 確認の5行。行は上下中央そろえ。 */
+.checkList { margin: 0; padding: 0; list-style: none; }
+.checkRow {
+  display: flex; align-items: center; gap: var(--tpl-htn-gap-s);
+  min-height: var(--tpl-htn-check-row-h); padding: var(--tpl-htn-check-pad); box-shadow: var(--tpl-htn-line-bottom);
+}
+.checkRow:last-child { box-shadow: none; }
+.checkIcon { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--color-ink-faint); }
+.checkRow[data-phase='ok'] .checkIcon { color: var(--color-accent-deep); }
+.checkRow[data-phase='error'] .checkIcon { color: var(--color-danger); }
+.checkTitle { flex-shrink: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 600; color: var(--color-ink); }
+.checkDetail {
+  flex: 1 1 0; min-width: 0; overflow-wrap: anywhere;
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary);
+}
+.checkRow[data-phase='error'] .checkDetail { color: var(--color-danger); }
+
+/* 確認中の回るリング。外枠が道、上側だけ濃くして時計回りに回す。 */
+.ring {
+  display: block; width: var(--tpl-htn6-ring); height: var(--tpl-htn6-ring);
+  border-radius: var(--tpl-htn-radius-pill);
+  border: var(--tpl-htn6-ring-w) solid var(--color-control-border);
+  border-top-color: var(--color-accent-deep);
+  animation: tplHtn6Spin var(--motion-spin) linear infinite;
+}
+@keyframes tplHtn6Spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ring { animation: none; } }
+
+/* ③Step2 友だち追加テスト */
+.qrBlock { display: flex; align-items: center; gap: var(--tpl-htn6-qr-gap); flex-wrap: wrap; }
+.qrFrame {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: var(--tpl-htn6-qr); height: var(--tpl-htn6-qr); padding: var(--tpl-htn6-qr-pad);
+  border-radius: var(--tpl-htn-radius-m); background: var(--color-canvas); box-shadow: var(--tpl-htn-ring);
+}
+.qrFrame img { display: block; width: 100%; height: 100%; }
+.qrSide { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-gap-s); }
+.receiptState { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); }
+.receiptState p { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
+.receiptState p:first-child { font-weight: 700; color: var(--color-accent-deep); }
+.receiptSuccess p:first-child { color: var(--color-success); }
+.receiptError p:first-child { color: var(--color-danger); }
+.receiptAccount {
+  display: flex; align-items: center; gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn6-err-pad);
+  border-radius: var(--tpl-htn-radius-m); background: var(--color-info-bg);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18);
+}
+.receiptAccountIcon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--tpl-htn-preview-avatar); height: var(--tpl-htn-preview-avatar); flex: 0 0 auto;
+  border-radius: var(--polish-radius-pill); background: var(--color-accent-deep); color: var(--color-canvas); font-weight: 700;
+}
+.receiptInstructions {
+  display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); padding: var(--tpl-htn6-err-pad);
+  border-radius: var(--tpl-htn-radius-m); background: var(--color-canvas-sunken);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18);
+}
+.receiptInstructions p, .receiptHelp { margin: 0; }
+.receiptHelp { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); }
+.receiptHelp a { color: var(--color-accent-deep); font-weight: 700; }
+.receiptHelp a:focus-visible { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
+.qrWait { display: inline-flex; align-items: center; gap: var(--tpl-htn-gap-s); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
+
+/* ④ 使い方のひな型は共通の RadioCardGroup／RadioCard・StatusBadge が持つ（★V8 §24）。
+   画面CSSは持たない。 */
+
+/* ⑤-0 引き継ぎ中。地と角は共通の Card（surface="muted" corner="control"）が持つ（★V8 §24）。 */
+.handoverBox {
+  display: flex; flex-direction: column; gap: 0;
+  margin-top: var(--tpl-htn6-handover-intro-to-stages);
+}
+.handoverHeading { display: flex; align-items: center; gap: var(--tpl-htn-gap-s); }
+.handoverHeading > :last-child { margin-left: auto; }
+.handoverHeading .panelTitle { font-size: var(--tpl-htn6-handover-title-size); line-height: var(--tpl-htn6-handover-title-lh); }
+.handoverIcon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--tpl-htn6-handover-icon-size); height: var(--tpl-htn6-handover-icon-size); border-radius: var(--radius-pill); background: var(--color-selection-bg); color: var(--color-accent-deep); }
+.handoverSpinner { flex: none; animation: handover-turn var(--tpl-htn6-handover-spin-time) linear infinite; }
+.handoverStages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tpl-htn-gap-s); }
+.handoverStage { display: flex; align-items: center; gap: var(--tpl-htn-gap-s); min-height: var(--tpl-htn6-handover-stage-h); padding: var(--tpl-htn-gap-s); border-radius: var(--tpl-htn-radius-m); background: var(--color-canvas-sunken); color: var(--color-ink-secondary); font-size: var(--tpl-htn-text-14); font-weight: 600; }
+.handoverStage[data-state='current'] { color: var(--color-ink); background: var(--color-selection-bg); }
+.handoverStage[data-state='done'] { color: var(--color-accent-deep); }
+.handoverStageNumber { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--tpl-htn6-handover-step-size); height: var(--tpl-htn6-handover-step-size); border-radius: var(--radius-pill); background: var(--color-canvas); line-height: 1; }
+.handoverStage[data-state='current'] .handoverStageNumber, .handoverStage[data-state='done'] .handoverStageNumber { background: var(--color-selection-bg); color: var(--color-accent-deep); }
+.handoverMetrics { display: grid; grid-template-columns: 1fr 1fr 1.3fr; align-items: center; gap: var(--tpl-htn-gap-s); margin-top: var(--tpl-htn6-handover-stage-to-metrics); }
+.handoverMetrics > div { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); color: var(--color-ink-secondary); font-size: var(--tpl-htn-text-14); font-weight: 600; }
+.handoverMetrics strong { color: var(--color-ink); font-size: var(--tpl-htn6-handover-count-size); line-height: var(--tpl-htn6-handover-count-lh); font-variant-numeric: var(--font-numeric); }
+.handoverMetrics p { margin: 0; padding: var(--tpl-htn-gap-s); border-radius: var(--tpl-htn-radius-m); background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
+.handoverProgressHead { display: flex; justify-content: space-between; gap: var(--tpl-htn-gap-s); margin-top: var(--tpl-htn6-handover-metrics-to-progress); color: var(--color-ink-secondary); font-size: var(--tpl-htn-text-14); font-weight: 700; }
+.handoverProgressHead strong { color: var(--color-accent-deep); font-variant-numeric: var(--font-numeric); }
+.handoverProgressBar { margin-top: var(--tpl-htn6-handover-label-to-bar); }
+:root .handoverProgressBar { height: var(--tpl-htn6-handover-bar-h); }
+.handoverCurrent { margin: var(--tpl-htn6-handover-bar-to-status) 0 0; color: var(--color-ink); font-size: var(--tpl-htn6-handover-status-size); font-weight: 700; }
+.handoverCurrent[data-attention] { color: var(--color-warning); }
+.handoverCurrent + .progressNote { margin-top: var(--tpl-htn-gap-xs); }
+.handoverBreakdown { display: flex; flex-wrap: wrap; gap: var(--tpl-htn6-stat-gap); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
+.handoverBreakdown strong { color: var(--color-ink); }
+.handoverFooter { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--tpl-htn-gap-s); margin-top: var(--tpl-htn-gap-xs); }
+@keyframes handover-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .handoverSpinner { animation: none; } }
+@media (max-width: 700px) { .handoverStages { grid-template-columns: 1fr; } .handoverMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .handoverMetrics p { grid-column: 1 / -1; } .handoverProgressHead { flex-wrap: wrap; } }
+
+/* ⑤ 完了 */
+.doneHero { display: flex; flex-direction: column; align-items: center; gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn6-done-pad); text-align: center; }
+.doneIcon { color: var(--color-accent-deep); }
+.doneTitle { margin: 0; font-size: var(--tpl-htn6-text-20); line-height: var(--tpl-htn6-lh-28); font-weight: 700; color: var(--color-ink); }
+/* ⑤ 名前の箱。地と角は共通の Card（surface="muted" corner="control"）が持つ（★V8 §24）。 */
+.accountBox {
+  display: flex; align-items: center; gap: var(--tpl-htn-gap-s);
+  padding: var(--tpl-htn6-acct-pad);
+}
+.accountName { font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
+.accountId { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
+.useRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-gap-s); }
+
+/* ② 左の細い列「AC左 操作ステップ」（正本 v07 Fqy29 の g48QV）。
+   いまどこを触っているかと、musubo が自動でやることを、3つの段で見せる。 */
+.outlineCard {
+  flex: 1 1 auto; display: flex; flex-direction: column;
+}
+.outlineTitle { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
+.outlineCount { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+/* 題のかたまりと段の間だけ、もう一段あける（ZibvL）。 */
+.outlineGap { height: var(--tpl-htn-gap-xs); }
+/* 段より下を押し下げて、自動の説明をいちばん下に置く（t8JqzS）。 */
+.outlineSpacer { flex: 1 1 auto; }
+.outlineRow {
+  display: flex; align-items: flex-start; gap: var(--tpl-htn6-ac-row-gap);
+  padding: var(--tpl-htn6-ac-row-pad); border-radius: var(--tpl-htn6-ac-radius); background: transparent;
+}
+.outlineNum {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: var(--tpl-htn6-ac-num); height: var(--tpl-htn6-ac-num); border-radius: var(--tpl-htn-radius-pill);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); font-weight: 700;
+}
+.outlineText { display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-text-gap); min-width: 0; }
+.outlineRowTitle { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); font-weight: 700; }
+.outlineRowNote { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+/* 済んだ段。 */
+.outlineDone .outlineNum { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.outlineDone .outlineRowTitle { color: var(--color-ink-faint); }
+/* いまの段。 */
+.outlineCurrent { background: var(--color-canvas); box-shadow: var(--tpl-htn-ring-info); }
+.outlineCurrent .outlineNum { background: var(--color-accent-deep); color: var(--color-on-accent); }
+.outlineCurrent .outlineRowTitle { color: var(--color-ink); }
+/* これからの段。 */
+.outlineFuture .outlineNum { background: var(--color-shell-gray); color: var(--color-ink-faint); }
+.outlineFuture .outlineRowTitle { color: var(--color-ink-faint); }
+/* いちばん下の「musubo が自動で行うこと」（C7BtB）。 */
+.outlineAuto {
+  display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-auto-gap);
+  padding: var(--tpl-htn6-ac-auto-pad); border-radius: var(--tpl-htn6-ac-radius); background: var(--color-accent-soft);
+}
+.outlineAutoTitle { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); font-weight: 700; color: var(--color-accent-deep); }
+.outlineAutoBody { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-secondary); }
+/* ②の入力は縦に積む（正本 v07 の AC入力）。横2列にしない。 */
+.acInputs { display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-input-gap); min-width: 0; }
+.acField { display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-field-gap); min-width: 0; }

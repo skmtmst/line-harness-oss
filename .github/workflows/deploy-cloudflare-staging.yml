@@ -38,6 +38,21 @@ on:
         type: string
         required: false
         default: ''
+      pages_config_replay:
+        description: 未適用D1を避け、現在公開中と同じ管理画面コードを新しい検証API URLで再ビルドする
+        type: boolean
+        required: true
+        default: false
+      pages_source_sha:
+        description: 現在公開中の管理画面の40桁Git SHA
+        type: string
+        required: false
+        default: ''
+      expected_pages_deployment_id:
+        description: 現在公開中の管理画面のDeployment ID
+        type: string
+        required: false
+        default: ''
       expected_google_business_write_enabled:
         description: 配備後にVersionの実効値を照合する（今回の試験はtrue、戻す時はfalse）
         type: choice
@@ -59,7 +74,9 @@ jobs:
   deploy:
     if: >-
       github.repository != 'Shudesu/line-harness-oss' &&
-      github.ref == 'refs/heads/codex/development' &&
+      (github.ref == 'refs/heads/codex/development' ||
+       (github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/codex/masato-production-release-20261104')) &&
       (github.event_name == 'workflow_dispatch' ||
        vars.NEN_STAGING_DELIVERY_MODE == 'dry-run' ||
        vars.NEN_STAGING_DELIVERY_MODE == 'apply')
@@ -71,6 +88,9 @@ jobs:
       WORKER_CONFIG_REPLAY: ${{ github.event_name == 'workflow_dispatch' && inputs.worker_config_replay || false }}
       WORKER_SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.worker_source_sha || '' }}
       EXPECTED_WORKER_VERSION_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_worker_version_id || '' }}
+      PAGES_CONFIG_REPLAY: ${{ github.event_name == 'workflow_dispatch' && inputs.pages_config_replay || false }}
+      PAGES_SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.pages_source_sha || '' }}
+      EXPECTED_PAGES_DEPLOYMENT_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_pages_deployment_id || '' }}
       EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_google_business_write_enabled || 'skip' }}
       GH_TOKEN: ${{ github.token }}
       WORKER_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
@@ -78,7 +98,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
       D1_STAGING_DATABASE_NAME: ${{ secrets.D1_STAGING_DATABASE_NAME }}
       STAGING_API_URL: https://stg-api.musubo.jp
-      STAGING_PAGES_PROJECT: nen-line-stg-admin
+      STAGING_PAGES_PROJECT: nen-line-stg-admin-git
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -86,16 +106,32 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: '22.23.4'
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Check deployment security settings (read only)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec tsx scripts/security/run-deployment-safety.ts staging apps/worker/wrangler.staging.toml
+
       - name: Verify staging boundary and deploy lock
         run: |
-          test "$GITHUB_REF" = "refs/heads/codex/development"
+          case "$GITHUB_REF" in
+            refs/heads/codex/development) ;;
+            refs/heads/codex/masato-production-release-20261104)
+              test "$GITHUB_EVENT_NAME" = "workflow_dispatch" ;;
+            *) echo "::error::検証配備が許可されていないブランチです。"; exit 1 ;;
+          esac
           test "$DELIVERY_MODE" = "dry-run" -o "$DELIVERY_MODE" = "apply"
           test "$DELIVERY_TARGET" = "all" -o "$DELIVERY_TARGET" = "worker" -o "$DELIVERY_TARGET" = "admin"
+          test "$WORKER_CONFIG_REPLAY" != "true" -o "$PAGES_CONFIG_REPLAY" != "true"
+          if [ "$PAGES_CONFIG_REPLAY" = "true" ]; then
+            test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+            test "$DELIVERY_TARGET" = "admin"
+          fi
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           if [ "$DELIVERY_TARGET" != "admin" ]; then
             test -n "$WORKER_API_TOKEN"
@@ -109,6 +145,21 @@ jobs:
           grep -q 'database_name = "nen-line-stg"' apps/worker/wrangler.staging.toml
           if grep -q '^\[triggers\]' apps/worker/wrangler.staging.toml; then
             echo "::error::検証Workerでcronが有効です。通知事故を防ぐため中止します。"
+            exit 1
+          fi
+
+      - name: Verify isolated release ancestry
+        if: github.ref == 'refs/heads/codex/masato-production-release-20261104'
+        run: |
+          git fetch --no-tags --deepen=250 origin codex/development
+          release_base=941616d7a41390199ee6cfef7569cfd43b2d8497
+          excluded_merge=7e7f4f704ed237f88b2bee20c4e5b50a73c8bf45
+          git cat-file -e "$release_base^{commit}"
+          git cat-file -e "$excluded_merge^{commit}"
+          test "$(git merge-base "$GITHUB_SHA" FETCH_HEAD)" = "$release_base"
+          git merge-base --is-ancestor "$release_base" "$GITHUB_SHA"
+          if git merge-base --is-ancestor "$excluded_merge" "$GITHUB_SHA"; then
+            echo "::error::今回の対象外PR #2075が含まれています。"
             exit 1
           fi
 
@@ -158,7 +209,8 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "$DELIVERY_MODE" = "apply" ] && [ "$pending_count" -ne 0 ] && [ "$WORKER_CONFIG_REPLAY" != "true" ]; then
+          if [ "$DELIVERY_MODE" = "apply" ] && [ "$pending_count" -ne 0 ] && \
+            [ "$WORKER_CONFIG_REPLAY" != "true" ] && [ "$PAGES_CONFIG_REPLAY" != "true" ]; then
             echo "::error::検証D1に未適用マイグレーションが ${pending_count} 件あります。Migrate D1を先に実行してください。"
             exit 1
           fi
@@ -196,6 +248,34 @@ jobs:
           fi
           echo "root=$worker_root" >> "$GITHUB_OUTPUT"
 
+      - name: Prepare the deployed Admin source for config replay
+        id: admin_source
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.PAGES_API_TOKEN }}
+        run: |
+          admin_root="$GITHUB_WORKSPACE"
+          if [ "$PAGES_CONFIG_REPLAY" = "true" ]; then
+            printf '%s' "$PAGES_SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+            printf '%s' "$EXPECTED_PAGES_DEPLOYMENT_ID" | grep -Eq '^[0-9a-f-]{36}$'
+
+            project=$(curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$STAGING_PAGES_PROJECT")
+            active_id=$(printf '%s' "$project" | jq -r '.result.canonical_deployment.id')
+            active_sha=$(printf '%s' "$project" | jq -r '.result.canonical_deployment.deployment_trigger.metadata.commit_hash')
+            test "$active_id" = "$EXPECTED_PAGES_DEPLOYMENT_ID"
+            test "$active_sha" = "$PAGES_SOURCE_SHA"
+
+            git fetch --no-tags --deepen=200 origin codex/development
+            git cat-file -e "$PAGES_SOURCE_SHA^{commit}"
+            git merge-base --is-ancestor "$PAGES_SOURCE_SHA" "$GITHUB_SHA"
+            admin_root="$RUNNER_TEMP/admin-source"
+            git worktree add --detach "$admin_root" "$PAGES_SOURCE_SHA"
+            pnpm --dir "$admin_root" install --frozen-lockfile
+            test -z "$(git -C "$admin_root" status --porcelain)"
+          fi
+          echo "root=$admin_root" >> "$GITHUB_OUTPUT"
+
       - name: Acquire the shared staging lock
         id: staging_lock
         if: env.DELIVERY_MODE == 'apply'
@@ -207,6 +287,18 @@ jobs:
             --remote origin
           pnpm deploy:lock verify staging --sha "$GITHUB_SHA" --remote origin
 
+      # Keep this separate from acquisition so a stale checkout still releases its lock.
+      - name: Require latest deployment branch after acquiring the staging lock
+        if: env.DELIVERY_MODE == 'apply'
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_sha=$(git ls-remote --exit-code origin "$GITHUB_REF" | awk '{print $1}')
+          if [ -z "$latest_sha" ] || [ "$latest_sha" != "$GITHUB_SHA" ]; then
+            echo "::error::検証配備の開始後に対象ブランチが更新されました。最新版を確認し、dry-runからやり直してください。"
+            exit 1
+          fi
+
       - name: Bind the staging Cloudflare account
         run: |
           worker_root="${{ steps.worker_source.outputs.root }}"
@@ -215,6 +307,26 @@ jobs:
             "$worker_root/apps/worker/wrangler.staging.toml"
           grep -q "^account_id = \"$CLOUDFLARE_ACCOUNT_ID\"$" \
             "$worker_root/apps/worker/wrangler.staging.toml"
+
+      - name: Record the source revisions and public build metadata
+        id: build_metadata
+        run: |
+          worker_root="${{ steps.worker_source.outputs.root }}"
+          admin_root="${{ steps.admin_source.outputs.root }}"
+          echo "worker_sha=$(git -C "$worker_root" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "admin_sha=$(git -C "$admin_root" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "worker_version=$(node -p "require('$worker_root/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "released_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Stamp the staging Worker source version
+        id: worker_metadata
+        if: env.DELIVERY_TARGET != 'admin'
+        run: |
+          worker_root="${{ steps.worker_source.outputs.root }}"
+          pnpm exec tsx apps/worker/scripts/stamp-staging-version.ts "$worker_root" \
+            > "$RUNNER_TEMP/staging-worker-version.json"
+          cat "$RUNNER_TEMP/staging-worker-version.json"
+          echo "commit=$(jq -r .commit "$RUNNER_TEMP/staging-worker-version.json")" >> "$GITHUB_OUTPUT"
+          echo "version=$(jq -r .version "$RUNNER_TEMP/staging-worker-version.json")" >> "$GITHUB_OUTPUT"
 
       - name: Build Worker and LIFF assets
         if: env.DELIVERY_TARGET != 'admin'
@@ -228,7 +340,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
         run: |
           cd "${{ steps.worker_source.outputs.root }}"
-          npx wrangler deploy --config apps/worker/wrangler.staging.toml --dry-run
+          npx wrangler deploy --config apps/worker/wrangler.staging.toml --dry-run \
+            --var "BUILD_GIT_COMMIT:${{ steps.build_metadata.outputs.worker_sha }}" \
+            --var "BUILD_VERSION:${{ steps.build_metadata.outputs.worker_version }}" \
+            --var "BUILD_RELEASED_AT:${{ steps.build_metadata.outputs.released_at }}"
 
       - name: Deploy Worker to staging
         id: worker_deploy
@@ -238,12 +353,17 @@ jobs:
         run: |
           set -o pipefail
           cd "${{ steps.worker_source.outputs.root }}"
+          build_vars=(
+            --var "BUILD_GIT_COMMIT:${{ steps.build_metadata.outputs.worker_sha }}"
+            --var "BUILD_VERSION:${{ steps.build_metadata.outputs.worker_version }}"
+            --var "BUILD_RELEASED_AT:${{ steps.build_metadata.outputs.released_at }}"
+          )
           if [ "$WORKER_CONFIG_REPLAY" = "true" ]; then
             npx wrangler deploy --config apps/worker/wrangler.staging.toml \
-              --message "staging config replay from $WORKER_SOURCE_SHA" 2>&1 \
+              --message "staging config replay from $WORKER_SOURCE_SHA" "${build_vars[@]}" 2>&1 \
               | tee "$RUNNER_TEMP/worker-deploy.log"
           else
-            npx wrangler deploy --config apps/worker/wrangler.staging.toml 2>&1 \
+            npx wrangler deploy --config apps/worker/wrangler.staging.toml "${build_vars[@]}" 2>&1 \
               | tee "$RUNNER_TEMP/worker-deploy.log"
           fi
           version_id=$(sed -n 's/.*Current Version ID: //p' "$RUNNER_TEMP/worker-deploy.log" | tail -1)
@@ -266,6 +386,22 @@ jobs:
             '.result.deployments | max_by(.created_on) | .versions[] | select(.percentage == 100) | .version_id')
           test "$active_version" = "$version_id"
 
+          expected_commit="${{ steps.worker_metadata.outputs.commit }}"
+          expected_version="${{ steps.worker_metadata.outputs.version }}"
+          matched=false
+          for attempt in $(seq 1 15); do
+            public_version=$(curl --fail-with-body --silent --show-error "$STAGING_API_URL/admin/version" || true)
+            if printf '%s' "$public_version" | jq -e \
+              --arg commit "$expected_commit" --arg version "$expected_version" \
+              '.git_commit == $commit and .version == $version' > /dev/null; then
+              matched=true
+              break
+            fi
+            sleep 2
+          done
+          test "$matched" = true
+          echo "Worker public version: $expected_version ($expected_commit)" >> "$GITHUB_STEP_SUMMARY"
+
           if [ "$EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED" != "skip" ]; then
             actual=$(printf '%s' "$version" | jq -r \
               '.result.resources.bindings[] | select(.name == "GOOGLE_BUSINESS_WRITE_ENABLED") | .text')
@@ -275,27 +411,80 @@ jobs:
 
       - name: Build Admin Panel dependencies
         if: env.DELIVERY_TARGET != 'worker'
-        run: pnpm --filter @line-harness/update-engine build
+        run: |
+          cd "${{ steps.admin_source.outputs.root }}"
+          pnpm --filter @line-harness/update-engine build
 
       - name: Build Admin Panel for staging
         if: env.DELIVERY_TARGET != 'worker'
-        run: pnpm --filter web build
+        run: |
+          cd "${{ steps.admin_source.outputs.root }}"
+          pnpm --filter web build
         env:
+          APP_COMMIT_SHA: ${{ steps.build_metadata.outputs.admin_sha }}
+          APP_BUILD_TIME: ${{ steps.build_metadata.outputs.released_at }}
           NEXT_PUBLIC_API_URL: ${{ env.STAGING_API_URL }}
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
           NEXT_PUBLIC_HQ_TEMPLATE_DISTRIBUTION_ENABLED: '1'
           NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'
+          NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED: 'true'
+          # リリース前点検：ログイン前の規約・方針・表記・お問い合わせの公開先（秘密ではない）。
+          # 本番の配備（deploy-cloudflare-admin.yml）には切り替えのときに同じ4つを足す。
+          NEXT_PUBLIC_TERMS_URL: 'https://musubo.jp/terms/'
+          NEXT_PUBLIC_PRIVACY_URL: 'https://musubo.jp/privacy/'
+          NEXT_PUBLIC_COMMERCE_LAW_URL: 'https://musubo.jp/legal/'
+          NEXT_PUBLIC_CONTACT_URL: 'https://musubo.jp/contact/'
 
       - name: Deploy Admin Panel to staging
         if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'worker'
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.PAGES_API_TOKEN }}
         run: |
+          cd "${{ steps.admin_source.outputs.root }}"
+          source_sha="$GITHUB_SHA"
+          if [ "$PAGES_CONFIG_REPLAY" = "true" ]; then
+            source_sha="$PAGES_SOURCE_SHA"
+          fi
           npx wrangler pages deploy apps/web/out \
             --project-name "$STAGING_PAGES_PROJECT" \
-            --branch main \
-            --commit-hash "$GITHUB_SHA" \
-            --commit-message "staging deploy $GITHUB_SHA"
+            --branch codex/development \
+            --commit-hash "$source_sha" \
+            --commit-message "staging API URL config replay from $source_sha"
+
+          # Pagesのcanonical反映はアップロード完了より少し遅れることがある。
+          # 再配備はせず、読み取りだけで反映を待つ。
+          for attempt in {1..15}; do
+            project=$(curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$STAGING_PAGES_PROJECT")
+            deployed_id=$(printf '%s' "$project" | jq -r '.result.canonical_deployment.id')
+            deployed_sha=$(printf '%s' "$project" | jq -r '.result.canonical_deployment.deployment_trigger.metadata.commit_hash')
+            if [ "$deployed_sha" = "$source_sha" ] && \
+              { [ "$PAGES_CONFIG_REPLAY" != "true" ] || [ "$deployed_id" != "$EXPECTED_PAGES_DEPLOYMENT_ID" ]; }; then
+              break
+            fi
+            sleep 2
+          done
+          test "$deployed_sha" = "$source_sha"
+          if [ "$PAGES_CONFIG_REPLAY" = "true" ]; then
+            test "$deployed_id" != "$EXPECTED_PAGES_DEPLOYMENT_ID"
+          fi
+          echo "Admin Deployment ID: $deployed_id" >> "$GITHUB_STEP_SUMMARY"
+
+      # 配備runの成功に加え、ログインなしの公開口から実際のコードSHAを照合する。
+      - name: Verify public source revisions
+        if: env.DELIVERY_MODE == 'apply'
+        run: |
+          worker_url="-"; worker_sha="-"; admin_url="-"; admin_sha="-"
+          if [ "$DELIVERY_TARGET" != "admin" ]; then
+            worker_url="$STAGING_API_URL"
+            worker_sha="${{ steps.build_metadata.outputs.worker_sha }}"
+          fi
+          if [ "$DELIVERY_TARGET" != "worker" ]; then
+            admin_url="https://stg-admin.musubo.jp"
+            admin_sha="${{ steps.build_metadata.outputs.admin_sha }}"
+          fi
+          node scripts/deploy/verify-public-build.mjs "$worker_url" "$worker_sha" "$admin_url" "$admin_sha"
 
       - name: Summarize
         if: always()
@@ -310,9 +499,17 @@ jobs:
             echo "- Worker Version ID: \`${{ steps.worker_deploy.outputs.version_id || '未配備' }}\`"
             echo "- Worker config replay: \`$WORKER_CONFIG_REPLAY\`"
             echo "- Admin: \`nen-line-stg-admin\`"
+            echo "- Admin config replay: \`$PAGES_CONFIG_REPLAY\` (source: \`${PAGES_SOURCE_SHA:-$GITHUB_SHA}\`)"
             echo "- D1 migration: 未適用 ${{ steps.pending_migrations.outputs.count || '確認失敗' }} 件（このWorkflowでは適用しません）"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Release the staging lock after successful verification
-        if: success() && steps.staging_lock.outcome == 'success'
+      # 取得できた run は、途中で落ちても中断されても必ずここを通して解放する。
+      # success() にしていたため、取得後に1段でも失敗するとこの段が飛ばされ、
+      # 誰も配備していないのに排他が残り続けた（run 38250060610。管理画面の配備が
+      # Cloudflare 側の Unknown internal error で落ち、staging のロックが242分残留）。
+      # ロックは「いま配備中」の宣言なので、run が終わった時点で手放すのが正しい。
+      # 途中まで配備された事実は run の失敗と上の Summarize が示す。
+      # 取得していない場合（outcome != success）は他担当のロックなので触らない。
+      - name: Release the staging lock when the run ends
+        if: always() && steps.staging_lock.outcome == 'success'
         run: pnpm deploy:lock release staging --remote origin

@@ -1,4 +1,7 @@
-import { readFileSync } from 'node:fs'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import HqSettingsNavV8 from '@/v8/hq/settings-nav'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -9,7 +12,8 @@ const MERGED = readFileSync(join(HERE, 'merged-tabs.tsx'), 'utf8')
 const SRC = join(HERE, '..', '..')
 const NEN_MEMBERS = readFileSync(join(SRC, 'app', 'nen', 'members', 'page.tsx'), 'utf8')
 const NEN_HEALTH = readFileSync(join(SRC, 'app', 'nen', 'health', 'page.tsx'), 'utf8')
-const HQ_MEMBERS = readFileSync(join(SRC, 'app', 'hq', 'members', 'page.tsx'), 'utf8')
+// 入口は V8 の画面を出すだけになった（2026-10-09 管理画面 削除）。V8 の本体を見る。
+// 統括の設定の中のメニューは、店の設定と同じ共通の形（SettingsMenu）を使う（2026-10-15）。
 
 /*
  * #975 U091: タブが右にはみ出す画面（/analytics、/search-console、
@@ -38,6 +42,14 @@ describe('右に隠れたタブへ届く（#975 U091）', () => {
     expect(WRAPPER).toContain('onFocus')
   })
 
+  it('あとから本文フォントが届いた時点でも端の判定をやり直す', () => {
+    // ResizeObserver は容器の箱が変わったときだけ動くので、中のタブ名だけが
+    // 広がる本文フォントの読み込み完了では動かない。影と送りボタンが
+    // 出ないまま残るため、読み込み後にもう一度測る。
+    expect(WRAPPER).toContain('document.fonts?.ready')
+    expect(WRAPPER).toContain('updateEdges()')
+  })
+
   it('右端の操作はスクロール領域に入れず、初期位置から押せる', () => {
     // actions は scroller の外に描く（U029/U031 で直した重なりを戻さない）。
     expect(WRAPPER).toContain('shrink-0 items-center gap-2 border-b border-hairline')
@@ -46,8 +58,19 @@ describe('右に隠れたタブへ届く（#975 U091）', () => {
 
   it('対象画面はすべてスクロールできるタブを使う', () => {
     expect(MERGED).toContain('ScrollableTabs')
-    expect(NEN_MEMBERS).toContain('ScrollableTabs')
-    expect(NEN_HEALTH).toContain('ScrollableTabs')
-    expect(HQ_MEMBERS).toContain('ScrollableTabs')
+    expect(NEN_MEMBERS).toContain('<Tabs')
+    expect(NEN_HEALTH).toContain('<Tabs')
+    expect(readFileSync(join(SRC, 'components', 'shared', 'tabs.module.css'), 'utf8')).toContain('overflow-x: auto')
+    expect(readFileSync(join(SRC, 'components', 'shared', 'tabs.tsx'), 'utf8')).toContain('tabs[next]?.focus()')
   })
+})
+
+
+it('統括の設定は全4画面へのリンクと現在地を示す', () => {
+  const html = renderToStaticMarkup(createElement(HqSettingsNavV8, { active: 'members' }))
+  expect(html).toContain('aria-label="統括の設定"')
+  expect(html).toMatch(/<a(?=[^>]*href="\/hq\/members")(?=[^>]*aria-current="page")[^>]*>/)
+  for (const href of ['/hq/members', '/hq/settings', '/hq/billing', '/hq/support']) {
+    expect(html).toContain(`href="${href}"`)
+  }
 })

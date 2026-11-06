@@ -1,3 +1,5 @@
+import { logger } from '@line-crm/shared/server';
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { recordAuditEvent, type AuditRiskLevel } from './access-audit.js';
 
@@ -32,12 +34,13 @@ export interface LoginAuditRow {
  * 記録を残す。
  *
  * 例外を投げない。記録に失敗したせいでログインそのものが失敗する、
- * という向きの事故を作らないため。失敗はログに出す。
+ * という向きの失敗を作らないため。失敗はログに出す。
  */
 export async function recordLoginAudit(
   db: D1Database,
   input: {
     adminUserId?: string | null;
+    lineAccountId?: string | null;
     action: LoginAuditAction;
     screen?: string | null;
     ip?: string | null;
@@ -67,7 +70,7 @@ export async function recordLoginAudit(
       )
       .run();
   } catch (error) {
-    console.error('login_audit insert failed:', error);
+    logger.error("src_login_audit_failed");
   }
   try {
     const actor = input.adminUserId
@@ -87,6 +90,7 @@ export async function recordLoginAudit(
       sourceKind: 'login_audit',
       sourceId: id,
       tenantId: actor?.tenant_id,
+      lineAccountId: input.lineAccountId,
       category: 'auth',
       actorPrincipalId: input.adminUserId,
       actorRole: actor?.access_level === 'read_only'
@@ -103,28 +107,31 @@ export async function recordLoginAudit(
     });
   } catch (error) {
     // 認証自体は成功させ、保存失敗は安全な固定文言だけを運用ログへ残す。
-    console.error('audit_events auth insert failed:', error instanceof Error ? error.name : 'unknown');
+    logger.error("src_login_audit_failed");
   }
 }
 
 export async function getLoginAudit(
   db: D1Database,
-  opts: { adminUserId?: string; action?: LoginAuditAction; limit?: number } = {},
+  opts: { tenantId: string; lineAccountId: string; adminUserId?: string; action?: LoginAuditAction; limit?: number },
 ): Promise<LoginAuditRow[]> {
   const conditions: string[] = [];
-  const values: unknown[] = [];
+  const values: unknown[] = [opts.tenantId, opts.lineAccountId];
   if (opts.adminUserId) {
-    conditions.push('admin_user_id = ?');
+    conditions.push('la.admin_user_id = ?');
     values.push(opts.adminUserId);
   }
   if (opts.action) {
-    conditions.push('action = ?');
+    conditions.push('la.action = ?');
     values.push(opts.action);
   }
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const where = conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : '';
   values.push(Math.min(opts.limit ?? 100, 500));
   const result = await db
-    .prepare(`SELECT * FROM login_audit ${where} ORDER BY created_at DESC LIMIT ?`)
+    .prepare(`SELECT la.* FROM login_audit la
+      JOIN audit_events ae ON ae.source_kind = 'login_audit' AND ae.source_id = la.id
+      WHERE ae.tenant_id = ? AND ae.line_account_id = ? ${where}
+      ORDER BY la.created_at DESC LIMIT ?`)
     .bind(...values)
     .all<LoginAuditRow>();
   return result.results;
@@ -167,7 +174,7 @@ export async function getLastLoginByStaff(
   staffIds: string[],
 ): Promise<Record<string, string>> {
   if (staffIds.length === 0) return {};
-  const placeholders = staffIds.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(staffIds).sql;
   const { results } = await db
     .prepare(
       `SELECT admin_user_id, MAX(created_at) AS last_at
@@ -175,7 +182,7 @@ export async function getLastLoginByStaff(
         WHERE action = 'login' AND admin_user_id IN (${placeholders})
         GROUP BY admin_user_id`,
     )
-    .bind(...staffIds)
+    .bind(...sqlIdSet(staffIds).binds)
     .all<{ admin_user_id: string; last_at: string }>();
   const out: Record<string, string> = {};
   for (const row of results ?? []) out[row.admin_user_id] = row.last_at;

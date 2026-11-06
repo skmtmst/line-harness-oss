@@ -25,6 +25,9 @@ describe('copyLineAccountSettings', () => {
     });
 
     raw.prepare("INSERT INTO account_settings (id, line_account_id, key, value) VALUES ('setting-1', 'source', 'sidebar.order', '[]')").run();
+    raw.prepare("INSERT INTO account_settings (id, line_account_id, key, value) VALUES ('setting-2', 'source', 'inbox_email_legacy_enabled', 'true')").run();
+    raw.prepare("INSERT INTO account_settings (id, line_account_id, key, value) VALUES ('setting-3', 'source', 'feature.specialized.catalog', '[\"nen_campaigns\"]')").run();
+    raw.prepare("INSERT INTO account_settings (id, line_account_id, key, value) VALUES ('setting-4', 'target', 'feature.specialized.catalog', '[]')").run();
     raw.prepare("INSERT INTO auto_replies (id, keyword, response_content, line_account_id) VALUES ('reply-1', '予約', '承りました', 'source')").run();
     raw.prepare("INSERT INTO scenarios (id, name, trigger_type, line_account_id, on_complete_scenario_id) VALUES ('scenario-1', '来店後', 'manual', 'source', 'scenario-2')").run();
     raw.prepare("INSERT INTO scenarios (id, name, trigger_type, line_account_id) VALUES ('scenario-2', '再来店', 'manual', 'source')").run();
@@ -38,7 +41,9 @@ describe('copyLineAccountSettings', () => {
       'scenarios',
     ]);
 
-    expect(raw.prepare("SELECT key, value FROM account_settings WHERE line_account_id = 'target'").get()).toEqual({ key: 'sidebar.order', value: '[]' });
+    expect(raw.prepare("SELECT value FROM account_settings WHERE line_account_id = 'target' AND key = 'sidebar.order'").get()).toEqual({ value: '[]' });
+    expect(raw.prepare("SELECT value FROM account_settings WHERE line_account_id = 'target' AND key = 'feature.specialized.catalog'").get()).toEqual({ value: '[]' });
+    expect(raw.prepare("SELECT COUNT(*) AS count FROM account_settings WHERE line_account_id = 'target' AND key = 'inbox_email_legacy_enabled'").get()).toEqual({ count: 0 });
     expect(raw.prepare("SELECT keyword, response_content FROM auto_replies WHERE line_account_id = 'target'").get()).toEqual({ keyword: '予約', response_content: '承りました' });
     const copiedScenarios = raw.prepare("SELECT id, name, on_complete_scenario_id FROM scenarios WHERE line_account_id = 'target' ORDER BY name").all() as Array<{ id: string; name: string; on_complete_scenario_id: string | null }>;
     expect(copiedScenarios).toHaveLength(2);
@@ -52,4 +57,21 @@ describe('copyLineAccountSettings', () => {
     expect(JSON.parse(copiedAction.config_json)).toEqual({ scenarioId: second.id, stepId: copiedStep.id });
     expect(raw.prepare("SELECT COUNT(*) AS count FROM friends WHERE line_account_id = 'target'").get()).toEqual({ count: 0 });
   });
+});
+
+
+it('W18: 他店の公開版を参照せず、明示公開が必要な所有済み下書きとして複製する', async () => {
+  const { db, raw } = createTestD1();
+  raw.exec(`INSERT INTO scenarios(id,name,trigger_type,line_account_id,current_published_version_id,is_active)
+    VALUES('source-s','Scenario','manual','source','source-version',1);
+    INSERT INTO auto_replies(id,keyword,response_content,line_account_id,current_draft_version_id,current_published_version_id)
+    VALUES('source-r','Keyword','Reply','source','source-draft','source-published');`);
+  await copyLineAccountSettings(db, 'source', 'target', ['scenarios', 'autoReplies']);
+  expect(raw.prepare("SELECT is_active,current_published_version_id FROM scenarios WHERE line_account_id='target'").get())
+    .toEqual({ is_active: 0, current_published_version_id: null });
+  expect(raw.prepare("SELECT is_active,lifecycle_status,current_draft_version_id,current_published_version_id FROM auto_replies WHERE line_account_id='target'").get())
+    .toEqual({ is_active: 0, lifecycle_status: 'draft', current_draft_version_id: null, current_published_version_id: null });
+  expect(raw.prepare("SELECT current_published_version_id,is_active FROM scenarios WHERE id='source-s'").get())
+    .toEqual({ current_published_version_id: 'source-version', is_active: 1 });
+  raw.close();
 });

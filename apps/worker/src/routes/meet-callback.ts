@@ -1,19 +1,25 @@
+import { lineTransport } from '../lib/external-call/line.js';
+import { acquireWorkflow } from '../services/workflow-execution.js';
+import { sendRecordedNotification,NotificationDeliveryIncomplete } from '../services/recorded-notification-send.js';
+import { prepareWorkflowStep, getWorkflowStep,ensureWorkflowStep,claimWorkflowStep,finishWorkflowStep,failWorkflowStep } from '@line-crm/db';
+import { patchFriendMetadata,friendMetadataPatchStatement } from '../features/friends/friend-metadata/index.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { getFriendByLineUserIdForAccount, getScenarioById } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { verifySupportRelay } from '../services/support-relay.js';
 import { sha256Hex } from '../middleware/auth.js';
-
+import { readBoundedText } from '../lib/input-errors.js';
+import { fail } from '../lib/fail.js';
 const app = new Hono<Env>();
 
-// Meet Harness calls this when a hearing session completes
+
 app.post('/api/meet-callback', async (c) => {
   const secret = c.env.MEET_CALLBACK_SECRET;
   if (!secret) return c.json({ success: false, error: 'Meet callback not configured' }, 503);
-  const rawBody = await c.req.text();
-  if (new TextEncoder().encode(rawBody).byteLength > 256 * 1024) {
+  const rawBody = await readBoundedText(c.req.raw, 256 * 1024);
+  if (rawBody === null) {
     return c.json({ success: false, error: 'Payload too large' }, 413);
   }
   const verified = await verifySupportRelay(
@@ -62,7 +68,6 @@ app.post('/api/meet-callback', async (c) => {
     if (existing.payload_hash !== payloadHash) {
       return c.json({ success: false, error: 'Session payload conflict' }, 409);
     }
-    return c.json({ success: true, duplicate: true });
   }
 
   const scenario = await getScenarioById(c.env.DB, body.scenario_id);
@@ -72,16 +77,46 @@ app.post('/api/meet-callback', async (c) => {
     scenario?.line_account_id ?? null,
   );
   if (!friend) {
-    return c.json({ success: false, error: 'friend not found' }, 404);
+    return fail(c, 404, 'FRIEND_NOT_FOUND');
   }
 
-  const receipt = await c.env.DB.prepare(
-    `INSERT OR IGNORE INTO meet_callback_receipts (session_id, payload_hash, received_at)
-     VALUES (?, ?, ?)`,
-  ).bind(body.session_id, payloadHash, new Date().toISOString()).run();
-  if (!receipt.meta.changes) return c.json({ success: true, duplicate: true });
+  const ref = {scopeId:`line:${friend.line_account_id ?? 'default'}`,processKind:'meet_callback',subjectId:body.session_id};
+  if (existing && !await getWorkflowStep(c.env.DB,{...ref,stepKey:'__run'})) {
+    // 保存済みの受領票は LINE の受理を証明しないため、通知を再送せず結果だけを回復する。
+    await patchFriendMetadata(c.env.DB,friend.id,{meet_hearing:body});
+    return c.json({success:false,code:'MEET_DELIVERY_REVIEW_REQUIRED'},202);
+  }
+  await c.env.DB.batch([
+    c.env.DB.prepare(`INSERT OR IGNORE INTO meet_callback_receipts(session_id,payload_hash,received_at) VALUES(?,?,?)`)
+      .bind(body.session_id,payloadHash,new Date().toISOString()),
+    prepareWorkflowStep(c.env.DB,{...ref,stepKey:'__run'},{input:{payloadHash},maxAttempts:50}),
+  ]);
+  const actualReceipt=await c.env.DB.prepare('SELECT payload_hash FROM meet_callback_receipts WHERE session_id=?').bind(body.session_id).first<{payload_hash:string}>();
+  if(actualReceipt?.payload_hash!==payloadHash)return c.json({success:false,error:'Session payload conflict'},409);
+  const execution=await acquireWorkflow(c.env.DB,ref);
+  if(!execution){
+    const finished=await getWorkflowStep(c.env.DB,{...ref,stepKey:'__run'});
+    return finished?.status==='succeeded'?c.json({success:true,duplicate:true}):c.json({success:false,code:finished?.status==='unknown'?'MEET_DELIVERY_REVIEW_REQUIRED':'MEET_PROCESSING_INCOMPLETE'},202);
+  }
+  try {
+    const metadataRef={...execution.ref,stepKey:'metadata'};
+    const priorMetadata=await ensureWorkflowStep(execution.db,metadataRef,{maxAttempts:50});
+    if(priorMetadata.status!=='succeeded'){
+      const owned=await claimWorkflowStep(execution.db,metadataRef);
+      if(!owned)throw new Error('metadata_processing_incomplete');
+      try{
+        await finishWorkflowStep(execution.db,metadataRef,owned.lease_owner!,{statements:[
+          execution.db.prepare("SELECT json(CASE WHEN EXISTS(SELECT 1 FROM friends WHERE id=?) THEN 'true' ELSE 'friend_unavailable' END)").bind(friend.id),
+          friendMetadataPatchStatement(execution.db,friend.id,{meet_hearing:{
+            session_id:body.session_id,status:body.status,context:body.context,transcripts:body.transcripts,
+            requirements_doc:body.requirements_doc,completed_at:body.completed_at,
+          }}),
+        ]});
+      }catch(error){await failWorkflowStep(execution.db,metadataRef,owned.lease_owner!,{delayMs:0});throw error;}
+    }
 
-  // Resolve LINE access token (multi-account support)
+
+  // 別アカウントから送らないよう、対応するトークンを解決する。
   let accountToken: string | null = null;
   let accountId = ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
   if ((friend as unknown as Record<string, unknown>).line_account_id) {
@@ -96,9 +131,9 @@ app.post('/api/meet-callback', async (c) => {
     accountId,
     context: 'meet-callback.confirmation',
   });
-  const lineClient = new LineClient(accessToken);
+  const lineClient = new LineClient(accessToken,{transport:lineTransport(AbortSignal.timeout(10_000))});
 
-  // Build Flex message with requirements doc
+
   const transcriptRows = body.transcripts.map((t) => ({
     type: 'box' as const, layout: 'vertical' as const, margin: 'md' as const,
     contents: [
@@ -131,36 +166,20 @@ app.post('/api/meet-callback', async (c) => {
     },
   };
 
-  try {
-    await lineClient.pushMessage(friend.line_user_id, [
-      { type: 'flex', altText: 'ヒアリング結果', contents: resultFlex },
-    ]);
-  } catch (e) {
-    console.error('Failed to send meet callback message:', e);
-  }
-
-  // Save to friend metadata
-  try {
-    const existing = JSON.parse(friend.metadata || '{}') as Record<string, unknown>;
-    const updated = {
-      ...existing,
-      meet_hearing: {
-        session_id: body.session_id,
-        status: body.status,
-        context: body.context,
-        transcripts: body.transcripts,
-        requirements_doc: body.requirements_doc,
-        completed_at: body.completed_at,
-      },
-    };
-    await c.env.DB.prepare('UPDATE friends SET metadata = ?, updated_at = datetime(\'now\') WHERE id = ?')
-      .bind(JSON.stringify(updated), friend.id)
-      .run();
-  } catch (e) {
-    console.error('Failed to save meet hearing to metadata:', e);
-  }
-
+  const messages = [{type:'flex' as const,altText:'ヒアリング結果',contents:resultFlex}];
+  await sendRecordedNotification(execution.db,{
+    sourceId:`meet:${body.session_id}`,channel:'line',recipient:friend.line_user_id,
+    lineAccountId:friend.line_account_id,payload:JSON.stringify(messages),
+    send:key=>lineClient.pushMessage(friend.line_user_id,messages,key),
+  });
+  await execution.complete();
   return c.json({ success: true });
+  } catch(error) {
+    const unknown=error instanceof NotificationDeliveryIncomplete&&error.deliveryStatus==='unknown';
+    if(unknown)await failWorkflowStep(c.env.DB,execution.ref,execution.owner,{unknown:true,code:'delivery_unknown'}).catch(()=>undefined);
+    else await execution.fail().catch(()=>undefined);
+    return c.json({success:false,code:unknown?'MEET_DELIVERY_REVIEW_REQUIRED':'MEET_PROCESSING_INCOMPLETE'},202);
+  }
 });
 
 export { app as meetCallback };

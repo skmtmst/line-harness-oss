@@ -1,52 +1,41 @@
 .nav {
   flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: 0 12px 8px;
+  /* 項目の箱の左端はロゴの箱・下の「設定」と同じ線（--space-20）にそろえる。 */
+  padding: 0 var(--space-20) 8px;
+}
+
+/* 送られているとき、下の端で途中まで出ている項目は丸ごと隠す（設定の線で半分に切れて見せない）。 */
+.nav[data-clipped] {
+  mask-image: linear-gradient(to bottom,
+    var(--tpl-sidebar-mask-color) calc(100% - var(--nav-cut-bottom, 0px)), transparent calc(100% - var(--nav-cut-bottom, 0px)));
 }
 
 .section {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
 .sectionHeading {
   display: flex;
-  height: 34px;
   align-items: flex-end;
-  padding: 12px 12px 5px;
   color: var(--color-ink-faint);
-  font-size: var(--text-caption);
-  font-weight: 600;
 }
 
 .item {
   position: relative;
   display: flex;
-  height: 40px;
   align-items: center;
-  gap: 11px;
-  border-radius: var(--radius-card);
-  padding: 0 12px;
-  color: var(--color-ink);
-  font-size: 14px;
-  font-weight: 600;
-  transition: color 150ms, background-color 150ms;
-}
-
-.item:hover {
-  background: var(--color-surface-pearl);
+  padding: 0 10px;
+  font-size: var(--text-callout);
+  transition: color var(--motion-fast) var(--motion-ease-out), background-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .item:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
-}
-
-.active {
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-  font-weight: 700;
 }
 
 .active:hover {
@@ -58,19 +47,12 @@
 }
 
 .badge {
-  display: inline-flex;
-  border-radius: var(--radius-pill);
-  background: var(--color-danger);
-  padding: 2px 7px;
   color: var(--color-canvas);
-  font-size: var(--text-micro);
-  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .footer {
   min-height: 76px;
-  border-top: 1px solid var(--color-hairline);
 }
 
 .mobileHeader {
@@ -98,7 +80,7 @@
   overflow: hidden;
   color: var(--color-ink);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -115,7 +97,7 @@
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgb(17 24 39 / 33%);
+  background: var(--color-scrim);
 }
 
 .drawer {
@@ -128,7 +110,7 @@
   flex-direction: column;
   border-right: 1px solid var(--color-hairline);
   background: var(--color-canvas);
-  box-shadow: 0 20px 25px -5px rgb(17 24 39 / 10%);
+  box-shadow: var(--shadow-card);
   transition: transform var(--motion-slow) var(--motion-ease-out);
 }
 
@@ -140,12 +122,8 @@
   position: sticky;
   top: 0;
   display: none;
-  width: 256px;
-  height: 100vh;
   flex: 0 0 256px;
   flex-direction: column;
-  border-right: 1px solid var(--color-hairline);
-  background: var(--color-canvas);
 }
 
 @media (min-width: 1280px) {
@@ -172,7 +150,8 @@
   }
 
   .nav {
-    padding: 0 8px 8px;
+    /* 谷間帯でも項目の箱の左端はロゴの箱と同じ線（--space-20）にそろえる。 */
+    padding: 0 var(--space-20) 8px;
   }
 
   .item {
@@ -190,3 +169,413 @@
   height: 1px;
   background: var(--color-hairline);
 }
+
+.itemLabel {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* V8 でメニューを畳んだときに隠す塊の印。互換経路では何もしない。 */
+.collapseHide {
+  display: block;
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8 外側（移行③・Pencil `y3gx8R` / lh-pro-ui §1）
+ *
+ * メニューは枠で囲まず地（--color-shell）の上に直接置く。いまの項目は
+ * 白い地＋薄い影＋文字 600。組の名前は 11px・500・ink-faint。
+ * 畳むと幅 64・アイコンだけ（名前は title／乗せたときのふきだし）、
+ * 件数の赤い丸はアイコンの右上へ。
+ * ------------------------------------------------------------------- */
+@media (min-width: 1024px) {
+  /* v8 では 1024px から PC 型にする（畳んだ 64px は狭い幅でも読める） */
+  :root .desktop {
+    display: flex;
+  }
+
+  :root .mobileOnly {
+    display: none;
+  }
+}
+
+:root .desktop {
+  width: 240px;
+  flex-basis: 240px;
+  /* 上の案内帯を除いた workspace の高さ。項目が多いときは .nav だけ縦に送る。 */
+  height: 100%;
+  min-height: 0;
+  border-right: 0;
+  background: transparent;
+  transition: width var(--motion-base) var(--motion-ease-out),
+    flex-basis var(--motion-base) var(--motion-ease-out);
+}
+
+/* 上の案内帯を除いた残りの高さを使い、看板・設定・版・本人カードは縮めない。 */
+:root .desktop > :not(.nav),
+.drawer > :not(.nav) {
+  flex-shrink: 0;
+}
+
+/*
+ * 会社名の塊は中身の高さだけにし、その下の余白は流れる側（.nav）が持つ。
+ * 流れる領域の上の端＝会社名の塊の下の端なので、項目は会社名の真下で潜る。
+ * 上の端はマスクせず、会社名の下から項目が自然に続く。流した時だけ線を出す。
+ * 線の分の 1px は最初から透明で取っておき、流しても項目の位置を動かさない。
+ */
+:root .nav {
+  border-top: 1px solid transparent;
+  padding-top: 6px;
+}
+
+:root .nav[data-scrolled] {
+  border-top-color: var(--color-hairline);
+}
+
+/* 1152 の絵（35 枚）は開いたまま 240。狭い幅でも 216 に詰めない（2026-10-06 司令塔、絵が正本）。 */
+
+:root .identityRule {
+  display: none;
+}
+
+:root .item {
+  font-weight: 500;
+}
+
+:root .item:hover {
+  background: var(--color-nav-hover);
+}
+
+:root .active {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-nav-active);
+}
+
+:root .active:hover {
+  background: var(--color-canvas);
+}
+
+:root .active.danger {
+  color: var(--color-danger);
+}
+
+:root .sectionHeading {
+  font-size: var(--text-micro);
+  font-weight: 500;
+}
+
+:root .footer {
+  border-top: 0;
+}
+
+/* --- 畳んだ形（幅 64・アイコンだけ） ----------------------------------- */
+:root .desktop[data-collapsed] {
+  width: 64px;
+  flex-basis: 64px;
+}
+
+:root .desktop[data-collapsed] .nav {
+  padding: 0 12px 8px;
+}
+
+:root .desktop[data-collapsed] .item {
+  justify-content: center;
+  padding: 0;
+}
+
+:root .desktop[data-collapsed] .itemLabel,
+:root .desktop[data-collapsed] .sectionHeading,
+:root .desktop[data-collapsed] .collapseHide {
+  display: none;
+}
+
+/* 件数の赤い丸はアイコンの右上へ（開いているときは項目の右端）。
+   地の色の縁で切り抜き、小さくても読める形にする。 */
+:root .desktop[data-collapsed] .badge {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  box-sizing: border-box;
+  min-width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-shell);
+  padding: 0 2px;
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8 移行（夕44-A・部品 T7XSI6 版 2026-10-02-01）：組の開閉・項目の詰め
+ *
+ * 項目の上下を 5px、組の中の間を 1px に詰めて、9 組 48 項目が
+ * 高さ 1000 の板に収まるようにする。組の見出しは押せる開閉で、
+ * 畳んだ組は見出しだけ残る（組が丸ごと消えることはない）。
+ * 画面の高さが足りないときは .nav だけが縦に送られ、下の「設定」と
+ * 版は下端に固定される（nav が flex:1 なので追加の指定は要らない）。
+ * ------------------------------------------------------------------- */
+:root .item {
+  height: 36px;
+  min-height: 36px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+:root .section {
+  gap: 2px;
+}
+
+/* 組の見出し（押すと開閉）。右の矢印で今の開き方を示す。管理画面 には出ない。 */
+.sectionToggle {
+  display: flex;
+  width: 100%;
+  align-items: flex-end;
+  justify-content: space-between;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+:root .sectionToggle {
+  font-size: var(--text-micro);
+  font-weight: 500;
+}
+
+.sectionToggle:hover {
+  color: var(--color-ink-secondary);
+}
+
+.sectionToggle:focus-visible {
+  border-radius: var(--radius-control);
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.sectionChevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  margin-bottom: 1px;
+  transition: transform var(--motion-fast) var(--motion-ease-out);
+}
+
+/* 畳んでいる組は右を向く（開いているときは下向き）。 */
+.sectionChevronClosed {
+  transform: rotate(-90deg);
+}
+
+/*
+ * 開いている組の「⌄」は、見出しにマウスを乗せた時と焦点の時だけ出す。
+ * 畳んだ組の「›」は出したまま。場所は取ったままにして、出し入れで見出しの文字を動かさない。
+ * 触れない端末では常に出す。
+ */
+@media (hover: hover) {
+  .sectionChevron:not(.sectionChevronClosed) {
+    opacity: 0;
+    transition: opacity var(--motion-fast) var(--motion-ease-out), transform var(--motion-fast) var(--motion-ease-out);
+  }
+
+  .sectionToggle:hover .sectionChevron,
+  .sectionToggle:focus-visible .sectionChevron {
+    opacity: 1;
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: reduce) {
+  .sectionChevron:not(.sectionChevronClosed) {
+    transition: none;
+  }
+}
+
+/*
+ * 版の上に置く「設定」の入口（夕41・部品 njl8e）。v8 でだけ描く。
+ * 上に1本の細い線でメニューの項目と切り分ける。
+ */
+.settingsEntry {
+  border-top: 1px solid var(--color-hairline);
+  /* 左端は項目の箱・ロゴの箱と同じ線（--space-20）にそろえる。 */
+  padding: 4px var(--space-20);
+}
+
+/* 畳んだ帯では組の見出しを隠し、項目はアイコン1行分（40px）に揃える。 */
+:root .desktop[data-collapsed] .sectionToggle {
+  display: none;
+}
+
+:root .desktop[data-collapsed] .item {
+  height: 40px;
+}
+
+/* 畳んだ帯でも「設定」の歯車は出す（版の枠は collapseHide で隠れる）。 */
+:root .desktop[data-collapsed] .settingsEntry {
+  padding: 4px 12px;
+}
+
+/* v8 では下端に「設定」と版が入るので、空の76px枠は置かない。 */
+:root .footer {
+  display: none;
+}
+
+/* zUg8S / Yw24X の実寸。互換経路は既存値を保持。 */
+:root .item { gap: 10px; padding-inline: 10px; border-radius: var(--radius-button-primary); color: var(--color-ink-secondary); }
+:root .active { color: var(--color-ink); }
+:root .section { gap: 1px; }
+:root .sectionHeading,
+:root .sectionToggle { min-height: 0; box-sizing: border-box; height: 30px; padding: 10px 10px 2px; line-height: 17px; font-size: 11px; }
+:root .desktop { padding-top: 16px; }
+:root .desktop[data-collapsed] .item { height: 36px; min-height: 36px; }
+
+:root .desktop[data-collapsed] .section { gap: 6px; }
+:root .desktop[data-collapsed] .section + .section { margin-top: 6px; }
+:root .desktop[data-collapsed] .item { gap: 0; }
+
+/* 外側の絵は展開16px・畳んだ18px。組の境目は1pxの線を置く。 */
+:root .item { line-height: 21px; }
+:root .item > svg { width: 16px; height: 16px; flex-shrink: 0; }
+/*
+ * 絵の印は開いた形も畳んだ形も 18。線は 1.75 で固定し、拡大縮小で濃さが変わらないようにする（オーナー指示）。
+ * クラスを重ねるのは、全体の `a svg.lucide`（16px）より強く効かせるため。
+ */
+:root .item .v8NavIcon.v8NavIcon,
+:root .settingsEntry .v8NavIcon.v8NavIcon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  stroke-width: 1.75;
+}
+:root .item .v8NavIcon.v8NavIcon *,
+:root .settingsEntry .v8NavIcon.v8NavIcon * { vector-effect: non-scaling-stroke; }
+:root .item .v8NavIcon.v8NavIcon path,
+:root .settingsEntry .v8NavIcon.v8NavIcon path { stroke-width: inherit; }
+:root [data-collapsed] .item > svg { width: 18px; height: 18px; }
+:root .section + .section { margin-top: 1px; }
+:root [data-collapsed] .section + .section::before {
+  content: ''; display: block; width: 24px; height: 1px; flex-shrink: 0;
+  align-self: center; background: var(--color-hairline);
+}
+:root .sectionHeading > svg { width: 16px; height: 16px; }
+:root .badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 18px; padding: 0 6px; margin-left: auto;
+  font-family: var(--font-inter), Inter, sans-serif; font-size: 11px;
+  font-weight: 700; line-height: 11px; border-radius: 999px; background: var(--color-status-danger);
+}
+:root [data-collapsed] .badge,
+:root .desktop[data-collapsed] .badge {
+  position: absolute; top: 6px; right: 8px; min-width: 0; width: 8px; height: 8px;
+  padding: 0; border: 0; outline: 2px solid var(--color-shell); outline-offset: 0;
+  /* 畳んだ幅では数字がアイコンを潰すので、赤い点だけにする。件数は吹き出しと読み上げに残る。 */
+  font-size: 0; line-height: 0; color: transparent;
+}
+:root .section + .sectionHeading,
+:root .sectionHeading + .sectionHeading { margin-top: 1px; }
+
+/*
+ * ★V8 触り心地 5 回目：組の開閉で高さを滑らかに変える。項目は包みの中に残し、
+ * 畳んだら高さ 0（行の数 0fr）。見出しと包みの間の 1 段分も畳んだときは打ち消す。
+ * 開くときは最初から見え、閉じるときは縮み終わってから隠れる。
+ * 動きを減らす設定では一瞬で開閉する。
+ */
+:root .sectionItems {
+  display: grid;
+  grid-template-rows: 1fr;
+  gap: inherit;
+}
+
+:root .sectionItemsInner {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: inherit;
+  overflow: clip;
+}
+
+:root .sectionItemsClosed {
+  grid-template-rows: 0fr;
+  margin-top: calc(var(--tpl-ux5-nav-group-gap) * -1);
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root .sectionItems {
+    transition:
+      grid-template-rows var(--motion-base) var(--motion-ease-out),
+      margin-top var(--motion-base) var(--motion-ease-out),
+      visibility var(--motion-base) allow-discrete;
+  }
+}
+
+/* 畳んだ時の名前の吹き出し（アイコンの右・画面に固定）。乗せた瞬間に出す。動きを減らす設定では動かさない。 */
+:root .railTip {
+  position: fixed;
+  left: 72px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--polish-radius-control);
+  background: var(--color-ink-secondary); /* 黒より少し灰色 */
+  color: var(--color-canvas);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+  animation: rail-tip-in var(--motion-fast) var(--motion-ease-out);
+}
+:root .railTipCount {
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--color-danger);
+  color: var(--color-canvas);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+@keyframes rail-tip-in {
+  from { opacity: 0; transform: translate(-4px, -50%); }
+  to { opacity: 1; transform: translate(0, -50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root .railTip { animation: none; }
+}
+
+/* 組の見出しは小さな灰色。畳んだ帯の吹き出しは既存のまま。 */
+:root .sectionHeading, :root .sectionToggle { color: var(--color-ink-secondary); font-size: var(--polish-text-note); font-weight: var(--polish-control-weight); letter-spacing: var(--polish-nav-tracking); }
+:root .sectionChevron { width: var(--polish-icon-small); height: var(--polish-icon-small); color: var(--color-ink-faint); stroke-width: var(--polish-icon-stroke); }
+
+:root .desktop:not([data-collapsed]) .badge { padding-block-start: var(--polish-text-center-inset); }
+
+/*
+ * 左メニューの送るバー。普段は見せず、メニューに乗せた時だけ見える形にする。
+ * 触れない端末では常に見せる。
+ */
+@media (hover: hover) {
+  :root .nav {
+    scrollbar-color: transparent transparent;
+  }
+
+  :root .nav:hover {
+    scrollbar-color: var(--color-scroll-thumb) transparent;
+  }
+
+  :root .nav::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+
+  :root .nav:hover::-webkit-scrollbar-thumb {
+    background-color: var(--color-scroll-thumb);
+  }
+}
+
+.nav[aria-busy='true'] a { color: var(--color-ink-faint); }
+:root .deliveryItem { gap: 7px; }
+:root .deliveryItem .itemLabel { flex: 0 1 auto; font-size: 13px; }
+.comingSoon { flex: none; margin-left: auto; font-size: 9px; line-height: 18px; color: #64748b; white-space: nowrap; }
+:root .desktop[data-collapsed] .comingSoon { display: none; }

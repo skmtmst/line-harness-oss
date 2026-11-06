@@ -1,7 +1,5 @@
+import { jstTimestamp, jstDateOffset as japanDateOffset, jstMonthStart as japanMonthStart } from '@line-crm/shared';
 import type { D1Database } from '@cloudflare/workers-types';
-
-/** JST offset: UTC+9 in milliseconds */
-const JST_OFFSET_MS = 9 * 60 * 60_000;
 
 export const MAX_LIST_LIMIT = 200;
 
@@ -20,7 +18,7 @@ export function nonNegativeListOffset(value: number | undefined): number {
  * Format: YYYY-MM-DDTHH:mm:ss.sss+09:00
  *
  * All timestamps in this project are standardized to JST.
- * The +09:00 suffix ensures new Date() parses correctly for epoch comparisons.
+ * The +09:00 suffix ensures new Date parses correctly for epoch comparisons.
  */
 export function jstNow(): string {
   return toJstString(new Date());
@@ -31,8 +29,13 @@ export function jstNow(): string {
  * Format: YYYY-MM-DDTHH:mm:ss.sss+09:00
  */
 export function toJstString(date: Date): string {
-  const jst = new Date(date.getTime() + JST_OFFSET_MS);
-  return jst.toISOString().slice(0, -1) + '+09:00';
+  return jstTimestamp(date);
+}
+
+/** Legacy columns without an offset contain JST, as in the schema defaults. */
+export function followTimeSql(column:string):string {
+  return `julianday(CASE WHEN substr(${column},-1) IN ('Z','z') OR substr(${column},-6,1) IN ('+','-') OR substr(${column},-5,1) IN ('+','-') THEN ${column}
+    WHEN length(${column})=10 THEN ${column}||'T00:00:00+09:00' ELSE ${column}||'+09:00' END)`;
 }
 
 /**
@@ -44,13 +47,28 @@ export function isTimeBefore(a: string, b: string): boolean {
 }
 
 /**
+ * updated_at を版として使う更新の、次の版を返す。
+ *
+ * 同じミリ秒に2回書くと版が進まず、古い画面からの保存を見分けられない
+ * （M507・M509・M511・M513）。現在時刻が読んだ版以下のときは読んだ版の
+ * 1ms 先へ進め、版が必ず単調に進むようにする。読めない版のときは現在時刻。
+ */
+export function nextVersionToken(current: string | null | undefined, now: string = jstNow()): string {
+  if (!current) return now;
+  const currentMs = new Date(current).getTime();
+  if (!Number.isFinite(currentMs)) return now;
+  const nowMs = new Date(now).getTime();
+  if (!Number.isFinite(nowMs) || nowMs > currentMs) return now;
+  return toJstString(new Date(currentMs + 1));
+}
+
+/**
  * JSTの暦日（YYYY-MM-DD）。DBへ入る時刻はJST文字列（`jstNow`）なので、
  * 頭10文字と突き合わせて期間を切る。SQLiteの `date('now')` はUTCで
  * 9時間ずれるため、「今日」の境目の集計には使わない。
  */
 export function jstDateString(offsetDays = 0, nowMs = Date.now()): string {
-  const jst = new Date(nowMs + JST_OFFSET_MS + offsetDays * 86_400_000);
-  return jst.toISOString().slice(0, 10);
+  return japanDateOffset(offsetDays, new Date(nowMs));
 }
 
 /** 暦日の翌日（YYYY-MM-DD）。`col >= day AND col < next` の半開区間に使う。 */
@@ -61,18 +79,15 @@ export function nextDateString(day: string): string {
 /*
  * JSTの当月1日 00:00 を `jstNow` と同じ表記（+09:00 付き）で返す。
  * SQLite の `datetime('now','start of month')` は UTC の月初を返すため、
- * 日本時間の月初 0〜9 時に前月の記録を混ぜていた（監査 R384）。
+ * そのまま使うと日本時間の月初 0〜9 時に前月の記録が混ざる。
  * `occurred_at` など JST 文字列入りの列と文字列比較できる形に揃える。
  */
 export function jstMonthStartString(nowMs = Date.now()): string {
-  const jst = new Date(nowMs + JST_OFFSET_MS);
-  const year = jst.getUTCFullYear();
-  const month = String(jst.getUTCMonth() + 1).padStart(2, '0');
-  return `${year}-${month}-01T00:00:00.000+09:00`;
+  return `${japanMonthStart(new Date(nowMs))}T00:00:00.000+09:00`;
 }
 
 /*
- * 監査 R227: 期間の境界を UTC の ISO 文字列へ揃える。
+ * 期間の境界を UTC の ISO 文字列へ揃える。
  * 記録の時刻は JST 表記（`jstNow` の `+09:00`）で、画面から来る期間も
  * JST の暦日を指す。時差の書かれた値（`Z`・`+09:00`）はそのまま、
  * 書かれていない値（`'2026-08-01'`・`'2026-08-16T23:59:59.999'`）は

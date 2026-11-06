@@ -3,6 +3,8 @@
 import { useRef, useState } from 'react'
 import MenuPortal from '@/components/shared/menu-portal'
 import Notice from '@/components/shared/notice'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /**
  * 受信箱のプルダウン。
@@ -63,8 +65,8 @@ function FloatingPanel({
 function Chevron({ open }: { open: boolean }) {
   return (
     <svg
-      width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+      width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
       className={open ? 'rotate-180' : undefined}
     >
       <path d="m6 9 6 6 6-6" />
@@ -74,22 +76,22 @@ function Chevron({ open }: { open: boolean }) {
 
 function Check() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M20 6 9 17l-5-5" />
     </svg>
   )
 }
 
 /* 位置（absolute・z・mt）は器（MenuPortal）が決める。ここは箱の見た目だけ。 */
-const panelClass = 'border-hairline rounded-control bg-canvas min-w-full overflow-hidden border shadow-lg'
+const panelClass = 'border-hairline rounded-control bg-canvas min-w-full overflow-hidden border shadow-float'
 const rowClass = 'flex w-full items-center gap-2 px-3 py-2 text-left text-xs'
 
 // ─────────────────────────────────────────────────────────────
 // 担当者
 // ─────────────────────────────────────────────────────────────
 
-export type OperatorOption = { id: string; name: string }
+export type OperatorOption = { id: string; name: string; disabled?: boolean }
 
 export function buildOperatorRows(
   operators: OperatorOption[],
@@ -112,6 +114,7 @@ export function buildOperatorRows(
     探し直さずに確認できる。
   */
   if (currentValue && currentValue !== 'unassigned') {
+    if (!ordered.some(item => item.id === currentValue)) ordered.unshift({ id: currentValue, name: '担当者不明', disabled: true })
     ordered.sort((a, b) => Number(b.id === currentValue) - Number(a.id === currentValue))
   }
   return [...ordered, { id: 'unassigned', name: '未割り当て' }]
@@ -125,7 +128,7 @@ function OperatorMark({ option }: { option: OperatorOption }) {
   return (
     <span
       aria-hidden="true"
-      className="border-hairline bg-canvas-sunken text-ink-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold"
+      className="border-hairline bg-canvas-sunken text-ink-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-pill border text-xs font-medium"
     >
       {mark}
     </span>
@@ -136,7 +139,7 @@ export function OperatorDropdown({
   value,
   operators,
   onChange,
-  label = '担当者',
+  label = '担当',
   ariaLabel = '担当者を選ぶ',
   allowAll = true,
   compact = false,
@@ -180,6 +183,7 @@ export function OperatorDropdown({
         aria-label={ariaLabel}
         aria-expanded={open}
         onClick={() => setOpen((now) => !now)}
+        title={`${label}：${current?.name ?? (allowAll ? 'すべて' : '未割り当て')}`}
         className={`border-hairline rounded-control bg-canvas text-ink flex h-10 w-full items-center gap-1.5 whitespace-nowrap border px-2.5 text-xs ${open ? 'border-accent' : ''}`}
       >
         {compact ? (
@@ -205,19 +209,19 @@ export function OperatorDropdown({
           matchWidth="min"
           getAnchor={() => wrapRef.current}
           onClose={() => setOpen(false)}
-          label={ariaLabel ?? '担当者'}
+          label={ariaLabel ?? '担当'}
           panelClassName={panelClass}
         >
           {/* 担当が増えるほど縦に伸びる。探す手段が無いと使えない。 */}
           <div className="border-hairline border-b p-2">
-            <input
+            <SaveErrorField names={["query"]}><SharedTextField
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="担当者名を検索"
               aria-label="担当者名を検索"
               className="border-hairline rounded-control text-ink placeholder:text-ink-faint w-full border px-2 py-1 text-xs outline-none"
-            />
+            /></SaveErrorField>
           </div>
           {shown.length === 0 ? (
             <p className="text-ink-faint px-3 py-3 text-xs">見つかりません</p>
@@ -235,6 +239,7 @@ export function OperatorDropdown({
                 type="button"
                 role="option"
                 aria-selected={selected}
+                disabled={row.disabled}
                 onClick={() => { onChange(row.id); setOpen(false); setQuery('') }}
                 className={`${rowClass} ${selected ? 'bg-accent-soft text-accent-deep font-medium' : 'text-ink hover:bg-canvas-sunken'}`}
               >
@@ -306,8 +311,8 @@ export function StatusDropdown({
         onClick={() => setOpen((now) => !now)}
         className={`border-hairline rounded-control bg-canvas flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap border px-2.5 text-xs ${open ? 'border-accent' : ''}`}
       >
-        <span className={`h-2 w-2 rounded-full ${current.dot}`} aria-hidden="true" />
-        <span className="font-medium">{current.label}</span>
+        <span className={`h-2 w-2 rounded-pill ${current.dot}`} aria-hidden="true" />
+        <span className="font-semibold">{current.label}</span>
         <span className="text-ink-faint"><Chevron open={open} /></span>
       </button>
       {open ? (
@@ -332,8 +337,8 @@ export function StatusDropdown({
                 onClick={() => { onChange(status); setOpen(false) }}
                 className={`${rowClass} whitespace-nowrap ${selected ? 'bg-canvas-sunken' : 'hover:bg-canvas-sunken'}`}
               >
-                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${style.dot}`} aria-hidden="true" />
-                <span className={`rounded-pill px-2 py-0.5 text-[11px] font-medium ${style.pill}`}>{style.label}</span>
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-pill ${style.dot}`} aria-hidden="true" />
+                <span className={`rounded-pill px-2 py-0.5 text-micro font-medium ${style.pill}`}>{style.label}</span>
                 <span className={`text-accent-deep ml-auto ${selected ? '' : 'invisible'}`}><Check /></span>
               </button>
             )
@@ -408,14 +413,14 @@ export function FolderDropdown({
           panelClassName={`${panelClass} right-0 w-70`}
         >
           <div className="border-hairline border-b p-2">
-            <input
+            <SaveErrorField names={["query"]}><SharedTextField
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="フォルダを検索"
               aria-label="フォルダを検索"
               className="border-hairline rounded-control text-ink placeholder:text-ink-faint w-full border px-2 py-1.5 text-xs outline-none"
-            />
+            /></SaveErrorField>
           </div>
           <button
             type="button"

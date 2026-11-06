@@ -12,8 +12,22 @@ export interface StripeEventRow {
   processed_at: string;
 }
 
-export async function getStripeEvents(db: D1Database, opts: { friendId?: string; eventType?: string; limit?: number } = {}): Promise<StripeEventRow[]> {
+export async function getStripeEvents(db: D1Database, opts: {
+  friendId?: string; eventType?: string; limit?: number;
+  lineAccountIds?: readonly string[]; includeUnassigned?: boolean;
+} = {}): Promise<StripeEventRow[]> {
   const limit = boundedListLimit(opts.limit, 100);
+  if (opts.lineAccountIds !== undefined) {
+    const conditions = ['(f.line_account_id IN (SELECT value FROM json_each(?))'
+      + (opts.includeUnassigned ? ' OR (e.friend_id IS NULL OR (f.id IS NOT NULL AND f.line_account_id IS NULL))' : '') + ')'];
+    const binds: unknown[] = [JSON.stringify(opts.lineAccountIds)];
+    if (opts.friendId) { conditions.push('e.friend_id = ?'); binds.push(opts.friendId); }
+    if (opts.eventType) { conditions.push('e.event_type = ?'); binds.push(opts.eventType); }
+    const result = await db.prepare(`SELECT e.* FROM stripe_events e LEFT JOIN friends f ON f.id = e.friend_id
+      WHERE ${conditions.join(' AND ')} ORDER BY e.processed_at DESC LIMIT ?`)
+      .bind(...binds, limit).all<StripeEventRow>();
+    return result.results;
+  }
   if (opts.friendId) {
     const result = await db.prepare(`SELECT * FROM stripe_events WHERE friend_id = ? ORDER BY processed_at DESC LIMIT ?`)
       .bind(opts.friendId, limit).all<StripeEventRow>();

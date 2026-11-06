@@ -8,7 +8,7 @@ import {
   resolveAffiliateAttribution,
   ATTRIBUTION_WINDOW_DAYS,
 } from '../src/affiliate-attribution.js';
-import { trackConversion, type ConversionEvent } from '../src/conversions.js';
+import { trackConversion, type ConversionEvent } from '../src/conversions/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
@@ -405,7 +405,7 @@ describe('trackConversion + attribution integration', () => {
     });
 
     // Pin conversion-clock to the same frozen NOW the touch is anchored to:
-    // trackConversion otherwise stamps with Date.now(), and the 2-day-old
+    // trackConversion otherwise stamps with Date.now, and the 2-day-old
     // touch (2026-07-05) would fall outside the 90-day attribution window
     // on any real clock past 2026-10-03, yielding null instead of aff-1.
     const ev = (await trackConversion(

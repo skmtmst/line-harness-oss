@@ -1,13 +1,15 @@
+import { fail } from '../lib/fail.js';
+import { inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * TikTok利益計算の自動化: 状態確認と手動同期のAPI。
  *
- * - 認可は既存の google_sheets_integrations（#838）を使い回すため、
+ * - 認可は既存の google_sheets_integrationsを使い回すため、
  *   ここに新しいOAuthは無い。Googleの認可が生きているアカウントだけ動く。
  * - 変更系（手動同期）は owner / admin に限定する。
  */
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
@@ -20,20 +22,12 @@ import {
 
 export const tiktokPnl = new Hono<Env>();
 
-function fail(
-  c: Context<Env>,
-  status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503,
-  error: string,
-) {
-  return c.json({ success: false, error }, status);
-}
-
 /**
  * 利益計算に使えるGoogle連携を1件返す。
  *
- * #838 の書き出し先スプレッドシート未選択（`pending_target`）でも、
+ *  の書き出し先スプレッドシート未選択（`pending_target`）でも、
  * Googleの認可と更新用トークンは保存されているので利益計算は動く。
- * 利益計算は自分でスプレッドシートを作るため #838 の書き出し先に依存しない。
+ * 利益計算は自分でスプレッドシートを作るため  の書き出し先に依存しない。
  * 認可切れ（`expired`）と未接続（行なし）だけを未接続として扱う。
  */
 async function connectedIntegration(
@@ -85,9 +79,9 @@ tiktokPnl.get(
 tiktokPnl.post(
   '/api/integrations/tiktok-pnl/sync',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const lineAccountId = c.req.query('account_id');
-    if (!lineAccountId) return fail(c, 400, 'account_id を指定してください');
+    if (!lineAccountId) return fail(c, 400, 'account_id を指定してください', {}, ["account_id"]);
     const integration = await connectedIntegration(c, lineAccountId);
     if (!integration) {
       return fail(c, 409, 'Google Sheets連携が未接続です。先に管理画面のスプレッドシート連携を接続してください');

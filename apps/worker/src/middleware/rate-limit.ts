@@ -1,18 +1,10 @@
-/**
- * In-memory sliding window rate limiter for Cloudflare Workers.
- *
- * Cloudflare Workers have per-isolate memory that persists across
- * requests to the same instance. Counters are lost on cold start,
- * which is acceptable — this guards against burst abuse, not
- * long-term quota enforcement.
- */
+/** 短時間の集中要求は isolate 内のカウンタで抑える。再起動で失われるため長期の割当には使わず、機密操作は処理前に sensitive-rate-limit.ts の共有 D1 予算も確保する。 */
 
 import type { Context, Next } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
+import { authenticatedSensitiveLimit, preAuthSensitiveLimit } from './sensitive-rate-limit.js';
 
-// ---------------------------------------------------------------------------
-// Core rate-limit logic
-// ---------------------------------------------------------------------------
+
 
 interface RateLimitEntry {
   timestamps: number[];
@@ -58,20 +50,23 @@ function check(key: string, max: number, windowMs: number): { ok: boolean; remai
   return { ok: true, remaining: max - entry.timestamps.length, retryAfter: 0 };
 }
 
-// ---------------------------------------------------------------------------
-// Paths that are unauthenticated (lower limit, keyed by IP)
-// ---------------------------------------------------------------------------
+// 未認証の経路は、IP ごとの低い上限を使う。
 
 const UNAUTHENTICATED_PATTERNS: Array<string | RegExp> = [
   '/webhook',
+  /^\/webhook\/\d+$/,
   /^\/api\/forms\/[^/]+\/submit$/,
   // サイトスクリプトの受け口。認証が無く、外のサイトから直接叩かれる。
   '/api/site/collect',
-  // R429: 公開受信口。署名で守る公開口で、管理画面の認証は通さない。
+  // 公開受信口。署名で守る公開口で、管理画面の認証は通さない。
   // 未検証の Bearer/Cookie で認証済み枠（1000/分）へ切り替わると
   // 公開受信の負荷抑制が緩むため、Authorization の有無によらず IP 枠で抑える。
   /^\/api\/webhooks\/incoming\/[^/]+\/receive$/,
   '/api/qr',
+  // 公開の流入 URL も DB を使うため、ref・help・クエリを変えても同じ IP の予算を使う。未検証の資格情報で分散させない。
+  /^\/r\//,
+  /^\/liff\/(?:files|statements)\//,
+  /^\/api\/liff\/files\//,
   // 会員登録・メールログイン・パスワード再設定。認証前に叩かれる入口なので低い上限にする。
   /^\/api\/auth\/(register|password)\//,
 ];
@@ -91,28 +86,7 @@ function getClientIp(c: Context): string {
   );
 }
 
-function getAdminCookieToken(c: Context): string | null {
-  const cookie = c.req.header('Cookie');
-  if (!cookie) return null;
-  for (const part of cookie.split(';')) {
-    const [rawName, ...rawValue] = part.trim().split('=');
-    if (rawName === 'lh_admin_session') {
-      const raw = rawValue.join('=') || '';
-      // Cookie values are client-controlled; a malformed percent escape must
-      // not throw (it would turn the request into a 500 before auth runs).
-      try {
-        return decodeURIComponent(raw) || null;
-      } catch {
-        return raw || null;
-      }
-    }
-  }
-  return null;
-}
 
-// ---------------------------------------------------------------------------
-// Hono middleware
-// ---------------------------------------------------------------------------
 
 const AUTHENTICATED_MAX = 1000;
 const AUTHENTICATED_WINDOW = 60_000; // 1 min
@@ -120,56 +94,30 @@ const AUTHENTICATED_WINDOW = 60_000; // 1 min
 const UNAUTHENTICATED_MAX = 100;
 const UNAUTHENTICATED_WINDOW = 60_000; // 1 min
 
-// Per-IP ceiling applied to token/cookie-keyed requests. Rate limiting runs
-// BEFORE auth, so the token (Bearer or session cookie) is not yet validated —
-// an attacker could otherwise rotate bogus tokens/cookies to mint endless
-// fresh per-token buckets and bypass the IP limit. This ceiling bounds total
-// throughput per IP (well above a single legitimate session's allowance) so
-// rotation cannot escalate beyond it.
-const IP_CEILING_MAX = 3000;
-const IP_CEILING_WINDOW = 60_000; // 1 min
-
 export async function rateLimitMiddleware(c: Context<Env>, next: Next): Promise<Response | void> {
   const path = new URL(c.req.url).pathname;
 
-  // Skip rate limiting for docs / static assets
-  if (path === '/docs' || path === '/openapi.json' || path.startsWith('/r/')) {
+  // 公開文書は流入情報の DB 読込を行わない。
+  if (path === '/docs' || path === '/openapi.json') {
     return next();
   }
+  const denied = await preAuthSensitiveLimit(c);
+  if (denied) return denied;
 
   let key: string;
   let max: number;
   let windowMs: number;
 
   if (isUnauthenticatedPath(path)) {
-    // Key by IP for unauthenticated endpoints
+    // 未認証の要求は IP ごとに制限する。
     key = `ip:${getClientIp(c)}`;
     max = path === '/api/qr' ? 30 : UNAUTHENTICATED_MAX;
     windowMs = UNAUTHENTICATED_WINDOW;
   } else {
-    // Key by API key for authenticated endpoints
-    const authHeader = c.req.header('Authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : getAdminCookieToken(c);
-    if (token) {
-      // Use first 16 chars of token as key to avoid storing full secrets
-      key = `key:${token.slice(0, 16)}`;
-      max = AUTHENTICATED_MAX;
-      windowMs = AUTHENTICATED_WINDOW;
-      // Bound total per-IP throughput so an attacker cannot bypass the limiter
-      // by rotating unvalidated tokens/cookies (each minting a fresh bucket).
-      const ceiling = check(`ip-ceiling:${getClientIp(c)}`, IP_CEILING_MAX, IP_CEILING_WINDOW);
-      if (!ceiling.ok) {
-        return c.json(
-          { success: false, error: 'Too many requests. Please try again later.' },
-          { status: 429, headers: { 'Retry-After': String(ceiling.retryAfter) } },
-        );
-      }
-    } else {
-      // No auth header — key by IP with the lower limit
-      key = `ip:${getClientIp(c)}`;
-      max = UNAUTHENTICATED_MAX;
-      windowMs = UNAUTHENTICATED_WINDOW;
-    }
+    // 認証前は資格情報の文字列に触れずIPだけで分ける。
+    key = `pre-auth-ip:${getClientIp(c)}`;
+    max = 3000; // 同じ店内ネットワークの複数利用者を合わせた従来の天井。
+    windowMs = AUTHENTICATED_WINDOW;
   }
 
   const result = check(key, max, windowMs);
@@ -181,8 +129,21 @@ export async function rateLimitMiddleware(c: Context<Env>, next: Next): Promise<
     );
   }
 
-  // Proceed and attach rate-limit headers to the response
+
   await next();
 
+  c.header('X-RateLimit-Remaining', String(result.remaining));
+}
+
+/** 認証を通った後は確認済みの統括・利用者で分ける。 */
+export async function authenticatedRateLimitMiddleware(c: Context<Env>, next: Next): Promise<Response | void> {
+  const staff = c.get('staff');
+  if (!staff || isUnauthenticatedPath(c.req.path)) return next();
+  const denied = await authenticatedSensitiveLimit(c);
+  if (denied) return denied;
+  const result = check(`staff:${staff.tenantId ?? ''}:${staff.id}`, AUTHENTICATED_MAX, AUTHENTICATED_WINDOW);
+  if (!result.ok) return c.json({ success: false, error: 'Too many requests. Please try again later.' },
+    { status: 429, headers: { 'Retry-After': String(result.retryAfter) } });
+  await next();
   c.header('X-RateLimit-Remaining', String(result.remaining));
 }

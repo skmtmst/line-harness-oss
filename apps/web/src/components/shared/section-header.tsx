@@ -1,0 +1,68 @@
+import HelpTip from './help-tip'
+import TextLink from './text-link'
+import styles from './section-header.module.css'
+
+/**
+ * 段の題（Pencil ★V8 `CugIm`）。
+ *
+ * 板の中の一段の頭。題（15px/600）に、必要なら補足・「？」・
+ * 右端の行き先リンク（→つき）を付ける。「？」は help-tip、
+ * リンクは text-action の既存部品をそのまま使う。
+ */
+export default function SectionHeader({
+  title,
+  description,
+  size,
+  note,
+  actions,
+  help,
+  helpLabel,
+  href,
+  linkLabel,
+  wrap,
+  linkTone,
+  separation,
+}: {
+  /** 段の題（例「最近の動き」） */
+  title: React.ReactNode
+  description?:React.ReactNode
+  size?: 'small' | 'customer'
+  linkTone?: 'action'
+  /** 本文の段の間。既存の欄間に共通の余白を足し、次のまとまりの題を離す。 */
+  separation?: 'section'
+  /** 題の右の小さな補足（例「直近30日」） */
+  note?: React.ReactNode
+  /** 段の右端の閉じる操作など。補足と分けて右へ寄せる。 */
+  actions?: React.ReactNode
+  /** 「？」を押すと出る補足文。helpLabel とセットで渡す */
+  help?: React.ReactNode
+  /** 「？」の読み上げ名（例「最近の動きの説明」） */
+  helpLabel?: string
+  /** 右端に出す行き先リンクの URL。linkLabel とセットで渡す */
+  href?: string
+  /** 行き先リンクの文字（例「すべて見る」） */
+  linkLabel?: string
+  /**
+   * 狭い列で題と行き先が1行に入らないとき、題を「…」で切らずに行き先を次の行へ回す。
+   * 入るときは1行のまま（見た目は変わらない）。
+   */
+  wrap?: boolean
+}) {
+  return (
+    <div className={styles.root} data-size={size} data-wrap={wrap ? '' : undefined} data-separation={separation}>
+      {description?<div className={styles.labels}><h3 className={styles.title} title={typeof title === 'string' ? title : undefined}>
+        {title}
+      </h3><p className={styles.description}>{description}</p></div>:(<h3 className={styles.title} title={typeof title === 'string' ? title : undefined}>
+        {title}
+      </h3>)}
+      {note ? <span className={styles.note}>{note}</span> : null}
+      {help && helpLabel ? <HelpTip label={helpLabel}>{help}</HelpTip> : null}
+      {actions ? <span className={styles.link}>{actions}</span> : null}
+      {href && linkLabel ? (
+        <span className={styles.link}>
+          <TextLink href={href} tone={linkTone}>{linkLabel}</TextLink>
+        </span>
+      ) : null}
+    </div>
+  )
+}

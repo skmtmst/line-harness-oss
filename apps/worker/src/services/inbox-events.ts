@@ -18,6 +18,7 @@ export function inboxEventStatement(
     reason?: string | null;
     correlationId: string;
     createdAt: string;
+    messageGuardId?:string;
     guard?: { table: 'chats' | 'support_email_threads'; id: string; revision: number; updatedAt: string };
   },
 ): D1PreparedStatement {
@@ -26,7 +27,7 @@ export function inboxEventStatement(
         SELECT 1 FROM ${input.guard.table}
         WHERE id = ? AND revision = ? AND updated_at = ?
       )`
-    : '';
+    : input.messageGuardId ? ' WHERE EXISTS(SELECT 1 FROM support_email_messages WHERE id=?)' : '';
   const bindings: unknown[] = [
     crypto.randomUUID(),
     input.channel,
@@ -40,6 +41,7 @@ export function inboxEventStatement(
     input.createdAt,
   ];
   if (input.guard) bindings.push(input.guard.id, input.guard.revision, input.guard.updatedAt);
+  else if(input.messageGuardId)bindings.push(input.messageGuardId);
   return db.prepare(
     `INSERT INTO inbox_conversation_events
        (id, channel, conversation_id, event_type, before_json, after_json,

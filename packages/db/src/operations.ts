@@ -1,24 +1,14 @@
+export type { OperationCapability, OperationState, OperationStates, OperationIncidentStatus, OperationControlSnapshot, OperationIncident } from './operation-types.js';
+export { OPERATION_CAPABILITIES } from './operation-types.js';
+import { OPERATION_CAPABILITIES } from './operation-types.js';
+import type { OperationCapability, OperationState, OperationStates, OperationIncidentStatus, OperationControlSnapshot, OperationIncident } from './operation-types.js';
+import { sqlIdSet } from './id-queries.js';
 import {
   captureStoppedDefinitions,
   holdExpiredBroadcasts,
   inspectIncidentRestoreDrift,
   type OperationRestoreDrift,
 } from './operation-restore-guard.js';
-
-export const OPERATION_CAPABILITIES = [
-  'broadcast_dispatch',
-  'scenario_dispatch',
-  'reminder_dispatch',
-  'automation_actions',
-  'auto_reply_dispatch',
-  'webhook_outgoing',
-  'ad_postback',
-] as const;
-
-export type OperationCapability = (typeof OPERATION_CAPABILITIES)[number];
-export type OperationState = 'running' | 'stopped';
-export type OperationStates = Record<OperationCapability, OperationState>;
-export type OperationIncidentStatus = 'preparing' | 'stopped' | 'resolved' | 'failed';
 
 export interface OperationControlSet {
   scopeKey: string;
@@ -30,45 +20,6 @@ export interface OperationControlSet {
   actorId: string | null;
   stoppedAt: string | null;
   updatedAt: string | null;
-}
-
-export interface OperationControlSnapshot {
-  version: number;
-  states: OperationStates;
-  activeIncidentId: string | null;
-  reason: string | null;
-  actorId: string | null;
-  stoppedAt: string | null;
-  capturedAt: string;
-}
-
-export interface OperationIncident {
-  id: string;
-  scopeKey: string;
-  lineAccountId: string | null;
-  status: OperationIncidentStatus;
-  capabilities: OperationCapability[];
-  reason: string;
-  detail: string | null;
-  actorId: string;
-  resolvedByActorId: string | null;
-  controlVersion: number | null;
-  beforeSnapshot: OperationControlSnapshot;
-  stoppedSnapshot: OperationControlSnapshot | null;
-  restoredSnapshot: OperationControlSnapshot | null;
-  errorMessage: string | null;
-  /**
-   * N-451: 停止した瞬間に稼働対象だった定義の指紋（版・期限）のJSON。
-   * この仕組みより前に止めた incident では null で、復旧前検査は
-   * 「記録なし」として全ての変更検査をスキップしない（検査自体は走る）。
-   */
-  stoppedDefinitionsJson: string | null;
-  /** N-451: 直近の復旧試行の検査結果（再開した対象・理由つきで止めた対象）。 */
-  restoreReportJson: string | null;
-  stoppedAt: string | null;
-  resolvedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
 }
 
 const ALL_ACCOUNTS_SCOPE = '*';
@@ -332,7 +283,7 @@ export async function stopOperationCapabilities(
   }
 
   /*
-   * N-451: 止める瞬間の「止まった定義」の指紋を取る。
+   * 止める瞬間の「止まった定義」の指紋を取る。
    * 復旧のとき、ここで記録した版・期限と現在の定義を比べて、
    * 停止中の 編集・削除・追加・期限切れ を検査する。
    * 制御状態を裏返す前に取るので、snapshotは必ず停止前の定義を指す。
@@ -425,7 +376,7 @@ export async function stopOperationCapabilities(
   };
 }
 
-/** N-451: 復旧試行の検査結果。incident の restore_report_json と応答の両方に載せる。 */
+/** 復旧試行の検査結果。incident の restore_report_json と応答の両方に載せる。 */
 export interface OperationRestoreReport {
   evaluatedAt: string;
   drift: OperationRestoreDrift;
@@ -445,7 +396,7 @@ export type RestoreOperationIncidentResult =
   | { status: 'not_found' };
 
 /*
- * N-451: 停止前snapshotを無条件には戻さない。
+ * 停止前snapshotを無条件には戻さない。
  *
  * 停止時に保存した定義の指紋と現在を比べ、
  * - 変更・追加があった能力 → 再開せず理由つきで止めたままにする
@@ -581,8 +532,8 @@ export async function listOperationIncidents(
   const binds: unknown[] = [];
   if (options.includeGlobal) clauses.push("scope_key = '*'");
   if (options.accountIds.length > 0) {
-    clauses.push(`line_account_id IN (${options.accountIds.map(() => '?').join(',')})`);
-    binds.push(...options.accountIds);
+    clauses.push(`line_account_id IN (${sqlIdSet(options.accountIds).sql})`);
+    binds.push(...(options.accountIds.length ? sqlIdSet(options.accountIds).binds : []));
   }
   if (clauses.length === 0) return [];
   const limit = Math.max(1, Math.min(Math.floor(options.limit ?? 100), 200));

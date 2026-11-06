@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { getCommonVarUsageCounts } from '../src/common-vars.js'
+import { getCommonVarUsageCounts } from '../src/common-vars/index.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 let sqlite: Database.Database

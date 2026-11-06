@@ -25,13 +25,13 @@ describe('記録のタブ', () => {
   it('読み込み中は1枚だけ出す', () => {
     fixture.activity.mockImplementation(() => new Promise(() => undefined))
     render(<BroadcastActivity broadcastId="b1" formatDateTime={formatDateTime} />)
-    expect(screen.getByText('記録を読み込んでいます')).toBeTruthy()
+    expect(screen.getByLabelText('記録を読み込んでいます')).toBeTruthy()
   })
 
   it('失敗は読み直せる', () => {
     fixture.activity.mockRejectedValue(new Error('down'))
     render(<BroadcastActivity broadcastId="b1" formatDateTime={formatDateTime} />)
-    return waitFor(() => expect(screen.getByText('記録を表示できませんでした')).toBeTruthy())
+    return waitFor(() => expect(screen.getByText('記録を読み込めませんでした')).toBeTruthy())
   })
 
   it('空は記録が増えたら出ると書く', async () => {

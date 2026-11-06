@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * アフィリエイター登録・案件登録を、本物の React で mount して操作する（#686）。
@@ -21,12 +22,17 @@
  *   4. 途中保存の後に押し直すと、紹介者が二重にできる
  *   5. 途中保存の後に直した名前が、再開の保存で消える
  *   6. アカウントを切り替えても作りかけが残り、別店の登録を更新する
+ *   7. 途中保存のあと未保存の切替を変えると、知らせが保存済みと逆を言う（R525残部）
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /* ------------------------------------------------------------------ 差し替え */
+
+const notifySaved = vi.hoisted(() => vi.fn())
+vi.mock('@/components/shared/toast', async original => ({ ...await original<typeof import('@/components/shared/toast')>(), notifySaved }))
 
 const friendsList = vi.hoisted(() => vi.fn())
 const affiliatesCreate = vi.hoisted(() => vi.fn())
@@ -38,7 +44,10 @@ const offersUpdate = vi.hoisted(() => vi.fn())
  * `@/lib/api` は読み込んだ時点で NEXT_PUBLIC_API_URL を要求して落ちる。
  * 画面が実際に呼ぶ口だけを置いた差し替えにして、環境変数に縛られないようにする。
  */
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+  ...actual,
   // CreatePage の後始末が `error instanceof ApiError` を見るので、器だけ揃える。
   ApiError: class ApiError extends Error {},
   api: {
@@ -47,11 +56,15 @@ vi.mock('@/lib/api', () => ({
     affiliateOffers: { create: offersCreate, update: offersUpdate },
     tags: { list: vi.fn(async () => ({ success: true, data: [] })) },
     scenarios: { list: vi.fn(async () => ({ success: true, data: [] })) },
+    // 案件を作る（src/v8/affiliate-offer-new）は役割を読んで、閲覧のみなら保存を隠す。
+    staff: { me: vi.fn(async () => ({ success: true, data: { role: 'owner' } })) },
   },
-}))
+  }
+})
 
 const pushed = vi.hoisted(() => [] as string[])
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/affiliates/new',
   useRouter: () => ({ push: (href: string) => { pushed.push(href) } }),
 }))
 
@@ -123,9 +136,9 @@ function byLabel<T extends HTMLElement>(label: string): T {
 }
 
 function buttonByText(text: string): HTMLButtonElement {
-  const found = [...container.querySelectorAll('button')].find(
+  const found = ([...container.querySelectorAll('button')].find(
     (b) => (b.textContent ?? '').trim() === text,
-  )
+  ) ?? querySupplementaryPageAction(text))
   if (!found) throw new Error(`「${text}」のボタンが見つかりません（今あるのは ${[...container.querySelectorAll('button')].map((b) => b.textContent?.trim()).join(' / ')}）`)
   return found as HTMLButtonElement
 }
@@ -178,7 +191,7 @@ function friendPage(params: { accountId?: string; offset?: string; limit?: numbe
 }
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
   pushed.length = 0
   account.id = 'account-a'
   account.name = '本店'
@@ -213,7 +226,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     // 1ページ目は20件（＋「結びつけない」の空欄）。45件を全部は出さない。
     const select = byLabel<HTMLSelectElement>('LINEの友だちと結びつける')
     expect(select.options.length).toBe(21)
-    expect(hasText('全45件')).toBe(true)
+    expect(hasText('全45 件')).toBe(true)
 
     // 検索は選択中のLINEアカウントへ固定して投げている。
     expect(friendsList).toHaveBeenCalledWith(
@@ -228,7 +241,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     expect(hasText('本店の友だち21')).toBe(true)
 
     // 名前で絞り込む。
-    await type(byLabel<HTMLInputElement>('友だちの名前で検索'), '本店の友だち25')
+    await type(byLabel<HTMLInputElement>("友だちの名前で探す"), '本店の友だち25')
     await click(buttonByText('検索'))
     expect(friendsList).toHaveBeenLastCalledWith(
       expect.objectContaining({ accountId: 'account-a', search: '本店の友だち25', offset: '0' }),
@@ -240,9 +253,9 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     await mount(<NewAffiliatePage />)
 
     await type(byId<HTMLInputElement>('af-name'), '紹介パートナー')
-    await click(buttonByText('売上に対する割合注文金額の◯%を報酬にします'))
+    await click(container.querySelector<HTMLInputElement>('input[type=radio][value=rate]')!)
     await type(byId<HTMLInputElement>('af-rate'), '0')
-    await click(buttonByText('登録して、紹介リンクを発行する'))
+    await click(buttonByText('登録して紹介リンクを発行する'))
 
     expect(affiliatesCreate).toHaveBeenCalledTimes(1)
     expect(affiliatesCreate.mock.calls[0][0]).toMatchObject({
@@ -260,7 +273,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     await mount(<NewAffiliatePage />)
 
     await type(byId<HTMLInputElement>('af-name'), '最初の名前')
-    await click(buttonByText('登録して、紹介リンクを発行する'))
+    await click(buttonByText('登録して紹介リンクを発行する'))
 
     // 基本情報は保存済み・追加情報は未保存、と画面に出る。
     expect(affiliatesCreate).toHaveBeenCalledTimes(1)
@@ -280,12 +293,106 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     expect(pushed[0]).toContain('highlight=affiliate-1')
   })
 
+  it('追加情報の破棄は確認してから一覧へ移り、戻れば入力を残す', async () => {
+    affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
+    await mount(<NewAffiliatePage />)
+    await type(byId<HTMLInputElement>('af-name'), '入力を残す紹介者')
+    await click(buttonByText('登録して紹介リンクを発行する'))
+    const discard = screen.getByRole('link', { name: '追加情報を破棄して一覧へ戻る' })
+    await click(discard)
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect(pushed).toHaveLength(0)
+    await click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect(byId<HTMLInputElement>('af-name').value).toBe('入力を残す紹介者')
+    await click(discard)
+    await click(screen.getByRole('button', { name: '保存せずに移る' }))
+    expect(pushed[0]).toContain('highlight=affiliate-1')
+    expect(affiliatesCreate).toHaveBeenCalledTimes(1)
+    expect(affiliatesUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it('途中保存の知らせは、計測が既に始まっているか正しく伝える（R525）', async () => {
+    // オンで作ると行は最初から稼働で残る。追加情報の保存に失敗しても、
+    // 「追加情報を保存すると計測も始まります」とは言わない。
+    affiliatesCreate.mockImplementationOnce(async () => (
+      { success: true, data: { id: 'affiliate-1', isActive: true } }
+    ))
+    affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
+    await mount(<NewAffiliatePage />)
+
+    await type(byId<HTMLInputElement>('af-name'), '計測ありのパートナー')
+    await click(buttonByText('登録して紹介リンクを発行する'))
+
+    expect(affiliatesCreate.mock.calls[0][0]).toMatchObject({ isActive: true })
+    expect(hasText('基本情報は保存済みです')).toBe(true)
+    expect(hasText('計測は始まっています')).toBe(true)
+    expect(hasText('追加情報を保存すると計測も始まります')).toBe(false)
+
+    // やり直しの前にオフへ変えても、保存済みの真実は変わらない。
+    // 知らせは「既に始まっています」のまま、再開の送り先だけを言う。
+    // 「まだ始まっていない」とは言わない（R525残部）。
+    const tracking = ([...container.querySelectorAll('[data-action-row]')].find(row => row.textContent?.includes('すぐに計測を始める')) ?? querySupplementaryPageAction('すぐに計測を始める'))
+    expect(tracking).toBeTruthy()
+    await act(async () => { fireEvent.click(within(tracking as HTMLElement).getByRole('button', { name: /操作/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '削除する' })) })
+    await act(async () => { fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '削除する' })) })
+    expect(hasText('計測は始まっています')).toBe(true)
+    expect(hasText('計測はまだ始まっていません')).toBe(false)
+    expect(hasText('オフに切り替えて保存')).toBe(true)
+
+    await click(buttonByText('追加情報の保存を再開する'))
+    expect(affiliatesCreate).toHaveBeenCalledTimes(1)
+    expect(affiliatesUpdate).toHaveBeenLastCalledWith(
+      'affiliate-1', expect.objectContaining({ isActive: false }),
+    )
+    expect(pushed[0]).toContain('highlight=affiliate-1')
+  })
+
+  it('オフで作ると、計測を止めたまま追加情報だけを保存し直す（R525）', async () => {
+    affiliatesCreate.mockImplementationOnce(async () => (
+      { success: true, data: { id: 'affiliate-2', isActive: false } }
+    ))
+    affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
+    await mount(<NewAffiliatePage />)
+
+    const tracking = ([...container.querySelectorAll('[data-action-row]')].find(row => row.textContent?.includes('すぐに計測を始める')) ?? querySupplementaryPageAction('すぐに計測を始める'))
+    expect(tracking).toBeTruthy()
+    await act(async () => { fireEvent.click(within(tracking as HTMLElement).getByRole('button', { name: /操作/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '削除する' })) })
+    await act(async () => { fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '削除する' })) })
+
+    await type(byId<HTMLInputElement>('af-name'), '計測なしのパートナー')
+    await click(buttonByText('登録して紹介リンクを発行する'))
+
+    // オフが作るときに渡り、行は止まったまま残る。
+    expect(affiliatesCreate.mock.calls[0][0]).toMatchObject({ isActive: false })
+    expect(hasText('基本情報は保存済みです')).toBe(true)
+    expect(hasText('計測はまだ始まっていません')).toBe(true)
+    expect(hasText('計測は始まっています')).toBe(false)
+
+    // やり直しの前にオンへ変えても、保存済みの真実は変わらない。
+    // 知らせは「まだ始まっていません」のまま、再開の送り先だけを言う。
+    // 「既に始まっている」とは言わない（R525残部・逆向き）。
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '行うことを足す' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: 'すぐに計測を始める' })) })
+    expect(hasText('計測はまだ始まっていません')).toBe(true)
+    expect(hasText('計測は始まっています')).toBe(false)
+    expect(hasText('オンに切り替えて保存')).toBe(true)
+
+    await click(buttonByText('追加情報の保存を再開する'))
+    expect(affiliatesCreate).toHaveBeenCalledTimes(1)
+    expect(affiliatesUpdate).toHaveBeenLastCalledWith(
+      'affiliate-2', expect.objectContaining({ isActive: true }),
+    )
+    expect(pushed[0]).toContain('highlight=affiliate-2')
+  })
+
   it('途中保存のあとでLINEアカウントを切り替えたら、前の店の登録を更新しない', async () => {
     affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
     await mount(<NewAffiliatePage />)
 
     await type(byId<HTMLInputElement>('af-name'), 'A店のパートナー')
-    await click(buttonByText('登録して、紹介リンクを発行する'))
+    await click(buttonByText('登録して紹介リンクを発行する'))
     expect(hasText('基本情報は保存済みです')).toBe(true)
     const operationA = affiliatesCreate.mock.calls[0][0].operationId
 
@@ -297,10 +404,10 @@ describe('アフィリエイター登録の実操作（#686）', () => {
 
     // 作りかけは捨てられ、「再開する」ボタンは消えている。
     expect(hasText('基本情報は保存済みです')).toBe(false)
-    expect(buttonByText('登録して、紹介リンクを発行する')).toBeTruthy()
+    expect(buttonByText('登録して紹介リンクを発行する')).toBeTruthy()
 
     await type(byId<HTMLInputElement>('af-name'), 'B店のパートナー')
-    await click(buttonByText('登録して、紹介リンクを発行する'))
+    await click(buttonByText('登録して紹介リンクを発行する'))
 
     // 切替のあと、A店の紹介者(affiliate-1)へ PUT していない。
     // 新しく B店へ作りに行っている。
@@ -322,7 +429,7 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), '秋の紹介キャンペーン')
     await type(byId<HTMLInputElement>('of-amount'), '1.5')
-    await click(buttonByText('公開する'))
+    await click(buttonByText('保存して公開'))
 
     expect(hasText('報酬額は小数ではなく、1円単位の整数で入力してください')).toBe(true)
     expect(offersCreate).not.toHaveBeenCalled()
@@ -337,8 +444,7 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), '秋の紹介キャンペーン')
     await type(byId<HTMLInputElement>('of-amount'), '100')
-    await click(container.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!)
-    await click(buttonByText('下書きに保存'))
+    await click(buttonByText('保存して続けて作る'))
 
     /*
      * 「公開で作ってから止める」2段階は途中失敗で公開中の案件が残る。
@@ -351,7 +457,8 @@ describe('案件登録の実操作（#686）', () => {
     })
     expect(typeof offersCreate.mock.calls[0][0].operationId).toBe('string')
     expect(offersUpdate).not.toHaveBeenCalled()
-    expect(pushed[0]).toContain('highlight=offer-1')
+    expect(notifySaved).toHaveBeenCalledOnce()
+    expect(notifySaved).toHaveBeenCalledWith('下書きに保存しました。続けて作れます。')
   })
 
   it('作成応答が読めなくても、押し直しは同じ操作UUIDで案件を増やさない', async () => {
@@ -362,20 +469,20 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), '最初の案件名')
     await type(byId<HTMLInputElement>('of-amount'), '100')
-    await click(container.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!)
-    await click(buttonByText('下書きに保存'))
+    await click(buttonByText('保存して続けて作る'))
 
     expect(offersCreate).toHaveBeenCalledTimes(1)
     expect(hasText('一時的に応答を読めません')).toBe(true)
     expect(pushed).toHaveLength(0)
 
-    await click(buttonByText('下書きに保存'))
+    await click(buttonByText('保存して続けて作る'))
     expect(offersCreate).toHaveBeenCalledTimes(2)
     // 同じ操作UUIDで再送するので、サーバ側は先に作った行を回収できる。
     expect(offersCreate.mock.calls[1][0].operationId)
       .toBe(offersCreate.mock.calls[0][0].operationId)
     expect(offersCreate.mock.calls[1][0]).toMatchObject({ isActive: false })
-    expect(pushed[0]).toContain('highlight=offer-1')
+    expect(notifySaved).toHaveBeenCalledOnce()
+    expect(notifySaved).toHaveBeenCalledWith('下書きに保存しました。続けて作れます。')
   })
 
   it('再送で回収した行の公開状態が画面と違うときは、明示した状態へ1回だけ直す', async () => {
@@ -385,15 +492,15 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), '秋の紹介キャンペーン')
     await type(byId<HTMLInputElement>('of-amount'), '100')
-    await click(container.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!)
-    await click(buttonByText('下書きに保存'))
+    await click(buttonByText('保存して続けて作る'))
 
     expect(offersCreate).toHaveBeenCalledTimes(1)
     // 回収した行は公開中のまま返るため、画面の「下書きに保存」へ合わせる。
     expect(offersUpdate).toHaveBeenCalledTimes(1)
     expect(offersUpdate.mock.calls[0][0]).toBe('offer-1')
     expect(offersUpdate.mock.calls[0][1]).toEqual({ isActive: false })
-    expect(pushed[0]).toContain('highlight=offer-1')
+    expect(notifySaved).toHaveBeenCalledOnce()
+    expect(notifySaved).toHaveBeenCalledWith('下書きに保存しました。続けて作れます。')
   })
 
   it('作成だけ済んだ状態でLINEアカウントを切り替えたら、前の店の案件を更新しない', async () => {
@@ -409,8 +516,7 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), 'A店の案件')
     await type(byId<HTMLInputElement>('of-amount'), '100')
-    await click(container.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!)
-    await click(buttonByText('下書きに保存'))
+    await click(buttonByText('保存して続けて作る'))
     // 状態を直すPUTが落ちたエラーが出て、作成済みの身元(createdId)は残る。
     expect(hasText('一時的に保存できません')).toBe(true)
     const operationA = offersCreate.mock.calls[0][0].operationId
@@ -425,7 +531,7 @@ describe('案件登録の実操作（#686）', () => {
 
     await type(byId<HTMLInputElement>('of-name'), 'B店の案件')
     await type(byId<HTMLInputElement>('of-amount'), '200')
-    await click(buttonByText('下書きに保存'))
+    await click(buttonByText('保存して続けて作る'))
 
     // 切替のあと、A店の案件(offer-1)へ PUT していない。
     expect(offersUpdate.mock.calls.slice(offerUpdatesBeforeSwitch).map((call) => call[0]))
@@ -439,3 +545,6 @@ describe('案件登録の実操作（#686）', () => {
     expect(offersCreate.mock.calls[1][0].operationId).not.toBe(operationA)
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

@@ -1,3 +1,5 @@
+> 文書：@line-harness/sdk｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # @line-harness/sdk
 
 AI-native SDK for LINE Harness — programmatic LINE official account automation.
@@ -20,12 +22,15 @@ const client = new LineHarness({
   apiKey: 'your-api-key',
 })
 
-// Create a 3-step education scenario
+// Create an inactive 3-step education scenario (delivery does not start)
 const scenario = await client.createStepScenario('Welcome Flow', 'friend_add', [
   { delay: '0m', type: 'text', content: 'Welcome! Thanks for adding us.' },
   { delay: '1d', type: 'text', content: 'Here are 3 things you should know...' },
   { delay: '3d', type: 'flex', content: JSON.stringify(flexMessageJson) },
 ])
+
+// After reviewing the steps, activate explicitly with publish permission:
+// await client.scenarios.update(scenario.id, { isActive: true })
 
 // Broadcast to all friends
 await client.broadcastText('Weekend sale! 50% off!')
@@ -57,6 +62,8 @@ await client.tags.delete(tagId)
 ```
 
 #### Scenarios
+
+Creation defaults to `isActive: false`, including `createStepScenario`. Review the scenario before enabling it with `scenarios.update(id, { isActive: true })`. Explicit `isActive: true` on creation or update requires publish permission.
 
 ```ts
 const scenarios = await client.scenarios.list()
@@ -91,7 +98,7 @@ await client.broadcasts.delete(broadcastId)
 ### High-Level (Convenience)
 
 ```ts
-// Create scenario with steps in one call (delay: '0m', '1h', '1d', '1w')
+// Create an inactive scenario with steps in one call (delay: '0m', '1h', '1d', '1w')
 await client.createStepScenario(name, triggerType, steps)
 
 // Broadcast text to all

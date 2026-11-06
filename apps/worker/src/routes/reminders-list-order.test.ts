@@ -1,21 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
- * 一覧の並びが、アカウントを選んでいるときも display_order を見ることを確かめる。
- *
- * **この試験は、161 を入れた直後には通らない。**
- * `GET /api/reminders` はアカウントを指定したときだけ別のSQLを通る。そこが
- * `ORDER BY created_at DESC` のままでも、指定しない経路は直っているので、
- * 件数や中身を見る試験は全部通ってしまう。
- *
- * アカウントの選択は既定で先頭のアカウントに入るため、**指定するほうが
- * 通常の状態**。効かないほうが既定になっていた。
- *
- * 並びは「返ってきた順」でしか確かめられないので、SQLの文字列ではなく
- * **実際に流れたSQL**を見る。文字列を見ると、書き換えたつもりで別の場所を
- * 直したときに気づけない。
+ * アカウント指定の有無で異なる SQL を通るため、両方の実行結果が display_order に従うことを確かめる。
+ * アカウント指定は通常の利用経路なので省かず、SQL の文字列でなく返された順序で検証する。
  */
 
 const mocks = {
@@ -105,13 +94,15 @@ describe('リマインダ一覧の並び', () => {
     ).toContain('deleted_at IS NULL');
   });
 
-  it('アカウントを選んでいないときは getReminders() に任せる', async () => {
+  it('アカウントを選んでいないときは getReminders に任せる', async () => {
     const seen: string[] = [];
     const app = makeApp();
     const res = await app.request('/api/reminders', {}, { DB: makeDb(seen) });
     expect(res.status).toBe(200);
     // 並びの決め方が2か所に散らないよう、こちらは db 側の関数を通す。
-    expect(mocks.getReminders).toHaveBeenCalled();
+    expect(mocks.getReminders).toHaveBeenCalledWith(expect.anything(), {
+      allowedAccountIds: ['acc-1'], canSeeUnassigned: false,
+    });
   });
 
   it('担当外アカウントの一覧を返さない', async () => {

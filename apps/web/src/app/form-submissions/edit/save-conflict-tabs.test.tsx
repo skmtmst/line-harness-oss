@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * 409 の知らせが**3つのタブすべて**で DOM に出ることを、本物の React で確かめる
@@ -16,6 +17,7 @@
  * `.test.tsx` は `apps/web/vitest.config.ts` の include に入るので、
  * Required gate の `pnpm --filter web test` で必ず走る。
  */
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -46,6 +48,13 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     fetchApi: vi.fn(async () => ({ success: true, data: [] })),
     api: {
       ...actual.api,
+      // 「予約を入れる」欄のメニュー・担当読み。予約を使わない店では空。
+      // 素通しすると実通信で試験が環境へ依存するので、ここで空を返す。
+      bookingApi: {
+        ...actual.bookingApi,
+        listMenus: async () => ({ menus: [] }),
+        listMenuStaff: async () => ({ staff: [] }),
+      },
       friendFields: { ...actual.api.friendFields, list: async () => ({ success: true, data: [] }) },
       scenarios: { ...actual.api.scenarios, list: async () => ({ success: true, data: [] }) },
       reminders: { ...actual.api.reminders, list: async () => ({ success: true, data: [] }) },
@@ -76,7 +85,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 const navigation = vi.hoisted(() => ({ query: 'id=form-1&tab=basic' }))
-vi.mock('next/navigation', () => ({
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(navigation.query),
 }))
@@ -87,7 +97,7 @@ vi.mock('next/link', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {} }))
 
 const { default: EditFormPage } = await import('./page')
 
@@ -105,11 +115,12 @@ async function flush() {
 }
 
 function findButton(text: string): HTMLButtonElement | undefined {
-  return [...container.querySelectorAll('button')]
-    .find((node) => (node.textContent ?? '').includes(text)) as HTMLButtonElement | undefined
+  return ([...container.querySelectorAll('button')]
+    .find((node) => (node.textContent ?? '').includes(text)) ?? querySupplementaryPageAction(text)) as HTMLButtonElement | undefined
 }
 
 beforeEach(() => {
+  clearToastsForTest()
   net.putCount = 0
   net.saveResult = 'conflict'
   container = document.createElement('div')
@@ -133,7 +144,7 @@ describe('保存が 409 で弾かれたときの知らせ（3つのタブ）', (
     it(`${tab} タブでも、文言と「読み直す」が DOM に出る`, async () => {
       navigation.query = `id=form-1&tab=${tab}`
       await act(async () => {
-        root.render(<EditFormPage />)
+        root.render(<><EditFormPage /><ToastHost /></>)
       })
       await flush()
 
@@ -147,14 +158,14 @@ describe('保存が 409 で弾かれたときの知らせ（3つのタブ）', (
       expect(net.putCount).toBe(1)
       // 文言が出ている。デザインタブで出ないのが差し戻し理由だった。
       expect(container.textContent).toContain('ほかの人が')
-      expect(container.textContent).toContain('先に保存しました')
+      expect(container.textContent).toContain('を保存しました')
       // 読み直す出口も出ている。
-      const reload = container.querySelector('[data-qa="form-edit-conflict-reload"]')
+      const reload = findButton('最新を読み込んで続ける')
       expect(reload, `${tab}: 読み直す出口がある`).toBeTruthy()
       // 二重に出さない（元の位置からは消してある）。
-      expect(container.querySelectorAll('[data-qa="form-edit-conflict-reload"]').length).toBe(1)
+      expect([...container.querySelectorAll('button')].filter((button) => button.textContent?.includes('最新を読み込んで続ける'))).toHaveLength(1)
       // タブの外（共通部品）に出ている。
-      expect(reload!.closest('[data-design-part="save-conflict-bar"]')).toBeTruthy()
+      expect(reload!.closest('[data-save-conflict]')).toBeTruthy()
     })
   }
 
@@ -162,7 +173,7 @@ describe('保存が 409 で弾かれたときの知らせ（3つのタブ）', (
     net.saveResult = 'ok'
     navigation.query = 'id=form-1&tab=design'
     await act(async () => {
-      root.render(<EditFormPage />)
+      root.render(<><EditFormPage /><ToastHost /></>)
     })
     await flush()
     await act(async () => {
@@ -170,13 +181,13 @@ describe('保存が 409 で弾かれたときの知らせ（3つのタブ）', (
     })
     await flush()
     expect(net.putCount).toBe(1)
-    expect(container.querySelector('[data-design-part="save-conflict-bar"]')).toBeNull()
+    expect(container.querySelector('[data-save-conflict]')).toBeNull()
     /*
      * 成功の「保存しました」は基本タブの枠の中にあるので、デザインタブでは
      * 出ない。**これは #723 の差し戻し理由ではなく、前からの作り**なので
      * ここでは触らない（失敗が黙るのと違い、成功が黙っても作業は消えない）。
      * 司令塔へは所見として報告した。
      */
-    expect(container.textContent).not.toContain('保存しました')
+    expect(container.textContent).toContain('下書きを保存しました')
   })
 })

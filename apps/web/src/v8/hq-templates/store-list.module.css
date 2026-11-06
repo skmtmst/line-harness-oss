@@ -1,0 +1,12 @@
+/* 新しい統括の板だけ。店の一覧の寸法は変えない。 */
+.colHqActions { width: var(--tpl-hql-actions-w); }
+.hqNameButton { min-height: 0; }
+.colFormStorage { width: var(--tpl-hql-form-storage-w); }
+.colFormState { width: var(--tpl-hql-form-state-w); }
+.colFormDest { width: var(--tpl-hql-form-dest-w); }
+.colFormActions { width: var(--tpl-hql-form-actions-w); }
+/* タグの「よく使う絞り込み」：メニューの置き場と、選んでいるときの輪（店のタグと同じ）。 */
+.menuAnchor { position: relative; display: inline-flex; }
+.checkSpace { display: inline-block; width: var(--tpl-tag-grip); }
+/* タグの札を包む名前のリンク：札の形のまま押せる（下線・地を足さない）。 */
+.hqTagLink { display: inline-flex; min-width: 0; max-width: 100%; text-decoration: none; }

@@ -1,0 +1,161 @@
+/*
+ * ★V8 ダッシュボード（Pencil ）。
+ * 枠・板の頭・段の線と右の列の幅は型（DashboardPage・DashboardRow）が持つ。
+ * ここは段の中身だけ。寸法は app/globals.css の --tpl-db-* に1か所。
+ */
+.hidden { display: none; }
+.body { display: flex; flex-direction: column; min-width: 0; }
+.spacer { flex: 1; min-width: 0; }
+
+/* ── 板の頭の下の帯（閲覧のみ・失敗）。はじめにやることのカードは first-steps.module.css ── */
+.notices { display: flex; flex-direction: column; gap: var(--tpl-db-row-gap); }
+
+/* 数の帯の寸法はKpiBandとKpiCardの共通値を使う。左右はカードと同じ内側へそろえる。 */
+.todayBand { margin: 0 var(--tpl-list-inset) var(--space-16); }
+/* 帯の上の「いつ時点か」の1行。文字は段の下の「更新」と同じ。 */
+.asOf {
+  margin: 0 var(--tpl-list-inset) var(--space-8); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-db-small-lh);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cellDetail {
+  display: flex; flex-wrap: wrap; gap: var(--tpl-db-row-gap) var(--tpl-db-fig-gap);
+  padding: var(--tpl-db-th-pad); border-bottom: 1px solid var(--color-hairline);
+  color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh);
+}
+
+/* ── 段の中の共通の文字 ── */
+.note, .noteBody {
+  margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh);
+}
+.noteBody { color: var(--color-ink-secondary); }
+.updated, .updatedDanger {
+  margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-db-small-lh); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.updatedDanger { color: var(--color-danger); }
+.small { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-db-small-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.caption { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strong, .faintStrong { color: var(--color-ink); font-size: var(--polish-text-body); font-weight: 600; line-height: var(--tpl-db-text-lh); white-space: nowrap; }
+.faintStrong { color: var(--color-ink-faint); }
+.alertHead { display: flex; align-items: center; gap: var(--tpl-db-row-gap); margin: 0; }
+.inlineButton {
+  margin-left: var(--tpl-db-row-gap); padding: 0; border: 0; background: transparent; cursor: pointer;
+  color: var(--color-action); font: inherit; font-weight: 500;
+}
+.inlineButton:hover { text-decoration: underline; }
+/* 文の中・行の右の小さな文字の操作は、押せる最小の高さ 32 で行を押し広げない（数のマスの「もう一度試す」と同じ）。 */
+.inlineButton, .retryDanger, .inlineAction { min-height: 0; }
+.retryDanger { align-self: flex-start; padding: 0; border: 0; background: transparent; cursor: pointer; color: var(--color-danger); font-size: var(--text-caption); font-weight: 500; }
+.alert { margin: 0; color: var(--color-danger); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); }
+.stale { margin: 0; color: var(--color-status-warn-deep); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); }
+.connectionReason { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty {
+  margin: 0; display: flex; flex: 1; align-items: center; justify-content: center;
+  color: var(--color-ink-faint); font-size: var(--text-label); line-height: var(--tpl-db-text-lh);
+}
+.skeletonStack { display: flex; flex-direction: column; gap: var(--tpl-db-row-gap); }
+
+/* ── 右の列 ── */
+.asideStack { display: flex; flex-direction: column; height: 100%; }
+.kv { display: flex; align-items: center; gap: var(--tpl-db-kv-gap); min-width: 0; color: inherit; text-decoration: none; }
+a.kv:hover .kvKey { text-decoration: underline; }
+.kvKey { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-secondary); font-size: var(--polish-text-body); line-height: var(--tpl-db-text-lh); }
+.kvValue { flex-shrink: 0; white-space: nowrap; color: var(--color-ink); font-size: var(--polish-text-body); font-weight: 600; line-height: var(--tpl-db-text-lh); font-variant-numeric: tabular-nums;  font-family: var(--font-inter), Inter, sans-serif; }
+/* 17：数の色は札に任せ、値（.kvValue）は黒のまま。赤は鍵（.kvKey）の側だけ。 */
+.kvDanger .kvKey { color: var(--color-danger); font-weight: 600; }
+.kvFaint .kvValue { color: var(--color-ink-faint); }
+/* 値の左に差の札を並べる（札は値の太さ・色を引き継がない）。 */
+.kvDelta { display: inline-flex; align-items: center; gap: var(--tpl-db-kv-gap); }
+/* 行の右に小さな操作（接続状態の「確かめる」）。 */
+.kvWithAction { display: flex; align-items: center; gap: var(--tpl-db-kv-gap); min-width: 0; }
+.kvWithAction > .kv { flex: 1; min-width: 0; }
+.inlineAction { flex-shrink: 0; padding: 0; border: 0; background: transparent; cursor: pointer; color: var(--color-action); font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-db-caption-lh); white-space: nowrap; }
+.inlineAction:hover { text-decoration: underline; }
+.inlineAction:disabled { cursor: not-allowed; text-decoration: none; }
+.quota { display: flex; align-items: flex-end; gap: var(--tpl-db-quota-gap); margin: 0; white-space: nowrap; }
+.quotaPre { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); }
+/* 数字は絵と同じ比例幅（右の列の等幅の数字を受けない）。 */
+.quotaNum { color: var(--color-ink); font-family: var(--font-inter), Inter, sans-serif; font-size: var(--tpl-db-quota-size); font-weight: 600; line-height: var(--tpl-db-quota-lh); letter-spacing: var(--tpl-db-num-ls); }
+.track { position: relative; display: block; width: 100%; height: var(--tpl-db-bar-h); border-radius: var(--tpl-db-bar-radius); background: var(--color-track); overflow: hidden; }
+.fill, .fillDanger { position: absolute; inset: 0 auto 0 0; border-radius: var(--tpl-db-bar-radius); background: var(--color-accent-deep); }
+.fillDanger { background: var(--color-danger); }
+
+/* ── 段A：友だち数の推移 ── */
+.trendTools { display: flex; align-items: center; gap: var(--tpl-db-legend-gap); }
+.trendTable { flex: 1; min-height: 0; overflow: auto; }
+
+/* ── 段B：対応が必要な受信 ── */
+.colName { width: var(--tpl-db-col-name); flex-shrink: 0; display: flex; align-items: center; gap: var(--tpl-db-row-gap); min-width: 0; }
+.colBody { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.colWait { width: var(--tpl-db-col-wait); flex-shrink: 0; white-space: nowrap; }
+.colState { width: var(--tpl-db-col-state); flex-shrink: 0; display: flex; }
+/* 種類（メール・LINE）は灰の地の札。状態ではないので点は付けない。 */
+.route {
+  flex-shrink: 0; padding: var(--polish-status-pad); border-radius: var(--polish-status-radius);
+  background: var(--polish-status-neutral-bg); color: var(--polish-status-neutral-ink);
+  font-size: var(--text-caption); font-weight: var(--polish-status-weight); line-height: var(--tpl-db-small-lh);
+}
+.inboxName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-weight: 500; }
+.inboxName:hover, .inboxName:focus-visible { color: var(--color-action); text-decoration: underline; }
+.inboxPager { padding-top: var(--tpl-db-row-gap); justify-content: flex-end; }
+
+/* ── 段C：友だち追加リンク ── */
+.linkRow { display: flex; align-items: center; gap: var(--tpl-db-row-gap); min-width: 0; }
+.linkKey { color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); white-space: nowrap; }
+.routeSelect { display: flex; width: var(--tpl-db-route-w); flex-shrink: 0; }
+.routeSelect > * { width: 100%; max-width: 100%; }
+.routeSelect :global(button) { width: 100%; }
+.urlField {
+  flex: 1; min-width: 0; height: var(--tpl-db-control-h); padding: var(--tpl-db-url-pad);
+  border: 0; border-radius: var(--tpl-db-control-radius); outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  background: var(--color-surface-pearl); color: var(--color-ink-secondary);
+  font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); text-overflow: ellipsis;
+}
+.urlField:focus-visible { outline: var(--tpl-db-focus-ring) solid var(--color-focus-ring); }
+
+/* ── 段D ── */
+.plan { display: flex; align-items: flex-start; gap: var(--tpl-db-row-gap); min-width: 0; }
+.planText { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.planTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--polish-text-body); font-weight: 500; line-height: var(--tpl-db-text-lh); }
+a.planTitle:hover { text-decoration: underline; }
+.planKind { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-db-small-lh); white-space: nowrap; text-overflow: ellipsis; }
+.planTime { flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.figure { display: flex; align-items: flex-end; gap: var(--tpl-db-tag-gap); margin: 0; white-space: nowrap; }
+.bigNum { color: var(--color-ink); font-family: var(--font-inter), Inter, sans-serif; font-size: var(--tpl-db-num-size); font-weight: 600; line-height: var(--tpl-db-num-lh); letter-spacing: var(--tpl-db-num-ls); }
+.midNum { color: var(--color-ink); font-family: var(--font-inter), Inter, sans-serif; font-size: var(--tpl-db-fig-size); font-weight: 600; line-height: var(--tpl-db-fig-glyph-lh); padding-bottom: calc(var(--tpl-db-fig-lh) - var(--tpl-db-fig-glyph-lh)); }
+.unit { color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-db-text-lh); }
+.unitSmall { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); }
+.figs { display: flex; gap: var(--tpl-db-fig-gap); }
+.fig { display: flex; flex-direction: column; flex: 1; gap: var(--tpl-db-fig-inner-gap); min-width: 0; }
+.figKey { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); white-space: nowrap; }
+
+/* ── 段E：最近の動き ── */
+.activity { display: flex; flex-direction: column; gap: var(--tpl-db-act-gap); margin: 0 var(--tpl-list-inset); padding: var(--tpl-db-act-pad); }
+/* 履歴の縦線が行の間の隙間もつなぐように、共通の行へ隙間を渡す。 */
+.activity { --icon-row-list-gap: var(--tpl-db-act-gap); }
+.activityLink { display: block; color: inherit; text-decoration: none; border-radius: var(--tpl-db-th-radius); }
+.activityLink:hover { background: var(--color-surface-pearl); }
+
+.shipmentRow { padding: var(--tpl-db-act-pad); border-bottom: 1px solid var(--color-hairline); }
+
+/* 段の題は絵の高さ（23）。「？」の当たり（28）は上下へはみ出させ、段を押し広げない。 */
+.head { display: flex; flex-direction: column; justify-content: center; height: var(--tpl-db-head-h); flex-shrink: 0; }
+
+/*
+ * 板が狭い幅（右の列が1マス分＝約250px 以下になる 1280 以下）：
+ * 右の列の左右の余白を少し詰め、題（「現在の対応状況」など）を「…」で切らない。
+ * さらに狭い板（1152）では、題と行き先が1行に入らない段だけ行き先を次の行へ回すので、題の箱の高さを中身に合わせる。
+ */
+@container v8-page (max-width: 959px) {
+  .head { height: auto; min-height: var(--tpl-db-head-h); }
+}
+/* グラフ／表の小さな切り替えは絵の高さ（項目 24・全体 28）。押せる最小の高さ 32 をここだけ外す。 */
+
+/* 数のマスの下の補足は1行（狭い幅で2行に割らない）。全文は内訳で読める。 */
+.todayBand > * > p:last-child > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pendingMeta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); }
+
+/* 受信の内容が絵文字だけの時の添え書き。 */
+.inboxEmoji { display: inline-flex; align-items: baseline; gap: var(--space-4); min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; }
+.inboxEmojiNote { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--color-ink-faint); font-size: var(--text-caption); }

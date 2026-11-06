@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readImplementationSource } from '../test-utils/implementation-source.js';
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,7 +17,7 @@ import {
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
 /*
- * 送信経路の台帳の契約テスト (#1050)。
+ * 送信経路の台帳の契約テスト。
  *
  * 「緊急停止ボタンがある」だけでは各経路が止まる保証にならない。
  * 台帳が挙げるすべての経路について、停止対象なら停止状態を読む実装の
@@ -46,7 +47,7 @@ describe('送信経路の台帳 (#1050)', () => {
       for (const enforcement of path.enforcement) {
         const fullPath = join(REPO_ROOT, enforcement.file);
         expect(existsSync(fullPath), `${path.id}: ${enforcement.file} が無い`).toBe(true);
-        const source = readFileSync(fullPath, 'utf8');
+        const source = readImplementationSource(fullPath);
         expect(
           source.includes(enforcement.marker),
           `${path.id}: ${enforcement.file} に ${enforcement.marker} が無い`,
@@ -69,4 +70,8 @@ describe('送信経路の台帳 (#1050)', () => {
     // 食い違い、経路名乗りが黙って既定 (broadcast_dispatch) へ落ちる。
     expect(OPERATION_PROXY_CAPABILITY_HEADER).toBe('X-Line-Harness-Capability');
   });
+});
+
+it('運用者向けの説明は送信待ち・停止・再開の言葉で返す',()=>{
+ for(const path of OPERATION_SEND_PATHS)expect([path.label,path.note,path.excludedReason].filter(Boolean).join(' '),path.id).not.toMatch(/cron|manual 指定|X-Line-Harness|claim|pending|queued|retry_wait|processAutomationRun|replyToken|outbox|sweep|tick/);
 });

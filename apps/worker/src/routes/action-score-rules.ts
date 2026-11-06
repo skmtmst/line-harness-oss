@@ -1,8 +1,10 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
   ActionScoreRuleValidationError,
   getActionScoreBandOverview,
+  getActionScoreDraftReplayIfSameContent,
   getActionScoreRuleConfiguration,
   postActionScoreManualAdjustment,
   previewActionScoreBandDistribution,
@@ -11,7 +13,7 @@ import {
   stopActionScoreRules,
   testActionScoreRuleBundle,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -21,7 +23,7 @@ const actionScoreRules = new Hono<Env>();
 
 async function requireAccount(c: Context<Env>, value: unknown): Promise<string | Response> {
   const accountId = typeof value === 'string' ? value.trim() : '';
-  if (!accountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!accountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["accountId"]);
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!scope.allowedAccountIds.includes(accountId)) {
     return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
@@ -37,12 +39,12 @@ function validationResponse(c: Context<Env>, error: ActionScoreRuleValidationErr
     'published_version_missing',
     'friend_not_found',
   ]);
-  return c.json({
+  return inputError(c, {
     success: false,
     error: error.message,
     code: error.code,
     ...(error.field ? { field: error.field } : {}),
-  }, conflict ? 409 : notFound.has(error.code) ? 404 : 422);
+  }, conflict ? 409 : notFound.has(error.code) ? 404 : 422, []);
 }
 
 async function endpoint<T>(c: Context<Env>, run: () => Promise<T>, status = 200): Promise<Response> {
@@ -50,12 +52,7 @@ async function endpoint<T>(c: Context<Env>, run: () => Promise<T>, status = 200)
     return c.json({ success: true, data: await run() }, status as 200);
   } catch (error) {
     if (error instanceof ActionScoreRuleValidationError) return validationResponse(c, error);
-    console.error(JSON.stringify({
-      event: 'action_score_rule_api_failed',
-      path: c.req.path,
-      reason: error instanceof Error ? error.message : String(error),
-    }));
-    return c.json({ success: false, error: 'スコアのルールを処理できませんでした' }, 500);
+    throw error;
   }
 }
 
@@ -71,7 +68,7 @@ actionScoreRules.get('/api/action-scores/bands', requireRole('owner', 'admin', '
   return endpoint(c, () => getActionScoreBandOverview(c.env.DB, accountId));
 });
 
-actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'admin'), async (c) => {
+actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   type Body = {
     accountId?: unknown;
     expectedDraftVersionId?: unknown;
@@ -80,7 +77,15 @@ actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'a
   const body = await c.req.json<Body>().catch((): Body => ({}));
   const accountId = await requireAccount(c, body.accountId);
   if (typeof accountId !== 'string') return accountId;
-  return endpoint(c, async () => {
+  /*
+   * 応答消失後の再送の要求キー。版ずれの再送が自分の保存済みと
+   * 同じ内容なら、競合（409）ではなく保存済みの結果を返す。
+   */
+  const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
+  if (idempotencyKey && !isValidIdempotencyKey(idempotencyKey)) {
+    return inputError(c, { success: false, error: 'Idempotency-Key はUUIDで送ってください' }, 400, []);
+  }
+  try {
     const data = await saveActionScoreRuleDraft(c.env.DB, {
       lineAccountId: accountId,
       expectedDraftVersionId: typeof body.expectedDraftVersionId === 'string'
@@ -90,11 +95,26 @@ actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'a
       createdBy: c.get('staff').id,
     });
     auditLog(c, 'action_score.rules.draft.save', { kind: 'line_account', id: accountId });
-    return data;
-  });
+    return c.json({ success: true, data }, 200);
+  } catch (error) {
+    if (idempotencyKey
+      && error instanceof ActionScoreRuleValidationError
+      && error.code === 'version_conflict') {
+      const replayed = await getActionScoreDraftReplayIfSameContent(
+        c.env.DB, accountId, body.configuration,
+      );
+      if (replayed) {
+        auditLog(c, 'action_score.rules.draft.save', { kind: 'line_account', id: accountId });
+        c.header('Idempotency-Replayed', 'true');
+        return c.json({ success: true, data: replayed, replayed: true }, 200);
+      }
+    }
+    if (error instanceof ActionScoreRuleValidationError) return validationResponse(c, error);
+    throw error;
+  }
 });
 
-actionScoreRules.post('/api/action-scores/rules/test', requireRole('owner', 'admin'), async (c) => {
+actionScoreRules.post('/api/action-scores/rules/test', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   type Body = {
     accountId?: unknown;
     configuration?: unknown;
@@ -126,7 +146,7 @@ actionScoreRules.post(
   '/api/action-scores/rules/publish',
   requireRole('owner', 'admin'),
   requireIrreversibleConfirmation('action-score-rules-publish'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     type Body = { accountId?: unknown; draftVersionId?: unknown };
     const body = await c.req.json<Body>().catch((): Body => ({}));
     const accountId = await requireAccount(c, body.accountId);
@@ -144,7 +164,7 @@ actionScoreRules.post(
   },
 );
 
-actionScoreRules.post('/api/action-scores/rules/stop', requireRole('owner', 'admin'), async (c) => {
+actionScoreRules.post('/api/action-scores/rules/stop', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   type Body = { accountId?: unknown };
   const body = await c.req.json<Body>().catch((): Body => ({}));
   const accountId = await requireAccount(c, body.accountId);
@@ -157,17 +177,17 @@ actionScoreRules.post('/api/action-scores/rules/stop', requireRole('owner', 'adm
 });
 
 /**
- * N-235: 担当者が理由つきで1人分の点数を手で直す口。
+ * 担当者が理由つきで1人分の点数を手で直す口。
  * 不可逆操作なので確認ヘッダと冪等キーを必須にし、履歴は追記だけで残す。
  */
 actionScoreRules.post(
   '/api/action-scores/adjustments',
   requireRole('owner', 'admin'),
   requireIrreversibleConfirmation('action-score-adjustment'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!isValidIdempotencyKey(idempotencyKey)) {
-      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+      return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
     }
     type Body = {
       accountId?: unknown;
@@ -185,10 +205,10 @@ actionScoreRules.post(
     const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
     // 入力が成立しないものは、アカウント・友だちの照合より先に落とす。
     if (!friendId || !direction || !Number.isInteger(amount) || amount <= 0 || amount > 1_000_000) {
-      return c.json({ success: false, error: 'friendId、増減の向き、1以上の整数の点数が必要です' }, 400);
+      return inputError(c, { success: false, error: 'friendId、増減の向き、1以上の整数の点数が必要です' }, 400, ["friendId","direction","amount"]);
     }
     if (!reason || reason.length > 500) {
-      return c.json({ success: false, error: '理由を500字以内で入力してください' }, 400);
+      return inputError(c, { success: false, error: '理由を500字以内で入力してください' }, 400, ["reason"]);
     }
     const accountId = await requireAccount(c, body.accountId);
     if (typeof accountId !== 'string') return accountId;
@@ -207,23 +227,19 @@ actionScoreRules.post(
       return c.json({ success: true, data }, data.replayed ? 200 : 201);
     } catch (error) {
       if (error instanceof ActionScoreRuleValidationError) return validationResponse(c, error);
-      console.error(JSON.stringify({
-        event: 'action_score_adjustment_failed',
-        reason: error instanceof Error ? error.message : String(error),
-      }));
-      return c.json({ success: false, error: '点数を変更できませんでした' }, 500);
+      throw error;
     }
   },
 );
 
 /**
- * N-235: 編集中の帯の分けかたで、今いる友だちが各帯に何人入るかだけ数える
+ * 編集中の帯の分けかたで、今いる友だちが各帯に何人入るかだけ数える
  * 読み取り専用プレビュー。公開版・友だちの点数は動かさない。
  */
 actionScoreRules.post(
   '/api/action-scores/bands/preview',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     type Body = { accountId?: unknown; bands?: unknown };
     const body = await c.req.json<Body>().catch((): Body => ({}));
     const accountId = await requireAccount(c, body.accountId);

@@ -1,6 +1,7 @@
+import { generateGoogleReviewDraft } from './api/helpers/google-review-draft'
 import { fetchApi } from './api'
 
-/** 飲食店向け「Googleビジネス」のAPI。第1段（設定＋口コミ）★V6 GB-1〜GB-3、GB-13、GB-15、GB-16。第2段（プロフィール・営業時間・変更履歴）GB-10〜GB-12、GB-17〜GB-19。 */
+/** 飲食店向け「Googleビジネス」のAPI。第1段（設定＋口コミ）★管理画面 GB-1〜GB-3、GB-13、GB-15、GB-16。第2段（プロフィール・営業時間・変更履歴）GB-10〜GB-12、GB-17〜GB-19。 */
 
 export type GoogleConnectionStatus = 'pending_location' | 'connected' | 'expired' | 'no_permission' | 'disconnected'
 export type GoogleReplyStatus = 'unreplied' | 'draft' | 'pending_confirm' | 'replied' | 'published'
@@ -21,10 +22,13 @@ export type GoogleConnection = {
 
 export type GoogleLocationCandidate = { locationName: string; locationTitle: string; addressText: string | null }
 
+export type GoogleBusinessStore = { id: string; name: string; line_account_id: string | null }
+
 export type GoogleConnectionData = {
   success: true
   store: { id: string; name: string; lineAccountId: string }
   connection: GoogleConnection
+  stores?: GoogleBusinessStore[]
   candidates: GoogleLocationCandidate[]
   summary: { unrepliedCount: number; draftCount: number; attentionCount: number; newCount: number; storedCount: number; postsAttentionCount: number; syncStale: boolean }
   writeEnabled: boolean
@@ -177,7 +181,21 @@ export type GooglePostCtaType = 'book' | 'order' | 'shop' | 'learn_more' | 'sign
 export type GooglePostCta = { type: GooglePostCtaType; url: string | null }
 export type GooglePostOffer = { couponCode: string | null; redeemOnlineUrl: string | null; termsConditions: string | null }
 export type GooglePostSchedule = { startDate: string; startTime: string; endDate: string; endTime: string }
-export type GooglePostMedia = { mediaId: string; filename: string; sourceUrl: string }
+export type GooglePostMedia = { mediaId: string; filename: string; sourceUrl: string; originalMediaId?: string | null }
+
+/** Instagram への同時投稿（★V8-B `U1X7T2`・`HEEN9`／2026-10-07 承認）。 */
+export type GooglePostInstagramStatus = 'none' | 'published' | 'failed'
+export type GooglePostInstagram = {
+  /** この投稿を Instagram にも出すか。 */
+  enabled: boolean
+  /** Instagram 用の文章。`null` なら Google の本文をそのまま使う。 */
+  caption: string | null
+  mediaId: string | null
+  originalMediaId?: string | null
+  status: GooglePostInstagramStatus
+  permalink: string | null
+  error: string | null
+}
 
 export type GooglePost = {
   id: string
@@ -189,6 +207,8 @@ export type GooglePost = {
   cta: GooglePostCta | null
   offer: GooglePostOffer | null
   media: GooglePostMedia[]
+  /** `null` は「この口が Instagram 同時投稿に未対応」。札も操作も出さない。 */
+  instagram: GooglePostInstagram | null
   publishMode: 'now' | 'scheduled'
   status: GooglePostStatus
   googleState: string | null
@@ -209,6 +229,9 @@ export type GooglePostDraftInput = {
   cta?: GooglePostCta | null
   offer?: GooglePostOffer | null
   mediaId?: string | null
+  mediaOriginalId?: string | null
+  /** Instagram 同時投稿（★V8-B `U1X7T2`／2026-10-07 承認）。`caption` が空なら本文を使う。 */
+  instagram?: { enabled: boolean; caption?: string | null; mediaId?: string | null; originalMediaId?: string | null } | null
 }
 
 export type GooglePostListData = {
@@ -251,8 +274,13 @@ export const restaurantGoogleApi = {
   connection: (accountId: string) => fetchApi<GoogleConnectionData>(withAccount(`${base}/connection`, accountId)),
   connectStart: (accountId: string) =>
     fetchApi<{ success: true; mode: 'connect' | 'reconnect'; authorizeUrl: string }>(withAccount(`${base}/connect/start`, accountId), { method: 'POST', body: '{}' }),
-  selectLocation: (accountId: string, locationName: string) =>
-    fetchApi<{ success: true; connection: GoogleConnection }>(withAccount(`${base}/connect/select-location`, accountId), { method: 'POST', body: JSON.stringify({ locationName }) }),
+  // confirmSwitch は「前につないでいた店舗とは別の店舗に切り替える」確認を取れたときだけ true。
+  // 付けずに別店舗を送ると、サーバーが code: 'switch_confirmation_required' で止める。
+  selectLocation: (accountId: string, locationName: string, confirmSwitch?: boolean) =>
+    fetchApi<{ success: true; connection: GoogleConnection }>(withAccount(`${base}/connect/select-location`, accountId), {
+      method: 'POST',
+      body: JSON.stringify(confirmSwitch ? { locationName, confirmSwitch: true } : { locationName }),
+    }),
   disconnect: (accountId: string) =>
     fetchApi<{ success: true; revoked: boolean; connection: GoogleConnection }>(withAccount(`${base}/disconnect`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
   syncReviews: (accountId: string) =>
@@ -266,12 +294,7 @@ export const restaurantGoogleApi = {
     ),
   review: (accountId: string, id: string) =>
     fetchApi<{ success: true; review: GoogleReview; store: { id: string; name: string }; connection: GoogleConnection }>(withAccount(`${base}/reviews/${encodeURIComponent(id)}`, accountId)),
-  /** baseText は「短くする」「丁寧にする」で書き換える元の文章（保存前の画面上の内容）。 */
-  generateDraft: (accountId: string, id: string, mode: 'new' | 'shorter' | 'polite', baseText?: string) =>
-    fetchApi<{ success: true; draft: string; aiGenerated: true; generatedAt: string; mode: string }>(withAccount(`${base}/reviews/${encodeURIComponent(id)}/draft/generate`, accountId), {
-      method: 'POST',
-      body: JSON.stringify(mode === 'new' ? { mode } : { mode, baseText: baseText ?? '' }),
-    }),
+  generateDraft: (accountId: string, id: string) => generateGoogleReviewDraft(accountId, id),
   saveDraft: (accountId: string, id: string, replyDraft: string) =>
     fetchApi<{ success: true; review: GoogleReview }>(withAccount(`${base}/reviews/${encodeURIComponent(id)}/draft`, accountId), { method: 'PUT', body: JSON.stringify({ replyDraft }) }),
   publishReply: (accountId: string, id: string, comment: string) =>
@@ -285,6 +308,7 @@ export const restaurantGoogleApi = {
   syncProfile: (accountId: string) => fetchApi<GoogleProfileData>(withAccount(`${base}/profile/sync`, accountId), { method: 'POST', body: '{}' }),
   holidays: (accountId: string, days = 30) => fetchApi<{ success: true; today: string; days: number; holidays: GoogleHoliday[] }>(withAccount(`${base}/holidays`, accountId, { days })),
   photos: (accountId: string) => fetchApi<{ success: true; photos: GooglePhoto[] }>(withAccount(`${base}/photos`, accountId)),
+  proposeClosureHours: (accountId:string,closureId:string,expectedVersion:number,includePrivateEvent=false)=>fetchApi<{success:true;change:GoogleChange}>(withAccount(`${base}/hours/from-closure`,accountId),{method:'POST',body:JSON.stringify({closureId,expectedVersion,includePrivateEvent})}),
   proposeHours: (accountId: string, proposal: GoogleHoursProposal) =>
     fetchApi<{ success: true; change?: GoogleChange; question?: string }>(withAccount(`${base}/hours/propose`, accountId), { method: 'POST', body: JSON.stringify(proposal) }),
   proposeProfile: (accountId: string, proposal: GoogleProfileProposal) =>
@@ -314,6 +338,9 @@ export const restaurantGoogleApi = {
     fetchApi<{ success: true; alreadyPublished: boolean; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/publish`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
   removePost: (accountId: string, id: string) =>
     fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/remove`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
+  /** Instagram だけをもう一度送る（Google の公開はそのまま・★V8-B `HEEN9`／2026-10-07 承認）。 */
+  retryInstagram: (accountId: string, id: string) =>
+    fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/instagram/retry`, accountId), { method: 'POST', body: '{}' }),
 
   // 第4段：パフォーマンス
   performance: (accountId: string, days: GooglePerformanceDays) =>

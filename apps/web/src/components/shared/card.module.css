@@ -1,26 +1,45 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .card {
-  border: 1px solid var(--color-hairline);
+
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-card);
+  border: 0;
+  box-shadow: var(--card-shadow);
 }
+
+/* 枠を内側に引く段の箱。既定のカードの影・寸法は変えない。 */
+
+.segment { border-radius: var(--radius-segment); }
 
 .vertical {
   display: flex;
   flex-direction: column;
 }
+.horizontal { display: flex; align-items: center; justify-content: space-between; }
+/* Edge-to-edge media above padded content; the content owns its inset. */
+.media { display: flex; flex-direction: column; gap: 0; }
 
 .overflowHidden {
   overflow: hidden;
 }
 
-.paddingDefault {
-  padding: 16px;
-}
+/*
+ * 画面の絵での段の箱（「段 基本」・「箱 CSVで書き出す」・
+ * 「推薦カード」）：内側の余白 20px。既定（16・18）の合格は
+ * 変えない。変わり形として足す。
+ */
 
-.paddingRoomy {
-  padding: 18px;
+.card[data-card-surface='inset'], .card[data-card-surface='muted'] {
+  border: 0; box-shadow: none;
+}
+.card[data-card-surface='inset'] { box-shadow: var(--tpl-sa-ring); }
+.card[data-card-surface='muted'] { background: var(--color-surface-pearl); }
+.card[data-card-corner='control'] { border-radius: var(--radius-control); }
+.card[data-card-spacing] {
+  padding: var(--card-content-padding, 0);
+  gap: var(--card-content-gap, 0);
+  min-width: 0;
 }
 
 .header {
@@ -28,20 +47,28 @@
   min-height: 48px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   padding: 0 16px;
 }
 
 .headerRoomy {
   min-height: 58px;
-  padding: 0 18px;
+  padding: 0 24px;
 }
 
 .titleGroup {
   display: flex;
+  flex-wrap: wrap;
   min-width: 0;
   align-items: baseline;
   gap: 8px;
+}
+
+/* 題と「？」の行（CardHeader の help）。「？」は題の行の真ん中、間 8。 */
+.titleRow {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--polish-space-row);
 }
 
 .title {
@@ -60,31 +87,176 @@
  * ものにし、押せない補助文字はニュートラル（ink-secondary）にする。
  */
 .meta {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  font-weight: 700;
 }
 
-/*
- * #669 カード頭の操作（「すべて見る →」など）はテキストリンクなので
- * リンク色（action）にする。緑だと主操作ボタンと見分けがつかない。
- */
+/* カード頭の行き先リンク（「〇〇へ →」）は文字のリンクの緑。色の口は1つだけ。 */
 .action {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  color: var(--color-action);
-  font-size: var(--text-label);
-  font-weight: 600;
+  color: var(--color-link);
   white-space: nowrap;
-}
-
-.actionInfo {
-  color: var(--color-status-info);
 }
 
 .action :is(a, button):focus-visible {
   outline: revert;
 }
 }
+
+/* V8 の段の箱（・）。指定された箱だけに効かせる。 */
+:root :is(.form, .aside, .panel) {
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: var(--card-shadow);
+}
+:root .form {
+  gap: var(--polish-space-field);
+  padding: var(--tpl-cn-card-pad);
+}
+:root .aside {
+  gap: var(--tpl-cn-side-card-gap);
+  padding: var(--tpl-side-card-pad);
+}
+:root .panel {
+  gap: var(--tpl-cn-panel-inner-gap);
+  padding: var(--tpl-cn-panel-pad);
+}
+:root .card[data-appearance="outlined"] {  border-radius: var(--tpl-rt-card-radius);    min-width: 0;
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
+}
+:root .card[data-gap="normal"] { gap: var(--tpl-rt-section-gap); }
+:root .card[data-gap="tight"] { gap: var(--tpl-e49-section-gap); }
+:root .card[data-gap="loose"] { gap: var(--tpl-e1-sns-card-gap); }
+/* 縦に積む小さな設定カード。指定したカードだけに適用。 */
+
+/* カード内の設定段。既定のカード頭には効かない。 */
+.content { display: flex; flex-direction: column; gap: var(--polish-space-row); padding: var(--polish-space-card); min-width: 0; }
+/* CardContent owns the inset; its heading must not add another inset or divider. */
+html:root .headerContent { padding: 0; min-height: 0; align-items: flex-start; gap: var(--polish-space-field); }
+html:root .headerContent .titleGroup { flex: 1; flex-direction: column; align-items: stretch; gap: var(--polish-space-row); }
+html:root .headerContent .title { margin: 0; }
+html:root .headerContent .meta { display: flex; flex-direction: column; align-items: flex-start; gap: var(--polish-space-row); min-width: 0; }
+.headerStacked, .headerPanel { flex: 0 1 auto; min-width: 0; min-height: 0; align-items: flex-start; gap: var(--tpl-rs-panel-head-gap); padding: 0; }
+.headerStacked .titleGroup, .headerPanel .titleGroup { flex: 1 1 0; flex-direction: column; align-items: stretch; gap: var(--tpl-rs-panel-head-text-gap); }
+.headerStacked .title, .headerPanel .title { margin: 0; line-height: var(--tpl-rs-lh-14); }
+.headerStacked .meta, .headerPanel .meta { color: var(--color-ink-faint); font-size: var(--text-caption); font-weight: var(--font-weight-ui); line-height: var(--tpl-rs-lh-11); }
+.headerPanel { padding: var(--tpl-rs-panel-head-pad); box-shadow: var(--tpl-rs-line-bottom); }
+
+:root .card[data-spacing='settings'] {
+  display: flex; flex-direction: column; min-width: 0;
+  gap: var(--tpl-rest3-ec-card-gap); padding: var(--tpl-rest3-ec-card-pad);
+   border-radius: var(--tpl-rest3-ec-radius);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
+}
+/* 外部連携の設定・見本カードだけ（spacing='integration' | 'preview'）。既定のカードは変えない。 */
+:root .spacedInset {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
+}
+:root .integration { gap: var(--tpl-rule-row-gap); padding: var(--tpl-cn-card-pad); }
+:root .preview { gap: var(--tpl-toolbar-gap); padding: var(--tpl-side-card-pad); }
+
+/* NEN の設定フォーム。既定の面と余白は保つ。 */
+:root .inset { min-width: 0; border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px; box-shadow: none; }
+:root .bordered { min-width: 0;
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
+}
+:root .spacingNormal { gap: var(--tpl-nm-card-gap); }
+:root .spacingRoomy { gap: var(--tpl-nc-card-gap-wide); }
+
+:root .paddingCompact { padding: var(--tpl-nc-side-pad); }
+:root .spacingTight { gap: var(--tpl-nc-field-gap); }
+:root .spacingControls { gap: var(--tpl-toolbar-gap); }
+
+/* ・仕上げ1 */
+:root .paddingDefault, :root .paddingCompact { padding: var(--polish-space-card); }
+:root .paddingRoomy, :root .paddingSpacious { padding: var(--polish-space-section); }
+:root .header { padding-inline: var(--polish-space-card); gap: var(--polish-space-field); }
+:root .gapTight { gap: var(--polish-space-row); }
+
+/* ・仕上げ2 */
+:root :is(.title, .headerStacked .title, .headerPanel .title) { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
+:root .meta { font-weight: var(--polish-weight-body); }
+:root .action { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); }
+
+/* ：入れ子の面には影を重ねない。外のカードの内側だけをそろえる。 */
+:root .paddingCompact,
+:root .paddingDefault { padding: var(--tpl-card-pad); }
+
+/* ：中身の段の題は型や配置によらず15/700。 */
+:root .header .title,
+:root .headerStacked .title,
+:root .headerPanel .title {
+  font-size: var(--tpl-section-title-size);
+  font-weight: var(--tpl-section-title-weight);
+}
+:root .headerRestaurant{min-height:58px;padding:20px 24px 14px;align-items:flex-start;}
+:root .headerRestaurant .titleGroup{flex-direction:column;gap:2px;}
+:root .headerRestaurant .title{font-size:15px;line-height:23px;}
+:root .headerRestaurant .meta{font-size:14px;line-height:21px;}
+
+/* ・208：枠から中身は最低16。段の間は spacing・gap・variant の指定を使う。 */
+/* 縁は .card の影（--card-shadow）だけ。borderで本文を狭めると、段ごとに2pxずつ積み上がる。 */
+html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']):where(:not([data-card-frame='ring'])) {
+  border: 0;
+}
+html:root .paddingCompact { padding: var(--space-16); }
+html:root .card[data-card-spacing] { padding: max(var(--space-16), var(--card-content-padding, 0px)); }
+html:root .card[data-card-spacing][data-card-spacing-sides] { padding: var(--card-content-padding); }
+/*  の16は箱の端。中の見出しと本文・欄の間は指定した8〜12も使える。 */
+html:root .vertical { gap: max(var(--space-8), var(--card-content-gap, var(--space-16))); }
+
+/* ：余白の口を持たない既存の箱にも、枠から16を確保する。表の器は平らなまま。 */
+html:root .card[data-card-padding='none'][data-card-variant='default']:not([data-card-unframed]):not([data-spacing]):not([data-card-spacing]):not(:has([data-shared-part='list-table'], table)) { padding: var(--space-16); }
+
+/* 失敗した処理の箱。形と余白はCardのまま、状態だけ共通の赤。 */
+html:root .card[data-card-surface='danger'] { border: 0; outline-color: transparent; box-shadow: none; background: var(--color-danger-bg); }
+/* 回答など、頭・表・ページ送りの段がそれぞれ端の余白を持つ記録の箱。 */
+html:root .records {
+  display: flex; flex-direction: column; gap: var(--polish-space-field);
+  padding-block: var(--polish-space-section); border: 0;
+}
+html:root .records > .header { padding-inline: var(--polish-space-section); }
+html:root .records > [data-card-footer] { padding-inline: var(--polish-space-section); }
+
+/* 段の中の頭はCardの余白を使う。通常の頭の左右16を重ねない。 */
+html:root .headerStacked { padding: 0; }
+
+/* 内側の薄い面は平らにする。form/asideの外枠を重ねない。 */
+html:root .card[data-card-surface='muted'] { border: 0; outline-color: transparent; box-shadow: none; background: var(--color-surface-pearl); }
+
+html:root .card[data-card-selected] { --card-edge: var(--color-control-border); background: var(--polish-selection-bg); }
+
+/* 内側の線だけの面。外枠・影で本文の寸法を増やさず、既存のカードは変えない。 */
+html:root .card[data-card-frame='ring'] {
+  border: 0; box-shadow: var(--tpl-sa-ring);
+}
+
+/* 情報内と操作前の間は親のgapを1回だけ使う。高さ合わせで増えた分だけ操作の上へ回す。 */
+html:root .withActions { display: flex; flex-direction: column; }
+.information { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: inherit; }
+.bottomActions { min-width: 0; }
+.actionRow { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--polish-space-field); min-width: 0; }
+.actionRow > * { min-width: 0; width: 100%; }
+html:root .actionRow > :is(button, a) { grid-row: 1; padding-inline: var(--polish-space-row); }
+.actionRow > :is([role='status'], [role='alert']) { grid-column: 1 / -1; }
+
+
+/* 通常の白いカードは影だけで浮かせ、枠の線を重ねない。 */
+html:root .card[data-card-variant='default']:not([data-card-frame]):not([data-card-surface]):not([data-appearance]):not(:focus-visible) { border: 0; outline-color: transparent; }
+html:root .card:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }

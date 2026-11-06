@@ -1,17 +1,7 @@
-/*
- * N-069: 許可された友だちのリマインダ登録・取消を staff が行えるようにする。
- *
- * 実SQLite（bootstrap.sql を流した better-sqlite3）に実物の reminders
- * ルートを当て、認証も実物（Bearer APIキー → staff_members → 役割・
- * permission_keys・account境界）で通す。外部送信は走らない。
- *
- * 直す前: POST /api/reminders/:id/enroll/:friendId と
- * DELETE /api/friend-reminders/:id は requireRole('owner','admin') のため、
- * /reminders 権限を持つ staff でも 403 で止まっていた。
- */
+/** リマインダーの登録・取消は、許可された友だちに対して権限を持つ staff も操作できることを実 route・認証・SQLite で確かめる。外部送信はしない。 */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
@@ -126,7 +116,7 @@ function enrollmentCount(): number {
 }
 
 beforeEach(async () => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed(sqlite.raw);
   ({ reminders: remindersRoute } = await import('./reminders.js'));
 });
@@ -187,18 +177,19 @@ describe('リマインダ登録・取消の staff 許可 (N-069)', () => {
     expect(enrollmentStatus(ENROLLMENT_A)).toBe('active');
   });
 
-  test('他の管理口は staff のまま止まる（リマインダ作成・削除）', async () => {
+  test('編集権限があるstaffは自分のアカウントに作成し、未使用のものを削除できる', async () => {
     const created = await app().request('/api/reminders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${KEY_STAFF_A}` },
-      body: JSON.stringify({ name: '作れないはず', lineAccountId: ACC_A, triggerType: 'manual' }),
+      body: JSON.stringify({ name: '担当者が作成', lineAccountId: ACC_A, triggerType: 'manual' }),
     }, env());
-    expect(created.status).toBe(403);
-    const deleted = await app().request(`/api/reminders/${REMINDER_A}`, {
+    expect(created.status).toBe(201);
+    const body = await created.json() as { data: { id: string } };
+    const deleted = await app().request(`/api/reminders/${body.data.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${KEY_STAFF_A}` },
     }, env());
-    expect(deleted.status).toBe(403);
+    expect(deleted.status).toBe(200);
     expect(enrollmentStatus(ENROLLMENT_A)).toBe('active');
   });
 

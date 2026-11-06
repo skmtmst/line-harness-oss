@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { within } from '@testing-library/react'
 import AccountDetailPage from './page'
 
 /**
@@ -13,18 +14,19 @@ import AccountDetailPage from './page'
  * 統括・管理者だけに開く。
  */
 
+
 const fixture = vi.hoisted(() => ({
   tab: 'overview' as string | null,
   role: 'owner' as 'owner' | 'staff',
 }))
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
+  default: ({ children, href, ...rest }: React.ComponentProps<'a'>) => (
+    <a href={href} {...rest}>{children}</a>
   ),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => ({
     get: (key: string) => (key === 'id' ? 'a1' : key === 'tab' ? fixture.tab : null),
   }),
@@ -32,7 +34,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => undefined, replace: () => undefined, back: () => undefined }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
   usePageChrome: () => ({ title: null, fullWidth: false }),
 }))
@@ -69,6 +71,7 @@ function installFetch() {
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
     let body: unknown
     if (path === '/api/staff/me') body = { success: true, data: { role: fixture.role } }
+    else if (path.includes('/test-recipients')) body = {success:true,data:[]}
     else if (path === '/api/line-accounts/a1') body = { success: true, data: ACCOUNT }
     else if (path === '/api/line-accounts' || path.startsWith('/api/line-accounts?')) {
       body = { success: true, data: [ACCOUNT] }
@@ -83,6 +86,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme='v8'
   fixture.tab = 'overview'
   fixture.role = 'owner'
   installFetch()
@@ -94,36 +98,37 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(async () => { root.unmount() })
-  host.remove()
+  host.remove(); delete document.documentElement.dataset.theme
   vi.unstubAllGlobals()
 })
 
 async function renderPage() {
   await act(async () => { root.render(<AccountDetailPage />) })
-  // load() の二重取得と staff/me を流す。
+  // load の二重取得と staff/me を流す。
   await act(async () => { await Promise.resolve() })
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 }
 
 function clickButton(label: string) {
-  const button = [...host.querySelectorAll('button')].find((el) => el.textContent === label)
+  const button = [...document.body.querySelectorAll('button')].find((el) => el.textContent?.trim() === label)
   expect(button, `ボタン「${label}」がある`).toBeTruthy()
   act(() => { button!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
 }
 
 describe('R73 編集・差替えの入口', () => {
-  it('「編集する」で登録内容の入力窓が開く', async () => {
+  it('「編集」で登録内容の入力窓が開く', async () => {
     await renderPage()
     clickButton('編集する')
-    expect(host.textContent).toContain('登録の内容を編集する')
-    const nameInput = host.querySelector('input[value="然-NEN- TEST"]')
+    expect(document.body.textContent).toContain('登録の内容を編集する')
+    expect(within(document.body).getByLabelText('タイムゾーン')).toBeTruthy()
+    const nameInput = document.body.querySelector('input[value="然-NEN- TEST"]')
     expect(nameInput).toBeTruthy()
   })
 
   it('「差し替える」で資格情報の入力窓が開く', async () => {
     await renderPage()
     clickButton('差し替える')
-    expect(host.textContent).toContain('資格情報を差し替える')
+    expect(document.body.textContent).toContain('資格情報を差し替える')
   })
 
   it('運用担当には入力の入口を見せない', async () => {
@@ -137,8 +142,39 @@ describe('R73 編集・差替えの入口', () => {
   it('資格情報タブにも保存の入口がある', async () => {
     fixture.tab = 'credentials'
     await renderPage()
-    expect(host.textContent).toContain('値そのものは、ここにも出しません')
-    clickButton('資格情報を差し替える')
-    expect(host.textContent).toContain('資格情報を差し替える')
+    expect(document.body.textContent).toContain('秘密値そのものは表示しません')
+    clickButton('差し替える')
+    expect(document.body.textContent).toContain('資格情報を差し替える')
   })
 })
+
+describe('91 登録の内容は1枚のカード', () => {
+  it('つづきに割らず、友だち数・状態・国・地域・役割メモを同じカードに出す', async () => {
+    await renderPage()
+    const card = host.querySelector('[aria-labelledby="acd-basic"]')
+    expect(card).toBeTruthy()
+    for (const label of ['友だち数', '状態', '国・地域', '役割メモ']) {
+      expect(within(card as HTMLElement).getByText(label)).toBeTruthy()
+    }
+    expect(host.textContent).not.toContain('登録の内容（つづき）')
+  })
+})
+
+ it('V8 saves timezone through PUT and reloads the account', async () => {
+    await renderPage(); clickButton('編集する');
+    const input = within(document.body).getByLabelText('タイムゾーン') as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'Europe/Paris');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const original = globalThis.fetch;
+    vi.stubGlobal('fetch', async (url: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: String(url), init });
+      return original(url, init);
+    });
+    await act(async () => { [...document.body.querySelectorAll('button')].find(b => b.textContent?.trim() === '保存する')!.click(); });
+    expect(requests.some((r) => r.init?.method === 'PUT' && JSON.parse(String(r.init.body)).timezone === 'Europe/Paris')).toBe(true);
+ });
+
+vi.mock('@/contexts/account-context', () => ({useAccount: () => ({selectedAccountId:'a1',selectedAccount:{id:'a1',name:'Fixture'},accounts:[],loading:false})}))

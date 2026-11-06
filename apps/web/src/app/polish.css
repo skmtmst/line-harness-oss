@@ -1,0 +1,34 @@
+/*
+ * 仕上げの共通の規則（v8-design-rules.md §6.5 の 7・§6.11）。値は globals.css の変数を読む。
+ * globals.css は長いファイルなので、新しい規則はここへ置く（layout.tsx が globals.css の後に読む）。
+ */
+
+/* 押せる所の最小の大きさ（§6.5 の 7）。透明な当たりで広げる時の基準。 */
+:root { --polish-hit-min: 24px; }
+
+/* 文字を選んだ時の地は、ブランドの深い緑の薄い色。文字の色は変えない。 */
+::selection {
+  background: color-mix(in srgb, var(--color-accent-deep) 20%, transparent);
+  color: inherit;
+}
+
+/* 押した時に端末が重ねる灰色の光は出さない（押した手応えは各部品の押した時の色で出す）。 */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 動きを減らす設定では、待ってから一度に動く形も残さない（順に出す行のずらし・遅れて出る動き）。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-delay: 0s !important;
+    transition-delay: 0s !important;
+  }
+}
+
+/*
+ * 表の見出しの文字は 500（§6.5 の 3）。画面ごとに太くした見出しも、ここで共通の値にそろえる
+ * （画面の規則は詳しさが高いので、この 1 つの値だけは必ず勝たせる）。
+ */
+html:root :is(th, [role=columnheader]) { font-weight: var(--polish-control-weight) !important; }

@@ -1,0 +1,44 @@
+> 文書：dashboard のコード案内｜区分：今の説明｜最終確認：2026-10-26（日本時間）
+
+# ダッシュボードの動き：コードの入口
+
+現役の読み込み先を探す案内です。URL・保存・権限・失敗時の条件は下の動きの説明と要件を読み、ここへ複製しません。
+
+## URLから本体へ
+
+単独のNextページへ直接つながる機能ではありません。呼び出し側の画面から利用します。
+
+呼び出し側：[v8/style-dashboard/home.tsx](../style-dashboard/home.tsx)
+
+本体：[comparisons.ts](comparisons.ts)、[dashboard-editor.tsx](dashboard-editor.tsx)、[dashboard.tsx](dashboard.tsx)、[ec-period.tsx](ec-period.tsx)、[ec-summary.tsx](ec-summary.tsx)、[first-run-done.tsx](first-run-done.tsx)、[first-steps.tsx](first-steps.tsx)、[friend-add.tsx](friend-add.tsx)、[head.tsx](head.tsx)、[inbox.tsx](inbox.tsx)、[kpi-delta.tsx](kpi-delta.tsx)、[sections.tsx](sections.tsx)、[starter-retry.tsx](starter-retry.tsx)、[trend.tsx](trend.tsx)
+
+## 外に見せる名前（index.ts）
+
+- [index.ts](index.ts)：`DashboardV8`
+
+機能の内部は宣言元を直接読み、外部は明示された公開入口を使います。Nextのpage・layoutとWorkerのroute登録は直接接続します。決まりは [コードの構成と名前](../../../../../docs/code-structure.md)。
+
+## API・保存の実装へ
+
+- [lib/api.ts](../../lib/api.ts)
+
+HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗の形式は [エラーの共通契約](../../../../../docs/error-codes.md)。公開名や応答を改名しません。
+
+## 動きと試験
+
+- [BEHAVIOR.md](BEHAVIOR.md)
+- [comparisons.test.tsx](comparisons.test.tsx)
+- [dashboard-align.test.tsx](dashboard-align.test.tsx)
+- [dashboard-compare-band.test.tsx](dashboard-compare-band.test.tsx)
+- [dashboard-editor.test.tsx](dashboard-editor.test.tsx)
+- [first-run-done.test.tsx](first-run-done.test.tsx)
+- [starter-retry.test.tsx](starter-retry.test.tsx)
+- [dashboard.test.tsx](dashboard.test.tsx)
+- [ec-summary.test.tsx](ec-summary.test.tsx)
+- [first-steps-fold-react.test.tsx](first-steps-fold-react.test.tsx)
+- [first-steps.test.ts](first-steps.test.ts)
+- [friend-add-read-failure.test.tsx](friend-add-read-failure.test.tsx)
+- [friend-add.test.tsx](friend-add.test.tsx)
+- [kpi-delta.test.tsx](kpi-delta.test.tsx)
+
+実行：`NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm --filter web test -- src/v8/dashboard`。関連する入口の試験も実行してください。保存・入力保持・権限・別店舗・失敗からの回復を守り、文書の整合だけを動作の合格に数えません。

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { csvExportCell, csvExportLine } from './csv-export'
+import { csvExportCell, csvExportLine } from '@/v8/friends/list/csv-export'
 
 describe('簡易CSV書き出しの数式インジェクション対策(#496-4)', () => {
   it.each(['=cmd|/c calc', '+1+1', '-2+3', '@attacker'])(

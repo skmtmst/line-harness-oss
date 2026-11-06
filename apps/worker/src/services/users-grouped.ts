@@ -1,3 +1,4 @@
+import { d1BindingIdentity } from '../lib/d1-timing.js';
 import { URL_TOKEN_SQL } from '../lib/url-token.js';
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -83,11 +84,15 @@ export interface UsersGroupedResult {
 }
 
 export interface UsersGroupedOptions {
+  /** 本人統合やキャッシュより前に、サーバーで権限を確定する。 */
+  allowedAccountIds?: readonly string[];
   q?: string;
   onlyDups?: boolean;
   account?: string;
+  /** 選択中の店舗への所属。任意の絞り込みと両立させる固定条件。 */
+  memberAccountId?: string;
   /**
-   * FRIEND-09: UID連携の絞り込みはサーバー側の全件にかける。
+   * UID連携の絞り込みはサーバー側の全件にかける。
    * 画面側で表示中ページだけを絞ると「1人中 51〜1人」のような
    * 範囲表示になり、2ページ目以降の対象へ辿れない。
    */
@@ -118,15 +123,22 @@ interface FormRow {
   created_at: string;
 }
 
-let cached: { rows: UnifiedUserRow[]; at: number } | null = null;
+let cachedByDb = new WeakMap<D1Database, { rows: UnifiedUserRow[]; at: number; scopeKey: string }>();
 
 export function _resetCacheForTest(): void {
-  cached = null;
+  cachedByDb = new WeakMap();
 }
 
-async function computeAllRows(db: D1Database): Promise<UnifiedUserRow[]> {
-  const identResult = await db.prepare(IDENT_SQL).all<IdentRow>();
-  const formsResult = await db.prepare(FORMS_SQL).all<FormRow>();
+async function computeAllRows(db: D1Database, allowedAccountIds?: readonly string[]): Promise<UnifiedUserRow[]> {
+  if (allowedAccountIds?.length === 0) return [];
+  const scoped = allowedAccountIds !== undefined;
+  const identQuery = db.prepare(IDENT_SQL + (scoped
+    ? ' AND friends.line_account_id IN (SELECT value FROM json_each(?))' : ''));
+  const formsQuery = db.prepare(FORMS_SQL.replace('ORDER BY fs.created_at DESC', (scoped
+    ? 'AND f.line_account_id IN (SELECT value FROM json_each(?)) ' : '') + 'ORDER BY fs.created_at DESC'));
+  const bindings = JSON.stringify(allowedAccountIds);
+  const identResult = await (scoped ? identQuery.bind(bindings) : identQuery).all<IdentRow>();
+  const formsResult = await (scoped ? formsQuery.bind(bindings) : formsQuery).all<FormRow>();
 
   const formByFriend = new Map<string, FormRow[]>();
   for (const row of formsResult.results ?? []) {
@@ -229,7 +241,9 @@ async function computeAllRows(db: D1Database): Promise<UnifiedUserRow[]> {
 }
 
 function applyFilters(rows: UnifiedUserRow[], opts: UsersGroupedOptions): UnifiedUserRow[] {
-  let filtered = rows;
+  let filtered = opts.memberAccountId
+    ? rows.filter(row => row.accounts.some(account => account.accountId === opts.memberAccountId))
+    : rows;
   if (opts.onlyDups) {
     filtered = filtered.filter((r) => r.isDuplicate);
   }
@@ -265,14 +279,18 @@ export async function computeUsersGrouped(
   opts: UsersGroupedOptions = {},
 ): Promise<UsersGroupedResult> {
   let allRows: UnifiedUserRow[];
-  if (!opts.forceRefresh && cached && Date.now() - cached.at < CACHE_TTL_MS) {
+  const scopeKey = opts.allowedAccountIds === undefined ? 'internal-unscoped'
+    : JSON.stringify([...new Set(opts.allowedAccountIds)].sort());
+  const cacheDb = d1BindingIdentity(db);
+  const cached = cachedByDb.get(cacheDb);
+  if (!opts.forceRefresh && cached?.scopeKey === scopeKey && Date.now() - cached.at < CACHE_TTL_MS) {
     allRows = cached.rows;
   } else {
-    allRows = await computeAllRows(db);
+    allRows = await computeAllRows(db, opts.allowedAccountIds);
     if (allRows.length > 0) {
-      cached = { rows: allRows, at: Date.now() };
+      cachedByDb.set(cacheDb, { rows: allRows, at: Date.now(), scopeKey });
     } else {
-      cached = null;
+      cachedByDb.delete(cacheDb);
     }
   }
 

@@ -1,8 +1,9 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * 日付の選択。Pencil ★V7「日付の選択」（V7 文書 `Fw065`）。
+ * 日付の選択。Pencil ★V8（V8.pen）「日付の入力（カレンダー）」。
  *
- *   欄     高さ 40・余白 [0,12]・角丸 8・枠 $hairline（開いている間は $accent-deep 1.5px）
+ *   欄     高さ 36（ほかの欄と同じ・）・余白 [0,12]・角丸 8・枠 $hairline（開いている間は $accent-deep 1.5px）
  *   暦     幅 296・余白 16・角丸 12・影 beautiful-shadows md・欄の 6px 下、左をそろえる
  *   日付   36×36。選んだ日は濃い緑の丸、今日は線の丸、指を乗せた日は $canvas-sunken の角丸 8
  *   動き   暦は motion-fast で出る（不透明度＋大きさ 0.97→1、左上が起点）
@@ -17,7 +18,7 @@
 .field {
   display: flex;
   width: 100%;
-  height: 40px;
+  height: 36px;
   align-items: center;
   gap: 8px;
   padding: 0 36px 0 12px;
@@ -32,9 +33,25 @@
   transition: border-color var(--motion-fast) var(--motion-ease-out);
 }
 
+/* 消すボタンを置かない欄（日時の欄の clearable={false}）は右の空きを詰める。 */
+.field[data-no-clear] {
+  padding-right: 12px;
+}
+
+:root .field:not([data-open]):not([data-invalid]) {
+  border-color: var(--color-control-border);
+  box-shadow: var(--control-shadow);
+}
+
 .field[data-open] {
   border-color: var(--color-accent-deep);
   box-shadow: inset 0 0 0 0.5px var(--color-accent-deep);
+}
+
+/* 閲覧のみ（日時の欄の readOnly）。字を見せるだけで開かない。 */
+.field[data-readonly] {
+  cursor: default;
+  background: var(--color-canvas-sunken);
 }
 
 .field[data-invalid] {
@@ -43,14 +60,9 @@
 
 .field:disabled {
   cursor: not-allowed;
-  background: var(--color-canvas-sunken);
-  opacity: 0.6;
+  opacity: var(--polish-disabled-opacity);
 }
 
-.field:focus-visible {
-  outline: 2px solid var(--color-action);
-  outline-offset: 2px;
-}
 
 .icon {
   width: 16px;
@@ -72,9 +84,9 @@
 }
 
 /*
- * 消すボタンは欄の右端に収める（40px の欄の中・上下1px空け）。
+ * 消すボタンは欄の右端に収める（36px の欄の中・上下1px空け）。
  * 素のボタン扱い（globals の min-height:32px）で 32px に伸びると、
- * 隣の欄（40px）と高さがずれて見える。
+ * 隣の欄（36px）と高さがずれて見える。
  */
 .clear {
   position: absolute;
@@ -99,8 +111,8 @@
 }
 
 .clear :global(svg) {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 .popover {
@@ -111,16 +123,6 @@
   z-index: 60;
   width: 296px;
   padding: 16px;
-  border-radius: 12px;
-  background: var(--color-canvas);
-  /* beautiful-shadows md */
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / 6%),
-    0 1px 1px -0.5px rgb(0 0 0 / 6%),
-    0 3px 3px -1.5px rgb(0 0 0 / 6%),
-    0 6px 6px -3px rgb(0 0 0 / 6%),
-    0 12px 12px -6px rgb(0 0 0 / 6%),
-    0 24px 24px -12px rgb(0 0 0 / 6%);
   transform-origin: top left;
   animation: date-field-in var(--motion-fast) var(--motion-ease-out);
 }
@@ -128,7 +130,7 @@
 @keyframes date-field-in {
   from {
     opacity: 0;
-    scale: 0.97;
+    scale: var(--popover-enter-scale);
   }
 }
 
@@ -143,7 +145,7 @@
   margin: 0;
   color: var(--color-ink);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .nav {
@@ -190,7 +192,7 @@
 }
 
 .weekdays span[data-weekday='sat'] {
-  color: var(--color-status-info);
+  color: var(--color-action);
 }
 
 .grid[data-slide='next'] {
@@ -234,7 +236,7 @@
   color: var(--color-ink);
   font: inherit;
   font-size: var(--text-body);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
   cursor: pointer;
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),
@@ -250,60 +252,89 @@
 }
 
 .day[data-today] {
-  border-radius: 9999px;
-  box-shadow: inset 0 0 0 1.5px var(--color-accent-deep);
-  font-weight: 700;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1.5px var(--color-control-border);
+  font-weight: 500;
 }
 
 .day[data-selected] {
-  border-radius: 9999px;
-  background: var(--color-accent-deep);
-  box-shadow: none;
-  color: var(--color-on-accent);
-  font-weight: 700;
+  border-radius: var(--radius-pill);
+  background: var(--polish-selection-bg);
+  box-shadow: var(--polish-selection-shadow);
+  color: var(--color-ink);
+  font-weight: 500;
 }
 
 .day[aria-disabled='true'] {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .day:focus-visible,
-.clear:focus-visible,
-.today:focus-visible,
-.reset:focus-visible {
-  outline: 2px solid var(--color-action);
-  outline-offset: 2px;
+.clear:focus-visible {
+  outline: var(--polish-focus-width) solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
 }
 
 .footer {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-top: 6px;
   padding-top: 8px;
   border-top: 1px solid var(--color-hairline);
 }
 
-.today,
-.reset {
+.footerGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+:root .field[data-size='compact'] { height: 36px; }
+
+}
+
+:root .field[data-size="compact"] { height: var(--tpl-rt-control-h); }
+
+/* 日付を選ぶ入口は白い地。入力の誤りとキーボードの輪は残す。 */
+:root .field { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
+:root .field:not([data-open]):not([data-invalid]) { border-color: var(--color-control-border); box-shadow: none; }
+:root .field[data-open] { border-color: var(--color-control-border); box-shadow: none; }
+:root .field:hover:not(:disabled):not([data-readonly]) { background: var(--color-canvas-sunken); }
+:root .field[data-invalid] { border-color: var(--color-danger); }
+
+:root .day[data-selected] { font-weight: 600; }
+
+:root .chevron { width: var(--polish-icon-control); height: var(--polish-icon-control); flex: none; color: var(--color-ink-faint); margin-inline-start: auto; }
+:root .field:not([data-clearable]) { padding-inline-end: var(--tpl-select-inset); }
+
+/* 日付の欄も線ではなく影で浮かせる。 */
+:root .field {
   border: 0;
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
 }
 
-.today {
-  color: var(--color-action);
+:root .field:not([data-open]):not([data-invalid]),
+:root .field[data-open] {
+  border: 0;
+  box-shadow: var(--shadow-raised-control);
 }
 
-.reset {
-  color: var(--color-ink-secondary);
+:root .field[data-invalid] {
+  border: 0;
+  box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
 }
 
-.today:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
+:root .field[data-readonly] {
+  background: var(--color-canvas-sunken);
+  box-shadow: none;
 }
+
+:root .field:disabled {
+  box-shadow: none;
 }
+
+/* 印と文字の上下の真ん中をそろえる（差 0.5 以内。§6.5 の 2）。英数字の書体は字の箱が上に寄るので、共通の補正値で文字を下げる。 */
+:root .field > :is(.value, .placeholder) { translate: 0 var(--text-optical-shift); }/* 誤り＋焦点は赤1本（青を重ねない）。層の外に置く（全体の青輪より勝つため）。 */

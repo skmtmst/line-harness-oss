@@ -1,0 +1,6 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.tip { flex-shrink: 0; }
+.content { display: flex; flex-direction: column; gap: var(--polish-space-row); }
+.part { display: block; }
+}

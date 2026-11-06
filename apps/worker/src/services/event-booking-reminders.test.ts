@@ -1,4 +1,6 @@
-import { describe, expect, test, vi } from 'vitest';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { BookingExternalCircuits } from '../features/booking/booking-external-circuits.js';
+import { afterEach,describe, expect, test, vi } from 'vitest';
 import {
   computeRemindersForBooking,
   insertRemindersForBooking,
@@ -17,7 +19,7 @@ describe('computeRemindersForBooking', () => {
     });
     expect(out).toHaveLength(1);
     expect(out[0].kind).toBe('day_before');
-    // 前日 18:00 JST = 09:00 UTC of 2099-05-31
+    // 2099-05-31 の18時 JST は09時 UTCになる。
     expect(out[0].scheduled_at).toBe('2099-05-31T09:00:00.000Z');
   });
 
@@ -76,7 +78,7 @@ describe('computeRemindersForBooking', () => {
 
   test('日跨ぎ JST 23:00 → UTC 14:00 の前日計算が正しい', () => {
     // 2099-06-01 23:00 JST = 2099-06-01 14:00 UTC
-    // day_before should be 2099-05-31 18:00 JST = 2099-05-31 09:00 UTC
+    // 前日通知は2099-05-31の18時 JST、09時 UTCを予定する。
     const out = computeRemindersForBooking({
       starts_at_utc: '2099-06-01T14:00:00Z',
       reminder_day_before_enabled: true,
@@ -211,58 +213,25 @@ interface DueRow {
   last_error: string | null;
 }
 
+const opened:Array<ReturnType<typeof createTestD1>>=[];
+afterEach(()=>{for(const item of opened.splice(0))item.raw.close()});
 function dueDB(state: { rows: DueRow[] }): D1Database {
-  return {
-    prepare(sql: string) {
-      let bound: unknown[] = [];
-      const stmt = {
-        bind(...args: unknown[]) { bound = args; return stmt; },
-        async first<T>() { return null as T | null; },
-        async all<T>() {
-          if (sql.includes('FROM event_booking_reminders r')) {
-            const [nowIso] = bound as [string];
-            const items = state.rows.filter(
-              (r) =>
-                (r.status === 'pending' || r.status === 'failed') &&
-                r.scheduled_at <= nowIso &&
-                r.starts_at > nowIso,
-            );
-            return { results: items as unknown as T[] };
-          }
-          return { results: [] };
-        },
-        async run() {
-          // CAS claim: bump retry_count if status pending/failed and current retry_count matches
-          if (sql.includes('SET retry_count = retry_count + 1')) {
-            const [id, expected] = bound as [string, number];
-            const r = state.rows.find((x) => x.id === id);
-            if (!r) return { success: true, meta: { changes: 0 } };
-            if (r.retry_count !== expected) return { success: true, meta: { changes: 0 } };
-            if (r.status !== 'pending' && r.status !== 'failed') return { success: true, meta: { changes: 0 } };
-            r.retry_count = expected + 1;
-            return { success: true, meta: { changes: 1 } };
-          }
-          if (sql.startsWith("UPDATE event_booking_reminders SET status='sent'")) {
-            const [sent_at, id] = bound as [string, string];
-            const r = state.rows.find((x) => x.id === id);
-            if (r) { r.status = 'sent'; r.sent_at = sent_at; }
-            return { success: true, meta: { changes: 1 } };
-          }
-          // 失敗記録は retry_count も書き戻す。fence の前で投げた場合
-          // (資格情報が復号できない等) は claim が走っておらず、ここで
-          // 数えないと上限に届かず failed のまま滞留するため。
-          if (sql.startsWith('UPDATE event_booking_reminders SET status = ?, retry_count = ?, last_error = ?')) {
-            const [status, retry_count, last_error, id] = bound as [string, number, string, string];
-            const r = state.rows.find((x) => x.id === id);
-            if (r) { r.status = status; r.retry_count = retry_count; r.last_error = last_error; }
-            return { success: true, meta: { changes: 1 } };
-          }
-          return { success: true, meta: {} };
-        },
-      };
-      return stmt;
-    },
-  } as unknown as D1Database;
+  const item=createTestD1();opened.push(item);const raw=item.raw;
+  raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret)VALUES('a','c','account','tok','s');
+    INSERT INTO friends(id,line_user_id,line_account_id,is_following)VALUES('f','U1','a',1)`);
+  for(const row of state.rows){
+    raw.prepare(`INSERT INTO events(id,line_account_id,name,target_type,venue_name,venue_url,reminder_hours_before)
+      VALUES(?,'a',?,'single',?,?,?)`).run(`e-${row.id}`,row.event_name,row.venue_name,row.venue_url,row.reminder_hours_before);
+    raw.prepare(`INSERT INTO event_slots(id,event_id,starts_at,ends_at)VALUES(?,?,?,?)`)
+      .run(`s-${row.id}`,`e-${row.id}`,row.starts_at,row.starts_at);
+    raw.prepare(`INSERT INTO event_bookings(id,line_account_id,event_id,slot_id,friend_id,status,requested_at)
+      VALUES(?,'a',?,?,'f','confirmed','2026-01-01')`).run(row.booking_id,`e-${row.id}`,`s-${row.id}`);
+    raw.prepare(`INSERT INTO event_booking_reminders(id,booking_id,kind,scheduled_at,status,retry_count)
+      VALUES(?,?,?,?,?,?)`).run(row.id,row.booking_id,row.kind,row.scheduled_at,row.status,row.retry_count);
+    for(const field of ['status','retry_count','sent_at','last_error'])Object.defineProperty(row,field,{get:()=>
+      (raw.prepare(`SELECT ${field} FROM event_booking_reminders WHERE id=?`).get(row.id) as Record<string,unknown>)[field]});
+  }
+  return item.db;
 }
 
 function dueRow(over: Partial<DueRow> = {}): DueRow {
@@ -324,7 +293,7 @@ describe('processDueEventReminders', () => {
     expect(state.rows[0].retry_count).toBe(3);
   });
 
-  test('marks failed (retryable) on first failure', async () => {
+  test('marks an uncertain first send failed_permanent without a replay', async () => {
     const state = { rows: [dueRow({ id: 'r1', retry_count: 0 })] };
     const db = dueDB(state);
     const sender = vi.fn(async () => { throw new Error('temp'); });
@@ -332,9 +301,9 @@ describe('processDueEventReminders', () => {
       now: new Date('2026-05-09T01:00:00Z'),
       sender,
     });
-    expect(state.rows[0].status).toBe('failed');
+    expect(state.rows[0].status).toBe('failed_permanent');
     expect(state.rows[0].retry_count).toBe(1);
-    expect(state.rows[0].last_error).toBe('temp');
+    expect(state.rows[0].last_error).toBe('delivery_unknown');
   });
 
   test('hours_before kind passes hoursBefore from event setting', async () => {
@@ -352,4 +321,55 @@ describe('processDueEventReminders', () => {
       }),
     );
   });
+});
+
+describe('W5 durable reminder delivery',()=>{
+ test('外部受理後の通知済み保存が失敗したら不明で停止し、再送しない',async()=>{
+  const state={rows:[dueRow()]},db=dueDB(state),item=opened.at(-1)!;
+  item.raw.exec(`CREATE TRIGGER stop_result BEFORE UPDATE ON event_booking_reminders
+    WHEN NEW.status='sent' BEGIN SELECT RAISE(ABORT,'fixture'); END`);
+  const now=new Date('2026-05-09T01:00:00Z'),sender=vi.fn(async()=>undefined);
+  expect(await processDueEventReminders(db,{now,sender})).toEqual({sent:0,failed:1});
+  expect(item.raw.prepare("SELECT status FROM workflow_steps WHERE process_kind='booking_line_delivery'").get())
+    .toEqual({status:'unknown'});
+  item.raw.exec('DROP TRIGGER stop_result');
+  await processDueEventReminders(db,{now:new Date(now.getTime()+600000),sender});
+  expect(sender).toHaveBeenCalledTimes(1);expect(state.rows[0].status).toBe('failed_permanent');
+ });
+ test('遮断中は外部要求0・試行数0のまま、再開後は同じ予定を送る',async()=>{
+  const state={rows:[dueRow()]},db=dueDB(state),item=opened.at(-1)!;
+  const base=Date.parse('2026-05-09T01:00:00Z'),circuit=new BookingExternalCircuits(db);
+  const scope={accountId:'a',storeId:'a',destination:'line',connectionId:'a'};
+  for(let n=0;n<5;n++){const admission=await circuit.acquire(scope,base);if(admission.allowed)await circuit.settle(admission.lease,'failure',base);}
+  const sender=vi.fn(async()=>undefined);
+  for(let n=0;n<4;n++)expect(await processDueEventReminders(db,{now:new Date(base+n*1000),sender})).toEqual({sent:0,failed:0});
+  expect(sender).not.toHaveBeenCalled();
+  expect(state.rows[0].status).toBe('pending');expect(state.rows[0].retry_count).toBe(0);
+  expect(item.raw.prepare("SELECT status,attempt_count FROM workflow_steps WHERE process_kind='event_reminder'").get())
+    .toEqual({status:'pending',attempt_count:0});
+  expect(await processDueEventReminders(db,{now:new Date(base+31_000),sender})).toEqual({sent:1,failed:0});
+  expect(sender).toHaveBeenCalledTimes(1);
+ });
+ test('holds the send lease across await and a concurrent cron cannot send',async()=>{
+  const state={rows:[dueRow()]},db=dueDB(state);let started!:()=>void,release!:()=>void;
+  const entered=new Promise<void>(resolve=>started=resolve),wait=new Promise<void>(resolve=>release=resolve);
+  const sender=vi.fn(async()=>{started();await wait});const now=new Date('2026-05-09T01:00:00Z');
+  const first=processDueEventReminders(db,{now,sender});await entered;
+  expect(await processDueEventReminders(db,{now,sender})).toEqual({sent:0,failed:0});
+  release();await first;expect(sender).toHaveBeenCalledTimes(1);
+ });
+ test('lost acknowledgement keeps the original text and retry key, and never replays',async()=>{
+  const state={rows:[dueRow()]},db=dueDB(state),item=opened.at(-1)!;
+  const sender=vi.fn(async(_params:Parameters<import('./event-booking-notifier.js').EventBookingNotificationSender>[0])=>{throw new Error('secret provider body')});const base=Date.parse('2026-05-09T01:00:00Z');
+  await processDueEventReminders(db,{now:new Date(base),sender});
+  item.raw.prepare("UPDATE events SET name='changed'").run();
+  await processDueEventReminders(db,{now:new Date(base+30_000),sender});expect(sender).toHaveBeenCalledTimes(1);
+  for(let n=1;n<4;n++)await processDueEventReminders(db,{now:new Date(base+n*60_000),sender});
+  expect(sender).toHaveBeenCalledTimes(1);
+  expect(state.rows[0].status).toBe('failed_permanent');
+  expect(sender.mock.calls[0]![0].ctx.eventName).toBe('X');
+  expect(sender.mock.calls[0]![0].retryKey).toBeTruthy();
+  expect(JSON.stringify(item.raw.prepare('SELECT input_json,error_code FROM workflow_steps').all())).not.toContain('secret provider body');
+  expect(JSON.stringify(item.raw.prepare('SELECT input_json FROM workflow_steps').all())).not.toContain('tok');
+ });
 });

@@ -1,15 +1,11 @@
 /**
  * M (止めた流入経路の QR): 印刷用 PDF をサーバーで組み立てる。
  *
- * ブラウザの印刷に頼らず、Worker が A4・1枚の PDF を返す。外部サービスへは
+ * ブラウザの印刷に頼らず、Worker が A4/A5・1枚の PDF を返す。外部サービスへは
  * 何も送らない。依存を増やさないため、PDF の骨組みは自前で書く。
  *
- * 描けるもの: QR の升目(ベクターの四角。印刷しても読み取れる)、URL と
- * 発行日時の英数字文(Helvetica)。日本語の店名・ヒントは、埋め込む
- * フォント資産が無いため本文には描けない。代わりに文書情報(`/Title`・
- * `/Subject`・`/Keywords`。閲覧ソフトの表題に出る)とファイル名に残す。
- * 店名を紙面に出す対応(フォント資産の用意か、画面描画の埋め込み)は
- * 後の課題として報告に残す。
+ * QR はベクター、英数字は Helvetica、日本語は PDF の日本語CIDフォントで描く。
+ * クーポン付きの店頭用紙にはクーポン名・店名・読み取りの案内を入れる。
  */
 
 import type { QrSymbol } from './qr-matrix.js';
@@ -19,13 +15,15 @@ export const QR_PDF_PAGE_WIDTH = 595.28;
 export const QR_PDF_PAGE_HEIGHT = 841.89;
 
 export interface QrPrintSheetInput {
-  /** 店名。文書情報とファイル名に残す(本文には描けない。上記コメント)。 */
+  /** 店名。文書情報とクーポン付き用紙の本文に残す。 */
   accountName: string;
   /** QR にする URL。ASCII だけ受け付ける(経路 URL は ASCII で作る)。 */
   url: string;
   /** 発行日時(日本語表記のまま。ASCII だけ受け付ける)。例: `2026-09-27 15:00`。 */
   issuedAt: string;
   qr: QrSymbol;
+  couponName?: string;
+  paper?: 'A4' | 'A5';
 }
 
 /** PDF に載せられないときに投げる。利用者には 400 で返す。 */
@@ -63,19 +61,21 @@ export function utf16beHex(value: string): string {
 }
 
 /**
- * A4・1枚の PDF を組み立てる。QR は升目をそのまま四角で描く。
- * 1モジュールが潰れないよう、紙面の中央に 360pt 四方で置く。
+ * A4/A5・1枚の PDF を組み立てる。QR は升目をそのまま四角で描く。
+ * 紙面の中央に A4 は 360pt、A5 は 240pt 四方で置く。
  */
 export function buildQrPrintPdf(input: QrPrintSheetInput): Uint8Array {
   assertPrintableAscii(input.url, 'URL');
   assertPrintableAscii(input.issuedAt, '発行日時');
   if (input.qr.size <= 0) throw new QrPdfError('QR の升目がありません');
 
-  const qrSize = 360;
+  const pageWidth = input.paper === 'A5' ? 419.53 : QR_PDF_PAGE_WIDTH;
+  const pageHeight = input.paper === 'A5' ? 595.28 : QR_PDF_PAGE_HEIGHT;
+  const qrSize = input.paper === 'A5' ? 240 : 360;
   const cells = input.qr.size;
   const module = qrSize / cells;
-  const qrX = (QR_PDF_PAGE_WIDTH - qrSize) / 2;
-  const qrTop = QR_PDF_PAGE_HEIGHT - 140;
+  const qrX = (pageWidth - qrSize) / 2;
+  const qrTop = pageHeight - 140;
   const qrY = qrTop - qrSize;
 
   const lines: string[] = [];
@@ -96,14 +96,25 @@ export function buildQrPrintPdf(input: QrPrintSheetInput): Uint8Array {
   lines.push('BT /F1 9 Tf');
   lines.push(`1 0 0 1 72 64 Tm (Issued ${escapeLiteral(input.issuedAt)}) Tj`);
   lines.push('ET');
+  if (input.couponName) {
+    const japaneseLine = (text: string, y: number, size: number) => {
+      const shortened = [...text].slice(0, Math.floor((pageWidth - 64) / size)).join('');
+      const x = (pageWidth - [...shortened].length * size) / 2;
+      lines.push(`BT /F2 ${size} Tf 1 0 0 1 ${x} ${y} Tm <${utf16beHex(shortened).slice(4)}> Tj ET`);
+    };
+    japaneseLine(input.accountName, pageHeight - 50, 12);
+    japaneseLine(input.couponName, pageHeight - 94, 18);
+    japaneseLine('読み取って友だち追加でクーポン', qrY - 70, 14);
+    japaneseLine('LINEのトークにクーポンが届きます', qrY - 96, 10);
+  }
   const content = lines.join('\n');
 
   const objects: string[] = [];
   objects.push('<< /Type /Catalog /Pages 2 0 R >>');
   objects.push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
   objects.push(
-    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${QR_PDF_PAGE_WIDTH} ${QR_PDF_PAGE_HEIGHT}]`
-    + ' /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}]`
+    + ` /Resources << /Font << /F1 4 0 R ${input.couponName ? '/F2 7 0 R' : ''} >> >> /Contents 5 0 R >>`,
   );
   objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
   objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
@@ -113,6 +124,11 @@ export function buildQrPrintPdf(input: QrPrintSheetInput): Uint8Array {
     + ` /Creator <${utf16beHex('musubo')}> >>`,
   );
 
+  if (input.couponName) {
+    objects.push('<< /Type /Font /Subtype /Type0 /BaseFont /HeiseiKakuGo-W5 /Encoding /UniJIS-UTF16-H /DescendantFonts [8 0 R] >>');
+    objects.push('<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HeiseiKakuGo-W5 /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 6 >> /FontDescriptor 9 0 R /DW 1000 >>');
+    objects.push('<< /Type /FontDescriptor /FontName /HeiseiKakuGo-W5 /Flags 4 /FontBBox [-92 -250 1010 922] /ItalicAngle 0 /Ascent 880 /Descent -120 /CapHeight 700 /StemV 80 >>');
+  }
   const encoder = new TextEncoder();
   const parts: Uint8Array[] = [encoder.encode('%PDF-1.4\n')];
   const offsets: number[] = [];

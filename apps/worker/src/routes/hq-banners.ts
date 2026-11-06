@@ -1,5 +1,18 @@
+import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { checkMediaGate } from '../services/file-scan.js';
+import { getPinnedMediaObject } from '../services/media-upload-storage.js';
+import {serializeProject,parseTextLines,parseEmphasisLines,serializeGeneration,serializeMedia,serializeImage} from './hq-banner-serializers.js';
+import {GapError,gapAccount,gapWrite} from '../services/gap-common.js';
+import {requireAccountAi} from '../services/account-ai-features.js';
+import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { hqBannerFolders } from './hq-banner-folders.js';
+import { processBannerGeneration, BannerJobFailure } from '../services/banner-jobs.js';
+import { bannerGenerationOperationId, bannerGenerationRequestMatches } from '../services/banner-generation-retry.js';
 import { Hono, type Context } from 'hono';
 import {
+  getWorkflowStep,
+  HqFolderError,
+  bannerReferencesFromRow,
   createBannerGeneration,
   createBannerImage,
   createBannerImageDelivery,
@@ -17,6 +30,7 @@ import {
   countRecentFailedBannerGenerations,
   listBannerGenerations,
   listBannerImages,
+  countBannerImages,
   listBannerProjects,
   recordBannerUsage,
   touchBannerProject,
@@ -28,8 +42,11 @@ import {
   type BannerProject,
   type Media,
 } from '@line-crm/db';
+import { toJstString } from '@line-crm/db';
+
+
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { resolveEntitlements } from '../services/billing-plans.js';
@@ -45,7 +62,7 @@ import {
   resolveBannerCropPosition,
   resizeBannerToPreset,
 } from '../services/banner-resize.js';
-import { toJstString } from '@line-crm/db';
+
 import {
   DEFAULT_OPENAI_IMAGE_MODEL,
   generateOpenAIImage,
@@ -87,6 +104,16 @@ const UPLOAD_ALLOWED: Record<string, { ext: string }> = {
 };
 
 hqBanners.use('/api/hq/banners/*', requireRole('owner', 'admin'));
+hqBanners.route('/',hqBannerFolders);
+hqBanners.use('/api/hq/banners/*',async(c,next)=>{
+ if(c.req.method!=='POST'||!(/\/projects\/[^/]+\/generations$/.test(c.req.path)||/\/generations\/[^/]+\/run$/.test(c.req.path)))return next();
+ try{
+  gapWrite(c,{admin:true});
+  const a=await gapAccount(c);await requireAccountAi(c.env.DB,a,'banner',tenantOf(c));
+  if(/\/run$/.test(c.req.path)){const g=await getBannerGeneration(c.env.DB,c.req.path.split('/').at(-2)!,tenantOf(c));if(g&&g.ai_account_id!==a)throw new GapError('not_found',404);}
+ }catch(e){if(e instanceof GapError)return c.json({success:false,error:e.code,code:e.code,data:{enabled:false,feature:'banner'}},e.status);throw e;}
+ return next();
+});
 
 function tenantOf(c: Context<Env>): string {
   return c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
@@ -155,91 +182,11 @@ function refusal(usage: UsageSnapshot, needed: number): string | null {
   return null;
 }
 
-function serializeProject(p: BannerProject) {
-  return {
-    id: p.id,
-    name: p.name,
-    description: p.description,
-    isFavorite: p.is_favorite === 1,
-    archivedAt: p.archived_at,
-    imageCount: Number(p.image_count ?? 0),
-    runningCount: Number(p.running_count ?? 0),
-    createdBy: p.created_by,
-    createdAt: p.created_at,
-    updatedAt: p.updated_at,
-  };
-}
 
-function parseTextLines(value: string): string[] {
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
-  } catch {
-    return [];
-  }
-}
 
-function serializeGeneration(g: BannerGeneration) {
-  return {
-    id: g.id,
-    projectId: g.project_id,
-    status: g.status,
-    mode: g.mode,
-    presetKey: g.preset_key,
-    aspectRatio: g.aspect_ratio,
-    apiSize: g.api_size,
-    quality: g.quality,
-    textLines: parseTextLines(g.text_lines),
-    mainColor: g.main_color,
-    subColor: g.sub_color,
-    personOption: g.person_option,
-    customPrompt: g.custom_prompt,
-    freePrompt: g.free_prompt,
-    finalPrompt: g.final_prompt,
-    engine: g.engine,
-    modelName: g.model_name,
-    requestedCount: g.requested_count,
-    doneCount: g.done_count,
-    failedCount: g.failed_count,
-    unitsPerImage: g.units_per_image,
-    errorMessage: g.error_message,
-    referenceImageId: g.reference_image_id ?? null,
-    referenceMode: g.reference_mode ?? null,
-    createdBy: g.created_by,
-    createdAt: g.created_at,
-    startedAt: g.started_at,
-    finishedAt: g.finished_at,
-  };
-}
 
-function serializeMedia(m: Media, base: string) {
-  return {
-    id: m.id,
-    filename: m.filename,
-    mimeType: m.mime_type,
-    sizeBytes: m.size_bytes,
-    width: m.width,
-    height: m.height,
-    url: m.public_url ?? `${base}/images/${m.r2_key}`,
-  };
-}
 
-function serializeImage(i: BannerImageWithDetail, base: string) {
-  return {
-    id: i.id,
-    projectId: i.project_id,
-    generationId: i.generation_id,
-    sequence: i.sequence,
-    source: i.source,
-    parentImageId: i.parent_image_id,
-    isFavorite: i.is_favorite === 1,
-    createdBy: i.created_by,
-    createdAt: i.created_at,
-    media: serializeMedia(i.media, base),
-    generation: i.generation ? serializeGeneration(i.generation) : null,
-    deliveredAccountIds: i.delivered_account_ids,
-  };
-}
+
 
 async function readJson(c: Context<Env>): Promise<Record<string, unknown> | null> {
   return c.req.json<Record<string, unknown>>().catch(() => null);
@@ -267,7 +214,7 @@ function sizeToDimensions(apiSize: string): { width: number | null; height: numb
 }
 
 function safeFilenameBase(name: string): string {
-  const cleaned = name.replace(/[\\/:*?"<>| -]/g, '').trim();
+  const cleaned = name.replace(/[\\/:*?"<>|\0-]/g, '').trim();
   return (cleaned || 'banner').slice(0, 40);
 }
 
@@ -305,8 +252,7 @@ hqBanners.get('/api/hq/banners/stats', async (c) => {
     const stats = await getBannerStats(c.env.DB, tenantOf(c));
     return c.json({ success: true, data: stats });
   } catch (err) {
-    console.error('GET /api/hq/banners/stats error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -316,20 +262,19 @@ hqBanners.get('/api/hq/banners/projects', async (c) => {
   try {
     const archived = c.req.query('archived') === '1';
     const query = c.req.query('q')?.trim() || undefined;
-    const items = await listBannerProjects(c.env.DB, { tenantId: tenantOf(c), archived, query });
+    const items = await listBannerProjects(c.env.DB, { tenantId: tenantOf(c), archived, query, folderId: c.req.query('folderId') === '__none__' ? null : c.req.query('folderId') });
     return c.json({ success: true, data: items.map(serializeProject) });
   } catch (err) {
-    console.error('GET /api/hq/banners/projects error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-hqBanners.post('/api/hq/banners/projects', async (c) => {
+hqBanners.post('/api/hq/banners/projects', inputJsonBoundary(), async (c) => {
   try {
     const body = await readJson(c);
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
     if (!name || name.length > 100) {
-      return c.json({ success: false, error: 'プロジェクト名は1〜100文字で入力してください' }, 400);
+      return inputError(c, { success: false, error: 'プロジェクト名は1〜100文字で入力してください' }, 400, ["name"]);
     }
     const description = typeof body?.description === 'string' ? body.description.trim().slice(0, 500) : '';
     const project = await createBannerProject(c.env.DB, {
@@ -337,11 +282,12 @@ hqBanners.post('/api/hq/banners/projects', async (c) => {
       name,
       description,
       createdBy: c.get('staff')?.id ?? null,
+      folderId: body?.folderId as string | null | undefined,
     });
     return c.json({ success: true, data: serializeProject(project) }, 201);
   } catch (err) {
-    console.error('POST /api/hq/banners/projects error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    if(err instanceof HqFolderError)return folderInputError(c, err);
+    throw err;
   }
 });
 
@@ -364,20 +310,20 @@ hqBanners.get('/api/hq/banners/projects/:id', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/hq/banners/projects/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-hqBanners.patch('/api/hq/banners/projects/:id', async (c) => {
+hqBanners.patch('/api/hq/banners/projects/:id', inputJsonBoundary(), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const body = await readJson(c);
-    const patch: { name?: string; description?: string; isFavorite?: boolean; archived?: boolean } = {};
+    const patch: { name?: string; description?: string; isFavorite?: boolean; archived?: boolean; folderId?: string | null } = {};
+    if (body && 'folderId' in body) patch.folderId = body.folderId as string | null;
     if (typeof body?.name === 'string') {
       const name = body.name.trim();
       if (!name || name.length > 100) {
-        return c.json({ success: false, error: 'プロジェクト名は1〜100文字で入力してください' }, 400);
+        return inputError(c, { success: false, error: 'プロジェクト名は1〜100文字で入力してください' }, 400, ["name"]);
       }
       patch.name = name;
     }
@@ -388,12 +334,12 @@ hqBanners.patch('/api/hq/banners/projects/:id', async (c) => {
     if (!project) return c.json({ success: false, error: 'プロジェクトが見つかりません' }, 404);
     return c.json({ success: true, data: serializeProject(project) });
   } catch (err) {
-    console.error('PATCH /api/hq/banners/projects/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    if(err instanceof HqFolderError)return folderInputError(c, err);
+    throw err;
   }
 });
 
-hqBanners.post('/api/hq/banners/projects/:id/duplicate', async (c) => {
+hqBanners.post('/api/hq/banners/projects/:id/duplicate', inputJsonBoundary(), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const source = await getBannerProject(c.env.DB, c.req.param('id'), tenantId);
@@ -421,18 +367,39 @@ hqBanners.post('/api/hq/banners/projects/:id/duplicate', async (c) => {
     const refreshed = await getBannerProject(c.env.DB, copy.id, tenantId);
     return c.json({ success: true, data: serializeProject(refreshed ?? copy) }, 201);
   } catch (err) {
-    console.error('POST /api/hq/banners/projects/:id/duplicate error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // ============================================================ generations
 
-hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
+hqBanners.post('/api/hq/banners/projects/:id/generations', inputJsonBoundary(), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const project = await getBannerProject(c.env.DB, c.req.param('id'), tenantId);
     if (!project) return c.json({ success: false, error: 'プロジェクトが見つかりません' }, 404);
+    const key = c.req.header('Idempotency-Key');
+    if (key !== undefined && (!key.trim() || key.length > 200 || /[^\x21-\x7e]/.test(key))) {
+      return inputError(c, { success: false, error: 'Idempotency-Key is invalid' }, 400, []);
+    }
+    const requestBody=await readJson(c);
+    const crop=resolveBannerCropPosition(requestBody?.cropPosition ?? requestBody?.gravity);
+    if(!crop)return inputError(c, {success:false,error:'切り抜きの位置は中央・上・下から選んでください'}, 400, ["cropPosition"]);
+    const validation = validateBannerRequest(requestBody);
+    if (!validation.ok || !validation.value) {
+      return inputError(c, { success: false, error: validation.error, field: validation.field }, 400, []);
+    }
+    const v = validation.value;
+    const operationId = key ? await bannerGenerationOperationId(tenantId, project.id, key) : undefined;
+    if (operationId) {
+      const previous = await getBannerGeneration(c.env.DB, operationId, tenantId);
+      if (previous) {
+        if (previous.ai_account_id!==c.req.query('account_id') || !bannerGenerationRequestMatches(previous, v) || (previous.crop_gravity ?? 'center')!==crop) {
+          return c.json({ success: false, code: 'idempotency_conflict', error: '同じ操作キーで生成条件が変わっています' }, 409);
+        }
+        return c.json({ success: true, data: serializeGeneration(previous) }, 201);
+      }
+    }
     if (project.archived_at) {
       return c.json({ success: false, error: 'アーカイブ済みのプロジェクトでは生成できません。復元してからお試しください' }, 409);
     }
@@ -440,11 +407,6 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
       return c.json({ success: false, error: '画像生成の接続設定がまだありません。運営にお問い合わせください' }, 503);
     }
 
-    const validation = validateBannerRequest(await readJson(c));
-    if (!validation.ok || !validation.value) {
-      return c.json({ success: false, error: validation.error }, 400);
-    }
-    const v = validation.value;
     const usage = await usageSnapshot(c, tenantId);
     const refused = refusal(usage, v.count);
     if (refused) {
@@ -452,29 +414,34 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
     }
     const quality = resolveBannerQuality(c.env.BANNER_IMAGE_QUALITY);
 
-    // 参照画像はこの統括のライブラリにある、消していない画像だけ。
-    if (v.referenceImageId) {
-      const reference = await getBannerImageWithDetail(c.env.DB, v.referenceImageId, tenantId);
+    // 参照画像はこの統括のライブラリにある、消していない画像だけ（最大3枚）。
+    for (const entry of v.references) {
+      const reference = await getBannerImageWithDetail(c.env.DB, entry.imageId, tenantId);
       if (!reference || reference.deleted_at) {
-        return c.json({ success: false, error: '参照画像が見つかりません。ライブラリから選び直してください' }, 400);
+        return inputError(c, { success: false, error: '参照画像が見つかりません。ライブラリから選び直してください' }, 400, ["referenceImageId"]);
       }
       if (!(reference.media.mime_type in UPLOAD_ALLOWED)) {
-        return c.json({ success: false, error: '参照画像は PNG・JPEG・WebP の画像だけ使えます' }, 400);
+        return inputError(c, { success: false, error: '参照画像は PNG・JPEG・WebP の画像だけ使えます' }, 400, ["referenceImageId"]);
       }
     }
 
     const finalPrompt = buildBannerPrompt({
       mode: v.mode,
       preset: v.preset,
-      referenceMode: v.referenceMode,
+      references: v.references,
       textLines: v.textLines,
+      emphasisLines: v.emphasisLines,
+      baseColor: v.baseColor,
       mainColor: v.mainColor,
       subColor: v.subColor,
+      accentColor: v.accentColor,
       personOption: v.personOption,
       customPrompt: v.customPrompt,
       freePrompt: v.freePrompt,
     });
     const generation = await createBannerGeneration(c.env.DB, {
+      operationId,
+      aiAccountId:c.req.query('account_id'),
       tenantId,
       projectId: project.id,
       mode: v.mode,
@@ -483,8 +450,11 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
       apiSize: v.preset.apiSize,
       quality,
       textLines: v.textLines,
+      emphasisLines: v.emphasisLines,
+      baseColor: v.baseColor,
       mainColor: v.mainColor,
       subColor: v.subColor,
+      accentColor: v.accentColor,
       personOption: v.personOption,
       customPrompt: v.customPrompt,
       freePrompt: v.freePrompt,
@@ -493,15 +463,18 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
       modelName: c.env.OPENAI_IMAGE_MODEL || DEFAULT_OPENAI_IMAGE_MODEL,
       requestedCount: v.count,
       unitsPerImage: 1,
-      referenceImageId: v.referenceImageId,
-      referenceMode: v.referenceMode,
+      cropGravity: crop,
+      references: v.references,
       createdBy: c.get('staff')?.id ?? null,
     });
+    // 同時要求は主キーを共有し、最初に確定した選択を正本として保つ。
+    if (operationId && (generation.ai_account_id!==c.req.query('account_id') || !bannerGenerationRequestMatches(generation, v) || (generation.crop_gravity ?? 'center')!==crop)) {
+      return c.json({ success: false, code: 'idempotency_conflict', error: '同じ操作キーで生成条件が変わっています' }, 409);
+    }
     await touchBannerProject(c.env.DB, project.id);
     return c.json({ success: true, data: serializeGeneration(generation) }, 201);
   } catch (err) {
-    console.error('POST /api/hq/banners/projects/:id/generations error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -511,190 +484,43 @@ hqBanners.get('/api/hq/banners/generations/:id', async (c) => {
   return c.json({ success: true, data: serializeGeneration(generation) });
 });
 
-/**
- * 1枚だけ生成して保存する。画面はこれを requested_count 回呼ぶ。
- *
- * 1リクエスト＝1枚にしているのは、画像生成に数十秒かかるため。
- * まとめて待つと途中で切れたときに全部消えるが、1枚ずつなら成功分が残る。
- */
-hqBanners.post('/api/hq/banners/generations/:id/run', async (c) => {
-  const tenantId = tenantOf(c);
-  const db = c.env.DB;
-  const generation = await getBannerGeneration(db, c.req.param('id'), tenantId);
-  if (!generation) return c.json({ success: false, error: '生成が見つかりません' }, 404);
-
-  const base = workerUrl(c);
-  const finished = (g: BannerGeneration) => g.done_count + g.failed_count >= g.requested_count;
-  if (generation.status === 'done' || generation.status === 'failed' || generation.status === 'canceled' || finished(generation)) {
-    return c.json({ success: true, data: { generation: serializeGeneration(generation), image: null, finished: true } });
+/** 生成の実行権は cron と共有する。新しいクライアントは GET のポーリングだけを使い、この入口は互換用に残す。 */
+hqBanners.post('/api/hq/banners/generations/:id/run',inputJsonBoundary(), async(c)=>{
+  const tenantId=tenantOf(c),id=c.req.param('id');
+  const generation=await getBannerGeneration(c.env.DB,id,tenantId);
+  if(!generation)return c.json({success:false,error:'生成が見つかりません'},404);
+  const body=await readJson(c),crop=resolveBannerCropPosition(body?.gravity);
+  if(!crop)return inputError(c, {success:false,error:'切り抜きの位置は中央・上・下から選んでください'}, 400, ["gravity"]);
+  if(body?.gravity!==undefined && crop!==(generation.crop_gravity ?? 'center')) {
+    const changed=await c.env.DB.prepare(`UPDATE banner_generations SET crop_gravity=? WHERE id=? AND tenant_id=? AND started_at IS NULL
+      AND NOT EXISTS(SELECT 1 FROM workflow_steps WHERE scope_id=? AND process_kind='banner_generation' AND subject_id=? AND step_key='__run' AND first_attempt_at IS NOT NULL)`)
+      .bind(crop,id,tenantId,`tenant:${tenantId}`,id).run();
+    if(changed.meta.changes!==1)return c.json({success:false,error:'生成開始後は切り抜きの位置を変更できません'},409);
   }
-  if (!c.env.OPENAI_API_KEY) {
-    return c.json({ success: false, error: '画像生成の接続設定がまだありません。運営にお問い合わせください' }, 503);
+  let imageId:string|null;
+  try{imageId=await processBannerGeneration(c.env,id,tenantId);}
+  catch(error){
+    const latest=await getBannerGeneration(c.env.DB,id,tenantId);
+    const status=error instanceof BannerJobFailure?error.status:502;
+    return inputError(c, {success:false,error:error instanceof BannerJobFailure?error.message:'画像の保存に失敗しました。もう一度お試しください',
+      data:{generation:serializeGeneration(latest!),image:null,finished:!!latest && !['queued','running'].includes(latest.status)}}, status as 400|422|502, []);
   }
-
-  // 上限は1枚ごとにも見る。作成後に別の生成で使い切っている場合がある。
-  const usage = await usageSnapshot(c, tenantId);
-  const refused = refusal(usage, 1);
-  if (refused) {
-    await updateBannerGenerationProgress(db, generation.id, {
-      status: generation.done_count > 0 ? 'done' : 'failed',
-      errorMessage: refused,
-      markFinished: true,
-    });
-    const latest = await getBannerGeneration(db, generation.id, tenantId);
-    return c.json({ success: true, data: { generation: serializeGeneration(latest!), image: null, finished: true } });
-  }
-
-  // 切り抜きの位置（R120）。生成APIを叩く前に断つ。保存はしない（migration 不要）。
-  const runBody = await readJson(c);
-  const crop = resolveBannerCropPosition(runBody?.gravity);
-  if (!crop) {
-    return c.json({ success: false, error: '切り抜きの位置は中央・上・下から選んでください' }, 400);
-  }
-
-  await updateBannerGenerationProgress(db, generation.id, { status: 'running', markStarted: true });
-  const model = generation.model_name || c.env.OPENAI_IMAGE_MODEL || DEFAULT_OPENAI_IMAGE_MODEL;
-  const sequence = generation.done_count + generation.failed_count + 1;
-
-  try {
-    // 参照画像（★V6 35-2）。R2 から読んで OpenAI へ添える。消えていれば分かる言葉で止める。
-    let referenceImage: OpenAIReferenceImage | undefined;
-    if (generation.reference_image_id) {
-      const reference = await getBannerImageWithDetail(db, generation.reference_image_id, tenantId);
-      const object = reference ? await c.env.IMAGES.get(reference.media.r2_key) : null;
-      if (!reference || !object) {
-        throw new ReferenceMissingError();
-      }
-      referenceImage = {
-        bytes: new Uint8Array(await object.arrayBuffer()),
-        mimeType: reference.media.mime_type,
-        filename: reference.media.filename || 'reference',
-      };
-    }
-    const result = await generateOpenAIImage({
-      apiKey: c.env.OPENAI_API_KEY,
-      model,
-      prompt: generation.final_prompt,
-      size: generation.api_size as '1024x1024' | '1536x1024' | '1024x1536',
-      quality: generation.quality,
-      referenceImage,
-    });
-
-    // 生成は3種類の大きさだけなので、用途の指定寸法へ cover で整えてから
-    // 保存する（R120）。binding が無い環境では元のまま保存する。
-    const apiDims = sizeToDimensions(generation.api_size);
-    const preset = findBannerPreset(generation.preset_key);
-    const shaped = preset
-      ? await resizeBannerToPreset(result.bytes, preset, crop, c.env.CF_IMAGES ?? null)
-      : { bytes: result.bytes, width: apiDims.width, height: apiDims.height, resized: false };
-    // 整形したものは JPEG、元のままのときは生成時の形式のまま。
-    const mimeType = shaped.resized ? 'image/jpeg' : result.mimeType;
-
-    const project = await getBannerProject(db, generation.project_id, tenantId);
-    const r2Key = `banner/${crypto.randomUUID()}.jpg`;
-    await c.env.IMAGES.put(r2Key, shaped.bytes, {
-      httpMetadata: { contentType: mimeType },
-      customMetadata: { source: 'banner-generation', generationId: generation.id },
-    });
-    let media: Media;
-    try {
-      media = await createMedia(db, {
-        lineAccountId: null,
-        kind: 'image',
-        filename: `${safeFilenameBase(project?.name ?? 'banner')}-${sequence}.jpg`,
-        mimeType,
-        sizeBytes: shaped.bytes.byteLength,
-        r2Key,
-        width: shaped.width,
-        height: shaped.height,
-        uploadedBy: c.get('staff')?.id ?? null,
-      });
-    } catch (error) {
-      await c.env.IMAGES.delete(r2Key).catch(() => undefined);
-      throw error;
-    }
-    const image = await createBannerImage(db, {
-      tenantId,
-      projectId: generation.project_id,
-      generationId: generation.id,
-      mediaId: media.id,
-      sequence,
-      // 描き直しは「元の画像の派生」として source='edited'。参考は新しい画像だが元をたどれるよう parent を持つ。
-      source: generation.reference_mode === 'edit' ? 'edited' : 'generated',
-      parentImageId: generation.reference_image_id ?? null,
-      createdBy: c.get('staff')?.id ?? null,
-    });
-    await recordBannerUsage(db, {
-      tenantId,
-      generationId: generation.id,
-      units: 1,
-      reason: generation.reference_mode === 'edit' ? 'edit' : 'generate',
-    });
-    const nowDone = generation.done_count + 1;
-    const isFinished = nowDone + generation.failed_count >= generation.requested_count;
-    await updateBannerGenerationProgress(db, generation.id, {
-      doneDelta: 1,
-      status: isFinished ? 'done' : 'running',
-      markFinished: isFinished,
-    });
-    await touchBannerProject(db, generation.project_id);
-
-    const latest = await getBannerGeneration(db, generation.id, tenantId);
-    const detail = await getBannerImageWithDetail(db, image.id, tenantId);
-    return c.json({
-      success: true,
-      data: {
-        generation: serializeGeneration(latest!),
-        image: detail ? serializeImage(detail, base) : null,
-        finished: isFinished,
-        // 用途の指定寸法へ整形できたか。false のとき画面は
-        // 「大きさの調整は検証環境で確認」と出す（R120）。
-        resized: shaped.resized,
-        targetWidth: preset?.targetWidth ?? shaped.width,
-        targetHeight: preset?.targetHeight ?? shaped.height,
-      },
-    });
-  } catch (error) {
-    const message = error instanceof OpenAIImageError
-      ? error.userMessage
-      : error instanceof ReferenceMissingError
-        ? error.message
-        : '画像の保存に失敗しました。もう一度お試しください';
-    if (error instanceof OpenAIImageError) {
-      console.warn('banner generation rejected:', error.kind, error.status);
-    } else if (error instanceof ReferenceMissingError) {
-      console.warn('banner generation rejected: reference image missing');
-    } else {
-      console.error('banner generation run error:', error);
-    }
-    // 失敗したら、その生成はそこで止める。成功分はそのまま残す。
-    await updateBannerGenerationProgress(db, generation.id, {
-      failedDelta: 1,
-      status: generation.done_count > 0 ? 'done' : 'failed',
-      errorMessage: message,
-      markFinished: true,
-    });
-    const latest = await getBannerGeneration(db, generation.id, tenantId);
-    return c.json({
-      success: false,
-      error: message,
-      data: { generation: serializeGeneration(latest!), image: null, finished: true },
-    }, error instanceof OpenAIImageError && error.kind === 'safety' ? 422 : error instanceof ReferenceMissingError ? 400 : 502);
-  }
+  const latest=await getBannerGeneration(c.env.DB,id,tenantId);
+  const image=imageId?await getBannerImageWithDetail(c.env.DB,imageId,tenantId):null;
+  const finished=!!latest && !['queued','running'].includes(latest.status);
+  const slot=image?await getWorkflowStep(c.env.DB,{scopeId:`tenant:${tenantId}`,processKind:'banner_generation',subjectId:id,stepKey:`image:${image.sequence}`}):null;
+  const resized=slot?.result_json?JSON.parse(slot.result_json).resized:undefined;
+  const preset=latest?findBannerPreset(latest.preset_key):null;
+  return c.json({success:latest?.status!=='failed',error:latest?.error_message ?? undefined,
+    data:{generation:serializeGeneration(latest!),image:image?serializeImage(image,workerUrl(c)):null,finished,resized,targetWidth:preset?.targetWidth ?? image?.media.width,targetHeight:preset?.targetHeight ?? image?.media.height}});
 });
-
-hqBanners.post('/api/hq/banners/generations/:id/cancel', async (c) => {
-  const tenantId = tenantOf(c);
-  const generation = await getBannerGeneration(c.env.DB, c.req.param('id'), tenantId);
-  if (!generation) return c.json({ success: false, error: '生成が見つかりません' }, 404);
-  if (generation.status === 'queued' || generation.status === 'running') {
-    await updateBannerGenerationProgress(c.env.DB, generation.id, {
-      status: generation.done_count > 0 ? 'done' : 'canceled',
-      markFinished: true,
-    });
-  }
-  const latest = await getBannerGeneration(c.env.DB, generation.id, tenantId);
-  return c.json({ success: true, data: serializeGeneration(latest!) });
+hqBanners.post('/api/hq/banners/generations/:id/cancel',inputJsonBoundary(), async(c)=>{
+  const tenantId=tenantOf(c),id=c.req.param('id');
+  const generation=await getBannerGeneration(c.env.DB,id,tenantId);
+  if(!generation)return c.json({success:false,error:'生成が見つかりません'},404);
+  await c.env.DB.prepare(`UPDATE banner_generations SET stop_requested_at=COALESCE(stop_requested_at,?),status='canceled',finished_at=?
+    WHERE id=? AND tenant_id=? AND status IN ('queued','running')`).bind(toJstString(new Date()),toJstString(new Date()),id,tenantId).run();
+  return c.json({success:true,data:serializeGeneration((await getBannerGeneration(c.env.DB,id,tenantId))!)});
 });
 
 // ================================================================= images
@@ -702,26 +528,41 @@ hqBanners.post('/api/hq/banners/generations/:id/cancel', async (c) => {
 hqBanners.get('/api/hq/banners/images', async (c) => {
   try {
     const tenantId = tenantOf(c);
-    const limitRaw = Number(c.req.query('limit') ?? '30');
-    const items = await listBannerImages(c.env.DB, {
+    const delivered = c.req.query('delivered');
+    if (delivered !== undefined && delivered !== '1' && delivered !== '0') {
+      return c.json({ success: false, error: 'delivered は 1 または 0 を指定してください' }, 400);
+    }
+    const shape = c.req.query('shape');
+    if (shape && !['square', 'landscape', 'portrait', 'rich_menu'].includes(shape)) return c.json({ success: false, error: '用途の指定を確認してください' }, 400);
+    const before = c.req.query('before')?.trim() || undefined;
+    if (before?.startsWith('{')) {
+      try { const cursor = JSON.parse(before); if (typeof cursor.at !== 'string' || typeof cursor.id !== 'string' || !cursor.id || !Number.isFinite(Date.parse(cursor.at))) throw new Error(); }
+      catch { return c.json({ success: false, error: '読み込み位置を確認してください' }, 400); }
+    }
+    const limitRaw = listQueryNumber(c.req.query('limit'), '30');
+    const filter = {
       tenantId,
+      delivered: delivered === undefined ? undefined : delivered === '1',
+      shape: shape as 'square' | 'landscape' | 'portrait' | 'rich_menu' | undefined,
       projectId: c.req.query('projectId')?.trim() || undefined,
+      folderId: c.req.query('folderId') === '__none__' ? null : c.req.query('folderId'),
       favoriteOnly: c.req.query('favorite') === '1',
       presetKey: c.req.query('preset')?.trim() || undefined,
       query: c.req.query('q')?.trim() || undefined,
-      before: c.req.query('before')?.trim() || undefined,
-      limit: Number.isFinite(limitRaw) ? limitRaw : 30,
-    });
+      before,
+      limit: Number.isFinite(limitRaw) ? Math.min(100, Math.max(1, Math.floor(limitRaw))) : 30,
+    };
+    const items = await listBannerImages(c.env.DB, filter);
+    const counts = c.req.query('withCounts') === '1' ? await countBannerImages(c.env.DB, filter) : undefined;
     const base = workerUrl(c);
     const last = items[items.length - 1];
-    return c.json({
-      success: true,
-      data: items.map((i) => serializeImage(i, base)),
-      nextBefore: items.length >= Math.min(Math.max(limitRaw || 30, 1), 100) && last ? last.created_at : null,
-    });
+    const responseItems = items.map((i) => serializeImage(i, base));
+    return c.json(buildCursorListResponse({ success: true,
+      data: responseItems,
+      counts,
+      nextBefore: items.length >= filter.limit && last ? JSON.stringify({ at: last.created_at, id: last.id }) : null, items: responseItems, paging: { limit: filter.limit }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
   } catch (err) {
-    console.error('GET /api/hq/banners/images error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -731,11 +572,12 @@ hqBanners.get('/api/hq/banners/images/:id', async (c) => {
   return c.json({ success: true, data: serializeImage(detail, workerUrl(c)) });
 });
 
-hqBanners.patch('/api/hq/banners/images/:id', async (c) => {
+hqBanners.patch('/api/hq/banners/images/:id', inputJsonBoundary(), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const body = await readJson(c);
-    const patch: { isFavorite?: boolean; projectId?: string } = {};
+    const patch: { isFavorite?: boolean; projectId?: string; folderId?: string | null } = {};
+    if (body && 'folderId' in body) patch.folderId = body.folderId as string | null;
     if (typeof body?.isFavorite === 'boolean') patch.isFavorite = body.isFavorite;
     if (typeof body?.projectId === 'string') {
       const target = await getBannerProject(c.env.DB, body.projectId, tenantId);
@@ -748,8 +590,8 @@ hqBanners.patch('/api/hq/banners/images/:id', async (c) => {
     const detail = await getBannerImageWithDetail(c.env.DB, existing.id, tenantId);
     return c.json({ success: true, data: serializeImage(detail!, workerUrl(c)) });
   } catch (err) {
-    console.error('PATCH /api/hq/banners/images/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    if(err instanceof HqFolderError)return folderInputError(c, err);
+    throw err;
   }
 });
 
@@ -763,7 +605,7 @@ hqBanners.delete('/api/hq/banners/images/:id', async (c) => {
 });
 
 /** 統括が手持ちの画像をプロジェクトへ取り込む。生成画像と同じように店舗へ渡せる。 */
-hqBanners.post('/api/hq/banners/projects/:id/uploads', async (c) => {
+hqBanners.post('/api/hq/banners/projects/:id/uploads', inputJsonBoundary({}, { maxBytes: Math.ceil((10 * 1024 * 1024) / 3) * 4 + 4096 }), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const project = await getBannerProject(c.env.DB, c.req.param('id'), tenantId);
@@ -771,8 +613,8 @@ hqBanners.post('/api/hq/banners/projects/:id/uploads', async (c) => {
     const body = await readJson(c);
     const data = typeof body?.data === 'string' ? body.data : '';
     const filename = typeof body?.filename === 'string' ? body.filename.trim() : '';
-    if (!data) return c.json({ success: false, error: 'ファイルの中身がありません' }, 400);
-    if (!filename) return c.json({ success: false, error: 'ファイル名がありません' }, 400);
+    if (!data) return inputError(c, { success: false, error: 'ファイルの中身がありません' }, 400, ["data"]);
+    if (!filename) return inputError(c, { success: false, error: 'ファイル名がありません' }, 400, ["filename"]);
 
     let base64 = data;
     let mimeType = typeof body?.mimeType === 'string' ? body.mimeType : '';
@@ -783,19 +625,19 @@ hqBanners.post('/api/hq/banners/projects/:id/uploads', async (c) => {
     }
     const spec = UPLOAD_ALLOWED[mimeType];
     if (!spec) {
-      return c.json({ success: false, error: '画像は PNG・JPEG・WebP のみ取り込めます' }, 400);
+      return inputError(c, { success: false, error: '画像は PNG・JPEG・WebP のみ取り込めます' }, 400, ["mimeType"]);
     }
     let bytes: Uint8Array;
     try {
       bytes = Uint8Array.from(atob(base64), (ch) => ch.charCodeAt(0));
     } catch {
-      return c.json({ success: false, error: 'ファイルの中身を読み取れませんでした' }, 400);
+      return inputError(c, { success: false, error: 'ファイルの中身を読み取れませんでした' }, 400, []);
     }
     if (bytes.byteLength > UPLOAD_MAX_BYTES) {
       return c.json({ success: false, error: 'ファイルが大きすぎます（上限 10MB）' }, 413);
     }
     if (!hasImageSignature(bytes, mimeType)) {
-      return c.json({ success: false, error: 'ファイルの実際の形式が、選択された形式と一致しません' }, 400);
+      return inputError(c, { success: false, error: 'ファイルの実際の形式が、選択された形式と一致しません' }, 400, ["mimeType"]);
     }
 
     const r2Key = `banner/${crypto.randomUUID()}.${spec.ext}`;
@@ -833,8 +675,7 @@ hqBanners.post('/api/hq/banners/projects/:id/uploads', async (c) => {
     const detail = await getBannerImageWithDetail(c.env.DB, image.id, tenantId);
     return c.json({ success: true, data: serializeImage(detail!, workerUrl(c)) }, 201);
   } catch (err) {
-    console.error('POST /api/hq/banners/projects/:id/uploads error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -846,7 +687,7 @@ hqBanners.post('/api/hq/banners/projects/:id/uploads', async (c) => {
  * 店舗ごとに実体を複製し、店舗の登録メディアとして1行作る。同じ店舗へ
  * 二度渡しても増えない。統括側の画像を消しても、渡した先は残る。
  */
-hqBanners.post('/api/hq/banners/images/:id/deliver', async (c) => {
+hqBanners.post('/api/hq/banners/images/:id/deliver', inputJsonBoundary(), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const staff = c.get('staff');
@@ -857,15 +698,21 @@ hqBanners.post('/api/hq/banners/images/:id/deliver', async (c) => {
     const rawIds = Array.isArray(body?.lineAccountIds) ? body.lineAccountIds : [];
     const lineAccountIds = [...new Set(rawIds.filter((v): v is string => typeof v === 'string' && v.trim() !== ''))];
     if (lineAccountIds.length === 0) {
-      return c.json({ success: false, error: '渡す先の店舗を1つ以上選んでください' }, 400);
+      return inputError(c, { success: false, error: '渡す先の店舗を1つ以上選んでください' }, 400, ["lineAccountIds"]);
     }
     if (lineAccountIds.length > 50) {
-      return c.json({ success: false, error: '一度に渡せる店舗は50件までです' }, 400);
+      return inputError(c, { success: false, error: '一度に渡せる店舗は50件までです' }, 400, ["lineAccountIds"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, staff, lineAccountIds)) {
       return c.json({ success: false, error: '渡す先に、この統括の店舗ではないものが含まれています' }, 404);
     }
 
+    const sourceGate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
+      id: image.media.id, lineAccountId: image.media.line_account_id, r2Key: image.media.r2_key,
+      filename: image.media.filename, mimeType: image.media.mime_type, sizeBytes: image.media.size_bytes,
+      width: image.media.width, height: image.media.height,
+    });
+    if (!sourceGate.allowed) return c.json({ success: false, code: sourceGate.code, error: sourceGate.message }, 409);
     const results: Array<{ lineAccountId: string; mediaId: string; alreadyDelivered: boolean }> = [];
     for (const lineAccountId of lineAccountIds) {
       const existing = await getBannerImageDelivery(c.env.DB, image.id, lineAccountId);
@@ -873,7 +720,7 @@ hqBanners.post('/api/hq/banners/images/:id/deliver', async (c) => {
         results.push({ lineAccountId, mediaId: existing.media_id, alreadyDelivered: true });
         continue;
       }
-      const source = await c.env.IMAGES.get(image.media.r2_key);
+      const source = await getPinnedMediaObject(c.env.IMAGES, image.media.r2_key, sourceGate.etag);
       if (!source) {
         return c.json({ success: false, error: '画像の実体が見つかりません。もう一度生成してください' }, 409);
       }
@@ -915,7 +762,6 @@ hqBanners.post('/api/hq/banners/images/:id/deliver', async (c) => {
       data: { image: serializeImage(detail!, workerUrl(c)), deliveries: results },
     });
   } catch (err) {
-    console.error('POST /api/hq/banners/images/:id/deliver error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });

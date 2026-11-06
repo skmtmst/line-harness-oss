@@ -1,0 +1,25 @@
+/*
+ * ★V8 シナリオを作る①。
+ * 枠・頭・手順の輪・下の帯は型（CreatePage）が持つ。ここは左の段（カード）の中身だけ。
+ */
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-label);
+}
+
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sc2-notice-gap);
+}
+
+.viewerBand { margin: 0; }
+
+/* 配信方式：図つきの共通カードを、同じ高さで横に並べる。 */
+.modeRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-sc2-mode-gap);
+}

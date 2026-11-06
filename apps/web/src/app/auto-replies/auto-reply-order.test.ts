@@ -3,7 +3,7 @@ import {
   inEvaluationOrder,
   movePriorityUpdates,
   type OrderedRule,
-} from './auto-reply-order'
+} from '../../v8/auto-replies/auto-reply-order'
 
 /**
  * 監査 R28（優先順位の説明が逆）の順番操作の契約。

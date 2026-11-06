@@ -1,4 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
+import type { CommonVarDeleteImpact } from '@line-crm/shared'
+import type { CommonVarDetail } from '@/lib/api'
 
 const WEB_URL = process.env.TEST_WEB_URL ?? 'http://127.0.0.1:3108'
 const PAGE_PATH = process.env.TEST_WEB_PATH ?? '/contents/vars/new'
@@ -26,6 +28,8 @@ async function preparePage(page: Page, posted: PostedCommonVar[], accounts: Post
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
   })
 
+  await page.route('**/admin/version', (route) => route.fulfill({ json: { version: '0.24.0', worker_hash: 'test', admin_hash: 'test', liff_hash: 'test' } }))
+  await page.route('**/admin/manifest', (route) => route.fulfill({ json: { latest: '0.24.0', releases: [] } }))
   await page.route('**/api/**', async (route: Route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -47,6 +51,10 @@ async function preparePage(page: Page, posted: PostedCommonVar[], accounts: Post
       }) })
       return
     }
+    if (url.pathname === '/api/staff/me') {
+      await route.fulfill({ status: 200, headers, body: JSON.stringify({ success: true, data: { id: 'staff-1', name: 'テスト担当', role: 'owner', accessLevel: 'full', isActive: true, permissionKeys: [], permissionViewKeys: [] } }) })
+      return
+    }
     if (url.pathname === '/api/line-accounts') {
       await route.fulfill({ status: 200, headers, body: JSON.stringify({
         success: true,
@@ -56,6 +64,10 @@ async function preparePage(page: Page, posted: PostedCommonVar[], accounts: Post
     }
     if (url.pathname === '/api/folders') {
       await route.fulfill({ status: 200, headers, body: JSON.stringify({ success: true, data: [] }) })
+      return
+    }
+    if (url.pathname === '/api/settings/features/visibility') {
+      await route.fulfill({ status: 200, headers, body: JSON.stringify({ success: true, data: { features: { common_vars: true }, parentChildMode: false, specializedFeatureKeys: [] } }) })
       return
     }
     if (url.pathname === '/api/settings/features') {
@@ -86,7 +98,8 @@ async function preparePage(page: Page, posted: PostedCommonVar[], accounts: Post
 
   await page.goto(`${WEB_URL}${PAGE_PATH}`)
   try {
-    await expect(page.getByLabel('共通情報名 *')).toBeVisible()
+    await expect(page.getByRole('textbox', { name: '共通情報名（友だちには見えません）', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '保存して公開', exact: true })).toBeEnabled()
   } catch (error) {
     throw new Error(`${String(error)}\nBrowser errors:\n${browserErrors.join('\n')}`)
   }
@@ -96,10 +109,10 @@ test('社内メモと通常値を登録内容へ含める', async ({ page }) => 
   const posted: PostedCommonVar[] = []
   await preparePage(page, posted)
 
-  await page.getByLabel('共通情報名 *').fill('shop hours')
-  await page.getByRole('textbox', { name: '値', exact: true }).fill('平日 10:00〜18:00')
-  await page.getByLabel('社内メモ 任意').fill('祝日の前日に更新する')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('textbox', { name: '共通情報名（友だちには見えません）', exact: true }).fill('shop hours')
+  await page.getByRole('textbox', { name: '中身', exact: true }).fill('平日 10:00〜18:00')
+  await page.getByRole('textbox', { name: '社内メモ', exact: true }).fill('祝日の前日に更新する')
+  await page.getByRole('button', { name: '保存して公開', exact: true }).click()
 
   await expect.poll(() => posted.length).toBe(1)
   expect(posted[0]).toMatchObject({
@@ -115,9 +128,9 @@ test('秘密値らしい内容は送信せず、入力へ戻って修正でき�
   const posted: PostedCommonVar[] = []
   await preparePage(page, posted)
 
-  await page.getByLabel('共通情報名 *').fill('shop secret check')
-  await page.getByRole('textbox', { name: '値', exact: true }).fill('password: hunter2')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('textbox', { name: '共通情報名（友だちには見えません）', exact: true }).fill('shop secret check')
+  await page.getByRole('textbox', { name: '中身', exact: true }).fill('password: hunter2')
+  await page.getByRole('button', { name: '保存して公開', exact: true }).click()
 
   const warning = page.getByRole('alertdialog')
   await expect(warning).toContainText('秘密値の可能性がある内容を確認してください')
@@ -125,10 +138,10 @@ test('秘密値らしい内容は送信せず、入力へ戻って修正でき�
 
   await warning.getByRole('button', { name: '入力に戻って修正する' }).click()
   await expect(warning).toBeHidden()
-  await expect(page.getByRole('textbox', { name: '値', exact: true })).toBeFocused()
+  await expect(page.getByRole('textbox', { name: '中身', exact: true })).toBeFocused()
 
-  await page.getByRole('textbox', { name: '値', exact: true }).fill('通常の案内文')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('textbox', { name: '中身', exact: true }).fill('通常の案内文')
+  await page.getByRole('button', { name: '保存して公開', exact: true }).click()
   await expect.poll(() => posted.length).toBe(1)
   expect(posted[0]).toMatchObject({ value: '通常の案内文' })
 })
@@ -138,27 +151,32 @@ test('警告表示中にアカウントを切り替えると、前アカウン�
   await preparePage(page, posted, TWO_ACCOUNTS)
 
   // account-1 で秘密値らしい内容を入力し、送信前警告を出す。
-  await page.getByLabel('共通情報名 *').fill('account-1 の下書き')
-  await page.getByRole('textbox', { name: '値', exact: true }).fill('通常値')
-  await page.getByLabel('社内メモ 任意').fill('password: hunter2')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('textbox', { name: '共通情報名（友だちには見えません）', exact: true }).fill('account-1 の下書き')
+  await page.getByRole('textbox', { name: '中身', exact: true }).fill('通常値')
+  await page.getByRole('textbox', { name: '社内メモ', exact: true }).fill('password: hunter2')
+  await page.getByRole('button', { name: '保存して公開', exact: true }).click()
 
   const warning = page.getByRole('alertdialog')
   await expect(warning).toBeVisible()
 
-  // 警告を閉じずに、ヘッダーの LINE アカウント選択で account-2 へ切り替える。
-  await page.getByLabel('LINEアカウント').selectOption('account-2')
+  // 警告を閉じずに、V8 の切替メニューから account-2 を選び、未保存の確認を通す。
+  await page.getByRole('button', { name: 'アカウントを切り替える', exact: true }).click()
+  await page.getByRole('menu', { name: 'LINEアカウントの切り替え', exact: true })
+    .getByRole('menuitemradio', { name: '別の店舗', exact: true }).click()
+  // V8 は入力を捨てて切り替える前に確認を挟む。
+  await page.getByRole('dialog', { name: /保存していない変更があります/ })
+    .getByRole('button', { name: '保存せずに移る', exact: true }).click()
 
   // 切替後は前アカウント向けの警告・入力を引き継がない。
   await expect(warning).toBeHidden()
-  await expect(page.getByLabel('共通情報名 *')).toHaveValue('')
-  await expect(page.getByLabel('社内メモ 任意')).toHaveValue('')
+  await expect(page.getByRole('textbox', { name: '共通情報名（友だちには見えません）', exact: true })).toHaveValue('')
+  await expect(page.getByRole('textbox', { name: '社内メモ', exact: true })).toHaveValue('')
   await expect(page.getByText('LINEアカウントが切り替わったため、入力をやり直してください')).toBeVisible()
 
   // account-2 用に改めて入力し、account-2 として正しく登録できる。
-  await page.getByLabel('共通情報名 *').fill('account-2 の値')
-  await page.getByRole('textbox', { name: '値', exact: true }).fill('account-2 の通常値')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('textbox', { name: '共通情報名（友だちには見えません）', exact: true }).fill('account-2 の値')
+  await page.getByRole('textbox', { name: '中身', exact: true }).fill('account-2 の通常値')
+  await page.getByRole('button', { name: '保存して公開', exact: true }).click()
 
   await expect.poll(() => posted.length).toBe(1)
   expect(posted[0]).toMatchObject({
@@ -174,31 +192,50 @@ test('日本語の秘密値ラベルを社内メモに書くと、送信前に�
   const posted: PostedCommonVar[] = []
   await preparePage(page, posted)
 
-  await page.getByLabel('共通情報名 *').fill('日本語ラベル確認')
+  await page.getByRole('textbox', { name: '共通情報名（友だちには見えません）', exact: true }).fill('日本語ラベル確認')
   // 日本語名からは差し込み名を自動生成できないため、明示的に入れる。
-  await page.getByLabel('差し込み名 *').fill('ja_label_check')
-  await page.getByRole('textbox', { name: '値', exact: true }).fill('通常値')
-  await page.getByLabel('社内メモ 任意').fill('パスワード: hunter2')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('textbox', { name: '差し込み名（あとから変えられません）', exact: true }).fill('ja_label_check')
+  await page.getByRole('textbox', { name: '中身', exact: true }).fill('通常値')
+  await page.getByRole('textbox', { name: '社内メモ', exact: true }).fill('パスワード: hunter2')
+  await page.getByRole('button', { name: '保存して公開', exact: true }).click()
 
   const warning = page.getByRole('alertdialog')
   await expect(warning).toContainText('秘密値の可能性がある内容を確認してください')
   await expect(warning).toContainText('社内メモ')
   expect(posted).toHaveLength(0)
+  await warning.getByRole('button', { name: '入力に戻って修正する' }).click()
+  await expect(page.getByRole('textbox', { name: '社内メモ', exact: true })).toBeFocused()
 })
 
 test('保存した社内メモは、編集画面を開き直すと再表示される', async ({ page }) => {
   const posted: PostedCommonVar[] = []
   await preparePage(page, posted)
 
-  await page.getByLabel('共通情報名 *').fill('再表示確認用')
+  await page.getByRole('textbox', { name: '共通情報名（友だちには見えません）', exact: true }).fill('再表示確認用')
   // 日本語名からは差し込み名を自動生成できないため、明示的に入れる。
-  await page.getByLabel('差し込み名 *').fill('redisplay_check')
-  await page.getByRole('textbox', { name: '値', exact: true }).fill('平日 10:00〜18:00')
-  await page.getByLabel('社内メモ 任意').fill('更新は毎月1日に確認する')
-  await page.getByRole('button', { name: '登録', exact: true }).click()
+  await page.getByRole('textbox', { name: '差し込み名（あとから変えられません）', exact: true }).fill('redisplay_check')
+  await page.getByRole('textbox', { name: '中身', exact: true }).fill('平日 10:00〜18:00')
+  await page.getByRole('textbox', { name: '社内メモ', exact: true }).fill('更新は毎月1日に確認する')
+  await page.getByRole('button', { name: '保存して公開', exact: true }).click()
   await expect.poll(() => posted.length).toBe(1)
   const created = posted[0]
+  const detail: CommonVarDetail = {
+    id: 'var-1', lineAccountId: 'account-1', folderId: null,
+    name: String(created.name), varKey: String(created.varKey), type: 'text',
+    value: String(created.value), memo: String(created.memo), version: 1,
+    validFrom: null, validUntil: null, fallbackValue: null, expiryBehavior: 'stop',
+    status: 'active', archivedAt: null, usages: [],
+    usagePage: { total: 0, shown: 0, hasMore: false, unavailableCount: 0 }, history: [],
+    createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z',
+  }
+  const impact: CommonVarDeleteImpact = {
+    variable: { id: detail.id, name: detail.name, varKey: detail.varKey },
+    total: 0, blockingTotal: 0, historicalTotal: 0, sendingFixedTotal: 0,
+    unscopedFormTotal: 0, canDelete: true, items: [], unavailableReferences: [],
+    byKind: { template: 0, broadcast: 0, scenario: 0, reminder: 0, auto_reply: 0, form: 0, automation: 0, friend_add: 0, common_action: 0 },
+    checkedAt: '2026-09-01T00:00:00Z', recommendedAction: 'delete',
+  }
+  let readImpact = false
 
   // 保存した内容を、編集画面を開き直したときの詳細・予約一覧として返す。
   await page.route('**/api/common-vars/**', async (route: Route) => {
@@ -215,17 +252,7 @@ test('保存した社内メモは、編集画面を開き直すと再表示さ�
         headers,
         body: JSON.stringify({
           success: true,
-          data: {
-            id: 'var-1',
-            name: created.name,
-            varKey: created.varKey,
-            type: created.type,
-            value: created.value,
-            memo: created.memo,
-            folderId: null,
-            version: 1,
-            history: [],
-          },
+          data: detail,
         }),
       })
       return
@@ -234,9 +261,21 @@ test('保存した社内メモは、編集画面を開き直すと再表示さ�
       await route.fulfill({ status: 200, headers, body: JSON.stringify({ success: true, data: [] }) })
       return
     }
+    if (request.method() === 'GET' && url.pathname === '/api/common-vars/var-1/delete-impact') {
+      readImpact = true
+      await route.fulfill({ status: 200, headers, body: JSON.stringify({ success: true, data: impact }) })
+      return
+    }
     await route.fallback()
   })
 
   await page.goto(`${WEB_URL}/contents/vars/edit?id=var-1`)
-  await expect(page.getByPlaceholder('運用上の注意や、この値の使い方を書きます')).toHaveValue(String(created.memo))
+  const memo = page.getByRole('textbox', { name: 'メモ（お客さまには出ません）', exact: true })
+  // At 1280 the detail template folds the side fields into its preview dialog.
+  await page.getByRole('button', { name: 'LINEの見え方を確認', exact: true }).click()
+  await expect(memo).toHaveValue(String(created.memo))
+  // The impact response arrives 400ms later; redisplay must survive it too.
+  await expect.poll(() => readImpact).toBe(true)
+  await expect(page.getByText('使われている場所がないため、確かめる文はありません。', { exact: true })).toBeVisible()
+  await expect(memo).toHaveValue(String(created.memo))
 })

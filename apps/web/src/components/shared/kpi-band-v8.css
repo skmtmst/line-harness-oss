@@ -1,0 +1,316 @@
+/* 枠を外すのは明示的に帯を選んだ部品だけ。画面ごとのカードは保持する。 */
+/*
+ * 印なしの帯（presentation の印がない data-kpi-strip）も v8 では横一列：
+ * 4マスなら4列・隙間0。呼び出し側の列数指定は生きる（列の型は決めない）。
+ * 先頭に置く：印つきの帯（下の強い指定）が勝ち、狭幅の
+ * 畳み方（下の決まり）も効く。管理画面 には効かない。
+ */
+:root [data-kpi-strip] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--tpl-band-gap);
+}
+:root [data-kpi-strip][data-kpi-presentation='band'] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-columns: none;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-block: 1px solid var(--tpl-band-line);
+  border-radius: 0;
+  background: var(--color-canvas);
+  box-shadow: none;
+}
+:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  outline-color: transparent;
+  box-shadow: none;
+}
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-border='dividers'] {
+  border-block: 0;
+}
+html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-edge-inset='parent']:not([data-kpi-density='compact']) > [data-design-version]:first-child {
+  padding-inline-start: 0;
+}
+html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-edge-inset='parent']:not([data-kpi-density='compact']) > [data-design-version]:last-child {
+  padding-inline-end: 0;
+}
+:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version]:not(:last-child) {
+  border-right: 1px solid var(--tpl-band-line);
+}
+:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] > * {
+  padding: 10px 16px;
+  gap: 4px;
+}
+@media (max-width: 639px) {
+  :root [data-kpi-strip] {
+    grid-auto-flow: row;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version]:not(:last-child) {
+    border-right: 0;
+    border-bottom: 1px solid var(--tpl-band-line);
+  }
+}
+
+/* 帯の数は共通の文字の値（--tpl- の変数で1か所管理）。 */
+:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-value],
+:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-number] {
+  font-size: var(--tpl-band-number-size);
+  line-height: var(--tpl-band-number-lh);
+}
+:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] {
+  min-height: 18px;
+}
+
+/* 段の中の帯も共通部品で寸法を決め、数のマスには影を付けない。 */
+:root [data-kpi-strip][data-kpi-density='compact'] > [data-design-version] {
+  padding: 10px 16px;
+  gap: 4px;
+}
+:root [data-kpi-strip][data-kpi-density='compact'] [data-kpi-value],
+:root [data-kpi-strip][data-kpi-density='compact'] [data-kpi-number] {
+  font-size: var(--tpl-band-compact-number-size);
+  line-height: var(--tpl-band-compact-number-lh);
+}
+:root [data-kpi-strip][data-kpi-density='compact'] [data-kpi-unit] {
+  font-size: var(--text-micro);
+}
+
+:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-skeleton] {
+  height: var(--tpl-band-number-lh);
+}
+:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] [data-kpi-skeleton] {
+  height: var(--tpl-band-compact-number-lh);
+}
+
+/* 補足は文節で折り返す。single指定は1行で省略し、全文はtitle。行き先は次の行へ保つ。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] { flex-direction: column; align-items: flex-start; }
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child {
+  display: block; flex: none; width: 100%; white-space: normal;
+  overflow: visible; text-overflow: clip; overflow-wrap: break-word; word-break: auto-phrase; /* 語の途中（「離／れています」）で折らない。文節に入らない幅だけ字で折る */
+}
+/* detailLayout='single'：1行＋省略（全文は title）。最後の1字だけ次の行に落ちる補足に使う（・）。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail-layout='single'] [data-kpi-detail] > span:first-child {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* 一覧の最低高さも共通の値。マスのcompact指定を残しても帯の寸法を優先する。 */
+:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) > [data-design-version] {
+  min-height: var(--tpl-list-band-h); box-sizing: border-box;
+  padding: var(--tpl-list-band-pad); gap: var(--tpl-band-cell-gap);
+}
+
+/* ：補足はマスでなく帯全体で有無を決める。1つでもあれば全マスをそろえる。 */
+html:root [data-kpi-strip][data-kpi-presentation='band']:not(:has([data-kpi-detail-present])) [data-kpi-detail] { display: none; }
+html:root [data-kpi-strip][data-kpi-presentation='band']:has([data-kpi-detail-present]) [data-kpi-detail] { display: flex; min-height: var(--tpl-band-detail-h); }
+html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']):not(:has([data-kpi-detail-present])) > [data-design-version] { min-height: var(--tpl-list-band-no-detail-h); }
+
+/* 帯の寸法は帯が持つ。画面の親から古い詰め方の変数を継承しない。
+   明示的にcompactを選んだ段・引き出しは既存の小さい口を保つ。 */
+html:root [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) {
+  --tpl-band-cell-pad-block: var(--space-16);
+  --tpl-band-cell-pad-side: var(--tpl-list-inset);
+  --tpl-band-cell-gap: var(--space-4);
+}
+
+/* 題の文字も帯が持つ。画面側の本文サイズを継承させない。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-label] {
+  font-size: var(--text-caption);
+  line-height: 18px;
+}
+
+/* 括弧の補足を分ける指定は、明示した改行を残す。 */
+html:root [data-list-skeleton] [data-kpi-detail-layout='qualifier'] [data-kpi-detail] > span:first-child {
+  white-space: pre-line;
+  word-break: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* 業種ダッシュボード（XBkC2・NqAvL ほか）：補足と行き先を同じ行に置く（補足は左・1行＋省略、行き先は右）。layout="link-row" の帯だけ。 */
+html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] { flex-direction: row; align-items: center; gap: var(--polish-space-row); }
+html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { flex: 1 1 auto; width: auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 狭い板（白い板が 1100 未満）では数と前との比べの札を折り返し、札を切らない。補足は1行を全部使い、行き先はその下の行の右へ下ろす。 */
+@container v8-page (max-width: 1099px) {
+  html:root [data-kpi-strip][data-kpi-layout='link-row'] [data-unit-spacing] { flex-wrap: wrap; row-gap: var(--space-2); }
+  html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] { flex-wrap: wrap; row-gap: var(--space-4); }
+  html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { flex-basis: 100%; }
+  html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] > :is(a, button) { margin-inline-start: auto; }
+}
+
+/* 複数段の数の帯は、共通の欄間隔で面と影を離す。 */
+:root [data-shared-part='kpi-band-rows'] { display: grid; gap: var(--polish-space-field); }
+:root [data-shared-part='kpi-band-rows'] > [data-kpi-strip] + [data-kpi-strip] { border-block-start: 0; }
+@media (min-width: 640px) {
+  /* 複数段だけは、各帯の既定の自動列より優先して最後の段も同じ列幅にする。 */
+  :root [data-shared-part='kpi-band-rows'] > [data-kpi-strip][data-kpi-presentation='band'] { grid-auto-flow: row; grid-template-columns: repeat(var(--kpi-band-row-columns), minmax(0, 1fr)); }
+}
+
+/* 数の帯は白い一枚の面。縦の薄い線だけを残す。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'],
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-border] {
+  border: 0; border-radius: var(--polish-band-radius); background: var(--color-canvas);
+  /* 縁の線は引かず、カードと同じ影だけで浮かせる。中の縦の区切りは薄いまま残す。 */
+  box-shadow: var(--card-shadow);
+  max-width: 100%;
+}
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-icon] { display: none; }
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-label] { color: var(--color-ink-secondary); font-weight: var(--polish-control-weight); }
+html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-edge-inset='parent']:not([data-kpi-density='compact']) > [data-design-version]:first-child { padding-inline-start: var(--tpl-list-inset); }
+html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-edge-inset='parent']:not([data-kpi-density='compact']) > [data-design-version]:last-child { padding-inline-end: var(--tpl-list-inset); }
+
+html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] { background: transparent; }
+
+/*
+ * 4マスは、1マスの中身（題・数・補足）が収まる幅がある限り4つ横並びを保つ。
+ * 1152 の画面幅（白い板が約 880）でも4つ。2段にするのは、1マス約 200 を
+ * 割る白い板だけにする（約 800 未満）。
+ */
+@container v8-page (width < 800px) {
+ html:root [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+ html:root [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+
+/* 数字の段だけを大きく軽くし、単位と補足の寸法は保つ。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-number] {
+  font-size: var(--tpl-band-number-size); font-weight: var(--tpl-band-number-weight);
+  line-height: var(--tpl-band-number-lh); letter-spacing: var(--tpl-band-number-tracking);
+}
+
+html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] { padding-block: var(--space-16); gap: var(--tpl-band-cell-gap); }
+/* 大きな金額・範囲がある帯も2列に逃がさず横一列のまま。入りきらない数だけ下の決まりで字を小さくする。 */
+
+/*
+ * 帯の1マスは数が長くても隣と重ならない。マスの幅を物差しにして、入りきらない時だけ字を小さくする
+ * （省略しない）。字数と単位の幅は KpiCard が data-kpi-fit の行に渡す。0.62 は数字1字の幅（em）の上限。
+ * マスは名前つきの容器（kpi-card）にし、数のカードの形の細いマスの切り替えもこれで測る。
+ */
+html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] { container: kpi-card / inline-size; }
+/* マスの幅が決まらない置き場（中身で幅を決める横並びなど）では幅が0と測られるので、縮めずに元の大きさのままにする。 */
+@container (min-width: 1px) {
+  html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] [data-kpi-fit] :is([data-kpi-value], [data-kpi-number]) {
+    font-size: min(var(--tpl-band-number-size), calc((100cqi - var(--kpi-fit-unit, 0px)) / (var(--kpi-fit-chars, 1) * 0.62)));
+  }
+  html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] > [data-design-version] [data-kpi-fit] :is([data-kpi-value], [data-kpi-number]) {
+    font-size: min(var(--tpl-band-compact-number-size), calc((100cqi - var(--kpi-fit-unit, 0px)) / (var(--kpi-fit-chars, 1) * 0.62)));
+  }
+}
+/*
+ * 差の札がある行は、数の箱の幅で詰める（札のぶんを差し引く）。札の無い行は上のまま。
+ * 100cqi は直近の容器（kpi-value＝数の箱）を見る。
+ */
+@container (min-width: 1px) {
+  html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] [data-kpi-fit]:has(> :is([data-kpi-delta-slot]:not(:empty), [data-kpi-action-slot])) :is([data-kpi-value], [data-kpi-number]) {
+    font-size: min(var(--tpl-band-number-size), calc((100cqi - var(--kpi-fit-unit, 0px)) / (var(--kpi-fit-chars, 1) * 0.62)));
+  }
+  html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] > [data-design-version] [data-kpi-fit]:has(> :is([data-kpi-delta-slot]:not(:empty), [data-kpi-action-slot])) :is([data-kpi-value], [data-kpi-number]) {
+    font-size: min(var(--tpl-band-compact-number-size), calc((100cqi - var(--kpi-fit-unit, 0px)) / (var(--kpi-fit-chars, 1) * 0.62)));
+  }
+}
+
+/*
+ * 数のカードの形（案A・KpiBand appearance="cards"）。マスを線で区切らず、1マスずつ共通のカードの面
+ * （白・--card-shadow・--card-edge・--radius-card）にして間を 12 空ける。帯の枠・影・区切り線は持たない。
+ */
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'],
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'][data-kpi-frame='card'],
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards']:has(> [data-design-version]:only-child) {
+  gap: var(--polish-space-field); border: 0; border-radius: 0; background: transparent; box-shadow: none;
+}
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'] > [data-design-version],
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'] > [data-design-version]:not(:last-child) {
+  position: relative; border: 0; border-radius: var(--radius-card); background: var(--color-canvas);
+  outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow);
+  padding: var(--polish-space-card) var(--space-20); gap: var(--space-8);
+}
+/* 題の左の印は色なしで、灰の小さな四角の中。 */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-icon] {
+  display: inline-flex; width: var(--tpl-kpi-card-icon-box); height: var(--tpl-kpi-card-icon-box);
+  border-radius: var(--radius-control); background: var(--color-canvas-sunken); color: var(--color-ink-secondary);
+}
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-icon] svg { width: var(--space-16); height: var(--space-16); }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-label] { color: var(--color-ink); }
+/* 数字は大きく詰める（大きさ・太さは帯の決まりのまま、字間だけ詰める）。 */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-number] { letter-spacing: var(--tpl-kpi-card-number-tracking); }
+
+/*
+ * 状態の札（差の札）は右上。題の行と同じ段に置き、題は札の手前で省略する（重ねない）。
+ * 数の行（data-unit-spacing）は箱を作らず中身を段に並べ、差の札だけ右上の欄へ移す。
+ */
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'] > [data-design-version] {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-auto-rows: auto; align-content: start; column-gap: var(--space-8);
+}
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > *,
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > [data-unit-spacing] > * { grid-column: 1 / -1; }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > :first-child { grid-column: 1; grid-row: 1; }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > [data-unit-spacing] { display: contents; }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > [data-unit-spacing] > [data-kpi-delta-slot] { grid-column: 2; grid-row: 1; align-self: center; }
+/* 説明は1行、行き先は右下。 */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] { flex-direction: row; align-items: flex-end; gap: var(--polish-space-row); margin-top: auto; }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > span:first-child { flex: 1 1 auto; width: auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 流れの数の細いグラフは右下。 */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-sparkline] {
+  display: block; position: absolute; right: var(--space-20); bottom: var(--polish-space-card);
+  width: 30%; height: var(--space-24);
+}
+/* 画面が 1152 より狭い時は 2×2。 */
+@media (max-width: 1151px) {
+  html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'] { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/*
+ * 細いカード（4 列で中身の幅が 200 未満＝1152 の 4 列）は、題を 1 行で全部見せる。右上の札は数字の行の右へ移し、
+ * 行き先は補足の下の行へ下ろす（題・補足を札や行き先で省略させない）。
+ */
+@container kpi-card (width < 200px) {
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > :first-child { display: contents; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > :first-child > * { grid-column: 2; grid-row: 1; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > :first-child > [data-kpi-label] { grid-column: 1 / -1; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version]:has(> :first-child > :not([data-kpi-label], [data-kpi-badge])) > :first-child > [data-kpi-label] { grid-column: 1; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > :first-child > [data-kpi-badge],
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > [data-unit-spacing] > [data-kpi-delta-slot] { grid-column: 2; grid-row: 2; align-self: center; justify-self: end; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > [data-unit-spacing] > p:first-child { grid-column: 1; grid-row: 2; min-width: 0; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] { flex-wrap: wrap; row-gap: var(--space-4); }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > span:first-child { flex-basis: 100%; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > a,
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > button { margin-inline-start: auto; }
+}
+
+/* 流れの帯は、指標のマスと矢印・割合を交互に並べる。ほかの帯の列数・寸法は変えない。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-layout='flow'] {
+  display: flex; gap: 0; align-items: stretch;
+}
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'][data-kpi-layout='flow'] > [data-design-version] {
+  flex: 1 1 0; min-width: 0;
+}
+/* 上の2マス分と下の1マスの両端をそろえるため、欄間は同じ幅を使う。 */
+html:root [data-kpi-strip][data-kpi-layout='flow'],
+html:root [data-kpi-strip][data-kpi-layout='flow-summary'] {
+  --kpi-flow-connection-width: calc(var(--space-24) + var(--space-16));
+}
+html:root [data-kpi-strip][data-kpi-layout='flow'] > [data-kpi-connection] {
+  flex: 0 0 var(--kpi-flow-connection-width); min-width: 0; border: 0; padding: 0;
+}
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'][data-kpi-layout='flow-summary'] {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--kpi-flow-connection-width);
+}
+/* 長い割合は省略せず、隣のカードを避けた下の行へ移す。 */
+html:root [data-kpi-strip][data-kpi-layout='flow'][data-kpi-flow-rates='below'] { padding-block-end: var(--space-24); }
+html:root [data-kpi-strip][data-kpi-layout='flow'][data-kpi-flow-rates='below'] > [data-kpi-connection] { position: relative; }
+html:root [data-kpi-strip][data-kpi-layout='flow'][data-kpi-flow-rates='below'] > [data-kpi-connection] > span {
+  position: absolute; top: calc(100% + var(--space-8)); left: 50%; transform: translateX(-50%); width: max-content; line-height: var(--space-16);
+}
+@container kpi-card (min-width: 1px) {
+  html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'][data-kpi-layout='flow'] > [data-design-version] [data-kpi-fit] :is([data-kpi-value], [data-kpi-number]) {
+    font-size: min(var(--tpl-band-number-size), calc((100cqi - var(--kpi-flow-fit-unit, 0px)) / (var(--kpi-flow-fit-chars, 1) * 0.62)));
+  }
+}
+
+/* どの数の帯でも、値が 0 の時は数字と単位を薄い灰にする（帯の形・数字の太さは変えない）。 */
+html:root [data-kpi-strip] [data-kpi-zero] [data-kpi-value],
+html:root [data-kpi-strip] [data-kpi-zero] [data-kpi-unit] { color: var(--color-kpi-zero); }

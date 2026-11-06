@@ -1,14 +1,12 @@
 /**
- * 予約の通知・Google同期の二重実行と失敗時の食い違い (m22l)。
- * R323・R324・R325・R326・R329・R335・R336 の回帰試験。
- * booking-update-retry.test.ts と同じ隔離 harness (better-sqlite3 + 実 bootstrap)。
+ * 通知・Google 同期の同時実行と再試行で二重処理を防ぐ。booking-update-retry.test.ts と同じ実 bootstrap の隔離環境で検証する。
  */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test, vi, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const availabilityMocks = vi.hoisted(() => ({
   computeSlots: vi.fn(() => [] as { start: string; end: string }[]),
@@ -48,8 +46,8 @@ const notifierMocks = vi.hoisted(() => {
   return { calls, sendBookingNotification };
 });
 // 送る側だけ差し替える。文面の組み立て（notificationTiming・formatStartsAtForStore）は本物を使う。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   ...notifierMocks,
 }));
 
@@ -234,8 +232,8 @@ describe('通知の再試行 (R323・R324)', () => {
     });
     expect(retry.status).toBe(200);
     expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1);
-    // R323: 同じ行の再送は安定キーで行う。
-    expect(notifierMocks.calls[0]).toMatchObject({ retryKey: 'booking-notification-retry:OP1' });
+    // 同じ行の再送は安定キーで行う。
+    expect(notifierMocks.calls[0]).toMatchObject({ retryKey: 'OP1' });
   });
 
   test('R324: 取消ずみの確定通知は送らず、未成功行は止まる', async () => {
@@ -267,7 +265,7 @@ describe('通知の再試行 (R323・R324)', () => {
 
   test('R329: 送信中の取消は 409 で巻き戻し、成立していない履歴を残さない', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1' });
-    // V6 の送信権を持つ登録を用意する (liveGuard が止める)。
+    // の送信権を持つ登録を用意する (liveGuard が止める)。
     // friend_reminders.reminder_id は reminders への外部キー。
     sqlite.exec(`
       INSERT INTO reminders (id, line_account_id, name, trigger_type, delivery_mode, is_active, lifecycle_status,
@@ -421,7 +419,7 @@ describe('予約の変更と通知予定 (R325・R326・R335・R336)', () => {
     expect(run.status).toBe('cancelled');
   });
 
-  test('R336: 日時変更でV6登録が新日時に移る', async () => {
+  test('R336: 日時変更で登録が新日時に移る', async () => {
     const { startsAt } = insertBooking(sqlite, { id: 'B1', friend: 'f1' });
     seedBookingRule(sqlite);
     sqlite.prepare(
@@ -432,7 +430,7 @@ describe('予約の変更と通知予定 (R325・R326・R335・R336)', () => {
     const moved = futureStartsAt(8);
     const res = await patchBody('B1', { lock_version: 0, starts_at: moved });
     expect(res.status).toBe(200);
-    // R336: 同期結果を応答で返す (失敗は failed になり監査にも残る)。
+    // 同期結果を応答で返す (失敗は failed になり監査にも残る)。
     await expect(res.clone().json()).resolves.toMatchObject({ v6_sync: 'synced' });
     const enrollment = sqlite.prepare(`SELECT status, target_date FROM friend_reminders WHERE id = 'E1'`).get() as {
       status: string;

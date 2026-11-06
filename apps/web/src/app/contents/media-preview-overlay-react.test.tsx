@@ -8,7 +8,7 @@
 import React, { act, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
-import MediaPreviewOverlay from './media-preview-overlay'
+import MediaPreviewOverlay from '@/v8/contents/media-preview-overlay'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -65,7 +65,7 @@ describe('メディアのプレビュー窓(R222, 実React)', () => {
     expect(dialog).not.toBeNull()
     // 最初に窓の中（右上の×）へ焦点が入る。
     const closeButton = Array.from(document.querySelectorAll('button')).find(
-      (el) => el.getAttribute('aria-label') === 'プレビューを閉じる',
+      (el) => el.getAttribute('aria-label') === '閉じる',
     ) as HTMLButtonElement
     expect(closeButton).toBeTruthy()
     expect(document.activeElement === closeButton || dialog!.contains(document.activeElement)).toBe(true)
@@ -114,7 +114,7 @@ describe('メディアのプレビュー窓(R222, 実React)', () => {
     await settle()
 
     const closeButton = Array.from(document.querySelectorAll('button')).find(
-      (el) => el.getAttribute('aria-label') === 'プレビューを閉じる',
+      (el) => el.getAttribute('aria-label') === '閉じる',
     ) as HTMLButtonElement
     await act(async () => { closeButton.click() })
     await settle()

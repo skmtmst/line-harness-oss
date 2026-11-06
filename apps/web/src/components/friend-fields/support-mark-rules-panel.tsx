@@ -27,6 +27,9 @@ import {
   type RequestAt,
 } from './support-mark-rules-view'
 import styles from './support-mark-rules-panel.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 type Draft = {
   name: string
@@ -34,6 +37,7 @@ type Draft = {
   priority: string
   manualProtectionMinutes: string
   isActive: boolean
+  condition?: SupportMarkAutomationRule['condition']
 }
 
 const EMPTY_DRAFT: Draft = {
@@ -46,6 +50,7 @@ const draftOf = (rule: SupportMarkAutomationRule): Draft => ({
   priority: String(rule.priority),
   manualProtectionMinutes: String(rule.manualProtectionMinutes),
   isActive: rule.isActive,
+  condition: rule.condition,
 })
 
 /**
@@ -67,6 +72,8 @@ export default function SupportMarkRulesPanel({
   markId: string | null
   markName: string
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [rules, setRules] = useState<SupportMarkAutomationRule[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'forbidden' | 'not-connected'>('loading')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -82,6 +89,13 @@ export default function SupportMarkRulesPanel({
     マークを続けて押すと、前の返事があとから届くことがある。
   */
   const requestRef = useRef<RequestAt>({ accountId: null, markId: null, generation: 0 })
+
+  /*
+    **新しいルール1件に要求キー1つ。** 二度押し・応答喪失の送り直しで
+    同じルールが2件できないよう、作る窓を開けるたびに取り直す。
+    保存に失敗した直しの再送は同じキーで送る。
+  */
+  const ruleKeyRef = useRef<string>(crypto.randomUUID())
 
   const load = useCallback(async () => {
     if (!accountId || !markId) return
@@ -99,7 +113,9 @@ export default function SupportMarkRulesPanel({
       setRules(inExecutionOrder(res.data))
       setState('ready')
     } catch (err) {
+
       if (!stillHere()) return
+      const fieldFailure = saveErrors.capture(err)
       /*
         権限不足・未接続・取得失敗を分ける。**次にすることが違う。**
         権限なら人に頼む、未接続なら待つ、取得失敗ならもう一度試す。
@@ -109,11 +125,11 @@ export default function SupportMarkRulesPanel({
         まだ Worker に無く（API は skmtmst/line-harness-oss#758）、
         入るまでは 404 が返る。
       */
-      if (!(err instanceof ApiError)) { setState('error'); return }
-      if (err.status === 403) { setState('forbidden'); return }
-      setState(err.status === 404 ? 'not-connected' : 'error')
+      if (!(err instanceof ApiError)) { { if (!fieldFailure) setState('error'); } return }
+      if (err.status === 403) { { if (!fieldFailure) setState('forbidden'); } return }
+      { if (!fieldFailure) setState(err.status === 404 ? 'not-connected' : 'error') }
     }
-  }, [accountId, markId])
+  }, [accountId, markId, saveErrors])
 
   /*
     **開いたときに読むだけ。** 保存や削除の口は呼ばない。
@@ -138,11 +154,11 @@ export default function SupportMarkRulesPanel({
 
   if (!markId) {
     return (
-      <ListState
+      <SaveErrorScope errors={saveErrors}><ListState
         kind="empty"
         title="マークを選んでください"
         description="左の一覧から選ぶと、そのマークの自動変更ルールを確認・保存できます。"
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -159,6 +175,7 @@ export default function SupportMarkRulesPanel({
     setDraft(EMPTY_DRAFT)
     setFailure(null)
     setTouched(false)
+    ruleKeyRef.current = crypto.randomUUID()
   }
 
   const openEdit = (rule: SupportMarkAutomationRule) => {
@@ -178,16 +195,18 @@ export default function SupportMarkRulesPanel({
     try {
       const res = call.kind === 'update'
         ? await api.supportMarks.updateAutomationRule(call.ruleId, accountId, call.expectedVersion, body)
-        : await api.supportMarks.createAutomationRule(markId, accountId, body)
+        : await api.supportMarks.createAutomationRule(markId, accountId, body, ruleKeyRef.current)
       if (!res.success) throw new Error('failed')
       setEditingId(null)
       await load()
     } catch (err) {
+      const fieldFailure = saveErrors.capture(err)
+
       /*
         **版競合では窓を閉じない。** 閉じると、直した内容が消えたのか
         保存できたのか分からなくなる。書いた内容は残したまま断る。
       */
-      setFailure(failureOf({ status: err instanceof ApiError ? err.status : undefined }))
+      { if (!fieldFailure) setFailure(failureOf({ status: err instanceof ApiError ? err.status : undefined })) }
     } finally {
       setSaving(false)
     }
@@ -203,16 +222,20 @@ export default function SupportMarkRulesPanel({
       )
       if (!res.success) throw new Error('failed')
       setPendingArchive(null)
-      await load()
+      void load()
+      return true
     } catch (err) {
-      setFailure(failureOf({ status: err instanceof ApiError ? err.status : undefined }))
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure) setFailure(failureOf({ status: err instanceof ApiError ? err.status : undefined })) }
+      return false
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <section className={styles.panel} data-design-node="GMvBd">
+    <SaveErrorScope errors={saveErrors}><section className={styles.panel} data-design-node="GMvBd">
       <header className={styles.head}>
         <div className={styles.headText}>
           <h3 className={styles.title}>自動変更ルール</h3>
@@ -231,16 +254,13 @@ export default function SupportMarkRulesPanel({
       </header>
 
       {failure ? (
-        <div
-          className={failure.kind === 'forbidden' ? styles.notice : styles.warn}
-          role="alert"
-          data-failure-kind={failure.kind}
-        >
-          <p>{failure.message}</p>
+        <Notice tone={failure.kind === "forbidden" ? "danger" : "warn"} role="alert" data-failure-kind={failure.kind} action={<>
           {failure.canReload ? (
             <Button onClick={() => void load()}>最新の内容を読み直す</Button>
           ) : null}
-        </div>
+        </>}>
+          <p>{failure.message}</p>
+        </Notice>
       ) : null}
 
       {state === 'loading' ? (
@@ -253,7 +273,7 @@ export default function SupportMarkRulesPanel({
         />
       ) : state === 'not-connected' ? (
         /*
-          **押しても何も起きない操作を並べない**（`v6-common-rules` §5-5）。
+          **押しても何も起きない操作を並べない**（`管理画面-common-rules` §5-5）。
           読み直しの口も出さない——押しても直らないため。
         */
         <ListState
@@ -266,7 +286,7 @@ export default function SupportMarkRulesPanel({
           kind="error"
           title={LIST_ERROR.title}
           description={LIST_ERROR.description}
-          action={<Button onClick={() => void load()}>自動変更ルールを読み直す</Button>}
+          onRetry={() => void load()}
         />
       ) : rules.length === 0 && editingId === null ? (
         <ListState kind="empty" title={LIST_EMPTY.title} description={LIST_EMPTY.description} />
@@ -303,12 +323,12 @@ export default function SupportMarkRulesPanel({
           <h4 className={styles.formTitle}>{editingId === 'new' ? 'ルールを作る' : 'ルールを変更'}</h4>
           <label className={styles.field}>
             <span className={styles.label}>ルールの名前</span>
-            <input
+            <SaveErrorField names={["name","draft.name"]}><SharedTextField
               className={styles.input}
               value={draft.name}
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
               placeholder="例: 担当者が決まったら対応中へ"
-            />
+            /></SaveErrorField>
             {errorFor('name') ? <span className={styles.fieldError}>{errorFor('name')}</span> : null}
           </label>
 
@@ -334,27 +354,27 @@ export default function SupportMarkRulesPanel({
           <div className={styles.pair}>
             <label className={styles.field}>
               <span className={styles.label}>優先順位</span>
-              <input
+              <SaveErrorField names={["priority","draft.priority"]}><SharedTextField
                 className={styles.input}
                 type="number"
                 min={PRIORITY_MIN}
                 max={PRIORITY_MAX}
                 value={draft.priority}
                 onChange={(e) => setDraft((d) => ({ ...d, priority: e.target.value }))}
-              />
+              /></SaveErrorField>
               <span className={styles.hint}>大きいほど先に見ます。</span>
               {errorFor('priority') ? <span className={styles.fieldError}>{errorFor('priority')}</span> : null}
             </label>
             <label className={styles.field}>
               <span className={styles.label}>手動変更のあと自動で変えない時間（分）</span>
-              <input
+              <SaveErrorField names={["manualProtectionMinutes","draft.manualProtectionMinutes","manual_protection_minutes","draft.manual_protection_minutes"]}><SharedTextField
                 className={styles.input}
                 type="number"
                 min={0}
                 max={PROTECTION_MAX}
                 value={draft.manualProtectionMinutes}
                 onChange={(e) => setDraft((d) => ({ ...d, manualProtectionMinutes: e.target.value }))}
-              />
+              /></SaveErrorField>
               {/* 0のときに「0なら保護しません。保護しない」と重ねて言わない。 */}
               <span className={styles.hint}>
                 {Number(draft.manualProtectionMinutes) === 0
@@ -367,10 +387,10 @@ export default function SupportMarkRulesPanel({
             </label>
           </div>
 
-          <Checkbox
+          <SaveErrorField names={["isActive","draft.isActive","is_active","draft.is_active"]}><Checkbox
             checked={draft.isActive}
             onCheckedChange={(checked) => setDraft((d) => ({ ...d, isActive: checked }))}
-          >このルールを動かす</Checkbox>
+          >このルールを動かす</Checkbox></SaveErrorField>
 
           <div className={styles.formActions}>
             <Button onClick={() => { setEditingId(null); setFailure(null) }} disabled={saving}>
@@ -382,9 +402,7 @@ export default function SupportMarkRulesPanel({
               data-qa-open="GMvBd-save"
               onMouseDown={() => setTouched(true)}
               onClick={() => void save()}
-              disabled={saving || errors.length > 0}
-            >
-              {saving ? '保存中…' : '保存'}
+              disabled={saving || errors.length > 0} busy={saving}>保存する
             </Button>
           </div>
         </div>
@@ -402,9 +420,9 @@ export default function SupportMarkRulesPanel({
         confirmLabel="このルールを停止"
         destructive
         busy={saving}
-        onConfirm={() => void archive()}
+        error={failure?.message} onSuccess={() => setPendingArchive(null)} onConfirm={() => archive()}
         onCancel={() => { if (!saving) setPendingArchive(null) }}
       />
-    </section>
+    </section></SaveErrorScope>
   )
 }

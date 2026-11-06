@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Route-level test for the admin offer CRUD (/api/affiliate-offers). The db
-// layer is mocked — real INSERT/UPDATE behaviour is covered against SQLite in
-// packages/db/test. Here we assert body → db wiring, validation (name required,
-// rewardAmount non-negative integer), serialization (snake → camel), and 404s.
+// 実 INSERT/UPDATE は DB パッケージで検証し、ここでは入力の接続、必須名・非負整数の報酬、応答の camelCase と404を確かめる。
 const dbMocks = {
-  // eager module-load deps (mirror other route tests)
+
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
   getAccountSetting: vi.fn().mockResolvedValue(null),
@@ -13,10 +10,11 @@ const dbMocks = {
     version: 1,
     data: { features: { affiliates: true } },
   }),
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
-  // offer route deps
+
   createAffiliateOffer: vi.fn(),
   updateAffiliateOffer: vi.fn(),
   listAffiliateOffers: vi.fn(),
@@ -26,7 +24,10 @@ const dbMocks = {
   listOfferVersions: vi.fn(),
   getOfferCapStatus: vi.fn(),
 };
-vi.mock('@line-crm/db', () => dbMocks);
+vi.mock('@line-crm/db', async (original) => {
+  const { readFolderAssignment, FolderAssignmentError } = await original<typeof import('@line-crm/db')>();
+  return { ...dbMocks, readFolderAssignment, FolderAssignmentError };
+});
 
 const worker = (await import('../index.js')).default;
 
@@ -130,7 +131,7 @@ describe('POST /api/affiliate-offers', () => {
     expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
   });
 
-  // #505 重大1: 選べる先が複数あるのに空欄で押すと 400。文言はそのまま
+  //  重大1: 選べる先が複数あるのに空欄で押すと 400。文言はそのまま
   // 画面へ出すので、運用者の言葉で返す。
   it('rejects a missing lineAccountId with 400 when several accounts are visible', async () => {
     dbMocks.getLineAccounts.mockResolvedValue([
@@ -139,8 +140,8 @@ describe('POST /api/affiliate-offers', () => {
     ]);
     const res = await req('POST', '/api/affiliate-offers', { name: 'x' });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.error).toContain('LINEアカウントを選んでください');
+    const body = (await res.json()) as { success: boolean; error: { code: string; message: string } };
+    expect(body.error.message).toContain('LINEアカウントを選んでください');
     expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
   });
 });
@@ -227,7 +228,7 @@ describe('PUT /api/affiliate-offers/:id', () => {
 
 describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => {
   // タグ・シナリオの存在確認だけ本物の振る舞いにし、他は既存モックを使う。
-  // R193: 保管済み・停止中も本物と同じく「見えるが選べない」行を返す。
+  // 保管済み・停止中も本物と同じく「見えるが選べない」行を返す。
   const visibleTags = new Map([
     ['tag-1', { accountId: 'account-1', status: 'active' }],
     ['tag-archived', { accountId: 'account-1', status: 'archived' }],
@@ -283,8 +284,8 @@ describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => 
       name: 'キャンペーンA', tagId: 'tag-2',
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('タグ');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toContain('タグ');
     expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
   });
 
@@ -311,7 +312,7 @@ describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => 
   });
 
   /*
-   * R193: 保管済みタグ・停止中シナリオは承認時点で実行できない。
+   * 保管済みタグ・停止中シナリオは承認時点で実行できない。
    * 「保存は通るが成果の時に動かない」を防ぐため、保存の時点で
    * 具体的な理由つきで止める。
    */
@@ -320,8 +321,8 @@ describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => 
       name: 'キャンペーンA', tagId: 'tag-archived',
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('保管済み');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toContain('保管済み');
     expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
   });
 
@@ -330,8 +331,8 @@ describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => 
       name: 'キャンペーンA', scenarioId: 'sc-stopped',
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('停止中');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toContain('停止中');
     expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
   });
 
@@ -339,8 +340,8 @@ describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => 
     dbMocks.getAffiliateOfferById.mockResolvedValue({ ...OFFER_ROW, line_account_id: 'account-1' });
     const res = await reqWithDb('PUT', '/api/affiliate-offers/off-1', { tagId: 'tag-archived' });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('保管済み');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toContain('保管済み');
     expect(dbMocks.updateAffiliateOffer).not.toHaveBeenCalled();
   });
 });

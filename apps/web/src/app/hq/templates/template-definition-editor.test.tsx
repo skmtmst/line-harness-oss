@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { emptyLayout } from '@line-crm/shared'
 import type { FormDefinition, MessageTemplateDefinition, RichMenuDefinition } from '@/lib/hq-templates-api'
-import TemplateDefinitionEditor, { definitionError, freshDefinition, referenceCount } from './template-definition-editor'
+import TemplateDefinitionEditor, { definitionError, freshDefinition, referenceCount, templateCompatibilityFailure } from './template-definition-editor'
 
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { uploadImage: vi.fn() } }))
 
@@ -19,7 +19,7 @@ describe('TemplateDefinitionEditor', () => {
 
     render(<TemplateDefinitionEditor type="template" value={value} disabled={false} onChange={onChange} />)
 
-    expect(screen.getByText('LINEプレビュー')).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'LINEでの見え方' })).toBeTruthy()
     expect(screen.getByText('本文に入れたURLの扱い')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '名前' }))
 
@@ -57,7 +57,7 @@ describe('TemplateDefinitionEditor', () => {
     }
     const onChange = vi.fn()
     render(<TemplateDefinitionEditor type="rich_menu" value={value} disabled={false} tenantId="tenant-a" onChange={onChange} />)
-    expect(screen.getByRole('list', { name: 'リッチメニュー作成の進み方' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '形と画像' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '変更後' } })
     expect(onChange).toHaveBeenCalledWith({
       ...value,
@@ -109,9 +109,21 @@ describe('TemplateDefinitionEditor', () => {
     const onCanonicalSave = vi.fn()
     render(<TemplateDefinitionEditor type="form" value={value} disabled={false} onChange={vi.fn()} onCanonicalSave={onCanonicalSave} />)
     expect((screen.getByLabelText(/フォーム名/) as HTMLInputElement).value).toBe('分岐フォーム')
-    expect(screen.getByRole('button', { name: '＋ ブロックを追加（12種）' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'フォームを保存' }))
+    expect(screen.getByRole('button', { name: '＋ ブロックを追加する（15種）' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'フォームを保存する' }))
     await waitFor(() => expect(onCanonicalSave).toHaveBeenCalledOnce())
     expect(onCanonicalSave.mock.calls[0][0].form.layout).toEqual(value.form.layout)
+  })
+})
+
+
+describe('互換の確認を止めた理由', () => {
+  it.each(['load', 'change'] as const)('%sは安全な日本語を残し、内部の原文では設定の確認へ戻す', phase => {
+    expect(templateCompatibilityFailure(new Error('この形式は扱えません。設定を確認してください。'), phase)).toBe('この形式は扱えません。設定を確認してください。')
+    const fallback = phase === 'load'
+      ? '内容を安全に読み込めないため停止しました。設定を確認してください。'
+      : '内容を安全に変換できないため停止しました。設定を確認してください。'
+    expect(templateCompatibilityFailure(new Error('unsupported layout'), phase)).toBe(fallback)
+    expect(templateCompatibilityFailure(new Error('形式の確認: D1_ERROR SELECT secret FROM tenant'), phase)).toBe(fallback)
   })
 })

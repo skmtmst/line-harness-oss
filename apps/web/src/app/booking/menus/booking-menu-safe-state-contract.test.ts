@@ -1,29 +1,28 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
-describe('V6 予約メニューの取得状態', () => {
+describe('V8 予約メニューの取得状態', () => {
   it('一覧と店舗設定を別々に待ち、一覧は一覧の応答だけで出す (DEEP-26)', () => {
-    expect(PAGE).toContain("type SupportingLoadState = 'loading' | 'ready' | 'error'")
-    // 一覧(listMenus)と設定(getSettings)を Promise.all で束ねない。
-    // 設定が遅れても、取れている一覧を隠さない。
-    expect(PAGE).not.toContain('await Promise.all([')
-    expect(PAGE).toContain('settingsLoadState')
-    expect(PAGE).toContain("setSettingsLoadState('ready')")
-    expect(PAGE).toContain("value={favorite?.name ?? '—'}")
-    expect(PAGE).toContain('`${bookingCounts.get(m.id) ?? 0} 件`')
+    expect(PAGE).toContain("type LoadStatus = 'loading' | 'ready' | 'error'")
+    // まとめて待つ間も、それぞれの返答で別の状態を更新する。
+    expect(PAGE).toContain('bookingApi.listMenus(accountId).then')
+    expect(PAGE).toContain('bookingApi.getSettings(accountId).then')
+    expect(PAGE).toContain("setMenusStatus('ready')")
+    expect(PAGE).toContain("setSettingsStatus('ready')")
+
   })
 
   it('APIの内部エラーを利用者へそのまま出さない', () => {
-    expect(PAGE).toContain("setError(bookingErrorMessage(e, '読み込み'))")
-    expect(PAGE).toContain("setErr(bookingErrorMessage(e, '保存'))")
+    expect(PAGE).toContain("setMenusError(bookingErrorMessage(error, '読み込み'))")
+    expect(PAGE).toContain("bookingErrorMessage(cause, '保存')")
     expect(PAGE).not.toContain('setError(e instanceof Error ? e.message')
   })
 
   it('アカウント切替時に前の件数と割り当てを残さない', () => {
-    expect(PAGE).toContain('setMenuStaff(new Map())')
-    expect(PAGE).toContain('setItems([])')
+    expect(PAGE).toContain('setStaffMatrices({})')
+    expect(PAGE).toContain("setMenusStatus('loading')")
   })
 
   it('担当と30日件数はメニュー一覧の集計だけを使い、予約明細を運ばない', () => {
@@ -34,9 +33,9 @@ describe('V6 予約メニューの取得状態', () => {
   })
 
   it('切替前のアカウントから遅れて届いた一覧を表示しない', () => {
-    expect(PAGE).toContain('const requestGeneration = ++loadGenerationRef.current')
-    expect(PAGE).toContain('if (loadGenerationRef.current !== requestGeneration) return')
-    expect(PAGE).toContain('if (loadGenerationRef.current === requestGeneration) setLoading(false)')
+    expect(PAGE).toContain('const generation = ++generationRef.current')
+    expect(PAGE).toContain('if (!alive()) return')
+    expect(PAGE).toContain("setMenusStatus('ready')")
   })
 
   it('作り替えの覚え書きを利用者へ出さない', () => {

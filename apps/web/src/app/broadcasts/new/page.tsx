@@ -1,8 +1,12 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import ListState from '@/components/shared/list-state'
+import { useStaffRole } from '@/lib/staff-role'
 import type { Tag } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -15,7 +19,7 @@ const BROADCAST_STEPS = new Set<BroadcastStepKey>(['basic', 'audience', 'message
 
 /**
  * `?condition=<JSON>` から渡される絞り込み条件（IDEA-03）。
- * 友だち一覧の「この条件で配信を作成」が付ける。
+ * 友だち一覧の「この条件で配信を作る」が付ける。
  * 形が壊れているものは採用しない —— 壊れた条件を黙って全員扱いにすると
  * 誤配信になる。'invalid' を返して画面に理由を出す。
  */
@@ -101,9 +105,14 @@ function audienceLabel(audience: AudienceHandoff): string {
 
 function NewBroadcastPageContent() {
   const router = useRouter()
+  const samePageUrl = useSamePageUrl()
+  const staffRole = useStaffRole()
+  const canManage = useFeatureAccess('broadcasts')
   const searchParams = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [tags, setTags] = useState<Tag[]>([])
+  /** R581: タグ候補の取得状態。失敗と真の0件を分けて案内するために持つ。 */
+  const [tagsStatus, setTagsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loading, setLoading] = useState(true)
   const audienceId = searchParams.get('audienceId')?.trim() ?? ''
   const [audience, setAudience] = useState<AudienceHandoff | null>(null)
@@ -131,14 +140,27 @@ function NewBroadcastPageContent() {
     const next = new URLSearchParams(searchParams.toString())
     if (step === 'basic') next.delete('step')
     else next.set('step', step)
-    router.replace(`/broadcasts/new${next.size ? `?${next.toString()}` : ''}`, { scroll: false })
+    samePageUrl.replace(`/broadcasts/new${next.size ? `?${next.toString()}` : ''}`)
   }
 
   const load = useCallback(async () => {
+    /*
+     * R581: 取得失敗を「候補なし」と誤案内しない。成功以外・通信失敗は
+     * 失敗として持ち、フォーム側で再試行できるようにする。
+     * m23m: タグ候補が取れなくても配信は作れる。取れない失敗で画面を落とさない。
+     */
+    setTagsStatus('loading')
     try {
       // R23横展開: 条件づくりのタグ候補は今のアカウントだけ。切替で取り直す。
       const res = await api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
-      if (res.success) setTags(res.data)
+      if (res.success) {
+        setTags(res.data)
+        setTagsStatus('ready')
+      } else {
+        setTagsStatus('error')
+      }
+    } catch {
+      setTagsStatus('error')
     } finally {
       setLoading(false)
     }
@@ -190,10 +212,10 @@ function NewBroadcastPageContent() {
   return (
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      {loading || audiencePending || (effectiveAudienceId && accountLoading) ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          読み込み中...
-        </div>
+      {!canManage ? (
+        <ListState kind="forbidden" title="一斉配信を作る権限がありません" description="一斉配信を作成する権限が必要です。管理者に依頼してください" action={<Link href="/broadcasts" className="text-action text-sm">一斉配信一覧へ戻る</Link>} />
+      ) : loading || audiencePending || (effectiveAudienceId && accountLoading) ? (
+        <ListState kind="loading" title="読み込み中…" />
       ) : audienceNoAccount ? (
         <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
           <p className="text-ink text-sm font-semibold">
@@ -238,14 +260,12 @@ function NewBroadcastPageContent() {
           ) : null}
           <BroadcastForm
             tags={tags}
+            tagsStatus={tagsStatus}
+            onRetryTags={() => { void load() }}
           onSuccess={(broadcast) => router.push(
             broadcast.status === 'scheduled'
               ? `/broadcasts/reserved?id=${encodeURIComponent(broadcast.id)}`
-              /*
-               * 「今すぐ配信」はここで送らない。下書きとして保存したあと、
-               * 送信ボタンのある詳細画面へ進める（IDEA-06: 保存と送信を
-               * ひとつの操作に見せない）。
-               */
+              // 送信後・承認依頼後は実物の配信詳細へ進む。
               : `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`,
           )}
           onCancel={() => router.push('/broadcasts')}
@@ -268,7 +288,7 @@ function NewBroadcastPageContent() {
 
 export default function NewBroadcastPage() {
   return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+    <Suspense fallback={<ListState kind="loading" title="読み込み中…" />}>
       <NewBroadcastPageContent />
     </Suspense>
   )

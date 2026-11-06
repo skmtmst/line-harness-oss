@@ -1,4 +1,6 @@
+import { captureDistributionName } from './distribution-display.js';
 import { beginHqTemplateDistributionRun, beginHqTemplateStoreResult, normalizeScopedTagName, type HqTemplateDistributionResult, type HqTemplatePreflight, type HqTemplatePreflightResolution, type HqTemplateStatement } from '@line-crm/db';
+
 import { requireHqTemplateAuthority, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAdapterResult, type HqTemplateAuthority, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
 import { createFormHqTemplateAdapter, type FormReference, type FormTemplateDependencies } from './form.js';
 import { bindScenarioGraphRevision, loadScenarioReferenceGraph, readScenarioGraphRevision, remapScenarioJson, scenarioGraphSnapshotToken, scenarioGraphSourceGuardStatements, ScenarioGraphError, type ScenarioGraphReference, type ScenarioGraphRow } from './scenario-graph.js';
@@ -37,7 +39,7 @@ function nextAliasName(name: string, existing: readonly string[]): string {
   return fail('SELECTION_REQUIRED');
 }
 
-/** Store-scoped planner: never writes; all reference creation joins the form batch. */
+/** 店舗範囲の計画だけを作り、参照作成はすべてフォームの batch で行う。 */
 export function createFormReferenceResolver({ db, authority }: { db: D1Database; authority: HqTemplateAuthority }): FormTemplateDependencies['resolveReference'] {
   const resolved = new Map<string, { targetId: string; aliasName?: string; planned?: boolean }>();
   const emitted = new Set<string>();
@@ -206,19 +208,20 @@ export async function buildFormRuntimePlan({ db, authority, input, context }: { 
 }
 
 export interface AtomicStoreOptions {
+  initialResourceCommit?: import('./contract.js').HqInitialResourceCommit;
   db: D1Database;
   authority: HqTemplateAuthority;
   templateId: string;
   runId: string;
   context: HqTemplateAdapterContext;
-  /** Trusted server planner only. Never pass SQL or this callback from request JSON. */
+  /** SQL やこのコールバックを要求 JSON から受け取らず、信頼済みサーバーだけが計画する。 */
   buildPlan: (context: HqTemplateAdapterContext, input: HqTemplateAdapterInput) => Promise<HqTemplateStoreAtomicCommitPlan>;
 }
 export type AtomicStoreOutcome = { status: HqTemplateDistributionResult['status']; reused: boolean };
 
 const MAX_DB_COMMIT_ATTEMPTS = 3;
 
-/** Atomic DB store with bounded retry; stale interrupted claims terminate safely. */
+/** DB の確定は原子的かつ有限の再試行とし、古い実行権は安全に終了する。 */
 export async function executeHqAtomicStore(options: AtomicStoreOptions): Promise<AtomicStoreOutcome> {
   const { db, authority, templateId, runId } = options;
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || options.context.tenantId !== authority.tenantId) fail('FORBIDDEN');
@@ -258,7 +261,7 @@ export async function executeHqAtomicStore(options: AtomicStoreOptions): Promise
   if (!p!.expires_at || !Number.isFinite(Date.parse(p!.expires_at)) || Date.parse(p!.expires_at) <= Date.now()) fail('VERSION_CONFLICT');
   const run = await beginHqTemplateDistributionRun(db, { id: runId, tenantId: authority.tenantId, templateId, templateVersionId: p!.template_version_id, idempotencyFingerprint: runId, createdBy: authority.actorId });
   if (run.run.status !== 'running' || run.run.created_by !== authority.actorId) fail('INVALID_RUN');
-  // Write receipt before the first claim, so even a crash in pending binds the decision.
+  // pending 中の中断でも判断が変わらないよう、最初の実行権取得前に受領票を保存する。
   await db.prepare(`INSERT OR IGNORE INTO audit_events(id,source_kind,source_id,tenant_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json) VALUES (?,'hq_template_store_request',?,?,'business',?,?,'hq_template.store_requested','hq_template',?,'success',?)`).bind(crypto.randomUUID(), sourceId, authority.tenantId, authority.actorId, authority.role, templateId, JSON.stringify({ requestHash })).run();
   await checkReceipt();
   const begun = await beginHqTemplateStoreResult(db, { runId, tenantId: authority.tenantId, templateId, templateVersionId: p!.template_version_id, targetAccountId: context.targetAccountId, preflightId: p!.id, idempotencyFingerprint: runId, snapshotToken: p!.snapshot_token });
@@ -277,6 +280,8 @@ export async function executeHqAtomicStore(options: AtomicStoreOptions): Promise
     const statements: HqTemplateStatement[] = [guard(claimCondition, claimBindings), guard(`EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND tenant_id=? AND status='consumed' AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, [p!.id, authority.tenantId]), guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [context.targetAccountId, authority.tenantId]), guard(`EXISTS(SELECT 1 FROM hq_template_versions v JOIN hq_templates t ON t.id=v.template_id AND t.tenant_id=v.tenant_id WHERE v.id=? AND v.tenant_id=? AND v.template_id=? AND v.definition_json=? AND t.archived_at IS NULL)`, [input.templateVersionId, authority.tenantId, templateId, input.definitionJson]), guard(`EXISTS(SELECT 1 FROM hq_template_distribution_runs WHERE id=? AND tenant_id=? AND status='running' AND created_by=?)`, [runId, authority.tenantId, authority.actorId]), ...plan.dbCommit];
     for (const r of plan.resolutions) statements.push({ sql: `UPDATE hq_template_preflight_resolutions SET resolution_mode=?,target_id=?,expected_revision=?,alias_name=? WHERE preflight_id=? AND tenant_id=? AND source_id=?`, bindings: [r.mode, r.targetId ?? null, r.expectedRevision ?? null, r.aliasName ?? null, p!.id, authority.tenantId, r.sourceId] });
     statements.push({ sql: `UPDATE hq_template_distribution_results SET status='succeeded',finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),error_code=NULL WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='staged' AND attempt_count=?`, bindings: claimBindings }, { sql: `INSERT INTO audit_events(id,tenant_id,line_account_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json) VALUES (?,?,?,'business',?,?,'hq_template.distributed','hq_template',?,'success',?)`, bindings: [crypto.randomUUID(), authority.tenantId, context.targetAccountId, authority.actorId, authority.role, templateId, JSON.stringify({ runId })] });
+    if(options.initialResourceCommit) statements.push(...await options.initialResourceCommit(context.targetAccountId,plan.resolutions));
+    statements.push(captureDistributionName(runId, authority.tenantId, context.targetAccountId));
     for (let commitAttempt = 1; commitAttempt <= MAX_DB_COMMIT_ATTEMPTS; commitAttempt++) {
       try {
         await db.batch(statements.map(s => db.prepare(s.sql).bind(...s.bindings)));
@@ -290,7 +295,7 @@ export async function executeHqAtomicStore(options: AtomicStoreOptions): Promise
     }
     return fail('STORE_COMMIT_FAILED');
   } catch (error) {
-    // A successful batch may lose its response. Never replay the business writes.
+    // batch が成功して応答だけ失われても、業務の書込を再実行しない。
     const row = await read().catch(() => null);
     if (!row) fail('RESULT_UNAVAILABLE');
     if (row!.status !== 'staged' || row!.attempt_count !== attempt) return { status: row!.status, reused: true };

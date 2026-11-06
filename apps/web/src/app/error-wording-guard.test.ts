@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * 禁止文言の全画面ガード（要件 v6-34 §10・§16）。
+ * 禁止文言の全画面ガード（要件 管理画面-34 §10・§16）。
  *
  * 画面に出す字で「取得できません」を使わない。読めなかった失敗は
  * 対応表の文面と追跡番号で言う（§9）。
@@ -43,49 +43,14 @@ function collect(dir: string, found: string[] = []): string[] {
  * ここに載っている = 未修正ということがこの試験で分かるようにする。
  */
 const KNOWN_FILES: string[] = [
-  'app/accounts/new/page.tsx',
   'app/affiliates/affiliate-display.ts',
-  'app/affiliates/tabs.tsx',
-  'app/auto-replies/page.tsx',
-  'app/booking/menus/new/page.tsx',
-  'app/booking/menus/page.tsx',
-  'app/emergency/page.tsx',
-  'app/events/bookings/page.tsx',
-  'app/events/edit/page.tsx',
-  'app/events/page.tsx',
-  'app/form-submissions/page.tsx',
-  'app/form-submissions/responses/page.tsx',
   'app/form-submissions/responses/response-summary.ts',
-  'app/friend-add-settings/runs/page.tsx',
-  'app/friends/detail/page.tsx',
   'app/getting-started/getting-started-view.ts',
   'app/health/page.tsx',
-  'app/inflow-links/ad-integration.tsx',
-  'app/inflow-links/detail/page.tsx',
-  'app/inflow-links/page.tsx',
-  'app/line-notifications/page.tsx',
-  'app/mileage/mileage-history-tab.tsx',
-  'app/nen-campaigns/nen-overview.tsx',
-  'app/reminders/detail/page.tsx',
-  'app/restaurant-test/google/google-business.tsx',
-  'app/restaurant-test/google/google-profile.tsx',
-  'app/rich-menus/edit/page.tsx',
-  'app/rich-menus/page.tsx',
-  'app/scenarios/detail/scenario-detail-client.tsx',
-  'app/scenarios/page.tsx',
-  'app/scenarios/results/page.tsx',
-  'app/settings/page.tsx',
-  'app/staff/page.tsx',
-  'app/tags/fields/edit/page.tsx',
-  'app/tags/searches/edit/page.tsx',
-  'app/updates/page.tsx',
-  'app/webhooks/webhook-overviews.tsx',
-  'app/webinars/edit/page.tsx',
-  'app/webinars/edit/review-text.ts',
-  'components/chats/friend-info-sidebar.tsx',
-  'components/friend-fields/field-list.tsx',
-  'components/inflow-links/site-script.tsx',
-  'components/line-notifications/notification-run-list.tsx',
+
+  // page.tsx から分けた取り込み画面へ、管理画面 の持ち越し文が移った分。
+  // 2026-10-04 完全切り替え：管理画面 page を捨て、V8 の list-v8 にしたので外す。
+  // ★V8 版も同じ持ち越し文言を使う（直すときは page.tsx と一緒に直す）
   'components/scenarios/scenario-dialogs.tsx',
   'components/shared/list-kpis.tsx',
   'components/staff/login-audit.tsx',

@@ -51,8 +51,8 @@ function asD1(sqlite: Database.Database): D1Database {
 const scope = { tenantId: LEGACY_TENANT_ID, lineAccountId: 'account-1' };
 
 /*
- * R180: 独自マーク1件・使用0人でも置換先なしで保管できる。
- * 以前は0人でも置換先が必須で、候補が空のときに保管できなかった。
+ * 独自マーク1件・使用0人でも置換先なしで保管できる。
+ * 0人でも置換先を必須にすると、候補が空のときに保管できない。
  * 友だちがいる・参照がある・初期値・共有の保護は変えない。
  */
 describe('R180 置換先なしの対応マーク保管', () => {

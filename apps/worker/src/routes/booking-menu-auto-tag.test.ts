@@ -1,5 +1,5 @@
 /*
- * E-03 #657: 予約メニューの自動タグ(menus.auto_tag_id)を、実 SQLite と実ルートで見張る。
+ * 予約メニューの自動タグ(menus.auto_tag_id)を、実 SQLite と実ルートで見張る。
  *
  * 文字列検査ではなく HTTP → ルート → 実 DB まで通す。ここで止めたい崩れ方:
  *
@@ -10,7 +10,7 @@
  *      予約成立時にそのまま付与し、後続副作用(シナリオ enrollment・
  *      tag_change イベント・マイル)まで動かす。
  *   4. auto_tag_id に文字列以外(数値・配列・オブジェクト・真偽値)が来ると
- *      `.trim()` が TypeError になり、入力不備が 500 として返る。
+ *      `.trim` が TypeError になり、入力不備が 500 として返る。
  *
  * 3 は「設定 → archive → 予約」を1本の実 DB で通して確かめる。waitUntil の
  * 中で付与するため、この試験の ExecutionContext は渡された Promise を集めて
@@ -23,11 +23,11 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // 送る側(LINE 通知)は対象外。予約の成否とタグ付与だけを見る。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../services/account-access.js', () => ({
@@ -200,14 +200,14 @@ describe('E-03 #657 予約メニューの自動タグ: 保存時と実行時の 
     test('整理済み(archived)タグは 400 tag_not_found で、メニュー自体を作らない', async () => {
       const res = await createMenu({ auto_tag_id: 'tag-archived' });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: 'tag_not_found' });
+      await expect(res.json()).resolves.toMatchObject({ code: 'tag_not_found' , fields: expect.any(Object), error: expect.any(String) });
       expect(menuRows()).toEqual([]);
     });
 
     test('別アカウントの有効タグは 400 tag_not_found で、メニュー自体を作らない', async () => {
       const res = await createMenu({ auto_tag_id: 'tag-other-account' });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: 'tag_not_found' });
+      await expect(res.json()).resolves.toMatchObject({ code: 'tag_not_found' , fields: expect.any(Object), error: expect.any(String) });
       expect(menuRows()).toEqual([]);
     });
 
@@ -225,7 +225,7 @@ describe('E-03 #657 予約メニューの自動タグ: 保存時と実行時の 
     ])('文字列以外(%s)の auto_tag_id は 400 invalid_auto_tag_id で、500 にしない', async (_label, value) => {
       const res = await createMenu({ auto_tag_id: value });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: 'invalid_auto_tag_id' });
+      await expect(res.json()).resolves.toMatchObject({ code: 'invalid_auto_tag_id' , fields: expect.any(Object), error: expect.any(String) });
       expect(menuRows()).toEqual([]);
     });
   });
@@ -247,21 +247,21 @@ describe('E-03 #657 予約メニューの自動タグ: 保存時と実行時の 
     test('整理済みタグへの付け替えは 400 で、いま入っている設定を壊さない', async () => {
       const res = await updateMenu('menu-a', { auto_tag_id: 'tag-archived' });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: 'tag_not_found' });
+      await expect(res.json()).resolves.toMatchObject({ code: 'tag_not_found' , fields: expect.any(Object), error: expect.any(String) });
       expect(storedAutoTag()).toBe('tag-active');
     });
 
     test('別アカウントのタグへの付け替えは 400 で、いま入っている設定を壊さない', async () => {
       const res = await updateMenu('menu-a', { auto_tag_id: 'tag-other-account' });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: 'tag_not_found' });
+      await expect(res.json()).resolves.toMatchObject({ code: 'tag_not_found' , fields: expect.any(Object), error: expect.any(String) });
       expect(storedAutoTag()).toBe('tag-active');
     });
 
     test('文字列以外の auto_tag_id は 400 invalid_auto_tag_id で、設定を壊さない', async () => {
       const res = await updateMenu('menu-a', { auto_tag_id: 42 });
       expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: 'invalid_auto_tag_id' });
+      await expect(res.json()).resolves.toMatchObject({ code: 'invalid_auto_tag_id' , fields: expect.any(Object), error: expect.any(String) });
       expect(storedAutoTag()).toBe('tag-active');
     });
 

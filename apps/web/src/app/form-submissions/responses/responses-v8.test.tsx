@@ -1,0 +1,315 @@
+// @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+/*
+ * V8の集まった回答（・）を本物の React で確かめる。
+ * テーマは `<html data-theme>` で替わるので、描画前に v8 を付ける。
+ */
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const fetchApi = vi.hoisted(() => vi.fn())
+const account = vi.hoisted(() => ({ current: 'acc-1' }))
+const role = vi.hoisted(() => ({ current: 'owner' as string | null }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.current, canManageRole: (value: string | null) => value === 'owner' || value === 'admin' }))
+
+vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
+  const actual = await importOriginal()
+  return { ...actual, fetchApi }
+})
+
+vi.mock('next/link', () => ({
+  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
+    React.createElement('a', { href }, children),
+}))
+
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  usePathname: () => '/form-submissions/responses',
+  useSearchParams: () => new URLSearchParams('id=form-1'),
+}))
+
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({ selectedAccountId: account.current, loading: false }),
+}))
+
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {}, usePageChrome: () => ({}) }))
+
+import FormResponsesPage from './page'
+
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+let host: HTMLDivElement
+let root: Root
+
+const formDetail = {
+  id: 'form-1',
+  name: '来店アンケート',
+  fields: [
+    { name: 'purpose', label: '今日のご来店の目的は？' },
+    { name: 'comment', label: 'ご意見・ご要望' },
+  ],
+  layout: {
+    version: 2,
+    header: [],
+    sections: [
+      {
+        id: 's1',
+        name: '質問',
+        blocks: [
+          {
+            id: 'b1', kind: 'input', type: 'radio', name: 'purpose',
+            label: '今日のご来店の目的は？', required: true,
+            choices: [{ id: 'c1', label: 'トリミング' }, { id: 'c2', label: '相談' }],
+          },
+          {
+            id: 'b2', kind: 'input', type: 'textarea', name: 'comment',
+            label: 'ご意見・ご要望', required: false,
+          },
+        ],
+      },
+    ],
+    options: {},
+  },
+  submitCount: 2,
+}
+
+const submissionsPage = {
+  items: [
+    {
+      id: 'sub-1', formId: 'form-1', friendId: 'friend-1', friendName: 'ココ',
+      data: { purpose: 'トリミング', comment: '待ち時間が短くて助かりました' },
+      destinationWrite: { status: 'succeeded', attempted: 1, succeeded: 1, failed: 0 },
+      postActions: { state: 'failed', pending: ['tag'] },
+      createdAt: '2026-09-30T17:40:00+09:00',
+    },
+  ],
+  total: 1,
+  page: 1,
+  limit: 20,
+  summary: { startedUnique: 2, submitted: 1, completionRate: 50, destinationWrites: { pending: 0, succeeded: 1, partial: 0, failed: 0, not_requested: 0, unknown: 0 }, dateAnsweredUniqueFriends: 1, dateFields: [] },
+}
+
+async function settle() {
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
+
+function tabButton(label: string): HTMLButtonElement | undefined {
+  return [...host.querySelectorAll('[role="tab"]')]
+    .find((node) => (node.textContent ?? '').includes(label)) as HTMLButtonElement | undefined
+}
+
+beforeEach(() => {
+  fetchApi.mockClear()
+  account.current = 'acc-1'
+  role.current = verifiedStaffRole('owner')
+  document.documentElement.dataset.theme = 'v8'
+  fetchApi.mockImplementation((async (url: string) => {
+    if (url.startsWith('/api/forms/form-1/submissions')) return { success: true, data: submissionsPage }
+    return { success: true, data: formDetail }
+  }) as typeof fetchApi)
+  host = document.createElement('div')
+  document.body.appendChild(host)
+  root = createRoot(host)
+})
+
+afterEach(async () => {
+  await act(async () => {
+    root.unmount()
+  })
+  host.remove()
+  document.documentElement.dataset.theme = ''
+})
+
+describe('V8 集まった回答', () => {
+  it('まとめて見るから始まり、棒と自由記述が出る（v0SbYR）', async () => {
+    await act(async () => {
+      root.render(<FormResponsesPage />)
+    })
+    await settle()
+    expect(tabButton('まとめて見る')?.getAttribute('aria-selected')).toBe('true')
+    expect(host.textContent).toContain('集まった回答：来店アンケート')
+    expect(host.textContent).toContain('今日のご来店の目的は？')
+    expect(host.textContent).toContain('ラジオ')
+    expect(host.textContent).toContain('ご意見・ご要望')
+    expect(host.textContent).toContain('待ち時間が短くて助かりました')
+  })
+
+  it('1件ずつ見るで表・札・右の詳細が出る（MKQyJ）', async () => {
+    await act(async () => {
+      root.render(<FormResponsesPage />)
+    })
+    await settle()
+    await act(async () => {
+      tabButton('1件ずつ見る')?.click()
+    })
+    await settle()
+    expect(host.textContent).toContain('未完')
+    const row = host.querySelector('tbody tr')
+    expect(row, '回答の行がある').toBeTruthy()
+    await act(async () => {
+      ;(row as HTMLElement).click()
+    })
+    await settle()
+    expect(host.textContent).toContain('回答の詳細：ココ')
+    expect(host.textContent).toContain('タグ付け')
+    expect(host.textContent).toContain('後処理をやり直す')
+  })
+})
+
+it('WEB-148: 閲覧のみでは編集・後処理を隠し、回答とCSVを残す', async () => {
+  role.current = verifiedStaffRole('staff')
+  await act(async () => root.render(<FormResponsesPage />)); await settle()
+  const rowTab = tabButton('1件ずつ見る');
+  if (rowTab) await act(async () => rowTab.click())
+  await settle()
+  const answer = host.querySelector('tbody tr') as HTMLElement | null
+  expect(answer).not.toBeNull()
+  await act(async () => answer!.click()); await settle()
+  expect(host.textContent).toContain('待ち時間が短くて助かりました')
+  expect(host.textContent).toContain('閲覧のみで見ています')
+  expect([...host.querySelectorAll('a')].some((el) => el.textContent?.includes('フォームを編集'))).toBe(false)
+  const retry = [...host.querySelectorAll('button')].find(el => el.textContent?.includes('後処理をやり直す'))!
+  expect(retry.getAttribute('aria-disabled') === 'true' || retry.hasAttribute('disabled')).toBe(true)
+  expect(host.textContent).toContain('CSVで書き出す')
+ })
+
+it('住所・予約は一覧とCSVでも同じ読める値にし、壊れた旧回答には注を出す', async () => {
+  const values = { address: { postalCode:'1234567',prefecture:'東京都',city:'新宿区',addressLine1:'1-2' }, booking: {menuId:'m',staffId:'s',startsAt:'2026-10-10T01:30:00Z'}, old:'[object Object]' }
+  const blocks = ['address','booking','old'].map(name => ({ id:name,kind:'input',type:name === 'old' ? 'text' : name,name,label:name }))
+  fetchApi.mockImplementation(async (url: string) => ({ success:true,data:url.includes('/submissions')
+    ? {...submissionsPage,items:[{...submissionsPage.items[0],data:values}]}
+    : {...formDetail,fields:blocks,layout:{...formDetail.layout,sections:[{id:'s',blocks}]}} }))
+  const { Blob } = await import('node:buffer')
+  const previousBlob = globalThis.Blob
+  globalThis.Blob = Blob as unknown as typeof globalThis.Blob
+  let blob: Blob | undefined
+  const oldCreate = URL.createObjectURL, oldRevoke = URL.revokeObjectURL
+  URL.createObjectURL = ((value: Blob) => { blob = value; return 'blob:export' }) as typeof URL.createObjectURL
+  URL.revokeObjectURL = () => {}
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  try {
+    await act(async () => root.render(<FormResponsesPage />)); await settle()
+    await act(async () => tabButton('1件ずつ見る')!.click()); await settle()
+    expect(host.textContent).toContain('〒123-4567 東京都新宿区1-2')
+    const csv = [...host.querySelectorAll('button')].find(b => b.textContent?.includes('CSVで書き出す'))!
+    await act(async () => csv.click()); await settle()
+    const content = await blob!.text()
+    expect(content).toContain('〒123-4567 東京都新宿区1-2')
+    expect(content).toContain('10/10 10:30')
+    expect(content).toContain('以前の保存で内容が失われています')
+    expect(content).not.toContain('[object Object]')
+  } finally { click.mockRestore(); URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke;globalThis.Blob=previousBlob }
+})
+
+const allButtons = () => [...document.querySelectorAll<HTMLButtonElement>('button')]
+async function rowView() {
+  await act(async () => root.render(<FormResponsesPage />)); await settle()
+  await act(async () => tabButton('1件ずつ見る')!.click()); await settle()
+}
+async function openResponseDelete(fromDetail = false) {
+  const menu = document.querySelector<HTMLButtonElement>(`[aria-label="${fromDetail ? '回答の詳細の操作' : '回答 sub-1 の操作'}"]`)!
+  expect(menu).toBeTruthy()
+  await act(async () => menu.click()); await settle()
+  const remove = allButtons().find(b => b.textContent === '回答を削除する')!
+  await act(async () => remove.click()); await settle()
+}
+it.each(['staff', 'viewer', null])('%sは一覧の削除を使えず、詳細の削除は理由付きで無効', async value => {
+  role.current = value
+  await rowView()
+  expect(document.querySelector('[aria-label="回答 sub-1 の操作"]')).toBeNull()
+  const detailMenu = document.querySelector<HTMLButtonElement>('[aria-label="回答の詳細の操作"]')!
+  expect(detailMenu).toBeTruthy()
+  await act(async () => detailMenu.click()); await settle()
+  const remove = document.querySelector<HTMLButtonElement>('[role="menuitem"][aria-label="回答を削除する"]')!
+  expect(remove).toBeTruthy()
+  expect(remove.getAttribute('aria-disabled') === 'true' || remove.disabled).toBe(true)
+  if (value === null) { expect(remove.disabled).toBe(true); expect(remove.getAttribute('aria-describedby')).toBeNull() }
+})
+it.each([false, true])('回答の%sから確認し、取消は送らない', async detail => {
+  if (!detail) fetchApi.mockImplementation(async (url: string) => ({ success: true, data: url.includes('/submissions') ? {
+    ...submissionsPage, items: [{ ...submissionsPage.items[0], postActions: { state: 'completed', pending: [] } },
+      { ...submissionsPage.items[0], id: 'sub-2', friendName: '別の回答者' }], total: 2,
+  } : formDetail }))
+  await rowView()
+  if (!detail) expect(host.querySelector('[aria-label="回答の詳細：別の回答者"]')).toBeTruthy()
+  await openResponseDelete(detail)
+  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+  expect(dialog.textContent).toContain('添付した写真・PDF・本人確認書類')
+  const target = submissionsPage.items[0]
+  expect(dialog.textContent).toContain(target.friendName)
+  expect(dialog.textContent).toContain('の回答と添付')
+  await act(async () => allButtons().find(b => b.textContent === 'キャンセル')!.click()); await settle()
+  expect(fetchApi.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+})
+it('回答削除の確認に実際の対象と環境を出し、アカウント切替後の古い確定を拒む', async () => {
+  await rowView(); await openResponseDelete()
+  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+  expect(dialog.textContent).toContain('LINEアカウント')
+  expect(dialog.textContent).toContain('環境')
+  expect(dialog.querySelector('[title="acc-1"]')).toBeTruthy()
+  await act(async () => { account.current = 'acc-2'; root.render(<FormResponsesPage />) }); await settle()
+  expect(fetchApi.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
+  await act(async () => { account.current = 'acc-1'; root.render(<FormResponsesPage />) }); await settle()
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
+  expect(fetchApi.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+})
+it('二重押下は1要求。失敗は窓を残してやり直し、成功後は再読込', async () => {
+  let reject!: (error: Error) => void
+  fetchApi.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (init?.method === 'DELETE') return await new Promise((_, fail) => { reject = fail })
+    return { success: true, data: url.includes('/submissions') ? submissionsPage : formDetail }
+  })
+  await rowView(); await openResponseDelete()
+  const confirm = allButtons().find(b => b.textContent?.includes('削除する') && !b.hasAttribute('role'))!
+  await act(async () => { confirm.click(); confirm.click() }); await settle()
+  expect(fetchApi.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
+  await act(async () => reject(new Error('offline'))); await settle()
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeTruthy()
+  expect(document.querySelector('[role="alert"]')).toBeTruthy()
+  fetchApi.mockImplementation(async (url: string, init?: RequestInit) => ({ success: true, data: init?.method === 'DELETE' ? { deleted: true } : url.includes('/submissions') ? { ...submissionsPage, items: [], total: 0 } : formDetail }))
+  await act(async () => allButtons().find(b => b.textContent?.includes('削除する') && !b.hasAttribute('role'))!.click()); await settle()
+  expect(fetchApi).toHaveBeenCalledWith('/api/forms/form-1/submissions/sub-1?account_id=acc-1', expect.objectContaining({ method: 'DELETE', headers: { 'X-Confirm-Irreversible': 'delete-form-response' } }))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)) })
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
+  expect(host.querySelector('tbody tr')).toBeNull()
+})
+
+afterEach(() => { verifiedStaffRole(null) })
+
+describe('19 空の値の言い方', () => {
+  it('名前の無い回答は薄い灰の「—」で出し、「不明」と書かない', async () => {
+    fetchApi.mockImplementation((async (url: string) => {
+      if (url.startsWith('/api/forms/form-1/submissions')) {
+        return { success: true, data: { ...submissionsPage, items: [{ ...submissionsPage.items[0], friendName: null }] } }
+      }
+      return { success: true, data: formDetail }
+    }) as typeof fetchApi)
+    await act(async () => { root.render(<FormResponsesPage />) })
+    await settle()
+    await act(async () => { tabButton('1件ずつ見る')?.click() })
+    await settle()
+    const name = host.querySelector('tbody button[title="不明"]')
+    expect(name).not.toBeNull()
+    expect(name!.textContent).toBe('—')
+    expect(name!.querySelector('[data-empty-value]')).not.toBeNull()
+  })
+})
+
+it('1件を選んだ後も、まとめ表示にはその回答への操作を残さない', async () => {
+  await rowView()
+  expect(document.querySelector('[data-detail-actions]')).toBeTruthy()
+  await act(async () => tabButton('まとめて見る')!.click()); await settle()
+  const footer = document.querySelector('[data-detail-actions]')!
+  expect(footer.textContent).not.toContain('後処理をやり直す')
+  expect(footer.textContent).not.toContain('友だちを開く')
+  const menu = footer.querySelector<HTMLButtonElement>('[aria-label="回答の詳細の操作"]')!
+  await act(async () => menu.click()); await settle()
+  expect(document.querySelector('[role="menuitem"][aria-label="回答を削除する"]')).toBeNull()
+  expect(document.querySelector('[role="menuitem"][aria-label="友だちを開く"]')).toBeNull()
+})

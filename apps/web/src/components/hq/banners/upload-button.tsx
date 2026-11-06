@@ -1,12 +1,15 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import { readFileAsBase64 } from '@/lib/hq-banners'
 
-const ACCEPT = ['image/png', 'image/jpeg', 'image/webp']
-const MAX_BYTES = 10 * 1024 * 1024
+export const BANNER_UPLOAD_ACCEPT = ['image/png', 'image/jpeg', 'image/webp']
+export const BANNER_UPLOAD_MAX_BYTES = 10 * 1024 * 1024
+const ACCEPT = BANNER_UPLOAD_ACCEPT
+const MAX_BYTES = BANNER_UPLOAD_MAX_BYTES
 
 /**
  * 「画像を取り込む」。Pencil 35-2 `e5PzbL`。
@@ -39,7 +42,7 @@ export default function UploadButton({
       const data = await readFileAsBase64(file)
       await onUpload({ filename: file.name, mimeType: file.type, data })
     } catch (caught) {
-      onError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした')
+      onError(describeApiFailure(caught, '取り込み', { scope: 'hq' }))
     } finally {
       setBusy(false)
       if (inputRef.current) inputRef.current.value = ''
@@ -57,9 +60,8 @@ export default function UploadButton({
         aria-hidden="true"
         onChange={(event) => void handle(event.target.files?.[0])}
       />
-      <Button onClick={() => inputRef.current?.click()} disabled={disabled || busy}>
-        <Upload aria-hidden="true" className="h-4 w-4" />
-        {busy ? '取り込み中…' : '画像を取り込む'}
+      <Button onClick={() => inputRef.current?.click()} disabled={disabled || busy} busy={busy} busyLabel="取り込み中…">
+        <Upload aria-hidden="true" className="h-4 w-4" />画像を取り込む
       </Button>
     </>
   )

@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import {
   computeUnansweredInbox,
   type UnansweredInboxOptions,
@@ -9,9 +11,9 @@ const MAX_HOURS = 24 * 7;
 const CATEGORY_LIMIT = 500;
 
 export interface ActivityDigestOptions {
-  /** Restrict output to accounts visible to the authenticated caller. */
+  /** 出力は認証済みの利用者から見えるアカウントへ限る。 */
   allowedAccountIds: readonly string[];
-  /** Include legacy rows whose account assignment is missing. */
+  /** 所属アカウントのない保存済み行を含めるかを明示する。 */
   canSeeUnassigned: boolean;
   hours?: number;
   now?: Date;
@@ -93,7 +95,7 @@ export function parseActivityDigestHours(value: string | undefined): number | nu
 }
 
 function formatJstSqlTimestamp(date: Date): string {
-  const jst = new Date(date.getTime() + 9 * 60 * 60_000).toISOString();
+  const jst = japanCalendar(date).toISOString();
   return jst.slice(0, -1);
 }
 
@@ -149,10 +151,10 @@ function accountScopeSql(
       ? { clause: `AND ${accountExpression} IS NULL`, bindings: [] }
       : { clause: 'AND 1 = 0', bindings: [] };
   }
-  const placeholders = allowedAccountIds.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(allowedAccountIds).sql;
   return {
     clause: `AND (${accountExpression} IN (${placeholders})${canSeeUnassigned ? ` OR ${accountExpression} IS NULL` : ''})`,
-    bindings: [...allowedAccountIds],
+    bindings: allowedAccountIds.length ? sqlIdSet(allowedAccountIds).binds : [],
   };
 }
 

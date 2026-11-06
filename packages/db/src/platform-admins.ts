@@ -1,7 +1,7 @@
 import { jstNow } from './utils.js';
 
 /**
- * 運営（musubo 提供元）の階層。★V6 37 マスター（運営）コンソール。
+ * 運営（musubo 提供元）の階層。★37 マスター（運営）コンソール。
  *
  * 運営マスターは staff_members の行を持ち、ログイン・2要素認証・LINE ログインは
  * 既存の仕組みをそのまま使う。「運営マスターかどうか」だけを platform_admins で判定する。
@@ -14,7 +14,7 @@ export interface PlatformAdmin {
   staff_id: string;
   is_active: number;
   approved_by: string | null;
-  /** 招待の進み具合（★V6 37-10）。active だけが運営マスターとして扱われる。 */
+  /** 招待の進み具合（★37-10）。active だけが運営マスターとして扱われる。 */
   activation_state: PlatformAdminActivationState;
   invited_by: string | null;
   invited_at: string | null;
@@ -105,7 +105,7 @@ export async function createPlatformAdmin(
 }
 
 /**
- * 招待の行を作る（★V6 37-10）。既に招待中・2要素認証待ちの行があれば招待し直し。
+ * 招待の行を作る（★37-10）。既に招待中・2要素認証待ちの行があれば招待し直し。
  * 登録完了（active）の行は触らない（呼び出し側で先に断る）。
  */
 export async function upsertPlatformAdminInvite(
@@ -203,6 +203,9 @@ export async function setPlatformAdminActive(
 // ---------------------------------------------------------------------------
 
 export const PLATFORM_AUDIT_ACTIONS = [
+  'application.contact',
+  'application.approve',
+  'application.invite',
   'tenant.create',
   'tenant.status.change',
   'tenant.feature_packs.change',
@@ -341,21 +344,34 @@ export interface ImpersonationSession {
 export async function getActiveImpersonation(
   db: D1Database,
   staffId: string,
+  sessionTokenHash?: string | null,
 ): Promise<ImpersonationSession | null> {
-  return db
-    .prepare(
-      `SELECT * FROM impersonation_sessions
-       WHERE staff_id = ? AND ended_at IS NULL
+  const results = await db.batch<ImpersonationSession>([
+    db.prepare(`UPDATE impersonation_sessions SET ended_at=? WHERE staff_id=? AND ended_at IS NULL
+    AND (julianday(started_at)<=julianday('now','-1 hour') OR NOT EXISTS
+      (SELECT 1 FROM platform_settings p JOIN admin_sessions s ON s.token_hash=p.value
+        WHERE p.key='auth.impersonation.session:'||impersonation_sessions.id AND s.staff_id=impersonation_sessions.staff_id
+          AND julianday(s.expires_at)>julianday('now')))`).bind(jstNow(), staffId),
+    db.prepare(
+      `SELECT i.*, CASE WHEN i.pii_revealed=1 AND EXISTS
+         (SELECT 1 FROM pii_reveal_logs r WHERE r.impersonation_session_id=i.id AND r.staff_id=i.staff_id
+           AND r.tenant_id=i.tenant_id AND length(trim(r.reason))>=4) THEN 1 ELSE 0 END AS pii_revealed
+       FROM impersonation_sessions i
+       WHERE staff_id = ? AND ended_at IS NULL AND julianday(started_at)>julianday('now','-1 hour')
+         AND EXISTS(SELECT 1 FROM platform_settings p JOIN admin_sessions s ON s.token_hash=p.value
+             WHERE p.key='auth.impersonation.session:'||i.id AND s.staff_id=i.staff_id AND julianday(s.expires_at)>julianday('now')
+               AND (?=1 OR p.value=?))
        ORDER BY started_at DESC LIMIT 1`,
     )
-    .bind(staffId)
-    .first<ImpersonationSession>();
+    .bind(staffId, sessionTokenHash === undefined ? 1 : 0, sessionTokenHash ?? null)
+  ]);
+  return results[1]!.results[0] ?? null;
 }
 
 /** 既に有効なものがあれば先に終える。運営マスター 1 人につき同時に 1 件だけ。 */
 export async function startImpersonation(
   db: D1Database,
-  input: { staffId: string; tenantId: string },
+  input: { staffId: string; tenantId: string; sessionTokenHash: string },
 ): Promise<ImpersonationSession> {
   const now = jstNow();
   await db
@@ -370,6 +386,8 @@ export async function startImpersonation(
     )
     .bind(id, input.staffId, input.tenantId, now)
     .run();
+  if (input.sessionTokenHash) await db.prepare('INSERT INTO platform_settings(key,value,updated_by,updated_at) VALUES (?,?,?,?)')
+    .bind(`auth.impersonation.session:${id}`, input.sessionTokenHash, input.staffId, now).run();
   return {
     id,
     staff_id: input.staffId,

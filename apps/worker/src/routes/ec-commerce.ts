@@ -1,17 +1,22 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { jstDate } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { classifyEcErrorCode, encryptCredential, getLineAccountById, jstDateString, jstNow, nextDateString } from '@line-crm/db';
 import { EC_EVENT_TYPES, ecEventLabel, addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { requireEcPermission } from './ec-operations.js';
 import { logOutgoingMessage } from '../services/event-bus.js';
-import type { EcEvent } from './ec-integrations.js';
-import { ecFlexMessage } from '../services/ec-notification-message.js';
+import type { EcEvent } from '../features/ec-commerce/member-snapshot/index.js';
+import { ecFlexMessage } from '../features/ec-commerce/ec-notification-message/index.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 import { notificationDeliveriesResponse } from './line-notifications.js';
-
+import { fail } from '../lib/fail.js';
 const ecCommerce = new Hono<Env>();
 // テスト送信の連打防止。同一の店・種別は30秒に1回だけ。全体の rateLimit とは
 // 別に、LINE API へ直接届く口だけ短いクールダウンを置く。
@@ -54,7 +59,7 @@ function storedStringList(value: unknown, allowed: ReadonlySet<string>): string[
 export type SubscriptionState = 'active' | 'paused' | 'at_risk' | 'cancelled';
 
 /**
- * 定期便の状態をどう読むかの表(#731)。**上から順に見て、先に当たったものが勝つ。**
+ * 定期便の状態をどう読むかの表。**上から順に見て、先に当たったものが勝つ。**
  *
  * 同じ判定を JS(`subscriptionState`)と SQL(`subscriptionStateSql`)の両方で
  * 使うので、**表はここ1か所だけに置く。**値が増えたときに片方だけ増える事故を
@@ -64,7 +69,7 @@ export type SubscriptionState = 'active' | 'paused' | 'at_risk' | 'cancelled';
  *
  * 判定語はすべて小文字・記号なしにすること。SQL 側は `lower(...) LIKE '%語%'`
  * へ展開するので、`%` や `_` を含む語を足すと LIKE のワイルドカードとして
- * 解釈される。日本語は `lower()` で変わらないのでそのまま比べられる。
+ * 解釈される。日本語は `lower` で変わらないのでそのまま比べられる。
  */
 export const SUBSCRIPTION_STATE_RULES: ReadonlyArray<{
   readonly state: SubscriptionState;
@@ -89,8 +94,8 @@ export function subscriptionState(value: unknown): SubscriptionState {
 /**
  * 上の表から SQL の `CASE` を組み立てる。`expr` は状態の文字列を返す SQL 式。
  *
- * `LIKE` は SQLite では ASCII の大小を区別しないが、JS 側が `toLowerCase()`
- * してから比べているので、ここでも `lower()` を掛けて条件を揃える。
+ * `LIKE` は SQLite では ASCII の大小を区別しないが、JS 側が `toLowerCase`
+ * してから比べているので、ここでも `lower` を掛けて条件を揃える。
  */
 export function subscriptionStateSql(expr: string): string {
   const whens = SUBSCRIPTION_STATE_RULES.map((rule) => {
@@ -182,9 +187,9 @@ ecCommerce.get(
   const accountWhere = lineAccountId
     ? 'line_account_id = ?'
     : scope?.allowedAccountIds.length
-      ? `(line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+      ? `(line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
       : scope?.canSeeUnassigned ? 'line_account_id IS NULL' : '1 = 0';
-  const accountBindings = lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? [];
+  const accountBindings = lineAccountId ? [lineAccountId] : (scope?.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []);
   /*
    * 「今日」はJSTの0時から。`received_at` はJST文字列（`jstNow`）で入るので、
    * 頭の日付で半開区間を切る。SQLiteの `datetime('now', '-1 day')` はUTCの
@@ -227,17 +232,13 @@ ecCommerce.get(
       GROUP BY event_type ORDER BY count DESC`,
   ).bind(...accountBindings, todayStart, tomorrowStart).all<{ event_type: string; count: number }>();
   /*
-   * 定期便の契約数(#731)。タブの数字はここから取る。
-   *
-   * 以前はタブが `/subscriptions?limit=1` を叩いていたが、あの口は行を取って
-   * から JS で数える作りだったので、**`limit=1` でも 500 行ぶん働いていた。**
-   * 件数は行を返さずに数えられる。`json_type` の守りは一覧側と同じで、
-   * 形の違うスナップショットで `json_each` がクエリごと落ちるのを防ぐ。
+   * タブの契約数だけを得るために行一覧を読み込まない。
+   * 一覧と同じ json_type の検証で、形式の異なるスナップショットが json_each 全体を失敗させるのを防ぐ。
    */
   const friendAccountWhere = lineAccountId
     ? 'f.line_account_id = ?'
     : scope?.allowedAccountIds.length
-      ? `(f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+      ? `(f.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
       : scope?.canSeeUnassigned ? 'f.line_account_id IS NULL' : '1 = 0';
   const subscriptionCount = await c.env.DB.prepare(
     `SELECT COUNT(*) AS count
@@ -268,7 +269,7 @@ ecCommerce.get(
         label: ecEventLabel(row.event_type, row.event_type),
         count: row.count,
       })),
-      /** 定期便の契約数。タブの数字用(#731)。 */
+      /** 定期便の契約数。タブの数字用。 */
       subscriptions: Number(subscriptionCount?.count ?? 0),
     },
   });
@@ -287,12 +288,9 @@ ecCommerce.get(
   const accountClause = lineAccountId
     ? 'e.line_account_id = ?'
     : scope?.allowedAccountIds.length
-      ? `(e.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR e.line_account_id IS NULL' : ''})`
+      ? `(e.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR e.line_account_id IS NULL' : ''})`
       : scope?.canSeeUnassigned ? 'e.line_account_id IS NULL' : '1 = 0';
-  const requestedLimit = Number(c.req.query('limit') || '30');
-  const requestedOffset = Number(c.req.query('offset') || '0');
-  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 30;
-  const offset = Number.isInteger(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 30, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'integer', minimum: 0 } });
   const eventType = c.req.query('eventType') || '';
   const status = c.req.query('status') || '';
   const view = c.req.query('view') || '';
@@ -313,7 +311,7 @@ ecCommerce.get(
     }
 
     const actionClauses: string[] = [accountClause];
-    const actionBindings: Array<string | number> = lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? [];
+    const actionBindings: Array<string | number> = lineAccountId ? [lineAccountId] : (scope?.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []);
     if (status) {
       actionClauses.push('a.status = ?');
       actionBindings.push(status);
@@ -376,7 +374,7 @@ ecCommerce.get(
            JOIN ec_events e ON e.id = a.event_id
           WHERE ${accountClause}
           GROUP BY a.status`,
-      ).bind(...(lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? []))
+      ).bind(...(lineAccountId ? [lineAccountId] : (scope?.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [])))
         .all<{ status: string; count: number }>(),
     ]);
     const orderIds = [...new Set(actionRows.results.flatMap((row) => (
@@ -387,9 +385,9 @@ ecCommerce.get(
         `SELECT id, order_id, external_product_id, product_name, quantity,
                 unit_amount_minor, line_amount_minor, product_url
            FROM ec_order_lines
-          WHERE order_id IN (${orderIds.map(() => '?').join(',')})
+          WHERE order_id IN (${sqlIdSet(orderIds).sql})
           ORDER BY order_id, line_index`,
-      ).bind(...orderIds).all<Record<string, unknown>>()
+      ).bind(...(orderIds.length ? sqlIdSet(orderIds).binds : [])).all<Record<string, unknown>>()
       : { results: [] as Record<string, unknown>[] };
     const linesByOrder = new Map<string, Array<Record<string, unknown>>>();
     for (const line of orderLines.results) {
@@ -414,8 +412,7 @@ ecCommerce.get(
     }
     return c.json({
       success: true,
-      data: {
-        items: actionRows.results.map((row) => {
+      data: buildOffsetListResponse({ items: actionRows.results.map((row) => {
           const orderId = row.order_id == null ? null : String(row.order_id);
           return {
             id: String(row.id),
@@ -437,7 +434,7 @@ ecCommerce.get(
             customerName: row.customer_name == null ? null : String(row.customer_name),
             friendId: row.friend_id == null ? null : String(row.friend_id),
             retryAvailable: row.status === 'retryable_failed' && Number(row.attempt_count) < Number(row.max_attempts),
-            /* IDEA-23: 「未連携／権限不足／通信失敗」を一覧でも分けるための分類。 */
+            /* 「未連携／権限不足／通信失敗」を一覧でも分けるための分類。 */
             failureKind: classifyEcErrorCode(row.error_code == null ? null : String(row.error_code)),
             order: orderId == null ? null : {
               id: orderId,
@@ -460,8 +457,7 @@ ecCommerce.get(
           };
         }),
         total: Number(actionCount?.count ?? 0),
-        summary: actionSummary,
-      },
+        summary: actionSummary, paging: { limit, offset }, sort: [{field:'receivedAt',direction:sort === 'oldest' ? 'asc' : 'desc'},{field:'createdAt',direction:sort === 'oldest' ? 'asc' : 'desc'}] }),
       pagination: { total: Number(actionCount?.count ?? 0), limit, offset },
     });
   }
@@ -471,7 +467,7 @@ ecCommerce.get(
   if (status && !STATUS_SET.has(status)) return c.json({ success: false, error: 'Invalid status' }, 400);
 
   const clauses: string[] = [accountClause];
-  const bindings: Array<string | number> = lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? [];
+  const bindings: Array<string | number> = lineAccountId ? [lineAccountId] : (scope?.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []);
   if (eventType) { clauses.push('e.event_type = ?'); bindings.push(eventType); }
   if (status) { clauses.push('e.status = ?'); bindings.push(status); }
   const where = `WHERE ${clauses.join(' AND ')}`;
@@ -496,9 +492,7 @@ ecCommerce.get(
     c.env.DB.prepare(`SELECT COUNT(*) AS count FROM ec_events e ${where}`).bind(...bindings).first<{ count: number }>(),
   ]);
 
-  return c.json({
-    success: true,
-    data: rows.results.map((row) => ({
+  const responseItems = rows.results.map((row) => ({
       id: row.id,
       externalEventId: row.external_event_id,
       eventType: row.event_type,
@@ -511,15 +505,16 @@ ecCommerce.get(
       errorMessage: row.error_message,
       receivedAt: row.received_at,
       processedAt: row.processed_at,
-    })),
-    pagination: { total: countRow?.count ?? 0, limit, offset },
-  });
+    }));
+  return c.json(buildOffsetListResponse({ success: true,
+    data: responseItems,
+    pagination: { total: countRow?.count ?? 0, limit, offset }, items: responseItems, total: countRow?.count ?? 0, paging: { limit, offset }, sort: [{ field: 'receivedAt', direction: 'desc' }] }));
 });
 
 /**
- * ページ送りを指定せずに呼ばれたときに返す件数(#731)。
+ * ページ送りを指定せずに呼ばれたときに返す件数。
  *
- * #722 と同じ考え方で、古い呼び出し側を壊さずに上限を置き、`Warning` で
+ *  と同じ考え方で、古い呼び出し側を壊さずに上限を置き、`Warning` で
  * ページ送りへ誘導する。ページ送りを指定した呼び出しにはこの上限はかからない。
  */
 const SUBSCRIPTIONS_NON_PAGINATED_MAX = 100;
@@ -531,16 +526,16 @@ const SUBSCRIPTIONS_NON_PAGINATED_MAX = 100;
 const SUBSCRIPTION_STATUS_EXPR = `coalesce(nullif(json_extract(c.value, '$.status_code'), ''), nullif(json_extract(c.value, '$.status'), ''), '')`;
 
 /**
- * `monthKey()` と同じ月キーを SQL で作る。`2026-9-01` のような1桁月も
+ * `monthKey` と同じ月キーを SQL で作る。`2026-9-01` のような1桁月も
  * `2026-09` に揃える。文字列でない値は NULL(集計から外れる)。
  */
 function monthKeySql(expr: string): string {
   return `CASE
     WHEN json_type(${expr}) != 'text' THEN NULL
-    WHEN json_extract(${expr}, '$') GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]*'
-      THEN substr(json_extract(${expr}, '$'), 1, 7)
-    WHEN json_extract(${expr}, '$') GLOB '[0-9][0-9][0-9][0-9]-[0-9]*'
-      THEN substr(json_extract(${expr}, '$'), 1, 5) || '0' || substr(json_extract(${expr}, '$'), 6, 1)
+    WHEN json_extract(${expr}) GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]*'
+      THEN substr(json_extract(${expr}), 1, 7)
+    WHEN json_extract(${expr}) GLOB '[0-9][0-9][0-9][0-9]-[0-9]*'
+      THEN substr(json_extract(${expr}), 1, 5) || '0' || substr(json_extract(${expr}), 6, 1)
     ELSE NULL END`;
 }
 
@@ -569,8 +564,7 @@ ecCommerce.get(
     return c.json({ success: false, error: '表示条件が正しくありません' }, 400);
   }
   const hasPagination = c.req.query('limit') !== undefined || c.req.query('offset') !== undefined;
-  const requestedLimit = Number(c.req.query('limit') || String(SUBSCRIPTIONS_NON_PAGINATED_MAX));
-  const requestedOffset = Number(c.req.query('offset') || '0');
+  const { limit: requestedLimit, offset: requestedOffset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: SUBSCRIPTIONS_NON_PAGINATED_MAX, limitPolicy: {}, offsetPolicy: {} });
   const limit = Number.isInteger(requestedLimit)
     ? Math.min(Math.max(requestedLimit, 1), 100)
     : SUBSCRIPTIONS_NON_PAGINATED_MAX;
@@ -578,7 +572,7 @@ ecCommerce.get(
 
   /*
    * 契約は1行の JSON 配列に入っているので、`json_each` で行へ展開してから
-   * 数える(#731)。行(=定期便を持つ友だち)を 500 で切って JS で数えていた
+   * 数える。行(=定期便を持つ友だち)を 500 で切って JS で数えていた
    * ころは、501人目以降の契約が一覧にも集計にも入らず、切ったことを知らせる
    * 手がかりも無かった。
    *
@@ -587,6 +581,7 @@ ecCommerce.get(
    * `try/catch` と `Array.isArray` で守っていたので、SQL へ移すとその守りが
    * 消える。弾いた行の数は下で別に数えて、応答と記録に残す。
    */
+  const currentMonth = jstDate().slice(0, 7);
   const contractsCte = `
     WITH contracts AS (
       SELECT s.friend_id AS friend_id,
@@ -608,9 +603,7 @@ ecCommerce.get(
     )`;
 
   /*
-   * 並び順は、直しても変えないこと。次の発送日が早い順で、日付を持たない
-   * ものは末尾。同じ日付のときは、元の JS が安定ソートだったので
-   * 「同期の新しい行から、行の中の並び順」を保つ。
+   * 同じ結果を安定して返すため、次回発送日の昇順、日付なしは末尾とし、同日の場合は同期の新しい行と行内の順序を保つ。
    */
   const orderBy = 'ORDER BY (next_shipping_at IS NULL), next_shipping_at ASC, synced_at DESC, friend_id ASC, contract_index ASC';
   const stateWhere = filter === 'all' ? '' : 'WHERE state = ?';
@@ -648,14 +641,14 @@ ecCommerce.get(
     ).bind(lineAccountId).all<{ month: string; count: number; amount: number }>(),
     c.env.DB.prepare(
       `${contractsCte} SELECT COUNT(*) AS count FROM contracts WHERE cancelled_month = ?`,
-    ).bind(lineAccountId, new Date().toISOString().slice(0, 7)).first<{ count: number }>(),
+    ).bind(lineAccountId, currentMonth).first<{ count: number }>(),
     c.env.DB.prepare(
       `${contractsCte}
        SELECT cancellation_reason AS reason, COUNT(*) AS count FROM contracts
         WHERE cancellation_reason IS NOT NULL AND cancellation_reason != ''
         GROUP BY cancellation_reason ORDER BY count DESC, reason ASC LIMIT 1`,
     ).bind(lineAccountId).first<{ reason: string; count: number }>(),
-    // 弾いた行。**黙って数から落とさない**ための数(#731)。
+    // 弾いた行。**黙って数から落とさない**ための数。
     c.env.DB.prepare(
       `SELECT COUNT(*) AS count
          FROM nen_ec_member_snapshots s JOIN friends f ON f.id = s.friend_id
@@ -672,11 +665,7 @@ ecCommerce.get(
   const malformedSnapshots = Number(malformedRow?.count ?? 0);
   if (malformedSnapshots > 0) {
     // 運用者が「なぜ数が合わないのか」を後から追えるようにする。
-    console.warn(JSON.stringify({
-      event: 'ec_subscriptions_malformed_snapshots_skipped',
-      line_account_id: lineAccountId,
-      skipped: malformedSnapshots,
-    }));
+    logger.warn("ec_subscriptions_malformed_snapshots_skipped");
   }
 
   const items = rows.results.map((row) => {
@@ -694,7 +683,7 @@ ecCommerce.get(
       riskReason: row.state === 'at_risk' ? '定期便のお支払いを確認できませんでした' : null,
       nextShippingAt: row.next_shipping_at,
       /*
-       * IDEA-21: 定期便の変更先。ECが契約ごとに渡すマイページURLをそのまま出す。
+       * 定期便の変更先。ECが契約ごとに渡すマイページURLをそのまま出す。
        * https 以外や形の違う値は出さない（クリック先を偽装しない）。
        */
       manageUrl: [contract.manage_url, contract.mypage_subscription_url]
@@ -717,7 +706,7 @@ ecCommerce.get(
   const withAmount = Number(amountRow?.with_amount ?? 0);
 
   if (!hasPagination) {
-    // Header 値は ASCII のみ。日本語の案内は PR と票に残す(#722 と同じ)。
+    // Header 値は ASCII のみ。日本語の案内は PR と票に残す( と同じ)。
     c.header(
       'Warning',
       `299 - "non-paginated subscriptions are limited to ${SUBSCRIPTIONS_NON_PAGINATED_MAX} rows; use limit/offset"`,
@@ -726,8 +715,7 @@ ecCommerce.get(
 
   return c.json({
     success: true,
-    data: {
-      items,
+    data: buildOffsetListResponse({ items,
       summary: {
         total,
         active: stateCount('active'),
@@ -737,7 +725,7 @@ ecCommerce.get(
         // 元の実装と同じく、**全件に金額があるときだけ**合計を出す。
         monthlyAmount: total > 0 && withAmount === total ? Number(amountRow?.sum_amount ?? 0) : null,
         startedThisMonth: Number(
-          monthRows.results.find((row) => row.month === new Date().toISOString().slice(0, 7))?.count ?? 0,
+          monthRows.results.find((row) => row.month === currentMonth)?.count ?? 0,
         ),
         cancelledThisMonth: Number(cancelRow?.count ?? 0),
         cancellationTopReason: reasonRow?.reason ?? null,
@@ -754,8 +742,7 @@ ecCommerce.get(
         ruleVersion: 'subscription-payment-status-v1',
         calculatedAt: syncedRow?.synced_at ?? null,
         predictiveScoreAvailable: false,
-      },
-    },
+      }, total: Number(countRow?.count ?? 0), paging: { limit, offset }, sort: [] }),
     pagination: { total: Number(countRow?.count ?? 0), limit, offset },
   });
 });
@@ -771,8 +758,7 @@ ecCommerce.get(
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
   }
   /*
-   * healthの「今日」「この30日」もJSTの暦日で切る。`date('now')` はUTCで、
-   * JSTの朝9時前は「昨日」になり、月末も9時間ずれる。
+   * health の今日・この30日は JST の暦日で切る。UTC の date('now') では日本時間の朝9時前や月末の境界がずれる。
    */
   const healthTodayStart = jstDateString(0);
   const healthWindowStart = jstDateString(-29);
@@ -794,7 +780,7 @@ ecCommerce.get(
        FROM ec_events WHERE line_account_id = ?`,
     ).bind(healthTodayStart, healthWindowEnd, healthWindowStart, healthWindowEnd, lineAccountId).first<Record<string, unknown>>(),
     /*
-     * #948 N-320: 「止めると影響する数」は EC の出来事を起点にする設定だけを
+     *  「止めると影響する数」は EC の出来事を起点にする設定だけを
      * 数える。コラム・誕生日など EC と無関係なNEN配信、手動のマイル・項目を
      * 全体件数として混ぜると、止めても変わらないものまで影響に見える。
      * conversion_events と analytics_saved_analyses は EC 起点かを判定する
@@ -846,9 +832,9 @@ ecCommerce.get(
   });
 });
 
-ecCommerce.put('/api/ec-commerce/connector', requireRole('owner', 'admin'), async (c) => {
+ecCommerce.put('/api/ec-commerce/connector', requireRole('owner', 'admin'), inputJsonBoundary({"provider":["string"],"shopDomain":["string"],"status":["string"],"inboundSecret":["string"],"expectedVersion":["number"]}), async (c) => {
   const lineAccountId = c.req.query('lineAccountId')?.trim() || '';
-  if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
@@ -871,11 +857,11 @@ ecCommerce.put('/api/ec-commerce/connector', requireRole('owner', 'admin'), asyn
     || !/^(?=.{3,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/.test(shopDomain)
     || eventTypes === null || identityRules === null
     || !Number.isInteger(expectedVersion) || expectedVersion < 0) {
-    return c.json({ success: false, error: 'つなぎ先の設定を確認してください' }, 400);
+    return inputError(c, { success: false, error: 'つなぎ先の設定を確認してください' }, 400, ["provider","status","shopDomain","eventTypes","identityRules","expectedVersion"]);
   }
   const inboundSecret = typeof body?.inboundSecret === 'string' ? body.inboundSecret.trim() : '';
   if (inboundSecret && inboundSecret.length < 32) {
-    return c.json({ success: false, error: 'つなぐための鍵は32文字以上で入力してください' }, 400);
+    return inputError(c, { success: false, error: 'つなぐための鍵は32文字以上で入力してください' }, 400, ["inboundSecret"]);
   }
   const current = await c.env.DB.prepare(
     `SELECT id, version, status, inbound_secret_encrypted, inbound_secret_last4, secret_updated_at
@@ -946,7 +932,7 @@ ecCommerce.put('/api/ec-commerce/connector', requireRole('owner', 'admin'), asyn
   return c.json({ success: true, data: { version: nextVersion } });
 });
 
-/** V6の共通送信台帳を、既存画面の互換URLでも返す。 */
+/** の共通送信台帳を、既存画面の互換URLでも返す。 */
 ecCommerce.get(
   '/api/ec-commerce/notification-runs',
   requireRole('owner', 'admin', 'staff'),
@@ -1011,11 +997,11 @@ ecCommerce.get(
   });
 });
 
-ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'admin'), async (c) => {
+ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const eventType = c.req.param('eventType');
-  if (!EVENT_TYPE_SET.has(eventType)) return c.json({ success: false, error: 'Invalid eventType' }, 400);
+  if (!EVENT_TYPE_SET.has(eventType)) return inputError(c, { success: false, error: 'Invalid eventType' }, 400, ["eventType"]);
   const lineAccountId = c.req.query('lineAccountId')?.trim();
-  if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
@@ -1027,20 +1013,20 @@ ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'adm
       || typeof body.introText !== 'string' || typeof body.outroText !== 'string'
       || typeof body.buttonLabel !== 'string' || typeof body.buttonUrl !== 'string'
       || typeof body.imageUrl !== 'string') {
-    return c.json({ success: false, error: 'isEnabled, title, introText and outroText are required' }, 400);
+    return inputError(c, { success: false, error: 'isEnabled, title, introText and outroText are required' }, 400, ["isEnabled","title","introText","outroText","buttonLabel","buttonUrl","imageUrl"]);
   }
   const title = body.title.trim();
-  if (!title || title.length > 80) return c.json({ success: false, error: 'Title must be 1-80 characters' }, 400);
+  if (!title || title.length > 80) return inputError(c, { success: false, error: 'Title must be 1-80 characters' }, 400, ["title"]);
   const introText = body.introText.trim();
   const outroText = body.outroText.trim();
   if (introText.length > 800 || outroText.length > 800) {
-    return c.json({ success: false, error: 'Editable copy must be 800 characters or fewer' }, 400);
+    return inputError(c, { success: false, error: 'Editable copy must be 800 characters or fewer' }, 400, ["introText","outroText"]);
   }
   const buttonLabel = body.buttonLabel.trim();
   const buttonUrl = body.buttonUrl.trim();
   const imageUrl = body.imageUrl.trim();
   if (buttonLabel.length > 20 || !isValidHttpsUrl(buttonUrl) || !isValidHttpsUrl(imageUrl)) {
-    return c.json({ success: false, error: 'Invalid button or image' }, 400);
+    return inputError(c, { success: false, error: 'Invalid button or image' }, 400, ["buttonLabel","buttonUrl","imageUrl"]);
   }
   const now = jstNow();
   await c.env.DB.prepare(
@@ -1058,28 +1044,28 @@ ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'adm
   return c.json({ success: true });
 });
 
-ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), async (c) => {
+ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const body = await c.req.json<{
     eventType?: unknown; accountId?: unknown; title?: unknown; introText?: unknown; outroText?: unknown;
     buttonLabel?: unknown; buttonUrl?: unknown; imageUrl?: unknown;
   }>().catch(() => null);
   if (!body || typeof body.eventType !== 'string' || !EVENT_TYPE_SET.has(body.eventType)) {
-    return c.json({ success: false, error: 'Invalid eventType' }, 400);
+    return inputError(c, { success: false, error: 'Invalid eventType' }, 400, ["eventType"]);
   }
   if (typeof body.accountId !== 'string' || !body.accountId) {
-    return c.json({ success: false, error: 'accountId is required' }, 400);
+    return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   }
   if (typeof body.title !== 'string' || !body.title.trim() || body.title.trim().length > 80
       || typeof body.introText !== 'string' || body.introText.trim().length > 800
       || typeof body.outroText !== 'string' || body.outroText.trim().length > 800
       || typeof body.buttonLabel !== 'string' || typeof body.buttonUrl !== 'string'
       || typeof body.imageUrl !== 'string') {
-    return c.json({ success: false, error: 'Invalid notification copy' }, 400);
+    return inputError(c, { success: false, error: 'Invalid notification copy' }, 400, ["title","introText","outroText","buttonLabel","buttonUrl","imageUrl"]);
   }
   if (body.buttonLabel.trim().length > 20
       || !isValidHttpsUrl(body.buttonUrl.trim())
       || !isValidHttpsUrl(body.imageUrl.trim())) {
-    return c.json({ success: false, error: 'Invalid button or image' }, 400);
+    return inputError(c, { success: false, error: 'Invalid button or image' }, 400, ["buttonLabel","buttonUrl","imageUrl"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -1095,7 +1081,7 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), asy
   }
   testSendAt.set(cooldownKey, Date.now());
   const account = await getLineAccountById(c.env.DB, body.accountId);
-  if (!account?.channel_access_token) return c.json({ success: false, error: 'LINE account is not configured' }, 400);
+  if (!account?.channel_access_token) return inputError(c, { success: false, error: 'LINE account is not configured' }, 400, ["accountId"]);
 
   const recipientSetting = await c.env.DB.prepare(
     `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`,
@@ -1107,13 +1093,13 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), asy
   } catch {
     friendIds = [];
   }
-  if (!friendIds.length) return c.json({ success: false, error: 'Test recipients are not configured' }, 400);
+  if (!friendIds.length) return inputError(c, { success: false, error: 'Test recipients are not configured' }, 400, []);
 
-  const placeholders = friendIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(friendIds).sql;
   const friends = await c.env.DB.prepare(
     `SELECT id, line_user_id FROM friends WHERE line_account_id = ? AND is_following = 1 AND id IN (${placeholders})`,
-  ).bind(body.accountId, ...friendIds).all<{ id: string; line_user_id: string }>();
-  if (!friends.results.length) return c.json({ success: false, error: 'No active test recipients' }, 400);
+  ).bind(body.accountId, ...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; line_user_id: string }>();
+  if (!friends.results.length) return inputError(c, { success: false, error: 'No active test recipients' }, 400, ["accountId"]);
 
   // テスト送信の見出し・前後の文章にも {{var.*}} を書ける。
   // 消えた共通情報は空文字にせず、テスト送信を止める。
@@ -1203,8 +1189,7 @@ function summarizeItems(raw: string | null): { text: string; count: number; quan
 }
 
 ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staff'), async (c) => {
-  const requestedLimit = Number(c.req.query('limit') || '20');
-  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 20;
+  const limit = parseOffsetPaging({ limit: c.req.query('limit') || undefined }, { defaultLimit: 20, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 100 } }).limit;
 
   // 出荷予定日は計算値なのでSQLでは並べ替えられない。直近のイベントを多めに
   // 取り出してから、算出した日付で並べ替えて limit で切る。
@@ -1227,11 +1212,11 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
   const accountWhere = requestedAccountId
     ? 'AND f.line_account_id = ?'
     : scope.allowedAccountIds.length
-      ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+      ? `AND (f.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
       : scope.canSeeUnassigned
         ? 'AND f.line_account_id IS NULL'
         : 'AND 1 = 0';
-  const accountBinds = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds;
+  const accountBinds = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [];
   const placeholders = SHIPMENT_EVENT_TYPES.map(() => '?').join(', ');
   const rows = await c.env.DB.prepare(
     `SELECT e.id, e.event_type, e.friend_id, e.received_at,

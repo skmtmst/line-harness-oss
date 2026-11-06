@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { signOperationsEvent } from '../services/operations-signature.js';
 import { DELIVERY_DISPATCH_JOB_NAMES } from '../services/feature-enforcement.js';
@@ -99,7 +99,7 @@ describe('緊急停止の保存API', () => {
     const noStepUp = await app().request('/api/operations/incidents', request, bindings());
     expect(noStepUp.status).toBe(401);
     /*
-     * #1058: 再認証のやり直しは画面が自分で案内する通常の状態。
+     * 再認証のやり直しは画面が自分で案内する通常の状態。
      * 管理画面がセッション喪失モーダルと区別できるよう機械コードを付ける。
      */
     await expect(noStepUp.json()).resolves.toMatchObject({
@@ -582,7 +582,7 @@ describe('N-451 復旧前検査と安全な復旧', () => {
       bindings(),
     );
     expect(replay.status).toBe(200);
-    // N-451: 再実行でも最初の検査結果（report）を返す。落とすと画面が成功と誤認する。
+    // 再実行でも最初の検査結果（report）を返す。落とすと画面が成功と誤認する。
     expect(await replay.json()).toMatchObject({
       duplicate: true,
       data: {
@@ -1149,7 +1149,7 @@ describe('停止不可理由の機械コード(N-453/N-455)', () => {
   });
 });
 
-describe('W: 運用状態の確認項目の追加（v6-32）', () => {
+describe('W: 運用状態の確認項目の追加（-32）', () => {
   it('月間配信数はLINEとHarnessの小さい方を送れる数にし、予定分と翌月1日(JST)のresetを返す', async () => {
     const now = '2026-09-15T05:00:00.000Z';
     testDb.raw.prepare(
@@ -1220,7 +1220,7 @@ describe('W: 運用状態の確認項目の追加（v6-32）', () => {
     expect(quota?.value).toMatchObject({ sendable: 200, forecastRemaining: -300 });
   });
 
-  it('鍵の期限は切れていればdanger、14日以内ならwarning、未記録ならunknown', async () => {
+  it('鍵の期限は切れていればdanger、取り替えの時期を過ぎても古いままならwarning、未記録ならunknown', async () => {
     const { runOperationHealthChecks } = await import('../services/operations-health.js');
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ type: 'unlimited' })));
 
@@ -1228,9 +1228,9 @@ describe('W: 運用状態の確認項目の追加（v6-32）', () => {
     let checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T00:00:00.000Z' });
     expect(checked.run.results.find((r) => r.checkKey === 'credential_expiry')).toMatchObject({ status: 'danger' });
 
-    testDb.raw.prepare("UPDATE line_accounts SET token_expires_at = '2026-09-25T05:00:00.000Z' WHERE id = 'account-1'").run();
+    testDb.raw.prepare("UPDATE line_accounts SET token_expires_at = '2026-09-20T05:00:00.000Z' WHERE id = 'account-1'").run();
     checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T05:00:00.000Z' });
-    expect(checked.run.results.find((r) => r.checkKey === 'credential_expiry')).toMatchObject({ status: 'warning', value: { daysLeft: 10 } });
+    expect(checked.run.results.find((r) => r.checkKey === 'credential_expiry')).toMatchObject({ status: 'warning', value: { daysLeft: 5 } });
 
     testDb.raw.prepare('UPDATE line_accounts SET token_expires_at = NULL WHERE id = ?').bind('account-1').run();
     checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T10:00:00.000Z' });
@@ -1361,7 +1361,7 @@ describe('繰り返し通知の止め方（同じ知らせが5分ごとに鳴ら
     unlimitedQuota();
 
     // 本番の received_at は strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours') の JST。
-    // 判定時刻(observedAt)は UTC なので、そのまま datetime() で引き算すると
+    // 判定時刻(observedAt)は UTC なので、そのまま datetime で引き算すると
     // 9時間ぶん受信が新しく見え、26時間前の受信が24時間以内に入ってしまっていた。
     // UTC 2026-09-15T12:00:00Z = JST 21:00 の26時間前 = JST 2026-09-14T19:00。
     testDb.raw.prepare(
@@ -1499,5 +1499,555 @@ describe('繰り返し通知の止め方（同じ知らせが5分ごとに鳴ら
     // 途中で1回失敗しても、3回に届かないうちは異常のまま保つ（正常へ往復させない）。
     broken = true;
     expect(await runAt('2026-09-15T00:30:00.000Z')).toMatchObject({ status: 'normal', value: { consecutive: 1 } });
+  });
+});
+
+describe('m26f: 緊急対応の失敗後回復', () => {
+  function failAt(pattern: RegExp): D1Database {
+    return new Proxy(testDb.db, {
+      get(target, property) {
+        if (property === 'prepare') {
+          return (sql: string) => {
+            if (pattern.test(sql)) throw new Error(`m26f injected failure: ${pattern}`);
+            return (target.prepare as (sql: string) => unknown)(sql);
+          };
+        }
+        return Reflect.get(target, property);
+      },
+    }) as D1Database;
+  }
+
+  async function grantStepUp(token: string, staffId = 'owner-1'): Promise<void> {
+    const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+    testDb.raw.prepare(
+      `INSERT INTO auth_step_up_grants (token_hash, staff_id, purpose, expires_at, created_at)
+       VALUES (?, ?, 'operations.control', ?, ?)`,
+    ).run(await hash(token), staffId, expiresAt, new Date().toISOString());
+  }
+
+  function seedOpenAlert(): void {
+    testDb.raw.prepare(
+      `INSERT INTO operation_health_runs
+         (id, scope_key, line_account_id, window_started_at, source, status, overall_status, started_at, completed_at)
+       VALUES ('run-m26f', 'account-1', 'account-1', '2026-09-16T00:00:00.000Z',
+               'scheduled', 'completed', 'warning', '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:00.000Z')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO operation_alerts
+         (id, line_account_id, check_key, status, severity, summary, source_run_id,
+          first_detected_at, last_detected_at, version, reopened_count, created_at, updated_at)
+       VALUES ('alert-m26f', 'account-1', 'webhook', 'open', 'warning', 'Webhook受信に失敗があります',
+               'run-m26f', '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:00.000Z', 1, 0,
+               '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:00.000Z')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO operation_alert_events
+         (id, alert_id, line_account_id, source_run_id, action, severity, summary, alert_version, created_at)
+       VALUES ('alert-event-m26f', 'alert-m26f', 'account-1', 'run-m26f', 'opened', 'warning',
+               'Webhook受信に失敗があります', 1, '2026-09-16T00:00:00.000Z')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO staff_members (id, name, role, api_key, line_user_id)
+       VALUES ('owner-1', 'Owner', 'owner', 'owner-m26f-key', 'U-owner-m26f')`,
+    ).run();
+  }
+
+  function ackInit(): RequestInit {
+    return {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccountId: 'account-1', expectedVersion: 1, note: '受領テスト' }),
+    };
+  }
+
+  function stopInit(stepUpToken: string, key: string, capabilities: string[] = ['broadcast_dispatch']): RequestInit {
+    return {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-confirm-irreversible': 'operation-stop',
+        'x-step-up-token': stepUpToken,
+        'idempotency-key': key,
+      },
+      body: JSON.stringify({
+        lineAccountId: 'account-1',
+        capabilities,
+        reason: '障害対応テスト',
+        expectedVersion: 0,
+        confirmation: '停止',
+      }),
+    };
+  }
+
+  function restoreInit(stepUpToken: string, key: string, incidentId: string, expectedVersion: number): { path: string; init: RequestInit } {
+    return {
+      path: `/api/operations/incidents/${incidentId}/restore`,
+      init: {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-confirm-irreversible': 'operation-restore',
+          'x-step-up-token': stepUpToken,
+          'idempotency-key': key,
+        },
+        body: JSON.stringify({ expectedVersion, confirmation: '復旧' }),
+      },
+    };
+  }
+
+  it('R571: 結果保存の失敗後に同じ5分枠で押し直すと確認処理を再実行する', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ type: 'unlimited' })));
+    const healthInit: RequestInit = {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccountId: 'account-1' }),
+    };
+
+    const failed = await app().request(
+      '/api/operations/health/runs', healthInit,
+      bindings({ DB: failAt(/INSERT OR REPLACE INTO operation_health_results/) }),
+    );
+    expect(failed.status).toBe(500);
+    expect(testDb.raw.prepare('SELECT status FROM operation_health_runs').get()).toEqual({ status: 'failed' });
+
+    const retried = await app().request('/api/operations/health/runs', healthInit, bindings());
+    expect(retried.status).toBe(201);
+    expect(await retried.json()).toMatchObject({ success: true, duplicate: false });
+    expect(testDb.raw.prepare('SELECT status FROM operation_health_runs').get()).toEqual({ status: 'completed' });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM operation_health_runs').get()).toEqual({ n: 1 });
+    expect(
+      (testDb.raw.prepare('SELECT COUNT(*) AS n FROM operation_health_results').get() as { n: number }).n,
+    ).toBeGreaterThan(0);
+  });
+
+  it('R572: 受領イベント保存の失敗後に同じ版で送り直すとイベントと通知準備が揃う', async () => {
+    seedOpenAlert();
+
+    const failed = await app().request(
+      '/api/operations/alerts/alert-m26f/acknowledge', ackInit(),
+      bindings({ DB: failAt(/INSERT OR IGNORE INTO operation_alert_events/) }),
+    );
+    expect(failed.status).toBe(500);
+    expect(testDb.raw.prepare(
+      "SELECT status, version FROM operation_alerts WHERE id = 'alert-m26f'",
+    ).get()).toEqual({ status: 'acknowledged', version: 2 });
+    expect(testDb.raw.prepare(
+      "SELECT COUNT(*) AS n FROM operation_alert_events WHERE alert_id = 'alert-m26f' AND action = 'acknowledged'",
+    ).get()).toEqual({ n: 0 });
+
+    const retried = await app().request(
+      '/api/operations/alerts/alert-m26f/acknowledge', ackInit(), bindings(),
+    );
+    expect(retried.status).toBe(200);
+    expect(await retried.json()).toMatchObject({
+      success: true,
+      duplicate: true,
+      data: { status: 'acknowledged', version: 2 },
+    });
+    const event = testDb.raw.prepare(
+      "SELECT alert_version, notification_enqueued_at FROM operation_alert_events WHERE alert_id = 'alert-m26f' AND action = 'acknowledged'",
+    ).get() as { alert_version: number; notification_enqueued_at: string | null };
+    expect(event.alert_version).toBe(2);
+    expect(event.notification_enqueued_at).not.toBeNull();
+    expect(
+      (testDb.raw.prepare(
+        `SELECT COUNT(*) AS n FROM operation_alert_notification_outbox o
+          JOIN operation_alert_events e ON e.id = o.event_id
+         WHERE e.alert_id = 'alert-m26f' AND e.action = 'acknowledged'`,
+      ).get() as { n: number }).n,
+    ).toBeGreaterThan(0);
+  });
+
+  it('R573: 停止のreceipt保存の失敗後に同じキーで送り直すと通知準備まで揃う', async () => {
+    await grantStepUp('m26f-stop-token-1');
+    const failed = await app().request(
+      '/api/operations/incidents', stopInit('m26f-stop-token-1', 'm26f-stop-key-1'),
+      bindings({ DB: failAt(/INSERT OR IGNORE INTO operation_request_receipts/) }),
+    );
+    expect(failed.status).toBe(500);
+    const control = testDb.raw.prepare(
+      "SELECT version, active_incident_id FROM operation_control_sets WHERE scope_key = 'account-1'",
+    ).get() as { version: number; active_incident_id: string | null };
+    expect(control.version).toBe(1);
+    expect(control.active_incident_id).not.toBeNull();
+    expect(testDb.raw.prepare(
+      "SELECT COUNT(*) AS n FROM operation_request_receipts WHERE action = 'stop'",
+    ).get()).toEqual({ n: 0 });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM operation_notification_outbox').get()).toEqual({ n: 0 });
+
+    await grantStepUp('m26f-stop-token-2');
+    const retried = await app().request(
+      '/api/operations/incidents', stopInit('m26f-stop-token-2', 'm26f-stop-key-1'), bindings(),
+    );
+    expect(retried.status).toBe(200);
+    const body = await retried.json() as {
+      success: boolean; duplicate: boolean;
+      data: { status: string; incident: { id: string } };
+    };
+    expect(body).toMatchObject({ success: true, duplicate: true, data: { status: 'changed' } });
+    expect(body.data.incident.id).toBe(control.active_incident_id);
+    expect(testDb.raw.prepare(
+      "SELECT COUNT(*) AS n FROM operation_request_receipts WHERE action = 'stop'",
+    ).get()).toEqual({ n: 1 });
+    expect(
+      (testDb.raw.prepare(
+        'SELECT COUNT(*) AS n FROM operation_notification_outbox WHERE incident_id = ?',
+      ).get(control.active_incident_id) as { n: number }).n,
+    ).toBe(2);
+  });
+
+  it('R573: 復旧のreceipt保存の失敗後に同じキーで送り直すと通知準備まで揃う', async () => {
+    await grantStepUp('m26f-restore-stop-token');
+    const stopped = await app().request(
+      '/api/operations/incidents', stopInit('m26f-restore-stop-token', 'm26f-restore-stop-key'), bindings(),
+    );
+    expect(stopped.status).toBe(201);
+    const stoppedBody = await stopped.json() as {
+      data: { control: { version: number }; incident: { id: string } };
+    };
+    const incidentId = stoppedBody.data.incident.id;
+    const version = stoppedBody.data.control.version;
+
+    await grantStepUp('m26f-restore-token-1');
+    const first = restoreInit('m26f-restore-token-1', 'm26f-restore-key-1', incidentId, version);
+    const failed = await app().request(
+      first.path, first.init,
+      bindings({ DB: failAt(/INSERT OR IGNORE INTO operation_request_receipts/) }),
+    );
+    expect(failed.status).toBe(500);
+    expect(testDb.raw.prepare(
+      'SELECT status FROM operation_incidents WHERE id = ?',
+    ).bind(incidentId).get()).toEqual({ status: 'resolved' });
+    expect(testDb.raw.prepare(
+      'SELECT COUNT(*) AS n FROM operation_request_receipts WHERE action = ? AND resource_id = ?',
+    ).bind(`restore:${incidentId}`, incidentId).get()).toEqual({ n: 0 });
+    expect(testDb.raw.prepare(
+      "SELECT COUNT(*) AS n FROM operation_notification_outbox WHERE incident_id = ? AND event_kind = 'restored'",
+    ).bind(incidentId).get()).toEqual({ n: 0 });
+
+    await grantStepUp('m26f-restore-token-2');
+    const second = restoreInit('m26f-restore-token-2', 'm26f-restore-key-1', incidentId, version);
+    const retried = await app().request(second.path, second.init, bindings());
+    expect(retried.status).toBe(200);
+    expect(await retried.json()).toMatchObject({
+      success: true,
+      duplicate: true,
+      data: { status: 'restored' },
+    });
+    expect(testDb.raw.prepare(
+      'SELECT COUNT(*) AS n FROM operation_request_receipts WHERE action = ? AND resource_id = ?',
+    ).bind(`restore:${incidentId}`, incidentId).get()).toEqual({ n: 1 });
+    expect(testDb.raw.prepare(
+      "SELECT COUNT(*) AS n FROM operation_request_receipts WHERE action = 'stop' AND resource_id = ?",
+    ).bind(incidentId).get()).toEqual({ n: 1 });
+    expect(
+      (testDb.raw.prepare(
+        "SELECT COUNT(*) AS n FROM operation_notification_outbox WHERE incident_id = ? AND event_kind = 'restored'",
+      ).bind(incidentId).get() as { n: number }).n,
+    ).toBe(2);
+  });
+
+  it('R573: 部分復旧のreceipt保存の失敗後に同じキーで送り直すと一度だけ補い、他人・異内容は409のまま', async () => {
+    await grantStepUp('m26f-partial-stop-token');
+    const stopped = await app().request(
+      '/api/operations/incidents',
+      stopInit('m26f-partial-stop-token', 'm26f-partial-stop-key', ['broadcast_dispatch', 'scenario_dispatch']),
+      bindings(),
+    );
+    expect(stopped.status).toBe(201);
+    const stoppedBody = await stopped.json() as {
+      data: { control: { version: number }; incident: { id: string } };
+    };
+    const incidentId = stoppedBody.data.incident.id;
+    const version = stoppedBody.data.control.version;
+
+    // 停止後に追加された稼働シナリオは復旧前検査で追加ずれになり、
+    // その能力だけ止まったままの部分復旧になる。
+    testDb.raw.prepare(
+      `INSERT INTO scenarios (id, name, trigger_type, is_active, line_account_id)
+       VALUES ('sc-m26f-partial', '停止後追加', 'manual', 1, 'account-1')`,
+    ).run();
+
+    await grantStepUp('m26f-partial-restore-token-1');
+    const first = restoreInit('m26f-partial-restore-token-1', 'm26f-partial-restore-key-1', incidentId, version);
+    const failed = await app().request(
+      first.path, first.init,
+      bindings({ DB: failAt(/INSERT OR IGNORE INTO operation_request_receipts/) }),
+    );
+    expect(failed.status).toBe(500);
+    // 版だけ進み、停止記録は動いたまま、記録と通知準備が欠けた状態。
+    expect(testDb.raw.prepare(
+      'SELECT version, active_incident_id FROM operation_control_sets WHERE scope_key = ?',
+    ).bind('account-1').get()).toEqual({ version: version + 1, active_incident_id: incidentId });
+    expect(testDb.raw.prepare(
+      'SELECT status FROM operation_incidents WHERE id = ?',
+    ).bind(incidentId).get()).toEqual({ status: 'stopped' });
+    expect(testDb.raw.prepare(
+      'SELECT restore_report_json FROM operation_incidents WHERE id = ?',
+    ).bind(incidentId).get()).not.toEqual({ restore_report_json: null });
+    expect(testDb.raw.prepare(
+      'SELECT COUNT(*) AS n FROM operation_request_receipts WHERE action = ? AND resource_id = ?',
+    ).bind(`restore:${incidentId}`, incidentId).get()).toEqual({ n: 0 });
+    expect(testDb.raw.prepare(
+      "SELECT COUNT(*) AS n FROM operation_notification_outbox WHERE incident_id = ? AND event_kind = 'restored'",
+    ).bind(incidentId).get()).toEqual({ n: 0 });
+
+    await grantStepUp('m26f-partial-restore-token-2');
+    const second = restoreInit('m26f-partial-restore-token-2', 'm26f-partial-restore-key-1', incidentId, version);
+    const retried = await app().request(second.path, second.init, bindings());
+    expect(retried.status).toBe(200);
+    const retriedBody = await retried.json() as {
+      success: boolean; duplicate: boolean;
+      data: { status: string; report: unknown };
+    };
+    expect(retriedBody).toMatchObject({ success: true, duplicate: true, data: { status: 'partial' } });
+    expect(retriedBody.data.report).not.toBeNull();
+    // 記録と通知準備は一度だけ補われる。
+    expect(testDb.raw.prepare(
+      'SELECT COUNT(*) AS n FROM operation_request_receipts WHERE action = ? AND resource_id = ?',
+    ).bind(`restore:${incidentId}`, incidentId).get()).toEqual({ n: 1 });
+    expect(
+      (testDb.raw.prepare(
+        "SELECT COUNT(*) AS n FROM operation_notification_outbox WHERE incident_id = ? AND event_kind = 'restored'",
+      ).bind(incidentId).get() as { n: number }).n,
+    ).toBe(2);
+
+    // 異内容（進んだ版と違う版）の再送は競合のまま。
+    await grantStepUp('m26f-partial-restore-token-3');
+    const mismatched = restoreInit('m26f-partial-restore-token-3', 'm26f-partial-restore-key-2', incidentId, version + 99);
+    const conflicted = await app().request(mismatched.path, mismatched.init, bindings());
+    expect(conflicted.status).toBe(409);
+    expect(await conflicted.json()).toMatchObject({ success: false, code: 'VERSION_CONFLICT' });
+
+    // 他人（確定させた担当者と違う）の再送は競合のまま。
+    testDb.raw.prepare(
+      `INSERT INTO staff_members (id, name, role, api_key, account_scope)
+       VALUES ('admin-1', 'Admin', 'admin', 'admin-m26f-partial-key', 'accounts')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at)
+       VALUES ('admin-1', 'account-1', '2026-09-16T00:00:00.000Z')`,
+    ).run();
+    await grantStepUp('m26f-partial-restore-token-4', 'admin-1');
+    const foreign = restoreInit('m26f-partial-restore-token-4', 'm26f-partial-restore-key-3', incidentId, version);
+    const rejected = await app('admin').request(foreign.path, foreign.init, bindings());
+    expect(rejected.status).toBe(409);
+
+    // 409の再送では記録も通知準備も増えない。
+    expect(testDb.raw.prepare(
+      'SELECT COUNT(*) AS n FROM operation_request_receipts WHERE action = ? AND resource_id = ?',
+    ).bind(`restore:${incidentId}`, incidentId).get()).toEqual({ n: 1 });
+    expect(
+      (testDb.raw.prepare(
+        "SELECT COUNT(*) AS n FROM operation_notification_outbox WHERE incident_id = ? AND event_kind = 'restored'",
+      ).bind(incidentId).get() as { n: number }).n,
+    ).toBe(2);
+  });
+});
+
+it.each([undefined, 'short', 'fixture-encryption-key-with-more-than-thirty-two-characters'])('operation status exposes only encryption readiness (%s)', async key => {
+  const res = await app().request('/api/operations/health?account_id=account-1', {}, bindings({ TOTP_ENCRYPTION_KEY: key }));
+  expect(res.status).toBe(200);
+  const body = await res.json() as { data: { loginSecurity: { configured: boolean; notice: string | null } } };
+  expect(body.data.loginSecurity.configured).toBe(Boolean(key && key.length >= 32));
+  expect(body.data.loginSecurity.notice).toBe(key && key.length >= 32 ? null : '二段階認証の鍵が未設定のため、必須にできません');
+  if (key) expect(JSON.stringify(body)).not.toContain(key);
+});
+
+/* ============ デリバリー連携のエラー監視（出前館QA#3） ============ */
+describe('デリバリー連携のエラー監視（出前館QA#3）', () => {
+  /**
+   * 外部連携の確認だけを取り出す。板の9行は増やさず、ここへ畳んで数える。
+   * 確認は5分枠で1回しか作られないため、同じ試験で2回目を見るときは
+   * NEXT_SLOT（6分後）を渡して別の枠にする。
+   */
+  async function externalIntegrations(db: D1Database = testDb.db, now = '2026-09-15T05:00:00.000Z') {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/quota/consumption')) return Response.json({ totalUsage: 0 });
+      return Response.json({ type: 'unlimited' });
+    }));
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    const checked = await runOperationHealthChecks(db, {
+      lineAccountId: 'account-1', source: 'manual', now,
+    });
+    return checked.run.results.find((result) => result.checkKey === 'external_integrations');
+  }
+
+  /** 2026-09-15T05:00:00Z の通算秒。基準からの差で「何分前」を作る。 */
+  const NOW_SEC = Math.floor(Date.parse('2026-09-15T05:00:00.000Z') / 1000);
+  const minutesAgo = (minutes: number) => NOW_SEC - minutes * 60;
+  /** 同じ試験で2回目の確認を作るための次の5分枠。 */
+  const NEXT_SLOT = '2026-09-15T05:06:00.000Z';
+
+  function seedState(service: string, connectionStatus: string, storeId = 'store-1'): void {
+    testDb.raw.prepare(
+      `INSERT INTO rt_delivery_service_states
+         (account_id, store_id, service, connection_status, intake_status, version, created_at, updated_at)
+       VALUES ('account-1', ?, ?, ?, 'open', 1, ?, ?)`,
+    ).run(storeId, service, connectionStatus, NOW_SEC, NOW_SEC);
+  }
+
+  function seedDispatch(
+    id: string,
+    service: string,
+    status: string,
+    requestedAt: number,
+    attempts = 1,
+    accountId = 'account-1',
+  ): void {
+    testDb.raw.prepare(
+      `INSERT INTO rt_delivery_dispatches
+         (id, account_id, store_id, service, action, target_kind, target_id, status,
+          attempts, requested_at, version, created_at, updated_at)
+       VALUES (?, ?, 'store-1', ?, 'accept', 'order', 'order-1', ?, ?, ?, 1, ?, ?)`,
+    ).run(id, accountId, service, status, attempts, requestedAt, requestedAt, requestedAt);
+  }
+
+  function seedEvent(
+    id: string,
+    service: string,
+    status: string,
+    receivedAt: number,
+    attempts = 1,
+  ): void {
+    testDb.raw.prepare(
+      `INSERT INTO rt_delivery_events
+         (id, account_id, service, external_event_id, event_type, status,
+          payload_json, attempts, received_at, version)
+       VALUES (?, 'account-1', ?, ?, 'order.created', ?, '{}', ?, ?, 1)`,
+    ).run(id, service, `ext-${id}`, status, attempts, receivedAt);
+  }
+
+  it('デリバリーの台帳が空なら今までどおり正常のまま', async () => {
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'normal',
+      value: { activeCount: 0, failingCount: 0, maxConsecutiveFailures: 0 },
+    });
+  });
+
+  it('つながっているサービスの数は外部連携の件数に足す', async () => {
+    seedState('demaecan', 'connected');
+    seedState('ubereats', 'connected', 'store-2');
+    seedState('rocketnow', 'disconnected');
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'normal',
+      value: { activeCount: 2, failingCount: 0 },
+    });
+  });
+
+  it('連携が切れたままのサービスは注意にする', async () => {
+    seedState('demaecan', 'error');
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'warning',
+      value: { activeCount: 1, failingCount: 1 },
+    });
+  });
+
+  it('送信の失敗は注意、再試行を使い切った打ち切りは異常にする', async () => {
+    seedDispatch('dsp-1', 'demaecan', 'failed', minutesAgo(5), 1);
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'warning',
+      value: { failingCount: 1, maxConsecutiveFailures: 1 },
+    });
+
+    seedDispatch('dsp-2', 'demaecan', 'exhausted', minutesAgo(3), 1);
+    expect(await externalIntegrations(testDb.db, NEXT_SLOT)).toMatchObject({
+      status: 'danger',
+      value: { maxConsecutiveFailures: 3 },
+    });
+  });
+
+  it('再試行待ちの送信も見える。繰り返しが3回に達したら異常にする', async () => {
+    seedDispatch('dsp-1', 'demaecan', 'retryable_failed', minutesAgo(5), 1);
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'warning',
+      value: { failingCount: 1, maxConsecutiveFailures: 1 },
+    });
+
+    testDb.raw.prepare('UPDATE rt_delivery_dispatches SET attempts = 3 WHERE id = ?').run('dsp-1');
+    expect(await externalIntegrations(testDb.db, NEXT_SLOT)).toMatchObject({
+      status: 'danger',
+      value: { maxConsecutiveFailures: 3 },
+    });
+  });
+
+  it('同じサービスの連打は1件にまとめ、別サービスは別の件数で数える', async () => {
+    seedDispatch('dsp-1', 'demaecan', 'failed', minutesAgo(5));
+    seedDispatch('dsp-2', 'demaecan', 'failed', minutesAgo(4));
+    seedDispatch('dsp-3', 'demaecan', 'failed', minutesAgo(3));
+    expect(await externalIntegrations()).toMatchObject({ value: { failingCount: 1 } });
+
+    seedDispatch('dsp-4', 'rocketnow', 'failed', minutesAgo(2));
+    expect(await externalIntegrations(testDb.db, NEXT_SLOT)).toMatchObject({ value: { failingCount: 2 } });
+  });
+
+  it('受信を処理できなかった通知も同じ確認で見える', async () => {
+    seedEvent('evt-1', 'demaecan', 'failed', minutesAgo(10));
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'warning',
+      value: { failingCount: 1 },
+    });
+  });
+
+  it('受信の繰り返し失敗が3回に達したら異常にする', async () => {
+    seedEvent('evt-1', 'demaecan', 'retryable_failed', minutesAgo(10), 3);
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'danger',
+      value: { maxConsecutiveFailures: 3 },
+    });
+  });
+
+  it('処理できた通知と成功した送信は失敗に数えない', async () => {
+    seedEvent('evt-1', 'demaecan', 'processed', minutesAgo(10), 2);
+    seedEvent('evt-2', 'demaecan', 'ignored', minutesAgo(9), 2);
+    seedDispatch('dsp-1', 'demaecan', 'succeeded', minutesAgo(5), 2);
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'normal',
+      value: { failingCount: 0, maxConsecutiveFailures: 0 },
+    });
+  });
+
+  it('1時間より前の失敗は数えない。直った後も注意が残り続けないようにする', async () => {
+    seedDispatch('dsp-old', 'demaecan', 'exhausted', minutesAgo(61));
+    seedEvent('evt-old', 'demaecan', 'failed', minutesAgo(90), 5);
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'normal',
+      value: { failingCount: 0, maxConsecutiveFailures: 0 },
+    });
+  });
+
+  it('別のアカウントの失敗は混ぜない', async () => {
+    seedDispatch('dsp-other', 'demaecan', 'exhausted', minutesAgo(5), 1, 'account-9');
+    expect(await externalIntegrations()).toMatchObject({
+      status: 'normal',
+      value: { failingCount: 0 },
+    });
+  });
+
+  it('デリバリーの台帳が読めない配備でも外部連携の確認ごと落とさない', async () => {
+    // 移行前の配備では rt_delivery_* が無い。その問い合わせだけ失敗させる。
+    const withoutDeliveryLedger = new Proxy(testDb.db, {
+      get(target, property) {
+        if (property === 'prepare') {
+          return (sql: string) => {
+            if (/rt_delivery_/.test(sql)) throw new Error('no such table: rt_delivery_dispatches');
+            return (target.prepare as (sql: string) => unknown)(sql);
+          };
+        }
+        return Reflect.get(target, property);
+      },
+    }) as D1Database;
+    // Webhook 側の連続失敗は、デリバリーの台帳が無くても今までどおり見えること。
+    testDb.raw.prepare(
+      `INSERT INTO outgoing_webhooks
+         (id, line_account_id, name, url, event_types, is_active, consecutive_failures, created_at, updated_at)
+       VALUES ('owh-1', 'account-1', '連携先', 'https://example.test/hook', '["friend_add"]', 1, 4,
+               '2026-09-15T00:00:00.000Z', '2026-09-15T00:00:00.000Z')`,
+    ).run();
+    expect(await externalIntegrations(withoutDeliveryLedger)).toMatchObject({
+      status: 'danger',
+      value: { failingCount: 1, maxConsecutiveFailures: 4 },
+    });
   });
 });

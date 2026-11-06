@@ -1,6 +1,7 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * ファイルを落とす場所・添付ファイルの行。Pencil ★V7 `NQMnx`。
+ * ファイルを落とす場所・添付ファイルの行。Pencil ★V8（V8.pen）「ファイルを落とす欄」。
  *
  * 落とす場所
  *   ふだん  地 $canvas-sunken、縁 1.5px $hairline、角丸 12、高さ 180
@@ -30,7 +31,7 @@
   min-height: 180px; /* height: 180 */
   padding: 16px;
   border: 1.5px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: 12px; /* cornerRadius: 12 */
+  border-radius: var(--radius-card); /* cornerRadius: 12 */
   background: var(--color-canvas-sunken); /* fill: $canvas-sunken */
   cursor: pointer;
   transition:
@@ -51,7 +52,7 @@
 }
 
 .zone[data-disabled] {
-  opacity: 0.6;
+  opacity: var(--polish-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -59,25 +60,26 @@
   margin: 0;
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .activeTitle {
   margin: 0;
-  color: var(--color-accent-deep); /* fill: $accent-deep */
+  color: var(--color-ink); /* fill: $accent-deep */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .rejectTitle {
   margin: 0;
   color: var(--color-status-danger); /* fill: $status-danger */
   font-size: var(--text-body); /* fontSize: 14 */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .zoneHint {
   margin: 0;
+  text-align: center;
   color: var(--color-ink-faint); /* fill: $ink-faint */
   font-size: 12px; /* fontSize: 12 */
 }
@@ -87,7 +89,7 @@
 }
 
 .activeIcon {
-  color: var(--color-accent-deep); /* fill: $accent-deep */
+  color: var(--color-ink); /* fill: $accent-deep */
 }
 
 .rejectIcon {
@@ -114,12 +116,6 @@
   display: none;
 }
 
-/* キーボードで場所へ来たときの輪郭。緑は「正常」の意味なので輪郭に使わない。 */
-.zone:focus-visible {
-  outline: 2px solid var(--color-action);
-  outline-offset: 2px;
-}
-
 .row {
   display: flex;
   align-items: center;
@@ -127,7 +123,7 @@
   min-height: 56px; /* height: 56 */
   padding: 0 12px; /* padding: 0 12 */
   border: 1px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: 10px; /* cornerRadius: 10 */
+  border-radius: var(--radius-card); /* cornerRadius: 10 */
   background: var(--color-canvas); /* fill: $canvas */
 }
 
@@ -145,7 +141,7 @@
   height: 36px; /* height: 36 */
   overflow: hidden;
   border: 1px solid var(--color-hairline); /* stroke: $hairline（画像の薄い縁） */
-  border-radius: 6px; /* cornerRadius: 6 */
+  border-radius: var(--radius-mini); /* cornerRadius: 6 */
   background: var(--color-shell); /* fill: $shell */
 }
 
@@ -198,7 +194,7 @@
   display: block;
   height: 4px; /* height: 4 */
   overflow: hidden;
-  border-radius: 2px; /* cornerRadius: 2 */
+  border-radius: var(--radius-mini); /* cornerRadius: 2 */
   background: var(--color-shell); /* fill: $shell */
   position: relative;
 }
@@ -206,10 +202,25 @@
 .miniFill {
   position: absolute;
   inset: 0;
-  border-radius: 2px; /* cornerRadius: 2 */
+  border-radius: var(--radius-mini); /* cornerRadius: 2 */
   background: var(--color-accent-deep); /* fill: $accent-deep */
   transform: scaleX(0);
   transform-origin: left center;
   transition: transform var(--motion-base) var(--motion-ease-out);
 }
 }
+
+.zone[data-variant='video'] { min-height: var(--tpl-rvid-drop-h); border-width: 1px; border-color: var(--color-control-border); border-radius: var(--radius-control); }
+
+.zone[data-invalid] { border-color: var(--color-danger); }
+
+.zone[data-variant='composer'] { height: var(--tpl-msg-composer-media-h); min-height: var(--tpl-msg-composer-media-h); padding: 0; gap: var(--tpl-msg-composer-gap-s); }
+.zone[data-variant='composer'] .zoneTitle { font-size: var(--text-label); line-height: var(--tpl-msg-composer-text-lh); }
+.zone[data-variant='composer'] .zoneHint { font-size: var(--text-micro); line-height: var(--tpl-msg-composer-tab-lh); }
+
+@layer components {
+.zone[data-variant='upload'] .zoneTitle { font-size: var(--text-heading); }
+}
+
+/* 欄の中の別の入れ方（「ライブラリから選ぶ」）。 */
+.secondary { display: inline-flex; }

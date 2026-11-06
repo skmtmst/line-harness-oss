@@ -1,0 +1,78 @@
+import { getPageAction } from '@/test-utils/page-action'
+// @vitest-environment happy-dom
+/*
+ * R561: HQタグひな形の「保存して続けて作る」は、保存後に空の新規入力画面へ
+ * 戻らなければならない（保存済みの行は残す）。正規編集部品の連続作成の
+ * 選択が統括ラッパーで落とされていたため、一覧へ戻っていた。
+ *
+ * 差し替えるのは API（サーバーとの境界）・shell のタイトル・next/link だけ。
+ * 編集部品と保存の流れは本物を使う。
+ */
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
+import React from 'react'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import TemplateConsole from '@/test-utils/hq-template-console'
+
+const calls = vi.hoisted(() => ({
+  context: vi.fn(),
+  list: vi.fn(),
+  accounts: vi.fn(),
+  get: vi.fn(),
+  create: vi.fn(),
+  update: vi.fn(),
+  remove: vi.fn(),
+  preflight: vi.fn(),
+  distribute: vi.fn(),
+  result: vi.fn(),
+  uploadImage: vi.fn(),
+}))
+vi.mock('@/lib/hq-templates-api', async (original) => ({ ...await original<typeof import('@/lib/hq-templates-api')>(), TEMPLATE_TYPES: ['tag', 'template', 'rich_menu', 'form'], hqTemplatesApi: { listStats: async () => ({ thisMonthSentCount: 0, outdatedTemplateCount: 0 }), listByKind: () => calls.list('template'), kindCounts: async () => ({}), versions: async () => [], receivedVersions: async () => [], messageReferences: async () => [], folders: { list: async () => [] }, ...calls } }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('next/link', () => ({
+  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
+    <a href={typeof href === 'string' ? href : '#'}>{children}</a>
+  ),
+}))
+
+let created = 0
+beforeEach(() => {
+  clearToastsForTest()
+  vi.resetAllMocks()
+  created = 0
+  window.sessionStorage.clear()
+  window.history.replaceState(null, '', '/hq/friend-attributes')
+  calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
+  calls.list.mockResolvedValue([])
+  calls.accounts.mockResolvedValue([])
+  calls.create.mockImplementation(async (input: { name: string; definition: unknown }) => {
+    created += 1
+    return {
+      template: { id: `t${created}`, name: input.name, description: null, template_type: 'tag', revision: 1, updated_at: '2026-09-29T00:00:00Z' },
+      definition: input.definition,
+    }
+  })
+})
+afterEach(cleanup)
+
+it('下書きの保存後に新しく作ると、保存済みを残して空の入力へ戻る', async () => {
+  render(<><TemplateConsole type="tag" /><ToastHost /></>)
+  fireEvent.click((await screen.findAllByRole('button', { name: 'タグを作る', exact: true }))[0])
+  fireEvent.change(await screen.findByPlaceholderText("例：定期購入者"), { target: { value: '一つ目' } })
+  fireEvent.click(getPageAction({ name: '下書きを保存', exact: true }))
+  await screen.findByText('ひな形を保存しました。')
+  expect(calls.create).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getAllByRole('button', { name: 'タグを作る', exact: true })[0])
+  expect((await screen.findByPlaceholderText("例：定期購入者") as HTMLInputElement).value).toBe('')
+  fireEvent.change(screen.getByPlaceholderText("例：定期購入者"), { target: { value: '二つ目' } })
+  fireEvent.click(getPageAction({ name: '下書きを保存', exact: true }))
+  await waitFor(() => expect(calls.create).toHaveBeenCalledTimes(2))
+  await screen.findByText('一つ目')
+  expect(screen.getByText('二つ目')).toBeTruthy()
+})
+
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], selectedAccountId: null, selectedAccount: null, setSelectedAccountId: vi.fn(), loading: false }) }))
+
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
+
+vi.mock('next/navigation', () => ({ usePathname: () => window.location.pathname, useSearchParams: () => new URLSearchParams(window.location.search), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))

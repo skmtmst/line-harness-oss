@@ -1,5 +1,5 @@
 /*
- * R347: 古い版で送信待ちの通知があっても、テンプレートの使用先が0件と
+ * 古い版で送信待ちの通知があっても、テンプレートの使用先が0件と
  * 数えられて削除できてしまう。
  *
  * ここで止めたい崩れ方:
@@ -16,8 +16,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { getTemplatesWithUsageCount } from '@line-crm/db';
 
 vi.mock('../services/account-access.js', () => ({
@@ -142,8 +142,10 @@ describe('R347 旧版に固定された送信待ちの登録', () => {
 
     const response = await app().request('/api/templates/tpl-a', { method: 'DELETE' });
     expect(response.status).toBe(200);
-    const row = await sqlite.db.prepare('SELECT id FROM templates WHERE id = ?').bind('tpl-a').first();
-    expect(row).toBeNull();
+    const row = await sqlite.db.prepare('SELECT deleted_at FROM templates WHERE id = ?').bind('tpl-a').first<{deleted_at:string}>();
+    expect(row?.deleted_at).toBeTruthy();
+    expect((await getTemplatesWithUsageCount(sqlite.db)).items.some(t => t.id === 'tpl-a')).toBe(false);
+    expect(sqlite.raw.prepare("SELECT COUNT(*) AS n FROM reminder_version_steps WHERE template_id = 'tpl-a'").get()).toMatchObject({n:1});
   });
 
   test('取消ずみ（再開できる）の登録も止める', async () => {

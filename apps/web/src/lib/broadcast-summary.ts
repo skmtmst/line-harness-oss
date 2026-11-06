@@ -12,6 +12,7 @@
  */
 
 import type { SegmentCondition } from './segment-condition'
+import { formatNumber } from '@/lib/format'
 
 const TYPE_LABELS: Record<string, string> = {
   text: 'テキスト',
@@ -65,7 +66,7 @@ export function contentExcerpt(messageType: string, messageContent: string, limi
     const head = typeof first?.title === 'string' && first.title
       ? first.title
       : typeof first?.text === 'string' ? first.text : ''
-    return head ? `${head}（${parsed.length}枚）` : `カルーセル ${parsed.length}枚`
+    return head ? `${head}（${formatNumber(parsed.length)}枚）` : `カルーセル ${formatNumber(parsed.length)}枚`
   }
 
   const obj = (parsed && typeof parsed === 'object' ? parsed : {}) as Record<string, unknown>
@@ -119,6 +120,7 @@ export function audienceSummary(
     targetType: string
     targetTagId?: string | null
     segmentConditions?: SegmentCondition | null
+    draftPayload?: Record<string, unknown> | null
   },
   tagName: (id: string) => string | null,
   /**
@@ -131,6 +133,7 @@ export function audienceSummary(
   if (broadcast.targetType === 'multi-account-dedup') return '複数アカウント（重複除外）'
   if (broadcast.targetType === 'all') return '友だち全員'
   if (broadcast.targetType === 'tag') {
+    if (!broadcast.targetTagId && broadcast.draftPayload?.draftTargetMode === 'unselected') return '送る相手は未選択'
     const name = broadcast.targetTagId ? tagName(broadcast.targetTagId) : null
     return name ? `タグ：${name}` : 'タグ（削除済み）'
   }
@@ -166,7 +169,38 @@ export function audienceSummary(
   }
 
   const count = rules.length + groups.reduce((n, g) => n + (g.rules?.length ?? 0), 0)
-  return `詳細条件 ${count} 件`
+  return `詳細条件 ${formatNumber(count)} 件`
+}
+
+/**
+ * 宛先の要約に、タグ名・シナリオ名のどちらが要るか（監査 WEB310）。
+ *
+ * 名前の読み込みが片方だけ失敗したとき、失敗した側を空の一覧にして
+ * 要約すると、実在するタグ・シナリオが「削除済み」と出る。要る側が
+ * 読めていないときは、要約せず「確認できませんでした」にする。
+ */
+export function audienceNamesNeeded(broadcast: {
+  targetType: string
+  segmentConditions?: SegmentCondition | null
+}): { tags: boolean; scenarios: boolean } {
+  if (broadcast.targetType === 'tag') return { tags: true, scenarios: false }
+  // audienceSummary が名前を引くのは「条件が1行だけ」のときだけ。同じ形を見る。
+  const condition = broadcast.segmentConditions
+  const rules = (condition?.rules ?? []).filter((rule) => rule.type !== 'is_following')
+  if (!condition || (condition.groups ?? []).length > 0 || rules.length !== 1) return { tags: false, scenarios: false }
+  const only = rules[0]
+  return {
+    tags: only.type === 'tag_exists' && typeof only.value === 'string',
+    scenarios: only.type === 'scenario_subscribed' && typeof only.value === 'string' && only.value !== '',
+  }
+}
+
+/** 読めた側だけで要約してよいか。要る側が1つでも読めていなければ false。 */
+export function audienceNamesUsable(
+  needed: { tags: boolean; scenarios: boolean },
+  loaded: { tags: boolean; scenarios: boolean },
+): boolean {
+  return (!needed.tags || loaded.tags) && (!needed.scenarios || loaded.scenarios)
 }
 
 /**

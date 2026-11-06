@@ -249,7 +249,7 @@ export async function stopCustomerNotificationDefinition(
 }
 
 /**
- * N-330 (#943): 送信に使う顧客通知の正本を決める。
+ * 送信に使う顧客通知の正本を決める。
  *
  * その業務イベントに顧客通知定義がある場合は、定義だけが正本になる。
  * `published` のときだけ送り、送る文面は確定済み版(`current_version_id`)の
@@ -313,7 +313,7 @@ export type CustomerEcDeliveryFinish =
   | { kind: 'failed'; errorCode: string; errorMessage: string };
 
 /**
- * N-328 (#943): EC取引イベントからの顧客送信を共通送信台帳へ書く。
+ * EC取引イベントからの顧客送信を共通送信台帳へ書く。
  *
  * 同一外部イベントは `(line_account_id, dedupe_key)` の通知1件、
  * `(line_account_id, idempotency_key)` の送達1件へ畳む。EC側の再送や
@@ -784,7 +784,7 @@ export interface NotificationMetricRow {
 }
 
 /**
- * 送信台帳の1件取得。要件 v6-24 §6 `GET deliveries/:id`。
+ * 送信台帳の1件取得。要件 -24 §6 `GET deliveries/:id`。
  * 一覧と同じ射影・同じ結合で返し、アカウント境界の外側は null（404 隠蔽）にする。
  */
 export async function getNotificationDelivery(
@@ -834,7 +834,7 @@ export async function getNotificationDelivery(
 
 /**
  * 手動の新規再送（resend）の送達行を、元の通知インスタンス配下に積む。
- * retry と違い元の行は触らず、新しい冪等キーで送る。要件 v6-24 §6。
+ * retry と違い元の行は触らず、新しい冪等キーで送る。要件 -24 §6。
  */
 export async function insertNotificationResendDelivery(
   db: D1Database,
@@ -983,6 +983,8 @@ export async function createCustomerTestInstance(
 /**
  * テスト送信の操作自体を監査に残す。誰がどの定義を誰に試し送りしたかが
  * 後から分かる。対応状況の履歴（resolved/reopened）とは別action・別kind。
+ * 枠競合などで送る前に止めたときも outcome 付きで残し、送達の有無と
+ * 止めた理由を区別できるようにする。
  */
 export async function recordCustomerTestAudit(
   db: D1Database,
@@ -992,6 +994,8 @@ export async function recordCustomerTestAudit(
     staffId: string;
     sourceEventId: string;
     recipientIds: string[];
+    outcome?: 'sent' | 'quota_insufficient';
+    errorMessage?: string;
   },
 ): Promise<void> {
   await db.prepare(`
@@ -1004,8 +1008,25 @@ export async function recordCustomerTestAudit(
       lineAccountId: input.lineAccountId,
       sourceEventId: input.sourceEventId,
       recipientIds: input.recipientIds,
+      ...(input.outcome ? { outcome: input.outcome } : {}),
+      ...(input.errorMessage ? { error: input.errorMessage } : {}),
     }), jstNow(),
   ).run();
+}
+
+/**
+ * 送る前に止めた試し送りの記録先を失敗で確定する。送達行のない成功前提の
+ * instance を残さないためのもので、送達行は作らない。
+ */
+export async function failCustomerTestInstance(
+  db: D1Database,
+  input: { lineAccountId: string; instanceId: string },
+): Promise<boolean> {
+  const result = await db.prepare(`
+    UPDATE notification_instances SET status = 'failed', updated_at = ?
+     WHERE id = ? AND line_account_id = ? AND status = 'pending'
+  `).bind(jstNow(), input.instanceId, input.lineAccountId).run();
+  return Number(result.meta.changes ?? 0) === 1;
 }
 
 /**

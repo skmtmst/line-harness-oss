@@ -133,8 +133,7 @@ it('実D1でowner/世代/期限が違うbatchは副作用0、後続文の例外�
 }, 30000);
 
 it('実D1でbind後かつbatch開始直前に所有権が変わっても同じtransactionの検査で拒否する', async () => {
-  // Interpose only the scheduling boundary; every SQL statement and transaction
-  // still executes in real D1 (Miniflare's remote object cannot be spied on).
+  // Miniflare の遠隔オブジェクトは監視できないため、予定の境界だけに割り込み、SQL とトランザクションは実 D1 で実行する。
   const racingDb = {
     prepare: native.prepare.bind(native),
     async batch(statements: D1PreparedStatement[]) {

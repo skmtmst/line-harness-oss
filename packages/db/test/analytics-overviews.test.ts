@@ -6,14 +6,8 @@ import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FEATURE_IDS } from '@line-crm/shared';
 
-import {
-  getAnalyticsFriendsOverview,
-  getAnalyticsReactionsOverview,
-  getAnalyticsRoutesOverview,
-  getAnalyticsUrlClicksOverview,
-  getAnalyticsUsageOverview,
-  type AnalyticsOverviewContext,
-} from '../src/analytics-overviews.js';
+import { getAnalyticsFriendsOverview, getAnalyticsReactionsOverview, getAnalyticsRoutesOverview, getAnalyticsUrlClicksOverview, getAnalyticsUsageOverview } from '../src/analytics-overviews.js';
+import { type AnalyticsOverviewContext } from '../src/analytics-overviews-types.js';
 import { setFriendSupportMarkBulk } from '../src/support-marks.js';
 import { analyticsWindow, analyticsWindowWhere } from '../src/utils.js';
 import { asD1 } from './d1-test-helper.js';
@@ -30,7 +24,7 @@ const CONTEXT: AnalyticsOverviewContext = {
   dataCutoffAt: '2026-08-30T16:00:00.000Z',
 };
 
-describe('V6分析の概要4画面', () => {
+describe('分析の概要4画面', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -215,7 +209,7 @@ describe('V6分析の概要4画面', () => {
     expect(result.data.metrics.sent.value).toBe(200);
   });
 
-  // 監査 R225: シナリオは届いた人数が取れない。送信ログの通数を
+  // シナリオは届いた人数が取れない。送信ログの通数を
   // 「到達」として出すと人数と通数が混ざるので、欄を分けて返す。
   it('シナリオは対象人数と送信通数を分け、届いた人数は取れないと返す', async () => {
     sqlite.exec(`
@@ -255,7 +249,7 @@ describe('V6分析の概要4画面', () => {
     expect(result.data.metrics.delivered).toMatchObject({ value: 25 });
   });
 
-  // 監査 R227: 記録の時刻表記（Z / +09:00）が混在しても、期間への所属は
+  // 記録の時刻表記（Z / +09:00）が混在しても、期間への所属は
   // 同じ瞬時で判定する。先読みの文字列範囲は「外さない」ためのもので、
   // 最終判定は julianday に任せる。
   it('シナリオ集計は Z と +09:00 が混在する記録を同じ瞬時で期間判定する', async () => {
@@ -288,7 +282,7 @@ describe('V6分析の概要4画面', () => {
     expect(scenario).toMatchObject({ sentMessages: { value: 3 }, targetPeople: { value: 1 } });
   });
 
-  // 監査 R227: 期間条件の先読みが索引へ乗ることを計画で確認する。
+  // 期間条件の先読みが索引へ乗ることを計画で確認する。
   // （履歴が増えても全件走査にならない）
   it('シナリオ集計の期間条件は作成日時の複合索引を使う', () => {
     const win = analyticsWindow(CONTEXT.from, CONTEXT.toExclusive);
@@ -896,7 +890,7 @@ describe('V6分析の概要4画面', () => {
   });
 
   /*
-   * N-448: 全任意機能の利用状況。共有カタログの featureId で機械照合し、
+   * 全任意機能の利用状況。共有カタログの featureId で機械照合し、
    * 直近90日の回数・最終利用・未計測理由のどれかを必ず返す。
    */
   it('全任意機能を共有カタログIDで返し、計測できない機能を0にしない', async () => {

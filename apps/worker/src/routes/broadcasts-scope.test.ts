@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 
 const mocks = vi.hoisted(() => ({
   getBroadcasts: vi.fn(),
+  getBroadcastListPage: vi.fn(),
   getBroadcastById: vi.fn(),
   createBroadcast: vi.fn(),
   updateBroadcast: vi.fn(),
@@ -16,10 +17,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@line-crm/db', async (importOriginal) => ({
-  // 台帳・記録・状態の純粋な部品と集計は本物を使う（#816）。
+  // 台帳・記録・状態の純粋な部品と集計は本物を使う。
   // 境界の判定対象（取得・作成・更新・削除）だけ差し替える。
   ...(await importOriginal<typeof import('@line-crm/db')>()),
   getBroadcasts: mocks.getBroadcasts,
+  getBroadcastListPage: mocks.getBroadcastListPage,
   getBroadcastById: mocks.getBroadcastById,
   createBroadcast: mocks.createBroadcast,
   updateBroadcast: mocks.updateBroadcast,
@@ -41,11 +43,11 @@ vi.mock('../services/account-access.js', () => ({
   },
 }));
 vi.mock('@line-crm/line-sdk', () => ({ LineClient: mocks.lineClient }));
-vi.mock('../services/broadcast.js', () => ({
+vi.mock('../features/broadcasts/broadcast.js', () => ({
   processBroadcastSend: mocks.processBroadcastSend,
   processQueuedBroadcasts: mocks.processQueuedBroadcasts,
   buildMessage: vi.fn(),
-  // N-062: 即時送信の直前再確認はこの試験の対象外のため通す。枠の拒否は専用試験で見る。
+  // 即時送信の直前再確認はこの試験の対象外のため通す。枠の拒否は専用試験で見る。
   guardScheduledBroadcastQuota: async () => ({ blocked: false }),
 }));
 vi.mock('../services/operator-notification-dispatch.js', () => ({
@@ -203,4 +205,11 @@ describe('broadcast tenant scope', () => {
     const response = await app().request('/api/segments/count', json('POST', { conditions: { operator: 'AND', rules: [] } }));
     expect(response.status).toBe(403);
   });
+});
+
+test('broadcasts passes date boundaries together with tenant scope', async () => {
+  mocks.getBroadcastListPage.mockResolvedValue({ items:[], total:0, drafts:0, statusCounts:{all:0} });
+  const response = await app().request('/api/broadcasts?from=2026-09-30&to=2026-09-30');
+  expect(response.status).toBe(200);
+  expect(mocks.getBroadcastListPage).toHaveBeenCalledWith(expect.anything(), undefined, expect.objectContaining({ allowedAccountIds: ['own-account'] }), expect.objectContaining({ order: 'desc', from: '2026-09-30T00:00:00+09:00', until: '2026-10-01T00:00:00+09:00', limit:20, offset:0 }));
 });

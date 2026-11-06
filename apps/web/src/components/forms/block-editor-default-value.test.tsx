@@ -23,7 +23,7 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-function mount(block: FormBlock) {
+function mount(block: FormBlock, onChange = vi.fn()) {
   act(() => {
     root.render(
       <BlockEditor
@@ -33,7 +33,7 @@ function mount(block: FormBlock) {
         refs={EMPTY_REFS}
         selected
         onSelect={() => {}}
-        onChange={() => {}}
+        onChange={onChange}
       />,
     )
   })
@@ -59,10 +59,17 @@ function defaultControl() {
 }
 
 describe('R196 初期値はその欄の形で入れる', () => {
-  it('日付は日付入力になる', () => {
-    mount(inputBlock('date'))
-    const control = defaultControl().querySelector('input')
-    expect(control?.type).toBe('date')
+  it('日付は共通の暦から選べ、初期値を更新する', async () => {
+    const changed = vi.fn()
+    mount({ ...inputBlock('date'), defaultValue: '2026-11-05' }, changed)
+    const control = defaultControl().querySelector<HTMLButtonElement>('button[aria-label="日付の初期値"]')
+    expect(control).not.toBeNull()
+    await act(async () => { control!.click() })
+    const day = [...document.querySelectorAll<HTMLButtonElement>('[role="gridcell"] button')].find(el => el.textContent === '6' && !el.hasAttribute('data-outside'))
+    expect(day).toBeDefined()
+    await act(async () => { day!.click() })
+    await act(async () => { ([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="日付を選ぶ"] button')].find(button => button.textContent?.trim() === '確定')!).click() })
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ defaultValue: '2026-11-06' }))
   })
 
   it('都道府県は選択欄になり47都道府県から選べる', async () => {
@@ -87,5 +94,25 @@ describe('R196 初期値はその欄の形で入れる', () => {
     mount(inputBlock('text'))
     const control = defaultControl().querySelector('input')
     expect(control?.type).toBe('text')
+  })
+})
+
+describe('F-11 5段階評価・住所の初期値', () => {
+  it('評価は★1〜★5の選択欄になる', async () => {
+    mount(inputBlock('rating'))
+    const combo = defaultControl().querySelector('button[aria-label="初期値"]')
+    expect(combo).not.toBeNull()
+    await act(async () => { (combo as HTMLButtonElement).click() })
+    const labels = Array.from(document.querySelectorAll('[role="option"]')).map((o) => o.textContent)
+    expect(labels).toEqual(['— 入れない —', '★1', '★2', '★3', '★4', '★5'])
+  })
+
+  it('住所に初期値の入力欄は出ない', () => {
+    mount(inputBlock('address'))
+    const label = Array.from(host.querySelectorAll('label')).find((el) =>
+      el.textContent?.includes('初期値'),
+    )
+    expect(label).toBeUndefined()
+    expect(host.textContent).toContain('初期値は入れられません')
   })
 })

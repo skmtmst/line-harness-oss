@@ -1,6 +1,7 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 // @vitest-environment happy-dom
 /*
- * ★V7 グラフ（ノード `h99Gb`）。
+ * ★管理画面 グラフ（ノード `h99Gb`）。
  * 増えた = `accent-deep`、減った = `ink-faint` の2色まで。
  * 数字は棒の色だけでなく文字でも読める。
  */
@@ -10,12 +11,12 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { BarChart, BarChartEmpty, barChartTicks, toBarChartItems } from './bar-chart'
+import { BarChart, BarChartEmpty, BarChartLegend, barChartTicks, toBarChartItems, type BarChartLegendItem, BarChartEventMark } from './bar-chart'
 
 const DIR = dirname(fileURLToPath(import.meta.url))
 const tsx = readFileSync(join(DIR, 'bar-chart.tsx'), 'utf8')
 const css = readFileSync(join(DIR, 'bar-chart.module.css'), 'utf8')
-const analyticsPage = readFileSync(join(DIR, '..', '..', 'app', 'analytics', 'page.tsx'), 'utf8')
+const analyticsPage = readUiSource(join(DIR, '..', '..', 'app', 'analytics', 'page.tsx'), 'utf8')
 
 afterEach(() => cleanup())
 
@@ -65,6 +66,10 @@ describe('数の写し（画面と一致させる）', () => {
     expect(barChartTicks(6)).toEqual([0, 2, 4, 6])
     expect(barChartTicks(0)).toEqual([0, 1])
     expect(barChartTicks(30)).toEqual([0, 10, 20, 30])
+    expect(barChartTicks(99400)).toEqual([0, 50000, 100000])
+    expect(barChartTicks(100001)).toEqual([0, 50000, 100000, 150000])
+    expect(barChartTicks(Number.POSITIVE_INFINITY)).toEqual([0, 1])
+    expect(barChartTicks(Number.MAX_VALUE)).toEqual([0, Number.MAX_VALUE])
   })
 })
 
@@ -84,6 +89,37 @@ describe('色は2つまで（増えた=濃い緑・減った=灰色）', () => {
     const legend = screen.getByRole('list', { name: '凡例' })
     expect(legend.textContent).toContain('増えた')
     expect(legend.textContent).toContain('減った')
+  })
+
+  it('凡例の文言を変えられる（d8X09：登録／ブロック）', () => {
+    render(
+      <BarChart
+        items={SAMPLE}
+        legend={[
+          { label: '登録', tone: 'added' },
+          { label: 'ブロック', tone: 'removed' },
+        ]}
+      />,
+    )
+    const legend = screen.getByRole('list', { name: '凡例' })
+    expect(legend.textContent).toContain('登録')
+    expect(legend.textContent).toContain('ブロック')
+    expect(legend.textContent).not.toContain('増えた')
+  })
+
+  it('凡例を外へ置いても、日を選ぶ操作と読み上げる数を保つ', () => {
+    const legend: BarChartLegendItem[] = [{ label: '登録', tone: 'added' }, { label: 'ブロック', tone: 'removed' }]
+    const selected: string[] = []
+    render(<>
+      <BarChartLegend items={legend} layout="dashboard" />
+      <BarChart items={SAMPLE} layout="dashboard" showLegend={false} legend={legend} onSelect={key => selected.push(key)} />
+    </>)
+    expect(screen.getAllByRole('list', { name: '凡例' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: '9月20日 登録6人・ブロック0人・朝の配信' }))
+    expect(selected).toEqual(['2026-09-20'])
+    const table = screen.getByRole('table', { name: '日ごとの増減' })
+    expect(table.textContent).toContain('6人')
+    expect(table.textContent).toContain('2人')
   })
 })
 
@@ -131,10 +167,10 @@ describe('まだ数えられないとき', () => {
 })
 
 describe('分析画面の配線（見た目と数字の一致）', () => {
-  it('日ごとの増減の枠が BarChart を使う', () => {
-    expect(analyticsPage).toContain("from '@/components/shared/bar-chart'")
-    expect(analyticsPage).toContain('<BarChart')
-    expect(analyticsPage).toContain('toBarChartItems(overview.days')
+  it('日ごとの増減の枠がV8のグラフへ実際の増減を渡す', () => {
+    expect(analyticsPage).toContain("from '@/components/shared/charts'")
+    expect(analyticsPage).toContain('<DailyBars')
+    expect(analyticsPage).toContain('days={overview.days}')
   })
 
   it('減った棒に赤を使わない', () => {
@@ -144,6 +180,91 @@ describe('分析画面の配線（見た目と数字の一致）', () => {
   it('日ごとの数は overview.days の増減をそのまま渡す', () => {
     expect(analyticsPage).toContain('overview.campaigns')
     // 選択日の1行は BarChart の外で今までどおり出す。
-    expect(analyticsPage).toContain('増加 {selectedDay.added}人・減少 {selectedDay.removed}人')
+    expect(analyticsPage).toContain('増加 ${selectedDay.added} 人・減少 ${selectedDay.removed} 人')
   })
+})
+
+/*
+ * V8 QA 1003-1459 ①：読み上げ用の表が見えないまま画面いっぱいの箱になり、
+ * 画面全体の横はみ出し（1440で286px・1152で110px）の原因になっていた。
+ * 表は `height: 0` を最小と読むうえ、画面側の `table { width: 100% }`
+ * （層の外）が幅を奪い、絶対配置の包含塊＝画面いっぱいに広がる。
+ * 最小・最大の両方を 0 で押さえ、箱を作らない。読み上げは残す。
+ */
+describe('読み上げ用の表は箱を作らない', () => {
+  it('表は読み上げに残る（隠し属性なし・見出しつき）', () => {
+    render(<BarChart items={SAMPLE} />)
+    const table = document.querySelector('table') as HTMLTableElement
+    expect(table.getAttribute('aria-hidden')).toBeNull()
+    expect(table.querySelector('caption')?.textContent).toBe('日ごとの増減')
+    expect(table.querySelectorAll('tbody tr')).toHaveLength(3)
+  })
+
+  it('.srOnly は最小・最大の両方を 0 で押さえる', () => {
+    expect(css).toMatch(/\.srOnly\s*\{[^}]*min-width:\s*0/s)
+    expect(css).toMatch(/\.srOnly\s*\{[^}]*max-width:\s*0/s)
+    expect(css).toMatch(/\.srOnly\s*\{[^}]*max-height:\s*0/s)
+    expect(css).toMatch(/\.srOnly\s*\{[^}]*overflow:\s*hidden/s)
+  })
+})
+
+/*
+ * 黒をなくす（#2・オーナー「黒がいや」）：指を乗せた日の吹き出しは
+ * 白地＋細い線＋浮く影＋ink字。黒（ink地）に戻さないための歯止め。
+ */
+describe('グラフの吹き出しは白（黒をなくす #2）', () => {
+  it('.tooltip は白地＋ink字（ink地にしない）', () => {
+    const tooltip = css.match(/\.tooltip \{[^}]*\}/s)?.[0] ?? ''
+    expect(tooltip).toMatch(/background:\s*var\(--color-canvas\)/)
+    expect(tooltip).toMatch(/color:\s*var\(--color-ink\)/)
+    expect(tooltip).not.toMatch(/background:\s*var\(--color-ink\)/)
+  })
+})
+
+
+describe('日別の増減と出来事の役目', () => {
+  it('減少を下へ指定しても日付・元の数・選択を保つ', () => {
+    const picked: string[] = []
+    const { container } = render(<BarChart items={SAMPLE} distribution="diverging" onSelect={key => picked.push(key)} />)
+    expect(container.querySelector('[data-chart-distribution="diverging"]')).not.toBeNull()
+    expect(container.querySelector('[data-chart-baseline]')).not.toBeNull()
+    expect(container.querySelector('[data-chart-series="removed"]')?.getAttribute('style')).toContain('height:')
+    fireEvent.click(screen.getByRole('button', { name: '9月21日 増えた0人・減った2人' }))
+    expect(picked).toEqual(['2026-09-21'])
+    const table = screen.getByRole('table', { name: '日ごとの増減' })
+    expect(table.textContent).toContain('2人')
+    expect(table.textContent).not.toContain('-2人')
+  })
+
+  it('配信とシナリオの印を凡例と同じ役目で日付へ渡す', () => {
+    const items = toBarChartItems([{ date: '2026-09-20', added: 6, removed: 0 }], { campaigns: [
+      { date: '2026-09-20', name: '朝の配信', kind: 'broadcast' },
+      { date: '2026-09-20', name: '来店のお礼', kind: 'scenario' },
+    ] })
+    const { container } = render(<>
+      <BarChartLegend items={[{ label: '増えた', tone: 'added' }, { label: '配信した日', tone: 'broadcast' }, { label: 'シナリオを始めた日', tone: 'scenario' }]} layout="analytics" />
+      <BarChart items={items} distribution="diverging" showLegend={false} />
+      <BarChartEventMark tone="broadcast" />
+    </>)
+    const tones = [...container.querySelectorAll('[data-chart-event]')].map(mark => mark.getAttribute('data-chart-event'))
+    expect(tones).toContain('broadcast')
+    expect(tones).toContain('scenario')
+    expect(container.querySelector('[data-chart-tone="broadcast"]')?.className).not.toBe(container.querySelector('[data-chart-tone="added"]')?.className)
+    expect(screen.getByRole('button', { name: '9月20日 増えた6人・減った0人・朝の配信、来店のお礼' })).not.toBeNull()
+    expect(screen.getAllByRole('list', { name: '凡例' })).toHaveLength(1)
+  })
+
+  it('追加の指定が無いグラフに基準線上下や出来事の印を足さない', () => {
+    const { container } = render(<BarChart items={SAMPLE} />)
+    expect(container.querySelector('[data-chart-distribution]')).toBeNull()
+    expect(container.querySelector('[data-chart-baseline]')).toBeNull()
+    expect(container.querySelector('[data-chart-event]')).toBeNull()
+  })
+})
+
+
+it('既定のダッシュボードは従来の読み上げ用見出しを保つ', () => {
+  render(<BarChart items={SAMPLE} layout="dashboard" legend={[{ label: '登録', tone: 'added' }, { label: 'ブロック', tone: 'removed' }]} />)
+  const table = screen.getByRole('table', { name: '日ごとの増減' })
+  expect([...table.querySelectorAll('thead th')].map(header => header.textContent)).toEqual(['日付', '増えた', '減った'])
 })

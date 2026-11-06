@@ -1,42 +1,44 @@
+import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   getAccountHealthLogs,
-  getLatestRiskLevel,
-  getLatestRiskLevels,
+  getLineAccountListStats,
   getAccountMigrations,
   getAccountMigrationById,
   createAccountMigration,
   updateAccountMigration,
+  isLineAccountTenantActive,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import { lineConnectionRisk, DEFAULT_TENANT_ID } from '@line-crm/shared';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-
+import { buildMetadata } from '../lib/build-metadata.js';
+import { fail } from '../lib/fail.js';
 const health = new Hono<Env>();
 
-// ========== Liveness ==========
-// Public (no auth, see middleware/auth.ts skip list): probed by
-// `create-line-harness update` and by the self-update verify phase
-// (capabilities advertises `/api/health`). Deliberately dependency-free —
-// it exists only to prove the Worker booted and is routing requests.
+// Worker の起動と経路だけを確かめるため、公開の liveness は外部依存なしで200を返す。capabilities で示した /api/health を CLI の配備後確認に使う。
 
-const LIVENESS_BODY = { success: true, data: { status: 'ok' } } as const;
-
-health.get('/health', (c) => c.json(LIVENESS_BODY));
-health.get('/api/health', (c) => c.json(LIVENESS_BODY));
+health.get('/health', (c) => {
+  c.header('Cache-Control', 'no-store');
+  return c.json({ success: true, data: { status: 'ok', ...buildMetadata(c.env) } });
+});
+health.get('/api/health', (c) => {
+  c.header('Cache-Control', 'no-store');
+  return c.json({ success: true, data: { status: 'ok', ...buildMetadata(c.env) } });
+});
 
 // ========== アカウントヘルス ==========
 
 // サイドバーの N+1 解消用。staff 可視範囲のアカウントだけを対象に、
-// 最新 riskLevel だけを1回で返す。ログ本文は含めない。
+// 一覧と同じ接続の判定だけを1回で返す。ログ本文は含めない。
 health.get('/api/accounts/health-summary', async (c) => {
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    const levels = await getLatestRiskLevels(c.env.DB, scope.allowedAccountIds);
-    const byId = new Map(levels.map((level) => [level.line_account_id, level.risk_level]));
+    const stats = await getLineAccountListStats(c.env.DB, scope.allowedAccountIds);
     const items = scope.allowedAccountIds.map((lineAccountId) => ({
       lineAccountId,
-      riskLevel: byId.get(lineAccountId) ?? null,
+      riskLevel: lineConnectionRisk(stats[lineAccountId]?.connection),
     }));
     return c.json({
       success: true,
@@ -47,8 +49,7 @@ health.get('/api/accounts/health-summary', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/accounts/health-summary error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -57,17 +58,18 @@ health.get('/api/accounts/:id/health', async (c) => {
     const lineAccountId = c.req.param('id');
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (!scope.ids.includes(lineAccountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
-    const [riskLevel, logs] = await Promise.all([
-      getLatestRiskLevel(c.env.DB, lineAccountId),
+    const [stats, logs] = await Promise.all([
+      getLineAccountListStats(c.env.DB, [lineAccountId]),
       getAccountHealthLogs(c.env.DB, lineAccountId),
     ]);
     return c.json({
       success: true,
       data: {
         lineAccountId,
-        riskLevel,
+        riskLevel: lineConnectionRisk(stats[lineAccountId]?.connection),
+        connection: stats[lineAccountId]?.connection ?? null,
         logs: logs.map((l) => ({
           id: l.id,
           errorCode: l.error_code,
@@ -79,8 +81,7 @@ health.get('/api/accounts/:id/health', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/accounts/:id/health error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -108,23 +109,38 @@ health.get('/api/accounts/migrations', async (c) => {
       })),
     });
   } catch (err) {
-    console.error('GET /api/accounts/migrations error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-health.post('/api/accounts/:id/migrate', requireRole('owner'), async (c) => {
+health.post('/api/accounts/:id/migrate', requireRole('owner'), inputJsonBoundary({"toAccountId":["string"]}), async (c) => {
   try {
     const fromAccountId = c.req.param('id');
     const body = await c.req.json<{ toAccountId: string }>();
-    if (!body.toAccountId) return c.json({ success: false, error: 'toAccountId is required' }, 400);
+    if (!body.toAccountId) return fail(c, 400, 'TO_ACCOUNT_ID_IS_REQUIRED', {}, ["toAccountId"]);
 
     const db = c.env.DB;
 
-    // 移行対象: このアカウントに紐づく友だち数をカウント（line_accountsとの関連はuser_id経由）
-    // 簡易版: is_following=1 の全友だちを移行対象とする
+    /*
+     * 存在しない移行元で 201 の幽霊行を作っていた。
+     * 移行前に可視範囲で有無を見て、無いときは 404 にして作らない。
+     * 範囲外も 404 に倒す（詳細口と同じ fail-closed）。
+     */
+    const scope = await getVisibleLineAccountScope(db, c.get('staff'));
+    const source = scope.accounts.find((account) => account.id === fromAccountId);
+    const target = scope.accounts.find((account) => account.id === body.toAccountId);
+    if (!source || !target || source.is_active !== 1 || target.is_active !== 1
+      || source.archived_at || target.archived_at
+      || (source.tenant_id ?? DEFAULT_TENANT_ID) !== (target.tenant_id ?? DEFAULT_TENANT_ID)
+      || !await isLineAccountTenantActive(db, fromAccountId)
+      || !await isLineAccountTenantActive(db, body.toAccountId)) {
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
+    }
+
+    // この移行件数に、別アカウントの友だちを含めない。
     const countResult = await db
-      .prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1`)
+      .prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND line_account_id = ?`)
+      .bind(fromAccountId)
       .first<{ count: number }>();
     const totalCount = countResult?.count ?? 0;
 
@@ -151,19 +167,18 @@ health.post('/api/accounts/:id/migrate', requireRole('owner'), async (c) => {
       },
     }, 201);
   } catch (err) {
-    console.error('POST /api/accounts/:id/migrate error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 health.get('/api/accounts/migrations/:migrationId', async (c) => {
   try {
     const item = await getAccountMigrationById(c.env.DB, c.req.param('migrationId'));
-    if (!item) return c.json({ success: false, error: 'Migration not found' }, 404);
+    if (!item) return fail(c, 404, 'MIGRATION_NOT_FOUND');
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (!scope.allowedAccountIds.includes(item.from_account_id)
       || !scope.allowedAccountIds.includes(item.to_account_id)) {
-      return c.json({ success: false, error: 'Migration not found' }, 404);
+      return fail(c, 404, 'MIGRATION_NOT_FOUND');
     }
     return c.json({
       success: true,
@@ -179,8 +194,7 @@ health.get('/api/accounts/migrations/:migrationId', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/accounts/migrations/:migrationId error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

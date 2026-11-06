@@ -1,9 +1,9 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * LINE に登録されている Webhook の宛先を読み、こちらの受け口と突き合わせる。
  *
- * `LineAccount.webhook` は型だけあって、**誰も値を入れていなかった**（台帳 #134）。
- * 入れないままだと、はじめの設定の段1（「Webhookが合っていて」）が
- * いつまでも終わらない。
+ * 接続の健康状態を確認するため、LINE側のWebhook設定を別途読み取る。
+ * はじめの設定の段1はアカウント登録の有無で判定する。
  *
  * **「合っている」と「確かめていない」を言い分ける。**
  * どちらも届かないかもしれないが、運用者のやることが違う——
@@ -21,8 +21,11 @@ export interface WebhookCheck {
 }
 
 /** こちらの受け口。`webhook.ts` の `POST /webhook` と揃える。 */
-export function expectedWebhookUrl(workerUrl: string): string {
-  return `${workerUrl.replace(/\/+$/, '')}/webhook`;
+export function expectedWebhookUrl(workerUrl: string, channelId?: string): string {
+  const base = `${workerUrl.replace(/\/+$/, '')}/webhook`;
+  if (channelId === undefined) return base;
+  if (!/^\d+$/.test(channelId)) throw new Error('Invalid LINE channel ID');
+  return `${base}/${channelId}`;
 }
 
 /**

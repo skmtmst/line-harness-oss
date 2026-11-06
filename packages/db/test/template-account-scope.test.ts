@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getAssociableTemplate, isTemplateAssociable, isTemplateSendable } from '../src/templates.js'
 
 /**
- * 結びつけ・送信の持ち主検査(#645・独立審査P2相当 指摘3)。
+ * 結びつけ・送信の持ち主検査。
  * 公開版があり、相手と持ち主が完全一致するときだけ通す。
  * 持ち主不明(null)は結びも送信もしない(fail-close)。
  * 持ち主未定のシナリオに結ぶと、送る側で別アカウントの公開版が混ざる。

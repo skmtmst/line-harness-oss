@@ -1,10 +1,10 @@
 /*
- * N-064: リマインダ別の登録者操作を実SQLite + 実routeで確認する。
+ * リマインダ別の登録者操作を実SQLite + 実routeで確認する。
  * 送信済み履歴を消さず、古い未送信だけを止めることまでDBを直接読む。
  */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
@@ -88,7 +88,7 @@ function deliveredHistoryCount() {
 }
 
 beforeEach(async () => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed();
   ({ reminders: remindersRoute } = await import('./reminders.js'));
 });

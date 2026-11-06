@@ -1,3 +1,5 @@
+import { logger } from '@line-crm/shared/server';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
   applyBulkPhotoDecisions,
@@ -23,15 +25,16 @@ import {
   type BulkPhotoDecisionItem,
   type BulkPhotoDecisionResult,
 } from '@line-crm/db';
+import { fail } from '../lib/fail.js';
 import {
   deliverPhotoReviewNotification,
   loadPhotoReviewRecipient,
   type PhotoReviewReasonCode,
-} from './nen-members.js';
-import type { Env } from '../index.js';
+} from './nen-members-definition.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { getFileScanBySubject } from '../services/file-scan.js';
-import { sha256Hex } from '../middleware/auth.js';
+import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth.js';
 import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
@@ -93,19 +96,18 @@ nenPhotoOperations.get(
   requirePhotoPermission('photo.submission.view'),
   async (c) => {
     const accountId = accountIdFromQuery(c);
-    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await accountVisible(c, accountId)) return c.json({ success: false, error: '写真審査情報が見つかりません' }, 404);
     try {
       return c.json({ success: true, data: await getPhotoReviewMetrics(c.env.DB, accountId) });
     } catch (error) {
-      console.error('GET photo review metrics error:', error);
-      return c.json({ success: false, error: '写真審査の集計を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
 
 /*
- * 報酬の決まりの版 (#817)。保存するたびに版を1つ足し、前の版は変えない。
+ * 報酬の決まりの版。保存するたびに版を1つ足し、前の版は変えない。
  * 「この版に戻す」は、その版の中身で新しい版を作る。
  * 決まりは全体で1つ（アカウントの切り分けなし）。見るだけなら
  * 写真審査の表示権限で足り、変えるのは owner・admin だけ。
@@ -122,6 +124,7 @@ nenPhotoOperations.get(
           versionNumber: version.version_number,
           policyKey: version.policy_key,
           points: version.points,
+          publicationPoints: Number(version.publication_points ?? 0),
           summary: version.summary,
           effectiveFrom: version.effective_from,
           createdBy: version.created_by_staff_id,
@@ -130,8 +133,7 @@ nenPhotoOperations.get(
         })),
       });
     } catch (error) {
-      console.error('GET photo reward policy versions error:', error);
-      return c.json({ success: false, error: '報酬の決まりの版を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -139,12 +141,16 @@ nenPhotoOperations.get(
 nenPhotoOperations.post(
   '/api/nen-members/photo-reward-policy/versions',
   requireRole('owner', 'admin'),
-  async (c) => {
-    type Body = { points?: unknown; summary?: unknown; effectiveFrom?: unknown; expectedVersion?: unknown };
+  inputJsonBoundary(), async (c) => {
+    type Body = { publicationPoints?: unknown; points?: unknown; summary?: unknown; effectiveFrom?: unknown; expectedVersion?: unknown };
     const body = await c.req.json<Body>().catch((): Body => ({}));
     const key = idempotencyKey(c);
     if (!key) {
-      return c.json({ success: false, error: '再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '再実行キーを確認してください' }, 400, []);
+    }
+    const publicationPoints = body.publicationPoints;
+    if (publicationPoints !== undefined && (typeof publicationPoints !== 'number' || !Number.isInteger(publicationPoints) || publicationPoints < 0 || publicationPoints > 100000)) {
+      return inputError(c, { success: false, error: '掲載時の追加点数を0〜100000で入力してください' }, 400, ["publicationPoints"]);
     }
     const points = Number(body.points);
     const summary = typeof body.summary === 'string' ? body.summary : '';
@@ -155,18 +161,19 @@ nenPhotoOperations.post(
       ? undefined
       : Number(body.expectedVersion);
     if (!Number.isInteger(points) || points <= 0 || points > 100000) {
-      return c.json({ success: false, error: '1枚につき付ける点数を1〜100000で入力してください' }, 400);
+      return inputError(c, { success: false, error: '1枚につき付ける点数を1〜100000で入力してください' }, 400, ["points"]);
     }
     if (effectiveFrom !== null && Number.isNaN(Date.parse(effectiveFrom))) {
-      return c.json({ success: false, error: '使い始めの日時の形を確認してください' }, 400);
+      return inputError(c, { success: false, error: '使い始めの日時の形を確認してください' }, 400, ["effectiveFrom"]);
     }
     if (expectedVersion !== undefined && (!Number.isInteger(expectedVersion) || expectedVersion < 1)) {
-      return c.json({ success: false, error: '確認した版の番号を確認してください' }, 400);
+      return inputError(c, { success: false, error: '確認した版の番号を確認してください' }, 400, ["expectedVersion"]);
     }
     auditLog(c, 'photo.reward.policy.create', { kind: 'nen-photo-reward-policy' });
     try {
       const { created, version } = await createPhotoRewardPolicy(c.env.DB, {
         points,
+        publicationPoints: publicationPoints as number | undefined,
         summary,
         effectiveFrom,
         expectedVersion,
@@ -181,6 +188,7 @@ nenPhotoOperations.post(
             versionNumber: version.version_number,
             policyKey: version.policy_key,
             points: version.points,
+          publicationPoints: Number(version.publication_points ?? 0),
             summary: version.summary,
             effectiveFrom: version.effective_from,
             createdAt: version.created_at,
@@ -188,11 +196,13 @@ nenPhotoOperations.post(
         },
       });
     } catch (error) {
+      if (String(error).includes('PHOTO_REWARD_POLICY_IDEMPOTENCY_CONFLICT')) {
+        return c.json({ success: false, error: '同じ確認キーが別の入力に使われています' }, 409);
+      }
       if (String(error).includes('PHOTO_REWARD_POLICY_VERSION_CONFLICT')) {
         return c.json({ success: false, error: 'ほかの担当者が先に保存しました。開き直して確認してください', code: 'VERSION_CONFLICT' }, 409);
       }
-      console.error('POST photo reward policy versions error:', error);
-      return c.json({ success: false, error: '報酬の決まりを保存できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -200,16 +210,16 @@ nenPhotoOperations.post(
 nenPhotoOperations.post(
   '/api/nen-members/photo-reward-policy/revert',
   requireRole('owner', 'admin'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     type Body = { versionNumber?: unknown };
     const body = await c.req.json<Body>().catch((): Body => ({}));
     const key = idempotencyKey(c);
     if (!key) {
-      return c.json({ success: false, error: '再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '再実行キーを確認してください' }, 400, []);
     }
     const versionNumber = Number(body.versionNumber);
     if (!Number.isInteger(versionNumber) || versionNumber < 1) {
-      return c.json({ success: false, error: '戻す版の番号を確認してください' }, 400);
+      return inputError(c, { success: false, error: '戻す版の番号を確認してください' }, 400, ["versionNumber"]);
     }
     auditLog(c, 'photo.reward.policy.revert', { kind: 'nen-photo-reward-policy' });
     try {
@@ -225,6 +235,7 @@ nenPhotoOperations.post(
             versionNumber: version.version_number,
             policyKey: version.policy_key,
             points: version.points,
+          publicationPoints: Number(version.publication_points ?? 0),
             summary: version.summary,
             effectiveFrom: version.effective_from,
             createdAt: version.created_at,
@@ -235,8 +246,7 @@ nenPhotoOperations.post(
       if (String(error).includes('PHOTO_REWARD_POLICY_VERSION_NOT_FOUND')) {
         return c.json({ success: false, error: '戻す版が見つかりません' }, 404);
       }
-      console.error('POST photo reward policy revert error:', error);
-      return c.json({ success: false, error: '報酬の決まりを戻せませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -245,13 +255,13 @@ nenPhotoOperations.post(
   '/api/nen-members/photos/:id/assessments/re-evaluate',
   requireRole('owner', 'admin', 'staff'),
   requirePhotoPermission('photo.submission.review'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     type Body = { lineAccountId?: unknown; expectedVersion?: unknown };
     const body = await c.req.json<Body>().catch((): Body => ({}));
     const key = idempotencyKey(c);
     if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()
       || !validVersion(body.expectedVersion) || !key) {
-      return c.json({ success: false, error: '対象アカウント、版、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '対象アカウント、版、再実行キーを確認してください' }, 400, ["lineAccountId","expectedVersion"]);
     }
     const lineAccountId = body.lineAccountId.trim();
     if (!await accountVisible(c, lineAccountId)) return c.json({ success: false, error: '写真が見つかりません' }, 404);
@@ -270,8 +280,7 @@ nenPhotoOperations.post(
       }
       return queueError(c, result.kind);
     } catch (error) {
-      console.error('POST photo assessment re-evaluate error:', error);
-      return c.json({ success: false, error: '写真の再評価を受け付けられませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -280,7 +289,7 @@ nenPhotoOperations.post(
   '/api/nen-members/photos/:id/assets/process',
   requireRole('owner', 'admin', 'staff'),
   requirePhotoPermission('photo.submission.review'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     type Body = { lineAccountId?: unknown; expectedVersion?: unknown; operation?: unknown };
     const body = await c.req.json<Body>().catch((): Body => ({}));
     const key = idempotencyKey(c);
@@ -288,7 +297,7 @@ nenPhotoOperations.post(
     if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()
       || !validVersion(body.expectedVersion) || !key
       || !['review', 'public', 'thumbnail', 'all'].includes(String(operation))) {
-      return c.json({ success: false, error: '対象、処理内容、版、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '対象、処理内容、版、再実行キーを確認してください' }, 400, ["lineAccountId","expectedVersion","operation"]);
     }
     const lineAccountId = body.lineAccountId.trim();
     if (!await accountVisible(c, lineAccountId)) return c.json({ success: false, error: '写真が見つかりません' }, 404);
@@ -308,8 +317,7 @@ nenPhotoOperations.post(
       }
       return queueError(c, result.kind);
     } catch (error) {
-      console.error('POST photo asset process error:', error);
-      return c.json({ success: false, error: '派生画像処理を受け付けられませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -320,14 +328,13 @@ nenPhotoOperations.get(
   async (c) => {
     const photoId = c.req.param('id');
     const accountId = accountIdFromQuery(c);
-    if (!photoId || !accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!photoId || !accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await accountVisible(c, accountId)) return c.json({ success: false, error: '写真が見つかりません' }, 404);
     try {
       const data = await getPhotoAssetStatus(c.env.DB, { photoId, lineAccountId: accountId });
       return data ? c.json({ success: true, data }) : c.json({ success: false, error: '写真が見つかりません' }, 404);
     } catch (error) {
-      console.error('GET photo asset status error:', error);
-      return c.json({ success: false, error: '派生画像の処理状況を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -338,14 +345,13 @@ nenPhotoOperations.get(
   async (c) => {
     const photoId = c.req.param('id');
     const accountId = accountIdFromQuery(c);
-    if (!photoId || !accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!photoId || !accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await accountVisible(c, accountId)) return c.json({ success: false, error: '写真が見つかりません' }, 404);
     try {
       const data = await getPhotoDerivatives(c.env.DB, { photoId, lineAccountId: accountId });
       return data ? c.json({ success: true, data }) : c.json({ success: false, error: '写真が見つかりません' }, 404);
     } catch (error) {
-      console.error('GET photo derivatives error:', error);
-      return c.json({ success: false, error: '派生画像を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -354,14 +360,14 @@ nenPhotoOperations.post(
   '/api/nen-members/photos/decisions/bulk',
   requireRole('owner', 'admin', 'staff'),
   requirePhotoPermission('photo.submission.bulk_review'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     type Decision = { photoId?: unknown; decision?: unknown; expectedVersion?: unknown; reasonCode?: unknown; reasonNote?: unknown };
     type Body = { lineAccountId?: unknown; decisions?: unknown };
     const body = await c.req.json<Body>().catch((): Body => ({}));
     const key = idempotencyKey(c);
     if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()
       || !Array.isArray(body.decisions) || body.decisions.length < 1 || body.decisions.length > 50 || !key) {
-      return c.json({ success: false, error: '対象アカウント、1〜50件の判断、再実行キーを指定してください' }, 400);
+      return inputError(c, { success: false, error: '対象アカウント、1〜50件の判断、再実行キーを指定してください' }, 400, ["lineAccountId","decisions"]);
     }
     const allowedReasons = new Set(['quality', 'privacy', 'unrelated', 'duplicate', 'other']);
     const decisions: BulkPhotoDecision[] = [];
@@ -373,9 +379,9 @@ nenPhotoOperations.post(
         || !['approve', 'return', 'reject'].includes(decision) || !validVersion(raw.expectedVersion)
         || (decision !== 'approve' && !allowedReasons.has(reasonCode ?? ''))
         || (reasonCode === 'other' && !reasonNote)) {
-        return c.json({ success: false, error: '写真、判断、理由、版を確認してください' }, 400);
+        return inputError(c, { success: false, error: '写真、判断、理由、版を確認してください' }, 400, ["decisions"]);
       }
-      // 単体審査と同じく補足は素で保存する（#500 軽）。
+      // 単体審査と同じく補足は素で保存する（ 軽）。
       // 一括だけ `[差し戻し]` を付けると「見送った理由」の表示が単体とずれる。
       decisions.push({
         photoId: raw.photoId.trim(), decision: decision as BulkPhotoDecision['decision'],
@@ -384,11 +390,11 @@ nenPhotoOperations.post(
       });
     }
     if (new Set(decisions.map((decision) => decision.photoId)).size !== decisions.length) {
-      return c.json({ success: false, error: '同じ写真を重複して指定できません' }, 400);
+      return inputError(c, { success: false, error: '同じ写真を重複して指定できません' }, 400, ["decisions"]);
     }
     const lineAccountId = body.lineAccountId.trim();
     if (!await accountVisible(c, lineAccountId)) return c.json({ success: false, error: '写真が見つかりません' }, 404);
-    // 検査が終わっていない写真は一括採用の対象にできない（v6-22 §4）。
+    // 検査が終わっていない写真は一括採用の対象にできない（-22 §4）。
     const approveTargets = decisions.filter((decision) => decision.decision === 'approve');
     if (approveTargets.length > 0) {
       for (const target of approveTargets) {
@@ -425,7 +431,7 @@ nenPhotoOperations.post(
           receiptId, lineAccountId, idempotencyKey: key, decisions, result: result.result,
         });
         /*
-         * 採用した分のポイント手続きをその場で一度届ける（PHOTO-06）。
+         * 採用した分のポイント手続きをその場で一度届ける。
          * 単体採用と同じく、失敗しても審査結果は確定済みで、行は
          * 日次回収・手動の再試行・照合で後から進められる。
          */
@@ -441,7 +447,7 @@ nenPhotoOperations.post(
                 { now: new Date() },
               );
             } catch (error) {
-              console.error('bulk photo reward delivery failed', item.photoId, error);
+              logger.error("nen_photo_operations.nen_members_photos_decisions_bulk_create_failed");
             }
           }
         }
@@ -453,8 +459,7 @@ nenPhotoOperations.post(
       }
       return queueError(c, result.kind);
     } catch (error) {
-      console.error('POST bulk photo decisions error:', error);
-      return c.json({ success: false, error: '写真の一括審査を完了できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -463,13 +468,13 @@ nenPhotoOperations.post(
   '/api/nen-members/photos/:id/original-download',
   requireRole('owner', 'admin', 'staff'),
   requirePhotoPermission('photo.original.download'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     type Body = { lineAccountId?: unknown; expectedVersion?: unknown };
     const body = await c.req.json<Body>().catch((): Body => ({}));
     const key = idempotencyKey(c);
     if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()
       || !validVersion(body.expectedVersion) || !key) {
-      return c.json({ success: false, error: '対象アカウント、版、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '対象アカウント、版、再実行キーを確認してください' }, 400, ["lineAccountId","expectedVersion"]);
     }
     const lineAccountId = body.lineAccountId.trim();
     if (!await accountVisible(c, lineAccountId)) return c.json({ success: false, error: '写真が見つかりません' }, 404);
@@ -477,6 +482,7 @@ nenPhotoOperations.post(
     if (!stepUpToken || !await consumeStepUpGrant(c.env.DB, {
       tokenHash: await sha256Hex(stepUpToken), staffId: c.get('staff')!.id,
       purpose: 'photo.original.download',
+      sessionTokenHash: await adminSessionTokenHashFromRequest(c),
     })) {
       return c.json({ success: false, error: '原本取得には二段階認証による再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
     }
@@ -499,8 +505,7 @@ nenPhotoOperations.post(
         data: { downloadUrl, expiresAt: result.expiresAt, oneTime: true },
       }, result.kind === 'created' ? 201 : 200);
     } catch (error) {
-      console.error('POST photo original download issue error:', error);
-      return c.json({ success: false, error: '原本の取得URLを発行できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -531,8 +536,7 @@ nenPhotoOperations.get(
         },
       });
     } catch (error) {
-      console.error('GET photo original download error:', error);
-      return c.json({ success: false, error: '原本を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -586,9 +590,9 @@ async function healBulkDecisionReceipt(
         onlyIfPending: true,
       })
       : false;
-    if (!recorded) console.error('heal bulk decision receipt failed', input.idempotencyKey);
+    if (!recorded) logger.error("nen_photo_operations.heal_bulk_decision_receipt_failed");
   } catch (error) {
-    console.error('heal bulk decision receipt failed', input.idempotencyKey, error);
+    logger.error("nen_photo_operations.heal_bulk_decision_receipt_failed");
   }
   return data;
 }
@@ -625,7 +629,7 @@ async function notifyOneBulkDecision(
         });
       }
     } catch (error) {
-      console.error('bulk photo decision recipient failure record failed', item.decisionId, error);
+      logger.error("nen_photo_operations.notify_one_bulk_decision_failed");
     }
     return { ...item, notificationStatus: 'failed', notificationError };
   }
@@ -674,7 +678,7 @@ async function notifyBulkPhotoDecisions(
     } catch (error) {
       // 対象1件の想定外の失敗で、後続対象の通知まで止めない（対象単位の分離）。
       // 送達台帳は pending か sending のまま残るが、どちらも再送口の拾い上げ対象。
-      console.error('bulk photo decision notify failed', item.decisionId, error);
+      logger.error("nen_photo_operations.notify_bulk_photo_decisions_failed");
       outcome = {
         ...item, notificationStatus: 'failed',
         notificationError: '通知を実行できませんでした。再送してください。',
@@ -695,9 +699,9 @@ async function notifyBulkPhotoDecisions(
       actorId: c.get('staff')!.id, idempotencyKey: input.idempotencyKey, result: data,
     });
     // false も握りつぶさない。次の同じ再実行鍵で送達台帳から作り直す。
-    if (!recorded) console.error('POST bulk photo decisions notification record failed', input.idempotencyKey);
+    if (!recorded) logger.error("nen_photo_operations.notify_bulk_photo_decisions_failed");
   } catch (error) {
-    console.error('POST bulk photo decisions notification record error:', error);
+    logger.error("nen_photo_operations.notify_bulk_photo_decisions_failed");
   }
   return data;
 }

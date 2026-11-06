@@ -1,13 +1,16 @@
 import { defineConfig } from 'vitest/config';
 
-// Root vitest config — deploy scripts plus the packages that have no vitest of
-// their own. `packages/shared` is pure TypeScript with no devDependencies, so
-// its tests run here instead of adding vitest to that package.
-// Per-package suites (apps/worker, packages/db) keep their own configs.
+// Repository scripts run here. Package suites, including packages/shared,
+// use their own configs; CI runs shared in UTC and Asia/Bangkok.
 export default defineConfig({
   test: {
+    // Script audits spawn child processes and scan the whole repository.
+    // Two workers keep CI's small runner responsive for their startup checks.
+    maxWorkers: 2,
+    // Vitest 4 restoreAllMocks no longer clears standalone vi.fn call history.
+    clearMocks: true,
     environment: 'node',
     globals: false,
-    include: ['scripts/**/*.test.ts', 'packages/shared/src/**/*.test.ts'],
+    include: ['scripts/**/*.test.ts'],
   },
 });

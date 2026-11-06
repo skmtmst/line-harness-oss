@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
@@ -9,7 +10,7 @@ import { describe, expect, it } from 'vitest'
  * 画面側は FUNNEL_STEP_KIND_OPTIONS が選択肢と案内文の両方の元になっている。
  * 正本に種類が増えて画面側へ反映し忘れたとき、この試験が先に落ちる。
  */
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const FUNNELS_DB = readFileSync(
   new URL('../../../../../packages/db/src/analytics-funnels.ts', import.meta.url),
   'utf8',
@@ -40,12 +41,12 @@ describe('ファネルの段の種類', () => {
 
   it('「段の作り方」の案内は選択肢の一覧から作る（古い5種の固定文を残さない）', () => {
     expect(PAGE).toContain(
-      "段には {FUNNEL_STEP_KIND_OPTIONS.map((item) => item.label).join('・')} を置けます",
+      "funnelStepKindsLabel: FUNNEL_STEP_KIND_OPTIONS.map((item) => item.label).join('・')",
     )
     expect(PAGE).not.toContain('タグ・友だち情報・フォーム回答・サイトの行動・購入')
   })
 
   it('段の選択セレクトと案内は同じ一覧を使う', () => {
-    expect(PAGE).toContain('options={FUNNEL_STEP_KIND_OPTIONS.map(')
+    expect(PAGE).toContain('options={FUNNEL_STEP_KINDS.map(')
   })
 })

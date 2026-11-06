@@ -1,0 +1,113 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/*
+ * どこからでも探す窓（V8「サクサク感」F②）。
+ * 開く速さは窓と同じ（200ms ease-out）。帯には置かない。
+ * 管理画面 の画面では使わない部品のため 管理画面 側の規定は持たない。
+ */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+  background: var(--polish-window-backdrop);
+  -webkit-backdrop-filter: blur(var(--polish-window-blur));
+  backdrop-filter: blur(var(--polish-window-blur));
+}
+
+.panel {
+  width: min(560px, 100%);
+  max-height: min(60dvh, 28rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--polish-radius-dialog);
+  background: var(--color-canvas);
+  box-shadow: var(--polish-window-shadow);
+}
+
+.input {
+  height: 48px;
+  border: 0;
+  border-bottom: 1px solid var(--color-hairline);
+  background: transparent;
+  padding: 0 16px;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+
+.input:focus {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.list {
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius-icon);
+  background: transparent;
+  padding: 6px 10px;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowActive {
+  background: var(--color-accent-soft);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.rowLabel {
+  overflow: hidden;
+  flex: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rowSection {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.empty {
+  padding: 16px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-body);
+  text-align: center;
+}
+
+/* 閉じかけで開き直しても、現在の位置から操作を受ける。 */
+.backdrop[data-closing] { opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .backdrop { transition: opacity var(--motion-base) var(--motion-ease-out); }
+  .panel { transition: opacity var(--motion-base) var(--motion-ease-out), transform var(--motion-base) var(--motion-ease-out); }
+  @starting-style {
+    .backdrop { opacity: 0; }
+    .panel { opacity: 0; transform: translateY(4px) scale(0.98); }
+  }
+  .backdrop[data-closing], .backdrop[data-closing] .panel { transition-duration: var(--motion-exit); }
+  .backdrop[data-closing] .panel { opacity: 0; transform: translateY(4px) scale(0.98); }
+}
+}

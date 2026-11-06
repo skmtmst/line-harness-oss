@@ -106,7 +106,7 @@ function savedConditionToRule(condition: SavedSearchCondition): SegmentRule | nu
     }
     /*
      * 写せないもの: 最終反応日(台帳の取り方が違う)・予約系の存在確認・
-     * リマインダ・個別メモ・共通イベント・購入履歴。
+     * リマインダ・メモ・共通イベント・購入履歴。
      */
     default:
       return null

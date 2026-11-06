@@ -2,7 +2,7 @@
  * 飲食店向け「Googleビジネス」：Googleから受け取った内容の保存期限の掃除。
  *
  * なぜ必要か。Google Business Profile APIのポリシー
- * （https://developers.google.com/my-business/content/policies 、2026-08-28更新）は
+ * （https://developers.google.com/my-business/content/policies、2026-08-28更新）は
  * 受信した内容を無期限に持つことを禁じ、一時保存する場合の条件を
  * 「no more than 30 calendar days」「stored securely」「cannot be manipulated or
  * aggregated」と定めている。つまり口コミ本文・プロフィール・指標などの

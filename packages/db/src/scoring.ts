@@ -1,3 +1,5 @@
+export type { FriendScoreRow } from './scoring-types.js';
+import type { FriendScoreRow } from './scoring-types.js';
 import { jstNow, toJstString } from './utils.js';
 // スコアリング（Lead Scoring）クエリヘルパー
 
@@ -9,25 +11,6 @@ export interface ScoringRuleRow {
   is_active: number;
   created_at: string;
   updated_at: string;
-}
-
-export interface FriendScoreRow {
-  id: string;
-  friend_id: string;
-  scoring_rule_id: string | null;
-  score_change: number;
-  reason: string | null;
-  created_at: string;
-  /** V6列。旧行は NULL のままなので、表示側は欠損を許容する。 */
-  event_type: string | null;
-  source: string | null;
-  rule_key: string | null;
-  operation: 'delta' | 'set' | 'manual_adjustment' | null;
-  score_before: number | null;
-  score_after: number | null;
-  occurred_at: string | null;
-  executed_by_staff_id: string | null;
-  executed_by_staff_name: string | null;
 }
 
 export type ActionScoreBand = 'high' | 'normal' | 'low';
@@ -69,7 +52,7 @@ type ActionScoreOverviewRow = {
 };
 
 /**
- * V6の「行動スコア」一覧を、既存の friends.score と friend_scores から組み立てる。
+ * の「行動スコア」一覧を、既存の friends.score と friend_scores から組み立てる。
  *
  * スコアはLINEアカウントをまたいで合算しない。`accountId` は必須で、Worker
  * 側の権限確認を通った値だけを受け取る。30日変化は履歴から計算し、現在値を
@@ -301,25 +284,34 @@ export async function addScore(
     /** 手で動かした記録には実行者を残す。自動の出来事は渡さない。 */
     executedByStaffId?: string | null;
     executedByStaffName?: string | null;
+    /** 同じ操作の再送には同じ値を渡す。 */
+    idempotencyKey?: string;
   },
 ): Promise<void> {
-  const id = crypto.randomUUID();
+  const id = input.idempotencyKey
+    ? JSON.stringify(['score', input.friendId, input.idempotencyKey]) : crypto.randomUUID();
   const now = jstNow();
-  await db.prepare(`INSERT INTO friend_scores (id, friend_id, scoring_rule_id, score_change, reason, created_at, executed_by_staff_id, executed_by_staff_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(
-      id,
-      input.friendId,
-      input.scoringRuleId ?? null,
-      input.scoreChange,
-      input.reason ?? null,
-      now,
-      input.executedByStaffId ?? null,
-      input.executedByStaffName ?? null,
-    ).run();
-
-  // スコアキャッシュを更新
-  await db.prepare(`UPDATE friends SET score = score + ?, updated_at = ? WHERE id = ?`)
-    .bind(input.scoreChange, now, input.friendId).run();
+  await db.batch([
+    db.prepare(`UPDATE friends SET score = score + ?, updated_at = ? WHERE id = ?
+      AND NOT EXISTS (SELECT 1 FROM friend_scores WHERE id = ?)`)
+      .bind(input.scoreChange, now, input.friendId, id),
+    db.prepare(`INSERT OR IGNORE INTO friend_scores
+      (id, friend_id, scoring_rule_id, score_change, reason, created_at, executed_by_staff_id, executed_by_staff_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(id, input.friendId, input.scoringRuleId ?? null, input.scoreChange, input.reason ?? null,
+        now, input.executedByStaffId ?? null, input.executedByStaffName ?? null),
+  ]);
+  if (input.idempotencyKey) {
+    const saved = await db.prepare(`SELECT friend_id, scoring_rule_id, score_change, reason,
+      executed_by_staff_id, executed_by_staff_name FROM friend_scores WHERE id = ?`)
+      .bind(id).first<FriendScoreRow>();
+    if (!saved || saved.friend_id !== input.friendId || saved.score_change !== input.scoreChange
+      || saved.scoring_rule_id !== (input.scoringRuleId ?? null) || saved.reason !== (input.reason ?? null)
+      || saved.executed_by_staff_id !== (input.executedByStaffId ?? null)
+      || saved.executed_by_staff_name !== (input.executedByStaffName ?? null)) {
+      throw new Error('score_idempotency_conflict');
+    }
+  }
 }
 
 /** 友だちの現在スコアを取得 */
@@ -334,7 +326,7 @@ export async function getFriendScoreHistory(db: D1Database, friendId: string): P
     `SELECT id, friend_id, scoring_rule_id, score_change, reason, created_at,
             event_type, source, rule_key, operation, score_before, score_after,
             occurred_at, executed_by_staff_id, executed_by_staff_name
-       FROM friend_scores WHERE friend_id = ? ORDER BY created_at DESC`,
+       FROM friend_scores WHERE friend_id = ? ORDER BY created_at DESC, id DESC`,
   )
     .bind(friendId).all<FriendScoreRow>();
   return result.results;
@@ -376,3 +368,5 @@ export async function applyScoring(db: D1Database, friendId: string, eventType: 
   }
   return totalChange;
 }
+
+export { getFriendScoreHistoryPage, type ScoreHistoryCursor } from './scoring-history-page.js';

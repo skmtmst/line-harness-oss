@@ -13,10 +13,10 @@ describe('作成画面の5段（設計 LMiL2）', () => {
   it('設計と同じ5段を、同じ順・同じ名前で出す', () => {
     expect(broadcastSteps(NOTHING).map((step) => [step.order, step.label])).toEqual([
       [1, '基本設定'],
-      [2, '対象者'],
-      [3, 'メッセージ'],
+      [2, '配信対象'],
+      [3, 'メッセージを作成'],
       [4, '送信設定'],
-      [5, '確認'],
+      [5, '最終確認'],
     ])
   })
 
@@ -42,7 +42,7 @@ describe('作成画面の5段（設計 LMiL2）', () => {
     expect(states).toEqual(['current', 'todo', 'todo', 'todo', 'todo'])
   })
 
-  it('4段そろって初めて「確認」が現在地になる。done にはしない', () => {
+  it('4段そろって初めて「最終確認」が現在地になる。done にはしない', () => {
     const steps = broadcastSteps({
       basicDone: true,
       audienceDone: true,

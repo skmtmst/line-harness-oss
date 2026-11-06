@@ -59,6 +59,27 @@ describe('状態の段', () => {
     expect(screen.getByLabelText('配信の状態').textContent).toContain('812 / 1,248人')
   })
 
+  it.each([
+    ['partial_failed', 'warn', '要確認：'],
+    ['failed', 'danger', '失敗：'],
+    ['sent', 'info', null],
+  ] as const)('E35: %s の帯は青にせず注意以上の組（%s）にする', (displayStatus, tone, word) => {
+    render(
+      <BroadcastStatusRail
+        displayStatus={displayStatus}
+        approvalInvolved={false}
+        scheduled={false}
+        ledger={{ sent: 800, failed: 10, unknown: 0, inFlight: 0, retryableCount: 5 }}
+        total={810}
+        formatDateTime={formatDateTime}
+        scheduledAt={null}
+      />,
+    )
+    const band = screen.getByLabelText('配信の状態').parentElement?.querySelector('[data-tone]')
+    expect(band?.getAttribute('data-tone')).toBe(tone)
+    if (word) expect(screen.getByLabelText('配信の状態').textContent).toContain(word)
+  })
+
   it('承認がいらない配信に承認待ちの段は出さない', () => {
     render(
       <BroadcastStatusRail
@@ -103,7 +124,7 @@ describe('状態の段', () => {
     )
     // 6段すべて済み（✓）。輪（aria-current）はどこにも無い。
     expect(container.querySelectorAll('[aria-current="step"]')).toHaveLength(0)
-    expect(container.querySelectorAll('svg')).toHaveLength(6)
+    expect(container.querySelectorAll('ol svg')).toHaveLength(6)
   })
 
   it('途中だけ「いまいる所」の輪を1つ出す', () => {

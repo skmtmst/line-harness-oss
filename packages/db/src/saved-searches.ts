@@ -1,3 +1,8 @@
+export type { SavedSearchUsageCount, SavedSearchReferenceUsageCount } from './saved-search-usage-types.js';
+import type { SavedSearchUsageCount, SavedSearchReferenceUsageCount } from './saved-search-usage-types.js';
+import {savedSearchMonth,getSavedSearchUsageCounts,getSavedSearchReferenceUsageCounts} from './saved-search-usage-read.js';
+export {getSavedSearchUsageCounts,getSavedSearchReferenceUsageCounts} from './saved-search-usage-read.js';
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { isSavedSearchOpAllowed } from '@line-crm/shared';
 import type {
@@ -66,16 +71,6 @@ export interface SavedSearchReference {
   created_at: string;
 }
 
-export interface SavedSearchUsageCount {
-  saved_search_id: string;
-  call_count_this_month: number;
-}
-
-export interface SavedSearchReferenceUsageCount extends SavedSearchUsageCount {
-  reference_kind: string;
-  reference_id: string | null;
-}
-
 export const INBOX_SAVED_VIEW_STATUSES = ['unread', 'in_progress', 'on_hold', 'resolved'] as const;
 export const INBOX_SAVED_VIEW_CHANNELS = ['line', 'email'] as const;
 export const INBOX_SAVED_VIEW_SORTS = ['newest', 'waiting_desc'] as const;
@@ -91,7 +86,7 @@ export interface InboxSavedViewConditions {
   assignees: string[];
   unread: 'all' | 'mine';
   /**
-   * 一覧上部の「すべて／要返信／期限超過」。N-020 で追加。
+   * 一覧上部の「すべて／要返信／期限超過」。
    * 持たない古い行は due から復元する（overdue → 'overdue'）。
    */
   quickFilter: (typeof INBOX_SAVED_VIEW_QUICK_FILTERS)[number];
@@ -103,6 +98,7 @@ export interface InboxSavedViewConditions {
 }
 
 const CONDITION_KINDS = new Set([
+  'visit_count','purchase_amount','last_activity_at','member_tier',
   'tag',
   'name',
   'field',
@@ -157,10 +153,10 @@ export function validateSearchConditions(
       }
       /*
         実行側（saved-search-filter のSQL変換）が解釈できない op を
-        ここで断る。以前は「op が空でない」だけを見ていたため、
+        ここで断る。「op が空でない」だけを見ると、
         `field` + `gte` のような保存は通るが検索で拒否される条件が
-        作れた。保存した本人はもう画面を離れているので、形の検査で
-        実行可否まで一致させる（ATTR-13）。
+        作れてしまう。保存した本人はもう画面を離れているので、形の検査で
+        実行可否まで一致させる。
       */
       if (!isSavedSearchOpAllowed(String(c.kind), c.op)) {
         return {
@@ -169,7 +165,7 @@ export function validateSearchConditions(
         };
       }
       /*
-       * R183: 開始日より後の終了日（逆転期間）は0人になる設定ミス。
+       * 開始日より後の終了日（逆転期間）は0人になる設定ミス。
        * 0人のまま保存・再利用されると「本当に該当者なし」と区別が
        * 付かないため、保存の時点で断る。片側だけの期間は許容する。
        * 日付は YYYY-MM-DD のため文字列比較で前後が分かる。
@@ -196,7 +192,7 @@ export function validateSearchConditions(
 
   /*
    * 「表示中のみ」「非表示のみ」はそれだけで意味のある絞り込みなので、
-   * all/any が空でも受け取る（#1010 FRIEND-01）。'all' は絞り込み無しと
+   * all/any が空でも受け取る。'all' は絞り込み無しと
    * 同じなので、それだけの条件はこれまで通り弾く。
    */
   if ((out.all?.length ?? 0) === 0 && (out.any?.length ?? 0) === 0
@@ -239,6 +235,7 @@ export function validateSearchConditions(
 }
 
 const SEGMENT_RULE_TYPES = new Set([
+  'customer_segment','visit_count','purchase_amount','last_activity_at','member_tier',
   'tag_exists',
   'tag_not_exists',
   'tag_all',
@@ -349,7 +346,7 @@ export function validateInboxSavedViewConditions(
     return { ok: false, error: '期限条件が正しくありません' };
   }
   /*
-    quickFilter は N-020 で追加した軸。持たない古い行は due から復元する。
+    quickFilter を持たない古い行は due から復元する。
     'overdue' は due='overdue' と同じ条件なので、保存時は両方を揃えて書く。
   */
   const quickFilter = input.quickFilter === undefined
@@ -425,7 +422,7 @@ export async function getSavedSearchById(
 
 /**
  * 画面から届いた「動かせる検索だけの新しい順」を、届いていない行の位置を
- * 保ったまま全体の並びへ戻して、1回のバッチで書く（#1014 ATTR-03）。
+ * 保ったまま全体の並びへ戻して、1回のバッチで書く。
  *
  * 動かせる範囲は PATCH と同じ：選択中アカウントの検索で、本人が作った
  * もの（owner/admin は全部）。行ごとの PATCH だと、他人が作った検索への
@@ -490,7 +487,7 @@ export async function getSavedSearchReferences(
 ): Promise<SavedSearchReference[]> {
   const ids = [...new Set(savedSearchIds.filter(Boolean))];
   if (ids.length === 0) return [];
-  const placeholders = ids.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(ids).sql;
   const result = await db
     .prepare(
       `SELECT saved_search_id, line_account_id, reference_kind, reference_id,
@@ -499,7 +496,7 @@ export async function getSavedSearchReferences(
         WHERE line_account_id = ? AND saved_search_id IN (${placeholders})
         ORDER BY reference_kind ASC, reference_name ASC, reference_id ASC`,
     )
-    .bind(lineAccountId, ...ids)
+    .bind(lineAccountId, ...(ids.length ? sqlIdSet(ids).binds : []))
     .all<SavedSearchReference>();
   return result.results;
 }
@@ -542,58 +539,8 @@ export async function upsertSavedSearchReference(
   ).run();
 }
 
-function savedSearchMonth(now = jstNow()): string {
-  return now.slice(0, 7);
-}
 
-/** 一覧の「今月の呼び出し」を検索ごとにまとめて返す。 */
-export async function getSavedSearchUsageCounts(
-  db: D1Database,
-  savedSearchIds: string[],
-  lineAccountId: string,
-  now = jstNow(),
-): Promise<Map<string, number>> {
-  const ids = [...new Set(savedSearchIds.filter(Boolean))];
-  if (ids.length === 0) return new Map();
-  const placeholders = ids.map(() => '?').join(', ');
-  const result = await db.prepare(
-    `SELECT saved_search_id, COUNT(*) AS call_count_this_month
-       FROM saved_search_usage_events
-      WHERE line_account_id = ?
-        AND saved_search_id IN (${placeholders})
-        AND substr(used_at, 1, 7) = ?
-      GROUP BY saved_search_id`,
-  ).bind(lineAccountId, ...ids, savedSearchMonth(now)).all<SavedSearchUsageCount>();
-  return new Map(result.results.map((row) => [
-    row.saved_search_id,
-    Number(row.call_count_this_month),
-  ]));
-}
 
-/** 詳細の使用先ごとに、今月何回呼ばれたかを返す。 */
-export async function getSavedSearchReferenceUsageCounts(
-  db: D1Database,
-  savedSearchIds: string[],
-  lineAccountId: string,
-  now = jstNow(),
-): Promise<Map<string, number>> {
-  const ids = [...new Set(savedSearchIds.filter(Boolean))];
-  if (ids.length === 0) return new Map();
-  const placeholders = ids.map(() => '?').join(', ');
-  const result = await db.prepare(
-    `SELECT saved_search_id, reference_kind, reference_id,
-            COUNT(*) AS call_count_this_month
-       FROM saved_search_usage_events
-      WHERE line_account_id = ?
-        AND saved_search_id IN (${placeholders})
-        AND substr(used_at, 1, 7) = ?
-      GROUP BY saved_search_id, reference_kind, reference_id`,
-  ).bind(lineAccountId, ...ids, savedSearchMonth(now)).all<SavedSearchReferenceUsageCount>();
-  return new Map(result.results.map((row) => [
-    `${row.saved_search_id}:${row.reference_kind}:${row.reference_id ?? ''}`,
-    Number(row.call_count_this_month),
-  ]));
-}
 
 /** 保存した検索を実際に使った時だけ追記する。 */
 export async function recordSavedSearchUsage(
@@ -816,7 +763,7 @@ export async function deleteSavedSearch(
   access: SavedSearchAccess,
 ): Promise<boolean> {
   /*
-   * R189: 一覧での呼び出し履歴（saved_search_usage_events）は閲覧の記録で、
+   * 一覧での呼び出し履歴（saved_search_usage_events）は閲覧の記録で、
    * 生きている使用先ではない。RESTRICT の外部キーが残っていると、一度でも
    * 一覧で開いた検索が「使用中」として消せなくなる。書き込むのは一覧表示
    * だけなので（recordSavedSearchUsage の呼び出しは friends 一覧のみ）、

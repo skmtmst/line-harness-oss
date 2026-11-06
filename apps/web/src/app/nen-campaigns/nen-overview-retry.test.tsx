@@ -10,8 +10,12 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import type { NenDelivery, NenDeliveryDetail, NenDeliveryList } from '@/lib/api'
-import { NenOverview, type NenTab } from './nen-overview'
+import NenOverview from '@/v8/nen-campaigns/list'
+import { type NenTab } from '@/v8/nen-campaigns/display'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { SegmentCondition } from './segment-query.js';
+import { DEFAULT_TENANT_ID, type SegmentCondition } from '@line-crm/shared';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { buildPublicSegmentQuery } from './segment-query.js';
 import { restrictSegmentInput, scopeSegmentQuery, scopeStoredBroadcastSegmentQuery } from './segment-query-scope.js';

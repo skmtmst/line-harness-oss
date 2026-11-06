@@ -382,7 +382,7 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
     // value(小数文字列)/number_itemsのみで、通貨相当はWebピクセル側の
     // price_currencyに分離されている。余計な項目を送らないよう鍵集合を固定する。
     // (docs.x.com/x-ads-api/measurement/web-conversions.md の例と
-    //  stape-io/twitter-tag の対応表で確認。2026-09-09)
+    // stape-io/twitter-tag の対応表に従う。
     expect(Object.keys(xBody.conversions[0]).sort()).toEqual(
       ['conversion_id', 'conversion_time', 'event_id', 'identifiers', 'number_items', 'value'],
     );
@@ -494,5 +494,30 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
     expect(logs(testDb)).toEqual([
       { ad_platform_id: 'p1', friend_id: 'f1', line_account_id: 'a1', status: 'failed' },
     ]);
+  });
+});
+
+
+describe('広告送信の再試行', () => {
+  it.each([400,401,403])('HTTP %s は自動で送り直さない', async status => {
+    const t = seedTwoAccounts();
+    const fetchMock = vi.fn(async () => ({ ok:false, status, text:async()=> 'rejected' }));
+    vi.stubGlobal('fetch',fetchMock);
+    await sendAdConversions(t.db,'f1','Purchase',1000,{idempotencyKey:'b333-permanent'});
+    t.raw.prepare('UPDATE ad_conversion_outbox SET next_attempt_at = NULL').run();
+    await drainAdConversionOutbox(t.db);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(t.raw.prepare('SELECT is_retryable FROM ad_conversion_outbox').get()).toEqual({is_retryable:0});
+    t.raw.close();
+  });
+  it.each([429,503])('HTTP %s も自動送信は最大3回', async status => {
+    const t=seedTwoAccounts();
+    const fetchMock=vi.fn(async()=>({ok:false,status,text:async()=> 'temporary'}));
+    vi.stubGlobal('fetch',fetchMock);
+    await sendAdConversions(t.db,'f1','Purchase',1000,{idempotencyKey:'b333-temporary'});
+    for(let i=0;i<5;i++) { t.raw.prepare('UPDATE ad_conversion_outbox SET next_attempt_at = NULL').run(); await drainAdConversionOutbox(t.db); }
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(t.raw.prepare('SELECT attempt_count,is_retryable FROM ad_conversion_outbox').get()).toEqual({attempt_count:3,is_retryable:0});
+    t.raw.close();
   });
 });

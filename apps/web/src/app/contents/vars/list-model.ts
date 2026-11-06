@@ -15,7 +15,7 @@ export function filterAndSortCommonVars(
       if (input.filter === 'empty' && item.value !== '') return false
       /*
        * 「期限つき」は有効期間（validFrom/validUntil）のこと（VAR-04、
-       * 要件 v6-14 §8-1）。値の切替予約（nextSchedule）も期限のある
+       * 要件 管理画面-14 §8-1）。値の切替予約（nextSchedule）も期限のある
        * 動きなので拾い続ける。両方ないものだけを外す。
        */
       if (input.filter === 'scheduled'

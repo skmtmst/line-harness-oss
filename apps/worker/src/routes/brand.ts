@@ -1,7 +1,8 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import { getLineAccounts } from '@line-crm/db';
 import { fetchBotProfile } from '../lib/bot-profile.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 export const brand = new Hono<Env>();
 
@@ -47,7 +48,7 @@ brand.get('/api/public/brand', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/public/brand error:', err);
+    logger.error("brand.public_brand_list_failed");
     return c.json({ success: true, data: empty });
   }
 });

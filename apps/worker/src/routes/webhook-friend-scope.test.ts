@@ -8,7 +8,7 @@ const lineClientMocks = vi.hoisted(() => ({
   pushMessage: vi.fn(),
 }));
 
-// Issue #961: 受信アカウントに該当する friend 行が無く、同一 line_user_id の
+// 受信アカウントに該当する friend 行が無く、同一 line_user_id の
 // 行が別アカウントに属するとき、webhook は相手の行を移動せず・混線した履歴を
 // 作らず・イベントを静かに諦めることを証明する。
 vi.mock('@line-crm/db', () => ({
@@ -60,7 +60,7 @@ vi.mock('@line-crm/line-sdk', async () => {
   return {
     ...actual,
     verifySignature: vi.fn(),
-    LineClient: vi.fn().mockImplementation(() => lineClientMocks),
+    LineClient: vi.fn().mockImplementation(function () { return lineClientMocks; }),
   };
 });
 
@@ -69,7 +69,7 @@ vi.mock('../services/event-bus.js', () => ({
   logOutgoingMessage: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../services/friend-add-routing.js', () => ({
+vi.mock('../features/friends/friend-add-routing.js', () => ({
   applyFriendAddRouting: vi.fn().mockResolvedValue({ routed: false, suppressed: false, enrollments: [] }),
 }));
 
@@ -131,7 +131,7 @@ async function postWebhook(events: unknown[]) {
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
-      body: JSON.stringify({ events }),
+      body: JSON.stringify({ destination: 'bot', events }),
     },
     baseEnv,
     {
@@ -154,7 +154,7 @@ beforeEach(() => {
       id: 'account-a',
       channel_secret: 'env-default-secret',
       channel_access_token: 'account-a-token',
-      is_active: 1,
+      is_active: 1, tenant_status: 'active',
     } as never,
   ]);
 });
@@ -205,3 +205,10 @@ describe('POST /webhook — Issue #961 別アカウント所有の friend 行へ
     expect(markLineWebhookEventSucceeded).toHaveBeenCalled();
   });
 });
+
+vi.mock('../services/line-webhook-events.js',async()=>{
+ const {unitLineEvents}=await import('../test-utils/workflow-unit.js');const ledger=await import('@line-crm/db');
+ const actual=await vi.importActual<typeof import('../services/line-webhook-events.js')>('../services/line-webhook-events.js');
+ return {...actual,processLineWebhookEvents:(input:any)=>unitLineEvents(input,ledger as any)};
+});
+vi.mock('../services/workflow-line-client.js',()=>({workflowLineClient:(client:any)=>client}));

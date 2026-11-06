@@ -6,10 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import HqSupportDetailPage from './page'
 
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string } & Record<string, unknown>) => <a href={href} {...rest}>{children}</a> }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(window.location.search),  useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},  usePageTitle: () => {} }))
 
-/** ★V6 36-3-A 統括のお問い合わせの続き。やり取りが左右に並び、続きを送ると API を呼んで読み直す。 */
+/** ★管理画面 36-3-A 統括のお問い合わせの続き。やり取りが左右に並び、続きを送ると API を呼んで読み直す。 */
 
 const detail = {
   id: 'r1', kind: 'bug', kindLabel: '不具合', subject: 'バナー生成で日本語の文字が崩れることがある', body: '2枚に1枚は誤字になります。',
@@ -36,7 +36,7 @@ beforeEach(() => {
     }
     if (url.endsWith('/api/hq/support/requests/r1')) return json({ success: true, data: detail })
     if (url.endsWith('/api/hq/support/requests')) return json({ success: true, data: [detail] })
-    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { id: 's1', name: '山田 太郎', email: 'yamada@example.com' } })
+    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { id: 's1', name: '山田 太郎', role: 'staff', email: 'yamada@example.com' } })
     if (url.endsWith('/api/tenants/me')) return json({ success: true, data: { name: '株式会社サンプル' } })
     return json({ success: false, error: `unexpected ${url}` }, 404)
   }))
@@ -62,20 +62,20 @@ describe('お問い合わせの続き', () => {
     const text = host.textContent ?? ''
     expect(text).toContain('#MB-0312')
     expect(text).toContain('バナー生成で日本語の文字が崩れることがある')
-    expect(text).toContain('株式会社サンプル ／ 山田 太郎')
+    expect(text).toContain('山田 太郎')
     expect(text).toContain('musubo 運営 ／ 坂本 真人')
     expect(text).toContain('再現を確認しました。')
     expect(text).toContain('続きを送る')
-    expect(text).toContain('一覧へ戻る')
-    expect(host.querySelector('[data-design-node="Nt0UH"]')).not.toBeNull()
-    expect(host.querySelector('a[aria-current="page"]')).not.toBeNull()
+    expect(text).toContain('これまでの問い合わせ')
+    expect(host.querySelector('textarea')).not.toBeNull()
+    expect(host.querySelector('[aria-current="page"]')).not.toBeNull()
   })
 
   it('本文を入れて送ると API を呼び、やり取りに追加されて案内が出る', async () => {
     await act(async () => { root.render(<HqSupportDetailPage />) })
     await flush()
     const textarea = host.querySelector('textarea') as HTMLTextAreaElement
-    const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('送信する'))!
+    const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('送る'))!
     expect(send.hasAttribute('disabled')).toBe(true)
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!

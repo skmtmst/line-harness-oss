@@ -1,3 +1,4 @@
+@import "../../../../liff/src/card-surface.css";
 /* webinar 専用 CSS。event-booking と同じパターン。
  * Tailwind v4: theme + utilities を取り込み、preflight (base reset) は除外。
  * webinar namespace (body.wb-active 配下) にだけ手動 reset を当てる。
@@ -62,8 +63,6 @@ body.wb-active #app {
   color: inherit;
   margin: 0;
   padding: 0;
-  background-color: transparent;
-  background-image: none;
   border: 0;
   cursor: pointer;
 }
@@ -89,15 +88,25 @@ body.wb-active #app {
   /* border: 0 (style が none になる) にすると Tailwind の .border 系
    * (幅・色のみ指定) が描画されなくなる。Tailwind preflight と同じく
    * 幅 0 + style solid でリセットする。 */
-  border-width: 0;
   border-style: solid;
-  border-color: currentColor;
-  border-radius: 0;
-  background-color: transparent;
+}
+/* 背景と枠の初期値は、各部品の utility より弱い層に置く。 */
+@layer base {
+  :where(body.wb-active) button {
+    background-color: transparent;
+    background-image: none;
+  }
+  :where(body.wb-active) input:not([type='radio']):not([type='checkbox']),
+  :where(body.wb-active) textarea {
+    border-width: 0;
+    border-color: currentColor;
+    border-radius: 0;
+    background-color: transparent;
+  }
 }
 :where(body.wb-active) input[type='radio'],
 :where(body.wb-active) input[type='checkbox'] {
-  accent-color: #06c755;
+  accent-color: var(--customer-primary, #06c755);
   width: 18px;
   height: 18px;
 }
@@ -118,7 +127,7 @@ body.wb-active #app {
 
 /* ハウススタイルのカード (eb-card と同じトーン) */
 .wb-card {
-  background: #fff;
+  background: var(--customer-ground, #fff);
   border-radius: 14px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.2);
 }

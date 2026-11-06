@@ -1,5 +1,9 @@
+import { fail } from '../lib/fail.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
-import type { Env } from '../index.js';
+import { getTenantCompanyContact, saveTenantCompanyContact, getStaffById } from '@line-crm/db';
+import { parseTenantCompanyContact } from '@line-crm/shared';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { isPlatformAdmin } from '../middleware/platform-admin.js';
@@ -12,7 +16,7 @@ type BoundaryAccount = {
   tenant_id: string | null;
 };
 
-type FeaturePack = 'restaurant';
+export type FeaturePack = 'restaurant';
 type TenantStatus = 'active' | 'suspended' | 'archived';
 
 type TenantRow = {
@@ -24,10 +28,10 @@ type TenantRow = {
   updated_at: string;
 };
 
-const ALLOWED_FEATURE_PACKS = new Set<FeaturePack>(['restaurant']);
+export const ALLOWED_FEATURE_PACKS = new Set<FeaturePack>(['restaurant']);
 const ALLOWED_TENANT_STATUSES = new Set<TenantStatus>(['active', 'suspended', 'archived']);
 
-function parseFeaturePacks(value: unknown): FeaturePack[] | null {
+export function parseFeaturePacks(value: unknown): FeaturePack[] | null {
   if (value === undefined) return [];
   if (!Array.isArray(value)) return null;
   if (!value.every((pack): pack is FeaturePack => (
@@ -36,12 +40,9 @@ function parseFeaturePacks(value: unknown): FeaturePack[] | null {
   return [...new Set(value)];
 }
 
-/**
- * Cross-tenant operations deliberately use a route-local gate. Query scoping
- * cannot protect these endpoints because they are intended to manage tenants.
- */
+/** 統括そのものを管理する入口は問い合わせの範囲指定だけでは守れないため、route 内の専用権限を必須にする。 */
 async function canManageTenants(c: Context<Env>): Promise<boolean> {
-  // ★V6 37: 運営マスター（platform_admins）で判定する。既定の統括のオーナーを
+  // ★37: 運営マスター（platform_admins）で判定する。既定の統括のオーナーを
   // 運営とみなす旧判定は、platform_admins が空の間だけの互換として
   // middleware/platform-admin.ts に残している。
   const staff = c.get('staff');
@@ -50,13 +51,57 @@ async function canManageTenants(c: Context<Env>): Promise<boolean> {
 }
 
 function forbidden(c: Context<Env>) {
-  return c.json({ success: false, error: '統括を管理する権限がありません' }, 403);
+  return fail(c, 403, 'FORBIDDEN', { error: '統括を管理する権限がありません' });
 }
 
-/** Read-only migration diagnostics. This route never returns LINE credentials. */
+/** 読み取り専用の移行診断とし、LINE の資格情報は返さない。 */
 export const tenants = new Hono<Env>();
 
-tenants.post('/api/tenants', async (c) => {
+async function hasTenantWideMembership(c: Context<Env>): Promise<boolean> {
+  const actor = c.get('staff');
+  if (!actor) return false;
+  if (actor.id === 'env-owner') return true;
+  const member = await getStaffById(c.env.DB, actor.id);
+  return Boolean(member?.is_active && member.account_scope === 'all'
+    && (member.tenant_id ?? DEFAULT_TENANT_ID) === (actor.tenantId ?? DEFAULT_TENANT_ID));
+}
+
+tenants.use('/api/tenants/me/company-contact', async (c, next) => {
+  if (!await hasTenantWideMembership(c)) return forbidden(c);
+  return next();
+});
+tenants.use('/api/tenants/boundary-preview', async (c, next) => {
+  if (!await hasTenantWideMembership(c)) return forbidden(c);
+  return next();
+});
+
+/** 会社・連絡先は統括の管理者だけに返す。汎用の名前の口には含めない。 */
+tenants.get('/api/tenants/me/company-contact', requireRole('owner', 'admin'), async c => {
+  const tenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
+  const data = await getTenantCompanyContact(dbFor(c.env), tenantId);
+  return data ? c.json({ success: true, data })
+    : c.json({ success: false, error: '統括が見つかりません' }, 404);
+});
+
+tenants.patch('/api/tenants/me/company-contact', requireRole('owner', 'admin'), inputJsonBoundary(), async c => {
+  const staff = c.get('staff')!;
+  if (staff.readOnly) return c.json({ success: false, error: '閲覧のみの権限では保存できません' }, 403);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const parsed = parseTenantCompanyContact(body);
+  if (parsed.error) return inputError(c, { success: false, error: parsed.error }, 400, ["name"]);
+  const revision = body?.expectedRevision;
+  if (typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 0) {
+    return inputError(c, { success: false, error: '最新版を読み込んでから保存してください' }, 400, ["expectedRevision"]);
+  }
+  const db = dbFor(c.env), tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+  if (!await getTenantCompanyContact(db, tenantId)) return c.json({ success: false, error: '統括が見つかりません' }, 404);
+  const data = await saveTenantCompanyContact(db, tenantId, staff.id, staff.role as 'owner' | 'admin', parsed.data!, revision);
+  if (!data) return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が変更しました。入力を控えて、最新版を読み直してください。' }, 409);
+  c.set('auditRecorded', true);
+  return c.json({ success: true, data });
+});
+
+tenants.post('/api/tenants', inputJsonBoundary(), async (c) => {
   if (!(await canManageTenants(c))) return forbidden(c);
 
   const body = await c.req.json<{
@@ -67,23 +112,22 @@ tenants.post('/api/tenants', async (c) => {
   }>().catch(() => null);
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   if (!name || name.length > 100) {
-    return c.json({ success: false, error: '統括名は1〜100文字で入力してください' }, 400);
+    return inputError(c, { success: false, error: '統括名は1〜100文字で入力してください' }, 400, ["name"]);
   }
-  // The current tenants schema has nowhere to persist these fields. Rejecting
-  // them avoids pretending that supplied business data was saved.
+  // 保存先の列がない入力を成功に見せないよう、未対応の業務項目は拒む。
   if (body?.prefecture !== undefined || body?.representativeName !== undefined) {
-    return c.json({ success: false, error: '未対応の項目が含まれています' }, 400);
+    return inputError(c, { success: false, error: '未対応の項目が含まれています' }, 400, ["prefecture","representativeName"]);
   }
   const featurePacks = parseFeaturePacks(body?.featurePacks);
   if (!featurePacks) {
-    return c.json({ success: false, error: '利用できない機能パックが含まれています' }, 400);
+    return inputError(c, { success: false, error: '利用できない機能パックが含まれています' }, 400, ["featurePacks"]);
   }
 
   const db = dbFor(c.env);
   const duplicate = await db.prepare('SELECT id FROM tenants WHERE name = ? LIMIT 1')
     .bind(name)
     .first<{ id: string }>();
-  if (duplicate) return c.json({ success: false, error: '同じ名前の統括が存在します' }, 400);
+  if (duplicate) return inputError(c, { success: false, error: '同じ名前の統括が存在します' }, 400, ["name"]);
 
   const tenantId = crypto.randomUUID();
   try {
@@ -91,8 +135,8 @@ tenants.post('/api/tenants', async (c) => {
       db.prepare(`INSERT INTO tenants (id, name, status, feature_packs)
         VALUES (?, ?, 'active', ?)`).bind(tenantId, name, JSON.stringify(featurePacks)),
     ]);
-  } catch {
-    return c.json({ success: false, error: '統括を作成できませんでした' }, 500);
+  } catch (error) {
+    throw error;
   }
 
   return c.json({
@@ -118,38 +162,37 @@ tenants.get('/api/tenants', async (c) => {
   });
 });
 
-tenants.patch('/api/tenants/:id/status', async (c) => {
+tenants.patch('/api/tenants/:id/status', inputJsonBoundary(), async (c) => {
   if (!(await canManageTenants(c))) return forbidden(c);
   const body = await c.req.json<{ status?: unknown }>().catch(() => null);
   const status = body?.status;
   if (typeof status !== 'string' || !ALLOWED_TENANT_STATUSES.has(status as TenantStatus)) {
-    return c.json({ success: false, error: '利用できない状態です' }, 400);
+    return inputError(c, { success: false, error: '利用できない状態です' }, 400, ["status"]);
   }
 
-  // This only records the tenant state. Enforcing it for login and delivery is
-  // a separate rollout; changing the state here does not delete child data.
+  // ここは統括状態だけを記録し、子データは消さない。ログインと配信での強制適用は別の接続で行う。
   const result = await dbFor(c.env).prepare(`UPDATE tenants
     SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
     WHERE id = ?`)
     .bind(status, c.req.param('id'))
     .run();
-  if (!result.meta.changes) return c.json({ success: false, error: 'tenant not found' }, 404);
+  if (!result.meta.changes) return fail(c, 404, 'TENANT_NOT_FOUND');
   return c.json({ success: true, data: { status: status as TenantStatus } });
 });
 
-tenants.patch('/api/tenants/:id/feature-packs', async (c) => {
+tenants.patch('/api/tenants/:id/feature-packs', inputJsonBoundary(), async (c) => {
   if (!(await canManageTenants(c))) return forbidden(c);
   const body = await c.req.json<{ featurePacks?: unknown }>().catch(() => null);
   const featurePacks = parseFeaturePacks(body?.featurePacks);
   if (!featurePacks) {
-    return c.json({ success: false, error: '利用できない機能パックが含まれています' }, 400);
+    return inputError(c, { success: false, error: '利用できない機能パックが含まれています' }, 400, ["featurePacks"]);
   }
   const result = await dbFor(c.env).prepare(`UPDATE tenants
     SET feature_packs = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
     WHERE id = ?`)
     .bind(JSON.stringify(featurePacks), c.req.param('id'))
     .run();
-  if (!result.meta.changes) return c.json({ success: false, error: 'tenant not found' }, 404);
+  if (!result.meta.changes) return fail(c, 404, 'TENANT_NOT_FOUND');
   return c.json({ success: true, data: { featurePacks } });
 });
 
@@ -160,16 +203,17 @@ tenants.get('/api/tenants/me', async (c) => {
   const tenant = await db.prepare(`SELECT name FROM tenants WHERE id = ?`)
     .bind(staffTenantId)
     .first<{ name: string }>();
-  if (!tenant) return c.json({ success: false, error: 'tenant not found' }, 404);
+  if (!tenant) return fail(c, 404, 'TENANT_NOT_FOUND');
   return c.json({ success: true, data: { name: tenant.name } });
 });
 
 /** 認証スタッフ自身が所属する統括の表示名だけを更新する。 */
-tenants.patch('/api/tenants/me', requireRole('owner', 'admin'), async (c) => {
+tenants.patch('/api/tenants/me', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+  if (!await hasTenantWideMembership(c)) return forbidden(c);
   const body = await c.req.json<{ name?: unknown }>().catch(() => null);
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
-  if (!name) return c.json({ success: false, error: '統括名を入力してください' }, 400);
-  if (name.length > 100) return c.json({ success: false, error: '統括名は100文字以内で入力してください' }, 400);
+  if (!name) return inputError(c, { success: false, error: '統括名を入力してください' }, 400, ["name"]);
+  if (name.length > 100) return inputError(c, { success: false, error: '統括名は100文字以内で入力してください' }, 400, ["name"]);
 
   const db = dbFor(c.env);
   const staffTenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
@@ -178,7 +222,7 @@ tenants.patch('/api/tenants/me', requireRole('owner', 'admin'), async (c) => {
     WHERE id = ?`)
     .bind(name, staffTenantId)
     .run();
-  if (!result.meta.changes) return c.json({ success: false, error: 'tenant not found' }, 404);
+  if (!result.meta.changes) return fail(c, 404, 'TENANT_NOT_FOUND');
   return c.json({ success: true, data: { name } });
 });
 

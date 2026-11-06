@@ -1,0 +1,157 @@
+/*
+ * ★V8 LINEアカウントの乗り換え。外側は設定の型（SettingsPage）。
+ * 中身の欄を絵の幅に広げ（詳細と同じ。共通の設定の中のメニューが幅 225 なので左の余白は 0）、段の間は 14。
+ */
+.screen {
+  display: contents;
+}
+
+.duo {
+  display: flex;
+  align-items: stretch;
+  gap: var(--tpl-acd-row-gap);
+  min-width: 0;
+}
+
+/* どこからどこへ・事前確認の結果（薄い地の箱）。 */
+.box {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.result {
+  flex: 0 0 var(--tpl-acd-ho-result-w);
+}
+.boxHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-acd-inline-gap);
+  margin: 0;
+}
+.boxLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-acd-label-size);
+}
+.boxValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-acd-value-size);
+  font-weight: 600;
+}
+.boxWarn {
+  margin: 0;
+  color: var(--color-warning);
+  font-size: var(--tpl-acd-label-size);
+}
+.declared {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-acd-ho-box-gap);
+}
+.inlineForm {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-acd-actions-gap);
+}
+
+/* 判断の表。頭は薄い地・行は上に線。 */
+
+.colName {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-acd-ho-name-gap);
+  min-width: 0;
+}
+.colEvidence {
+  flex: 0 0 var(--tpl-acd-ho-evidence-w);
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-acd-label-size);
+}
+.colChoice {
+  display: flex;
+  flex: 0 0 var(--tpl-acd-ho-choice-w);
+  min-width: 0;
+}
+.name {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-acd-ho-name-size);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sub {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-acd-ho-sub-size);
+}
+.fixed {
+  display: flex;
+  align-items: center;
+  height: var(--tpl-acd-ho-fixed-h);
+  padding: var(--tpl-acd-ho-fixed-pad);
+  color: var(--color-ink);
+  font-size: var(--tpl-acd-wide-size);
+  font-weight: 500;
+}
+
+/* 保存していない書き換えの帯。 */
+.pendingText {
+  flex: 1;
+  margin: 0;
+  color: var(--tpl-acd-warn-ink);
+  font-size: var(--tpl-acd-ho-band-size);
+  font-weight: 600;
+}
+
+/* 戻せること・気をつけること。 */
+.card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+
+  min-width: 0;
+  margin: 0;
+
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-acd-ho-title-size);
+  font-weight: 700;
+}
+.list {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-acd-note-size);
+  line-height: var(--tpl-acd-note-lh);
+  white-space: pre-line;
+}
+
+/* 下の行：未判断の数・引き継ぎをやめる・本実行する。 */
+.bottomNote {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-warning);
+  font-size: var(--tpl-acd-value-size);
+  font-weight: 600;
+}
+
+/* 狭い幅（1152 など）では事前確認の結果を下へ回す。 */
+@container v8-page (max-width: 1099px) {
+  .duo {
+    flex-direction: column;
+  }
+  .result {
+    flex-basis: auto;
+  }
+}
+
+.nameStack { display: flex; flex-direction: column; gap: var(--tpl-acd-ho-name-gap); min-width: 0; }
+
+.pendingText, .pendingTextNoticePlacement { min-width: 0; margin: 0; }

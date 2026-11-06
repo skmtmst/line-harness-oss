@@ -17,7 +17,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/components/feature-gate', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
-vi.mock('@/components/friend-fields/support-mark-editor', () => ({
+vi.mock('@/v8/tags/mark-editor', () => ({
   default: ({ markId }: { markId?: string }) => {
     captured.markId = markId
     return <div data-testid="support-mark-editor" />

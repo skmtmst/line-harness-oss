@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { toJstString } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: vi.fn(async () => true),

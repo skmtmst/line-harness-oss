@@ -1,5 +1,5 @@
 /*
- * 設計 ★V6 34-2「レシピ一覧」（`y0P0Qx`、1920）。
+ * 設計 ★管理画面 34-2「レシピ一覧」（`y0P0Qx`、1920）。
  *
  * 1 枚 1 行のカード。左に中身、右に操作。
  * **押せない理由は操作の下に置く。** ボタンの隣に並べると、
@@ -26,9 +26,10 @@
   grid-template-columns: minmax(0, 1fr) 240px;
   gap: 20px; /* gap: 20 */
   padding: 20px; /* padding: 20 */
-  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border: 1px solid var(--card-edge); /* stroke: $hairline */
   border-radius: var(--radius-card); /* cornerRadius: $radius-md */
-  background: var(--color-canvas); /* fill: $canvas */
+  background: var(--color-canvas); /* fill: $canvas */;
+  box-shadow: var(--card-shadow);
 }
 
 @media (max-width: 900px) {
@@ -47,7 +48,7 @@
 .name {
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-heading); /* fontSize: $size-heading */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 .purpose {
@@ -92,7 +93,7 @@
   background: var(--color-accent-deep); /* fill: $accent-deep */
   color: var(--color-on-accent); /* fill: $on-accent */
   font-size: var(--text-label); /* fontSize: $size-label */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
   text-align: center;
 }
 
@@ -107,7 +108,7 @@
   background: var(--color-canvas); /* fill: $canvas */
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-label); /* fontSize: $size-label */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
   text-align: center;
 }
 
@@ -123,7 +124,7 @@
   background: var(--color-canvas-sunken); /* fill: $canvas-sunken */
   color: var(--color-ink-faint); /* fill: $ink-faint */
   font-size: var(--text-label); /* fontSize: $size-label */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
   text-align: center;
 }
 

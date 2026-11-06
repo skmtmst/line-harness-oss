@@ -1,0 +1,104 @@
+/* ★V8 重複検出（Pencil ・1152 は ）。値は globals.css の --tpl-fr-*。 */
+.body { display: flex; flex-direction: column; gap: var(--tpl-fr-area-gap); padding: var(--tpl-fr-area-pad); min-width: 0; }
+
+.notice { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.linkButton { margin-left: var(--tpl-toolbar-gap); color: var(--color-action); font-weight: 600; }
+.linkButton:hover { text-decoration: underline; }
+
+.tools { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); min-width: 0; }
+.search { width: var(--tpl-fr-search-sm); flex-shrink: 1; min-width: 0; }
+.chips { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+.spacer { flex: 1; min-width: 0; }
+.reviewed { color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
+
+.panelHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
+.panelTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-fr-panel-title-size); font-weight: 700; line-height: var(--tpl-fr-panel-title-lh); }
+.panelSub { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-fr-desc-lh); }
+
+.colConfidence { width: var(--tpl-fr-dup-col-confidence); }
+.colEvidence { width: var(--tpl-fr-dup-col-evidence); }
+.colAccount { width: var(--tpl-fr-dup-col-account); }
+.colStatus { width: var(--tpl-fr-dup-col-status); }
+.colAction { width: var(--tpl-fr-dup-col-action); }
+.colNum { width: var(--tpl-fr-dup-col-num); }
+.colNumLast { width: var(--tpl-fr-dup-col-num-last); }
+
+:global(:root) .table thead tr { background: transparent; border-top: 0; }
+
+:global(:root) .table thead th.th {
+  height: var(--tpl-fr-dup-thead-h);
+  padding: var(--tpl-fr-dup-thead-pad);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-fr-desc-lh);
+  vertical-align: top;
+}
+
+:global(:root) .table thead th.th:first-child { padding-left: var(--tpl-fr-cell-inset); }
+:global(:root) .table thead th.th:last-child { padding-right: var(--tpl-fr-cell-inset); }
+
+:global(:root) .table td.td,
+:global(:root) .table td.tdAction {
+  height: var(--tpl-fr-mu-row-h);
+  padding: 0 var(--tpl-fr-stack-gap) 0 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-fr-desc-lh);
+  vertical-align: middle;
+}
+
+:global(:root) .table tr.rowCompact td.td { height: var(--tpl-fr-dup-row-compact-h); }
+:global(:root) .table td.td:first-child { padding-left: var(--tpl-fr-cell-inset); }
+:global(:root) .table td.tdAction,
+:global(:root) .table td.td:last-child { padding-right: var(--tpl-fr-cell-inset); }
+
+.pair {
+  display: block;
+  overflow: hidden;
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-fr-back-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pair:hover { text-decoration: underline; }
+
+.cellText { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--tpl-fr-status-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  line-height: var(--tpl-fr-sub-lh);
+  white-space: nowrap;
+}
+
+.pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.pillWarn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
+.pillMuted { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
+
+.rateHigh { color: var(--color-status-warn-deep); font-weight: 700; }
+.faint { color: var(--color-ink-disabled); }
+
+.stateCell { padding: var(--tpl-fr-state-pad); }
+.empty { display: flex; flex-direction: column; align-items: center; gap: var(--tpl-fr-stack-gap); }
+
+.pager { min-height: var(--tpl-fr-dup-pager-h); display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-toolbar-gap); padding-left: var(--tpl-fr-panel-pad); }
+.pagerCount { color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-fr-pager-lh); }
+
+/* 1152 の板：白い板が 1000 未満のときの列と探す欄。 */
+@container v8-page (max-width: 1000px) {
+  .search { width: var(--tpl-fr-search-xs); }
+  .colEvidence { width: var(--tpl-fr-dup-n-col-evidence); }
+  .colAccount { width: var(--tpl-fr-dup-n-col-account); }
+}
+
+/* 行（乗せたときの地の変化は共通の動きの速さ）。 */
+.row { transition: background-color var(--motion-fast) var(--motion-ease-out); }

@@ -1,0 +1,345 @@
+
+/*
+ * ★V8-B 運用状態の緊急コントロール（板 ）。
+ *
+ * 管理画面 の制御タブ（`page.tsx` 内の EmergencyControlPanel）とは別の部品として持つ。
+ * データの口・確認の言葉・本人確認・二重押し防止・競合の戻し方は同じ。
+ * 違いは置き場と見せ方だけ——上に4枚の数の帯、何を止めますか・
+ * 止めるアカウントのカード、止めているときの赤い帯、止めるとどうなるか・
+ * 止めたあとにすること、止めた・戻した記録の表。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rest3-em-gap);
+  min-width: 0;
+  container-type: inline-size;
+}
+
+/* 閲覧のみの帯。数の帯の上。 */
+
+.card {
+  padding: var(--tpl-rest3-em-card-pad);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  border-radius: var(--tpl-rest3-em-radius);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-em-title);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-em-title-lh);
+}
+
+.cardNote {
+  margin: var(--tpl-rest3-em-row-gap) 0 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rest3-em-small);
+  line-height: var(--tpl-rest3-em-small-lh);
+}
+
+/* 止める対象の行：左にチェック、右に実測の影響。 */
+.targetRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-rest3-em-target-gap);
+  margin-top: var(--tpl-rest3-em-row-gap);
+}
+
+.targetImpact {
+  display: none;
+}
+
+.accountRow {
+  display: flex;
+  flex-wrap: wrap;
+  /* ［選んだものを止める］は欄（題の下の選ぶ欄）と同じ高さにそろえる。 */
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--tpl-rest3-em-row-gap);
+  margin-top: var(--tpl-rest3-em-row-gap);
+}
+
+.accountField {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rest3-em-row-gap);
+  min-width: 0;
+}
+
+.fieldLabel {
+  display: block;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-em-body);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 理由・補足（本体）。窓の中と同じ Select＋複数行入力。 */
+.detailBlock {
+  margin-top: var(--tpl-rest3-em-row-gap);
+}
+
+.detailHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detailHead .fieldLabel {
+  margin-bottom: 4px;
+}
+
+.detailCounter {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.detailTextarea {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+/* 止めているときの赤い帯。 */
+.stoppedBand {
+  margin-top: var(--tpl-rest3-em-row-gap);
+  padding: var(--tpl-rest3-em-band-pad);
+  border-radius: var(--tpl-rest3-em-band-radius);
+  background: var(--color-canvas-sunken);
+}
+
+.stoppedTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-em-body);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-em-body-lh);
+}
+
+.stoppedLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-rest3-em-line-gap) var(--tpl-rest3-em-row-gap);
+  min-height: var(--tpl-rest3-em-ctl-h);
+  margin-top: var(--tpl-rest3-em-line-gap);
+}
+
+.stoppedText {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-em-body);
+  line-height: var(--tpl-rest3-em-body-lh);
+}
+
+.stoppedDot {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.stoppedNote {
+  margin: var(--tpl-rest3-em-line-gap) 0 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rest3-em-small);
+  line-height: var(--tpl-rest3-em-note-lh);
+}
+
+/* 止めるとどうなるか・止めたあとにすること。 */
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-rest3-em-kpi-gap);
+}
+
+.infoList {
+  margin: var(--tpl-rest3-em-list-top) 0 0;
+  padding-left: 0;
+  list-style: '・' inside;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rest3-em-body);
+  line-height: var(--tpl-rest3-em-list-lh);
+}
+
+/* 記録の表。 */
+.tableWrap {
+  overflow-x: auto;
+  margin-top: var(--tpl-rest3-em-row-gap);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--tpl-rest3-em-radius);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+}
+
+.table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--tpl-rest3-em-body);
+  line-height: var(--tpl-rest3-em-body-lh);
+}
+
+.table th {
+  padding: var(--tpl-rest3-em-th-pad);
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-rest3-em-th);
+  font-weight: 600;
+  line-height: var(--tpl-rest3-em-th-lh);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--tpl-rest3-em-td-pad);
+  line-height: var(--tpl-rest3-em-td-lh);
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table th:nth-child(1), .table td:nth-child(1) { width: var(--tpl-rest3-em-col-when); }
+.table th:nth-child(2), .table td:nth-child(2) { width: var(--tpl-rest3-em-col-who); }
+.table th:nth-child(3), .table td:nth-child(3) { width: var(--tpl-rest3-em-col-what); }
+.table th:nth-child(4), .table td:nth-child(4) { width: var(--tpl-rest3-em-col-why); }
+.table th:nth-child(5), .table td:nth-child(5) { width: var(--tpl-rest3-em-col-minutes); padding-right: var(--tpl-rest3-em-num-pad); text-align: right; }
+.table th:nth-child(6), .table td:nth-child(6) { padding-right: var(--tpl-rest3-em-last-pad); text-align: right; }
+
+.cellTruncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellWrapWords > span {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* 止められない理由・競合・結果の帯。 */
+.feedbackBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.feedbackDanger {
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+}
+
+/* 確認の窓の中身。 */
+
+.confirmTargetRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-hairline);
+  font-size: 13px;
+}
+
+.confirmTargetRow:first-child {
+  border-top: 0;
+}
+
+.confirmReason {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.dialogField {
+  display: block;
+  margin-top: 12px;
+}
+
+.dialogLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dialogInput {
+  width: 100%;
+  max-width: 280px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.dialogHint {
+  margin: 8px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.dialogError {
+  margin: 8px 0 0;
+  color: var(--color-danger);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 板が狭いとき（1152 など）は数の帯を2列に、説明の2枚を1列に。表は列の幅を中身に任せて横に送る。 */
+@container (max-width: 760px) {
+  .infoGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .table {
+    min-width: var(--tpl-rest3-em-table-min);
+  }
+}
+
+.targetItem {
+  display: inline-flex;
+}
+
+.accountSelect {
+  width: var(--tpl-rest3-em-select-w);
+  max-width: 100%;
+}
+
+.accountSelect :global(*) {
+  max-width: 100%;
+}
+.roBand { }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import SearchField from '@/components/shared/search-field'
@@ -13,6 +13,10 @@ import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, type AuditEventItem, type AuditEventSummary } from '@/lib/api'
 import ListRange from '@/components/ui/list-range'
 import Notice from '@/components/shared/notice'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import { formatDateTime } from '@/lib/format'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const EMPTY_SUMMARY: AuditEventSummary = {
   periodDays: null,
@@ -29,7 +33,7 @@ const ROLE_LABELS: Record<string, string> = {
   owner: '管理者',
   admin: '管理者',
   staff: '運用',
-  viewer: '見るだけ',
+  viewer: '閲覧のみ',
 }
 
 const PERIOD_OPTIONS = [
@@ -70,13 +74,7 @@ const TAB_GROUP: Record<string, 'deleted' | 'sent' | 'changed' | 'login' | 'atte
 function formatDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '日時を取得できませんでした'
-  return date.toLocaleString('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(date)
 }
 
 function actionLabel(row: AuditEventItem): string {
@@ -118,7 +116,7 @@ function locationLabel(row: AuditEventItem): string {
 }
 
 export default function LoginAudit({ userId }: { userId?: string }) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, loading: accountsLoading } = useAccount()
   const [rows, setRows] = useState<AuditEventItem[]>([])
   const [summary, setSummary] = useState<AuditEventSummary>(EMPTY_SUMMARY)
   const [total, setTotal] = useState(0)
@@ -144,12 +142,21 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     const requestId = ++requestSeq.current
     setLoading(true)
     setError('')
+    if (!selectedAccountId) {
+      setRows([])
+      setSummary(EMPTY_SUMMARY)
+      setTotal(0)
+      setLoadedPeriod(null)
+      setLoading(accountsLoading)
+      setError(accountsLoading ? '' : 'LINEアカウントを選択してください。')
+      return
+    }
     try {
       const from = periodFilter === 'all'
         ? undefined
         : new Date(Date.now() - Number(periodFilter) * 24 * 60 * 60 * 1000).toISOString()
       const auditResult = await api.audit.events({
-        lineAccountId: selectedAccountId ?? undefined,
+        lineAccountId: selectedAccountId,
         actorId: userId,
         query: query.trim() || undefined,
         from,
@@ -182,8 +189,17 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     } finally {
       if (requestId === requestSeq.current) setLoading(false)
     }
-  }, [actionFilter, page, pageSize, periodFilter, query, selectedAccountId, sort, userId])
+  }, [accountsLoading, actionFilter, page, pageSize, periodFilter, query, selectedAccountId, sort, userId])
 
+  useLayoutEffect(() => {
+    requestSeq.current += 1
+    setRows([])
+    setSummary(EMPTY_SUMMARY)
+    setTotal(0)
+    setLoadedPeriod(null)
+    setDetail(null)
+    setError('')
+  }, [selectedAccountId])
   useEffect(() => { void load() }, [load])
 
   const counts = {
@@ -221,17 +237,17 @@ export default function LoginAudit({ userId }: { userId?: string }) {
   const summaryValue = (value: number): number | null => (loadedPeriod === null ? null : value)
 
   return <div id="staff-audit">
-    <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-busy={loading}>
+    <KpiBand data-design="KPIs" className="mb-4" aria-busy={loading}>
       <AuditKpi label={summaryTitle} value={summaryValue(summary.total)} note={summaryNote} />
       <AuditKpi label="消した操作" value={summaryValue(summary.deleted)} note="削除として記録された操作" />
       <AuditKpi label="配信した操作" value={summaryValue(summary.sent)} note="送信・公開として記録された操作" />
       <AuditKpi label="いつもと違う場所から" value={summaryValue(summary.suspiciousLogins)} note="見なれない場所からのログイン" attention={summary.suspiciousLogins > 0} />
-    </div>
+    </KpiBand>
     <Notice tone="info" className="mb-4">だれが、いつ、何をしたかの記録です。いつもと違う場所からのログインは赤く出します。消した・配信した・設定を変えたで絞れます。</Notice>
     <div className="mb-3 flex flex-wrap items-center gap-3">
       <SearchField aria-label="人の名前・操作の内容で検索" value={query} onChange={setQuery} placeholder="人の名前・操作の内容で検索" className="min-w-64 flex-1" />
-      <Select aria-label="期間で絞り込む" value={periodFilter} onChange={setPeriodFilter} options={PERIOD_OPTIONS} />
-      <Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={PAGE_SIZE_OPTIONS} />
+      <SaveErrorField names={["periodFilter","period_filter"]}><Select aria-label="期間で絞り込む" label="期間" value={periodFilter} onChange={setPeriodFilter} options={PERIOD_OPTIONS} /></SaveErrorField>
+      <SaveErrorField names={["pageSize","limit","page_size"]}><Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={PAGE_SIZE_OPTIONS} /></SaveErrorField>
     </div>
     <div className="mb-3 flex flex-wrap items-center gap-3">
       <Tabs items={[
@@ -242,7 +258,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
         { label: 'ログイン', count: counts.login, current: actionFilter === 'login', onClick: () => setActionFilter('login') },
         { label: '気になるもの', count: counts.attention, current: actionFilter === 'attention', onClick: () => setActionFilter('attention') },
       ]} />
-      <Select aria-label="並び順" value={sort} onChange={setSort} options={SORT_OPTIONS} />
+      <SaveErrorField names={["sort"]}><Select aria-label="並び順" value={sort} onChange={setSort} options={SORT_OPTIONS} /></SaveErrorField>
     </div>
     {error
       ? <Notice tone="danger" action={<Button onClick={() => void load()}>もう一度読み込む</Button>}>{error}</Notice>
@@ -250,7 +266,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
         ? <TableStateRow colSpan={6} kind="loading" title="記録を読み込んでいます…" />
         : visible.length === 0
           ? <TableStateRow colSpan={6} kind="empty" title="条件に合う記録はありません。条件を変えてお試しください。" />
-          : visible.map((row) => <Tr key={row.id} interactive><Td><p className="truncate font-semibold text-ink" title={`${formatDate(row.createdAt)} ／ ${row.actor.name ?? '名前未取得'}`}>{formatDate(row.createdAt)} ／ {row.actor.name ?? '名前未取得'}</p><p className="mt-1 text-xs text-ink-faint">{row.actor.role ? ROLE_LABELS[row.actor.role] ?? row.actor.role : '権限を取得できませんでした'}</p></Td><Td className={`truncate font-medium ${isAttention(row) ? 'text-danger' : 'text-ink'}`} title={actionLabel(row)}>{actionLabel(row)}</Td><Td className="truncate text-ink-secondary" title={targetLabel(row)}>{targetLabel(row)}</Td><Td className="truncate text-ink-secondary" title={changeLabel(row)}>{changeLabel(row)}</Td><Td className={`truncate ${isAttention(row) ? 'text-danger' : 'text-ink-secondary'}`} title={locationLabel(row)}>{locationLabel(row)}</Td><ActionCell><Button variant="secondary" onClick={() => setDetail(row)}>詳細を見る</Button></ActionCell></Tr>)}</tbody></DataTable></div>}
+          : visible.map((row) => <Tr key={row.id} interactive><Td><p className="truncate font-semibold text-ink" title={`${formatDate(row.createdAt)} ／ ${row.actor.name ?? '名前未取得'}`}>{formatDate(row.createdAt)} ／ {row.actor.name ?? '名前未取得'}</p><p className="mt-1 text-xs text-ink-faint">{row.actor.role ? ROLE_LABELS[row.actor.role] ?? row.actor.role : '権限を取得できませんでした'}</p></Td><Td className={`truncate font-medium ${isAttention(row) ? 'text-danger' : 'text-ink'}`} title={actionLabel(row)}>{actionLabel(row)}</Td><Td className="truncate text-ink-secondary" title={targetLabel(row)}>{targetLabel(row)}</Td><Td className="truncate text-ink-secondary" title={changeLabel(row)}>{changeLabel(row)}</Td><Td className={`truncate ${isAttention(row) ? 'text-danger' : 'text-ink-secondary'}`} title={locationLabel(row)}>{locationLabel(row)}</Td><ActionCell><Button variant="secondary" onClick={() => setDetail(row)}>開く</Button></ActionCell></Tr>)}</tbody></DataTable></div>}
     {!loading && !error && total > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-ink-faint"><ListRange label="記録" total={total} first={first} last={last} /><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} /></div>}
     <Dialog
       open={detail !== null}
@@ -264,5 +280,5 @@ export default function LoginAudit({ userId }: { userId?: string }) {
 }
 
 function AuditKpi({ label, value, note, attention = false }: { label: string; value: number | null; note: string; attention?: boolean }) {
-  return <div className="flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4"><p className="text-xs font-semibold leading-normal text-ink-faint">{label}</p><p className={`text-xl font-bold leading-normal tabular-nums ${attention ? 'text-danger' : 'text-ink'}`}>{value === null ? '—' : <>{value.toLocaleString()}<span className="ml-1 text-xs font-medium text-ink-faint">件</span></>}</p><p className="text-xs leading-normal text-ink-faint">{note}</p></div>
+  return <KpiCard presentation="band" title={label} value={value} unit="件" detail={note} valueTone={attention ? 'danger' : 'default'} />
 }

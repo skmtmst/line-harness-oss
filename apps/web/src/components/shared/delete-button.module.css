@@ -1,0 +1,132 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/*
+ * 削除ボタン（Pencil ★V8 `prbOC`／`zopvP`）。
+ *
+ *   閉じたとき  48×48 のタイル（白地・細い枠・角丸 16）。★V8実寸に合わせた
+ *   開いたとき  右へ確認の帯が開く（✓ 赤 / ×）。開閉は 200ms
+ *   Esc・× はどちらも「やめる」
+ */
+
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 48px;
+}
+
+.tile,
+.confirm {
+  display: inline-flex;
+  align-items: center;
+  height: 48px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-panel);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+}
+
+.tile {
+  width: 48px;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.tile:disabled {
+  cursor: not-allowed;
+  opacity: var(--polish-disabled-opacity);
+}
+
+/* ★V8（夕17・prbOC）：地は灰色 #f5f5f7（shell）・枠なし。 */
+:root .tile {
+  border: 0;
+  background: var(--color-shell);
+}
+
+:root .tile:hover:not(:disabled) {
+  background: var(--color-shell-gray);
+  color: var(--color-status-danger);
+}
+
+/* 確認の帯。閉じている間は畳んで隠す。 */
+.confirm {
+  position: absolute;
+  left: 0;
+  gap: 8px;
+  overflow: hidden;
+  padding: 0 10px;
+  opacity: 0;
+  transform: scaleX(0.6);
+  transform-origin: left center;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.confirm button {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  cursor: pointer;
+}
+
+.yes:hover {
+  background: var(--color-status-danger-soft);
+}
+
+.no {
+  color: var(--color-ink-secondary);
+}
+
+.no:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.confirm button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+/*
+ * 開く：タイルが消え、確認の帯が左端から伸びる（200ms ease-out）。
+ * 「動きを減らす」設定では globals の規定で一瞬になる。
+ */
+.root[data-open] .tile {
+  pointer-events: none;
+}
+
+.root[data-open] .confirm {
+  opacity: 1;
+  transform: scaleX(1);
+  pointer-events: auto;
+}
+
+.tile,
+.confirm {
+  transition:
+    opacity var(--motion-base) var(--motion-ease-out),
+    transform var(--motion-base) var(--motion-ease-out);
+}
+
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
+:root .root { gap: 0; border-radius: var(--radius-panel); background: var(--color-shell); }
+:root .tile { flex: none; border-radius: var(--radius-panel); box-shadow: var(--shadow-board); }
+:root .tile > svg { width: 20px; height: 20px; }
+:root .root[data-open] .tile { opacity: 1; transform: none; box-shadow: none; border-radius: 16px 0 0 16px; }
+:root .root[data-open] .confirm { position: relative; width: 84px; padding: 0; justify-content: center; border: 0; border-radius: 0 16px 16px 0; background: var(--color-shell-gray); }
+:root .confirm button { flex: none; background: var(--color-canvas); box-shadow: var(--shadow-board); }
+:root .confirm button svg { width: 16px; height: 16px; }
+:root .yes { color: var(--color-danger); }
+:root .tile { gap: 0; }
+:root .root[data-open] { overflow: hidden; }
+:root .root[data-open] .tile { background: transparent; border-radius: 0; }
+:root .root[data-open] .confirm { border-radius: 0; }
+:root .confirm button { min-height: 0; gap: 0; border-radius: var(--polish-radius-control); }
+}

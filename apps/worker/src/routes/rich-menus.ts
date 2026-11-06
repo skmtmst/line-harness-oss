@@ -1,21 +1,22 @@
+import { boundedUploadBody, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import { getFriendById, getLineAccountById, recordRichMenuAssignment } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-
+import { fail } from '../lib/fail.js';
 const richMenus = new Hono<Env>();
 
 class LineAccountRequiredError extends Error {}
 
-/** Resolve LINE access token only after confirming the requested/default account is visible. */
+/** 要求または既定のアカウントが見えることを確認してから、LINE のトークンを解決する。 */
 async function resolveLineClient(c: Context<Env>): Promise<LineClient> {
   const accountId = c.req.query('accountId');
   if (accountId) {
     const account = await getLineAccountById(c.env.DB, accountId);
-    if (account) return new LineClient(account.channel_access_token);
+    if (account && await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return new LineClient(account.channel_access_token);
     throw new LineAccountRequiredError('LINE account not found');
   }
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -28,13 +29,12 @@ async function resolveLineClient(c: Context<Env>): Promise<LineClient> {
 function richMenuError(c: Context<Env>, prefix: string, err: unknown) {
   const message = err instanceof Error ? err.message : String(err);
   if (err instanceof LineAccountRequiredError) {
-    return c.json({ success: false, error: message }, 400);
+    return inputError(c, { success: false, error: message }, 400, []);
   }
-  console.error(`${prefix}:`, message);
-  return c.json({ success: false, error: `${prefix}: ${message}` }, 500);
+  throw err;
 }
 
-// GET /api/rich-menus — list all rich menus from LINE API
+
 richMenus.get('/api/rich-menus', async (c) => {
   try {
     const lineClient = await resolveLineClient(c);
@@ -46,7 +46,7 @@ richMenus.get('/api/rich-menus', async (c) => {
 });
 
 // POST /api/rich-menus — create a rich menu via LINE API
-richMenus.post('/api/rich-menus', requireRole('owner', 'admin'), async (c) => {
+richMenus.post('/api/rich-menus', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json();
     const lineClient = await resolveLineClient(c);
@@ -57,8 +57,8 @@ richMenus.post('/api/rich-menus', requireRole('owner', 'admin'), async (c) => {
   }
 });
 
-// DELETE /api/rich-menus/:id — delete a rich menu
-richMenus.delete('/api/rich-menus/:id', requireRole('owner', 'admin'), async (c) => {
+
+richMenus.delete('/api/rich-menus/:id', requireDeliveryAccess('richMenus'), async (c) => {
   try {
     const richMenuId = c.req.param('id');
     const lineClient = await resolveLineClient(c);
@@ -69,8 +69,8 @@ richMenus.delete('/api/rich-menus/:id', requireRole('owner', 'admin'), async (c)
   }
 });
 
-// POST /api/rich-menus/:id/default — set rich menu as default for all users
-richMenus.post('/api/rich-menus/:id/default', requireRole('owner', 'admin'), async (c) => {
+
+richMenus.post('/api/rich-menus/:id/default', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   try {
     const richMenuId = c.req.param('id');
     const lineClient = await resolveLineClient(c);
@@ -81,20 +81,20 @@ richMenus.post('/api/rich-menus/:id/default', requireRole('owner', 'admin'), asy
   }
 });
 
-// POST /api/friends/:friendId/rich-menu — link rich menu to a specific friend
-richMenus.post('/api/friends/:friendId/rich-menu', requireRole('owner', 'admin'), async (c) => {
+
+richMenus.post('/api/friends/:friendId/rich-menu', requireDeliveryAccess('richMenus'), inputJsonBoundary({"richMenuId":["string"]}), async (c) => {
   try {
     const friendId = c.req.param('friendId');
     const body = await c.req.json<{ richMenuId: string }>();
 
     if (!body.richMenuId) {
-      return c.json({ success: false, error: 'richMenuId is required' }, 400);
+      return inputError(c, { success: false, error: 'richMenuId is required' }, 400, ["richMenuId"]);
     }
 
     const db = c.env.DB;
     const friend = await getFriendById(db, friendId);
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     let accountToken: string | null = null;
@@ -123,20 +123,19 @@ richMenus.post('/api/friends/:friendId/rich-menu', requireRole('owner', 'admin')
     return c.json({ success: true, data: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('POST /api/friends/:friendId/rich-menu error:', message);
-    return c.json({ success: false, error: `Failed to link rich menu to friend: ${message}` }, 500);
+    throw err;
   }
 });
 
-// DELETE /api/friends/:friendId/rich-menu — unlink rich menu from a specific friend
-richMenus.delete('/api/friends/:friendId/rich-menu', requireRole('owner', 'admin'), async (c) => {
+
+richMenus.delete('/api/friends/:friendId/rich-menu', requireDeliveryAccess('richMenus'), async (c) => {
   try {
     const friendId = c.req.param('friendId');
     const db = c.env.DB;
 
     const friend = await getFriendById(db, friendId);
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     let accountToken: string | null = null;
@@ -165,13 +164,12 @@ richMenus.delete('/api/friends/:friendId/rich-menu', requireRole('owner', 'admin
     return c.json({ success: true, data: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('DELETE /api/friends/:friendId/rich-menu error:', message);
-    return c.json({ success: false, error: `Failed to unlink rich menu from friend: ${message}` }, 500);
+    throw err;
   }
 });
 
 /**
- * 友だちのリッチメニュー取得の短時間キャッシュ (#496-13)。
+ * 友だちのリッチメニュー取得の短時間キャッシュ (-13)。
  *
  * 取得のたびに LINE API を最大3本（個別→既定→一覧）叩くと、列挙で
  * 制限・課金を消費される。認可の検査は毎回行い、通った後だけここを見る。
@@ -187,7 +185,7 @@ export function _resetFriendRichMenuCacheForTest(): void {
   friendRichMenuCache.clear();
 }
 
-// GET /api/friends/:friendId/rich-menu — get rich menu currently linked to a friend
+
 richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
   try {
     const friendId = c.req.param('friendId');
@@ -196,9 +194,9 @@ richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
     const friend = await getFriendById(db, friendId);
     const friendAccId = (friend as unknown as Record<string, string | null> | null)?.line_account_id ?? null;
     // 認可: 隣の GET /api/friends/:id と同じく、見られる友だちだけ。
-    // 存在の有無は 404 に倒して、ID列挙の手がかりを漏らさない (#496-13)。
+    // 存在の有無は 404 に倒して、ID列挙の手がかりを漏らさない (-13)。
     if (!friend || !await canAccessAllLineAccounts(db, c.get('staff'), [friendAccId])) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const cached = friendRichMenuCache.get(friendId);
@@ -261,16 +259,14 @@ richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
     return c.json({ success: true, data });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('GET /api/friends/:friendId/rich-menu error:', message);
-    // 内部文言（`${message}`）をそのまま返すと紛れ込むため、利用者向けの定型文にする (#496-13)。
-    return c.json({ success: false, error: 'リッチメニューを取得できませんでした' }, 500);
+    throw err;
   }
 });
 
 export { richMenus };
 
 // POST /api/rich-menus/:id/image — upload rich menu image (accepts base64 body or binary)
-richMenus.post('/api/rich-menus/:id/image', requireRole('owner', 'admin'), async (c) => {
+richMenus.post('/api/rich-menus/:id/image', requireDeliveryAccess('richMenus'), boundedUploadBody(1024 * 1024), inputJsonBoundary({"image":["string"],"imageData":["string"],"contentType":["string"]}), async (c) => {
   try {
     const richMenuId = c.req.param('id');
     const contentType = c.req.header('content-type') ?? '';
@@ -279,13 +275,13 @@ richMenus.post('/api/rich-menus/:id/image', requireRole('owner', 'admin'), async
     let imageContentType: 'image/png' | 'image/jpeg' = 'image/png';
 
     if (contentType.includes('application/json')) {
-      // Accept base64 encoded image in JSON body
+
       const body = await c.req.json<{ image?: string; imageData?: string; contentType?: string }>();
       const imageBase64 = body.image ?? body.imageData;
       if (!imageBase64) {
-        return c.json({ success: false, error: 'image (base64) is required' }, 400);
+        return inputError(c, { success: false, error: 'image (base64) is required' }, 400, ["image","imageData"]);
       }
-      // Strip data URI prefix if present
+
       const base64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
       const binaryString = atob(base64);
       const bytes = new Uint8Array(binaryString.length);
@@ -295,11 +291,11 @@ richMenus.post('/api/rich-menus/:id/image', requireRole('owner', 'admin'), async
       imageData = bytes.buffer;
       if (body.contentType === 'image/jpeg') imageContentType = 'image/jpeg';
     } else if (contentType.includes('image/')) {
-      // Accept raw binary upload
+
       imageData = await c.req.arrayBuffer();
       imageContentType = contentType.includes('jpeg') || contentType.includes('jpg') ? 'image/jpeg' : 'image/png';
     } else {
-      return c.json({ success: false, error: 'Content-Type must be application/json (with base64) or image/png or image/jpeg' }, 400);
+      return inputError(c, { success: false, error: 'Content-Type must be application/json (with base64) or image/png or image/jpeg' }, 400, []);
     }
 
     const lineClient = await resolveLineClient(c);

@@ -1,37 +1,66 @@
 'use client'
 
-import { Images, Plus, Sparkles, Upload, X } from 'lucide-react'
-import { useId, useRef, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import Dialog from '@/components/shared/dialog'
+import ColorWell from '@/components/shared/color-well'
+import ImageMultiUpload from '@/components/shared/image-multi-upload'
 import HelpTip from '@/components/shared/help-tip'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Radio from '@/components/shared/radio'
+import RadioCard,{ RadioCardGroup } from '@/components/shared/radio-card'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
-import { TextArea, TextField } from '@/components/shared/text-field'
+import { TextArea,TextField } from '@/components/shared/text-field'
 import {
-  CROP_POSITION_OPTIONS,
-  CUSTOM_PROMPT_MAX,
-  FREE_PROMPT_MAX,
-  MAIN_COLOR_SWATCHES,
-  SUB_COLOR_SWATCHES,
-  TEXT_LINE_LENGTH_MAX,
-  TEXT_LINE_MAX,
-  groupPresets,
-  isHexColor,
-  presetOptionLabel,
-  tileCaption,
-  type BannerCropPosition,
-  type BannerGenerationInput,
-  type BannerImage,
-  type BannerPreset,
+BANNER_MAX_REFERENCE_IMAGES,
+BANNER_REFERENCE_MODES,
+BANNER_REFERENCE_MODE_DESCRIPTION,
+BANNER_REFERENCE_MODE_LABEL,
+COLOR_ROLES,
+CUSTOM_PROMPT_MAX,
+TEXT_LINE_LENGTH_MAX,
+TEXT_LINE_MAX,
+alignEmphasis,
+presetCardLabel,
+presetSizeLabel,
+tileCaption,
+type BannerColorRoleKey,
+type BannerGenerationInput,
+type BannerImage,
+type BannerPreset,
+type BannerReferenceMode,
+type BannerUsage,
 } from '@/lib/hq-banners'
+import { Images,Layers,Plus,Scissors,Sparkles,Upload,X } from 'lucide-react'
+import { useId,useRef,useState,type ReactNode } from 'react'
+import styles from './generation-panel.module.css'
+import { UsageBars } from './generation-usage'
+import LimitState from './limit-state'
+
+
+/**
+ * 使い方の説明に添える印。★BG-B `R6MBHf` の子の icon そのまま（lucide・14px・`$ink-secondary`）。
+ * `pBYPP`=layers（土台にする）／`L2e1G`=scissors（素材を一部使う）／`q0T2d`=sparkles（雰囲気を参考にする）。
+ */
+const BANNER_REFERENCE_MODE_ICON: Record<BannerReferenceMode, typeof Layers> = {
+  edit: Layers,
+  parts: Scissors,
+  inspire: Sparkles,
+}
 
 /**
  * 右 390px の生成パネル。Pencil 35-2 `GcJHv`（2026-09-13 に参照画像欄を足して作り直し）。
  *
- * 運用者に見せるのは「用途・参照画像・テキスト・色・人物・追加の指示・枚数」だけ。
+ * 運用者に見せるのは「作りたい内容・参照画像・用途・テキスト・色・人物・枚数」だけ。
  * 品質やクレジットの選択は置かない（2026-09-12 決定、`docs/hq-banner-generation.md`）。
  *
- * 単一選択（モード・人物・枚数・色の見本）は radio で組む。見た目は label が持つ。
+ * 2026-10-06（オーナー指示）：
+ * - 「バナー／自由入力」の切替は使い分けが分かりにくいので置かない。入力は1種類だけ。
+ * - 「切り抜きの位置」と点線の枠は機能外なので画面に出さない（中央で整形する）。
+ * - 選択肢は小さい箱（`variant="compact"`）で細く並べる。印・丸は出さない。
+ *
+ * 単一選択（人物・枚数・色の見本）は radio で組む。見た目は label が持つ。
  */
 export default function GenerationPanel({
   presets,
@@ -39,143 +68,146 @@ export default function GenerationPanel({
   value,
   onChange,
   disabled,
-  reference,
+  referenceImages,
   onPickReference,
   onUploadReference,
   referenceBusy,
+  usage,
+  onReloadUsage,
+  usageHeading,
+  monthRemaining,
+  v8Layout = false,
 }: {
   presets: BannerPreset[]
   maxCount: number
   value: BannerGenerationInput
   onChange: (next: BannerGenerationInput) => void
   disabled?: boolean
-  /** 選んでいる参照画像（`value.referenceImageId` の実体）。無ければ null。 */
-  reference: BannerImage | null
-  /** 「ライブラリから選ぶ」。親が 35-2-B のダイアログを開く。 */
+  /** 選んでいる参照画像の実体（`value.references` の画像）。無ければ空。 */
+  referenceImages: BannerImage[]
+  /** 「ライブラリから選ぶ」。親が ★BG-C `cOgWE` のダイアログを開く。 */
   onPickReference: () => void
   /** 「ファイルを選ぶ」。親がプロジェクトへ取り込んでから参照にする。 */
   onUploadReference: (file: File) => void
   referenceBusy?: boolean
+  /** 上限の帯（板 ）。上限のときだけ出す。 */
+  usage?: BannerUsage | null
+  onReloadUsage?: () => void
+  /**
+   * 利用量の棒の上に見出し「利用量」を置く（承認済み ★BG-B `qIp42` の `ta8eS` 1042,1843 37x17）。
+   * 板がそう描いている V8 のプロジェクトの中だけが渡す。管理画面 の既定は変えない。
+   */
+  usageHeading?: boolean
+  /** G-6：枚数のそばに残り枚数を置く。 */
+  monthRemaining?: boolean
+  /** 統括 V8 の板だけの並び。管理画面 の既定は変えない。 */
+  v8Layout?: boolean
 }) {
   const uid = useId()
   const fileRef = useRef<HTMLInputElement | null>(null)
   const set = <K extends keyof BannerGenerationInput>(key: K, next: BannerGenerationInput[K]) =>
     onChange({ ...value, [key]: next })
 
-  const presetOptions = groupPresets(presets).flatMap((group) =>
-    group.items.map((p) => ({ value: p.key, label: `${group.label}｜${presetOptionLabel(p)}` })),
-  )
-  const selectedPreset = presets.find((p) => p.key === value.presetKey)
+  /*
+   * テキストの行と「強調」は必ず一緒に動かす（Pencil ★修正案 `g64HOD` 決まり1）。
+   * 片方だけ足す・消すと、2行目の強調が3行目に付くような取り違えが起きる。
+   */
+  const setLines = (textLines: string[], emphasisLines: boolean[]) =>
+    onChange({ ...value, textLines, emphasisLines: alignEmphasis(textLines, emphasisLines) })
 
   return (
-    <aside
+    <Card
+      variant="form"
+      gap="normal"
       data-design-node="GcJHv"
-      className="flex w-full shrink-0 flex-col self-start rounded-card border border-hairline bg-canvas xl:sticky xl:top-4"
+      className="w-full shrink-0 self-start xl:sticky xl:top-4"
       style={{ maxWidth: 390 }}
       aria-label="画像を生成"
     >
-      <div className="flex min-h-14 flex-wrap items-center gap-2 px-4 py-2">
+      {/*
+        見出しの行。`min-h-14` は 2026-10-06 のオーナー指示で外した「バナー／自由入力」の
+        切替ボタン（板 `pj2tz`・`hPRmn`。板では見出しと同じ y156 の行にあった）を
+        押せる大きさに保つための最小高さだった。切替が無い今は題だけの行なので外す。
+        板Δ（`S0ay0i`画像を生成 → `RJIyX`出力サイズ）49 に対し、外すと 55 → 46 になる。
+      */}
+      <div className="flex flex-wrap items-center gap-2">
         <Sparkles aria-hidden="true" className="h-4.5 w-4.5 text-ink-faint" />
-        <h2 className="text-body font-bold text-ink">画像を生成</h2>
-        <span className="flex-1" />
-        <RadioCardGroup legend="生成のしかた" className="flex flex-wrap gap-1">
-          <ModeOption
-            name={`${uid}-mode`}
-            value="banner"
-            checked={value.mode === 'banner'}
-            disabled={disabled}
-            onSelect={() => set('mode', 'banner')}
-            label="バナー"
-          />
-          <ModeOption
-            name={`${uid}-mode`}
-            value="free"
-            checked={value.mode === 'free'}
-            disabled={disabled}
-            onSelect={() => set('mode', 'free')}
-            label="自由入力"
-          />
-        </RadioCardGroup>
+        <h2 className={v8Layout ? styles.v8HeadTitle : 'text-body font-bold text-ink'}>画像を生成</h2>
       </div>
-      <div className="border-t border-hairline" />
 
-      <div data-design-node="E8oZc" className="flex flex-col gap-4 p-4">
-        <Field label="用途" note="LINE と SNS の規格から選ぶ" htmlFor={`${uid}-preset`}>
-          <Select
-            aria-label="用途"
-            size="full"
-            id={`${uid}-preset`}
-            className="w-full"
-            value={value.presetKey}
-            disabled={disabled}
-            onChange={(value) => set('presetKey', value)}
-            options={value.presetKey ? presetOptions : [{ value: '', label: '用途を選んでください' }, ...presetOptions]}
-          />
-          {selectedPreset ? <p className="text-micro text-ink-faint">{selectedPreset.note}</p> : null}
+      <div data-design-node="E8oZc" className="flex flex-col gap-4">
+        <Field v8Layout={v8Layout} label="作りたい内容" note={`任意・${CUSTOM_PROMPT_MAX}文字まで`} htmlFor={`${uid}-custom`}>
+          <SaveErrorField names={["customPrompt", "value.customPrompt", "custom_prompt", "value.custom_prompt"]}>
+            <TextArea id={`${uid}-custom`} rows={3} maxLength={CUSTOM_PROMPT_MAX} disabled={disabled}
+              value={value.customPrompt} placeholder="例：桜と料理の写真を使った、春らしい案内"
+              onChange={(event) => set('customPrompt', event.target.value)} />
+          </SaveErrorField>
         </Field>
 
-        {selectedPreset ? (
-          <Field
-            label="切り抜きの位置"
-            note="生成後に用途の寸法へ整える"
-            help={
-              <HelpTip label="切り抜きの位置の説明">
-                生成は3種類の大きさだけなので、用途の寸法に合うよう切り抜きます。選んだ側を残します。
-              </HelpTip>
-            }
-          >
-            <fieldset className="grid grid-cols-3 gap-1.5" disabled={disabled}>
-              <legend className="sr-only">切り抜きの位置</legend>
-              {CROP_POSITION_OPTIONS.map((option) => (
-                <SegmentOption
-                  key={option.value}
-                  name={`${uid}-crop`}
-                  value={option.value}
-                  checked={value.cropPosition === option.value}
-                  onSelect={() => set('cropPosition', option.value)}
-                  label={option.label}
-                />
-              ))}
-            </fieldset>
-            <CropPreview preset={selectedPreset} crop={value.cropPosition} />
-          </Field>
-        ) : null}
-
-        <Field label="参照画像" note="任意・元にする画像を1枚">
-          <div data-design-node="jZi2W" className="flex flex-col gap-2">
-            {reference ? (
-              <>
-                <div data-design-node="hGpey" className="flex items-center gap-3 rounded-control border border-hairline bg-surface-pearl px-3 py-2.5">
+        {/*
+          参照画像（承認済み ★BG-B `L1ax1Y`）。最大 3 枚で、1 枚ずつ使い方を決める。
+          使い方の意味は下の説明（★BG-B `R6MBHf`）に出し、選ぶ前から読めるようにする。
+        */}
+        <Field v8Layout={v8Layout} label="参照画像" note={`任意・最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚`}>
+          <div data-design-node="L1ax1Y" className={v8Layout ? "flex flex-col gap-1.5" : "flex flex-col gap-2"}>
+            {value.references.map((entry, index) => {
+              const image = referenceImages.find((candidate) => candidate.id === entry.imageId) ?? null
+              const name = image ? referenceTitle(image) : `${index + 1}枚目`
+              return (
+                <div
+                  key={entry.imageId}
+                  data-design-node="hGpey"
+                  className="flex flex-wrap items-center gap-3 rounded-control border border-hairline bg-surface-pearl px-3 py-2.5"
+                >
                   {/* 統括の画像は Worker から配信されるので next/image の最適化は使わない（image-tile と同じ） */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={reference.media.url} alt="" className="h-14 w-14 shrink-0 rounded-mini bg-step-idle object-cover" />
+                  {image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img width={48} height={48} src={image.media.url} alt="" className="h-12 w-12 shrink-0 rounded-mini bg-step-idle object-cover" />
+                  ) : (
+                    <span className="h-12 w-12 shrink-0 rounded-mini bg-step-idle" />
+                  )}
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <p className="truncate text-label font-bold text-ink">{referenceTitle(reference)}</p>
-                    <p className="truncate text-micro text-ink-faint">{tileCaption(reference, presets)}</p>
+                    <p className="truncate text-label font-medium text-ink">{name}</p>
+                    <p className="truncate text-micro text-ink-faint">{image ? tileCaption(image, presets) : `${index + 1}枚目`}</p>
                   </div>
-                  <Button disabled={disabled || referenceBusy} onClick={() => set('referenceImageId', null)}>
+                  <SaveErrorField names={[`references.${index}.mode`,"mode","entry.mode"]}><Select
+                    aria-label={`${name}の使い方`}
+                    className="w-44"
+                    value={entry.mode}
+                    disabled={disabled || referenceBusy}
+                    onChange={(next) =>
+                      set(
+                        'references',
+                        value.references.map((other) =>
+                          other.imageId === entry.imageId ? { ...other, mode: next as BannerReferenceMode } : other,
+                        ),
+                      )
+                    }
+                    options={BANNER_REFERENCE_MODES.map((mode) => ({ value: mode, label: BANNER_REFERENCE_MODE_LABEL[mode] }))}
+                  /></SaveErrorField>
+                  <Button
+                    disabled={disabled || referenceBusy}
+                    aria-label={`${name}を外す`}
+                    onClick={() => set('references', value.references.filter((other) => other.imageId !== entry.imageId))}
+                  >
                     外す
                   </Button>
                 </div>
-                <fieldset data-design-node="RPm7W" className="grid grid-cols-2 gap-1.5" disabled={disabled}>
-                  <legend className="sr-only">参照画像の使い方</legend>
-                  <SegmentOption name={`${uid}-ref`} value="edit" checked={value.referenceMode === 'edit'} onSelect={() => set('referenceMode', 'edit')} label="土台に描き直す" />
-                  <SegmentOption name={`${uid}-ref`} value="inspire" checked={value.referenceMode === 'inspire'} onSelect={() => set('referenceMode', 'inspire')} label="雰囲気を参考にする" />
-                </fieldset>
-                <p className="text-micro text-ink-faint">
-                  描き直す: 構図と配色を保ったまま、文字や背景を指示で変えます。参考にする: 色やトーンだけ引き継いで新しく作ります。
-                </p>
-              </>
-            ) : (
+              )
+            })}
+
+            {value.references.length < BANNER_MAX_REFERENCE_IMAGES ? (
               <>
-                <div className="grid grid-cols-2 gap-2">
+                {v8Layout ? (
+                  /* 絵 ：参照画像は落とす欄（題・ドラッグ＆ドロップ・制限）と、その中の「ライブラリから選ぶ」。 */
+                  <ImageMultiUpload presentation="reference" disabled={disabled} busy={referenceBusy} onPickLibrary={onPickReference} onUpload={onUploadReference} />
+                ) : <div className="grid grid-cols-2 gap-2">
                   <Button disabled={disabled || referenceBusy} onClick={onPickReference} className="w-full">
                     <Images aria-hidden="true" className="h-4 w-4" />
                     ライブラリから選ぶ
                   </Button>
-                  <Button disabled={disabled || referenceBusy} onClick={() => fileRef.current?.click()} className="w-full">
-                    <Upload aria-hidden="true" className="h-4 w-4" />
-                    {referenceBusy ? '取り込んでいます…' : 'ファイルを選ぶ'}
+                  <Button disabled={disabled || referenceBusy} onClick={() => fileRef.current?.click()} className="w-full" busy={referenceBusy} busyLabel="取り込んでいます…">
+                    <Upload aria-hidden="true" className="h-4 w-4" />ファイルを選ぶ
                   </Button>
                   <input
                     ref={fileRef}
@@ -189,134 +221,195 @@ export default function GenerationPanel({
                       if (file) onUploadReference(file)
                     }}
                   />
-                </div>
-                <p className="text-micro text-ink-faint">ライブラリの画像か、手元の画像（PNG・JPEG・WebP、10MB まで）を 1 枚選べます。</p>
+                </div>}
+                {value.references.length === 0 ? (
+                  <p className={v8Layout ? styles.v8SmallMuted : "text-micro text-ink-faint"}>
+                    {`ライブラリの画像か、手元の画像（PNG・JPEG・WebP、10MB まで）を ${BANNER_MAX_REFERENCE_IMAGES} 枚まで選べます。`}
+                  </p>
+                ) : null}
               </>
+            ) : (
+              <p className={v8Layout ? styles.v8SmallMuted : "text-micro text-ink-faint"}>
+                {`参照画像は ${BANNER_MAX_REFERENCE_IMAGES} 枚までです。入れ替えるときは、どれかを外してください。`}
+              </p>
             )}
+
+            {/*
+              * 使い方の説明（★BG-B `R6MBHf`）。3 つの違いをここで読み切れるようにする。
+              * 絵のとおり、行ごとに「印（14px）＋名前＋説明」を置き、名前と説明は**縦に**積む
+              * （板では `UPIq5`「土台にする」と `Z55Iao`「構図と配色を…」が別の行。`：` でつないだ
+              * 1行にはしない）。器は `$surface-pearl`・角丸10・内側12・行間8。
+              * 角丸 10 は V7 で 12px の段に畳まれている（`globals.css` の `--radius-card` の但し書き）ので
+              * `rounded-card` を使う。半端な段は新規で増やさない（#704）。
+              */}
+            <div data-design-node="R6MBHf" className="flex flex-col gap-2 rounded-card bg-surface-pearl p-3">
+              <p className={v8Layout ? styles.v8Caption : "text-caption font-semibold text-ink"}>{`使い方は ${BANNER_REFERENCE_MODES.length} つから選べます`}</p>
+              <ul className="flex flex-col gap-2">
+                {BANNER_REFERENCE_MODES.map((mode) => {
+                  const ModeIcon = BANNER_REFERENCE_MODE_ICON[mode]
+                  return (
+                    <li key={mode} className="flex items-center gap-2">
+                      <ModeIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-ink-secondary" />
+                      <span className={styles.howToText}>
+                        <span className={v8Layout ? styles.v8SmallTitle : "text-micro font-semibold text-ink"}>{BANNER_REFERENCE_MODE_LABEL[mode]}</span>
+                        <span className={v8Layout ? styles.v8SmallMuted : "text-micro text-ink-faint"}>{BANNER_REFERENCE_MODE_DESCRIPTION[mode]}</span>
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
           </div>
         </Field>
 
-        {value.mode === 'banner' ? (
-          <>
-            <Field label="画像に入れるテキスト" note={`1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで`}>
-              <div className="flex flex-col gap-2 rounded-control border border-hairline p-3">
-                {value.textLines.map((line, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="w-3 text-micro font-semibold text-ink-faint" aria-hidden="true">{i + 1}</span>
-                    <TextField
-                      aria-label={`テキスト ${i + 1}行目`}
-                      value={line}
-                      maxLength={TEXT_LINE_LENGTH_MAX}
-                      disabled={disabled}
-                      placeholder={i === 0 ? '例: 2周年 春の感謝祭' : i === value.textLines.length - 1 ? '行動を促す文言（例: 今すぐチェック）' : ''}
-                      onChange={(event) => {
-                        const next = [...value.textLines]
-                        next[i] = event.target.value
-                        set('textLines', next)
-                      }}
-                      className="min-w-0 flex-1"
-                    />
-                    {value.textLines.length > 1 ? (
-                      <button
-                        type="button"
-                        disabled={disabled}
-                        aria-label={`${i + 1}行目を消す`}
-                        onClick={() => set('textLines', value.textLines.filter((_, j) => j !== i))}
-                        className="rounded-mini p-1 text-ink-faint hover:bg-canvas-sunken disabled:opacity-50"
-                      >
-                        <X aria-hidden="true" className="h-3.5 w-3.5" />
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-                {value.textLines.length < TEXT_LINE_MAX ? (
+        <OutputSize
+          name={`${uid}-preset`}
+          presets={presets}
+          value={value.presetKey}
+          disabled={disabled}
+          onSelect={(key) => set('presetKey', key)}
+          v8Layout={v8Layout}
+        />
+
+        {/*
+          * ★修正案 `g64HOD`（2026-10-06 承認）：行ごとに「強調」を入れ切りできる。
+          * 入れた行だけを強調カラーで目立たせる。丸やタグの印は出さず、
+          * 入っていることは地と枠と文字の色で示す。
+          */}
+        <Field v8Layout={v8Layout}
+          label="画像に入れるテキスト"
+          note={v8Layout ? `1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで` : `1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで／強調したい行は「強調」`}
+          noteSpread={!v8Layout}
+          footNote={v8Layout ? undefined : '「強調」を押した行は大きく・目立つ色で描きます（1〜2行まで推奨）'}
+          help={undefined}
+        >
+          <div className={v8Layout ? 'flex flex-col gap-1.5' : 'flex flex-col gap-2 rounded-control border border-hairline p-3'}>
+            {value.textLines.map((line, i) => (
+              <div key={i} className={v8Layout ? styles.v8TextRow : "flex items-center gap-2"}>
+                <span className={v8Layout ? styles.v8LineNumber : "w-3 text-micro font-semibold text-ink-faint"} aria-hidden="true">{i + 1}</span>
+                <SaveErrorField names={["line","lines"]}><TextField
+                  aria-label={`テキスト ${i + 1}行目`}
+                  value={line}
+                  maxLength={TEXT_LINE_LENGTH_MAX}
+                  disabled={disabled}
+                  placeholder={i === 0 ? '例: 2周年 春の感謝祭' : i === value.textLines.length - 1 ? '行動を促す文言（例: 今すぐチェック）' : ''}
+                  onChange={(event) => {
+                    const next = [...value.textLines]
+                    next[i] = event.target.value
+                    setLines(next, value.emphasisLines)
+                  }}
+                  className="min-w-0 flex-1"
+                /></SaveErrorField>
+                <EmphasisToggle
+                  v8Layout={v8Layout}
+                  index={i}
+                  on={value.emphasisLines[i] === true}
+                  disabled={disabled}
+                  onToggle={() => {
+                    const next = alignEmphasis(value.textLines, value.emphasisLines)
+                    next[i] = !next[i]
+                    set('emphasisLines', next)
+                  }}
+                />
+                {value.textLines.length > 1 ? (
                   <button
                     type="button"
                     disabled={disabled}
-                    onClick={() => set('textLines', [...value.textLines, ''])}
-                    className="inline-flex items-center gap-1 self-start text-caption font-semibold text-action hover:underline disabled:opacity-50"
+                    aria-label={`${i + 1}行目を消す`}
+                    onClick={() =>
+                      setLines(
+                        value.textLines.filter((_, j) => j !== i),
+                        alignEmphasis(value.textLines, value.emphasisLines).filter((_, j) => j !== i),
+                      )
+                    }
+                    className={v8Layout ? styles.v8LineRemove : "rounded-mini p-1 text-ink-faint hover:bg-canvas-sunken "}
                   >
-                    <Plus aria-hidden="true" className="h-3.5 w-3.5" />
-                    行を足す
+                    <X aria-hidden="true" className="h-3.5 w-3.5" />
                   </button>
                 ) : null}
               </div>
-            </Field>
-
-            <div className="grid grid-cols-2 gap-3">
-              <ColorPicker
-                name={`${uid}-main`}
-                label="メインカラー"
-                swatches={MAIN_COLOR_SWATCHES}
-                value={value.mainColor}
-                onChange={(v) => set('mainColor', v)}
-                disabled={disabled}
-              />
-              <ColorPicker
-                name={`${uid}-sub`}
-                label="サブカラー"
-                note="任意"
-                swatches={SUB_COLOR_SWATCHES}
-                value={value.subColor}
-                onChange={(v) => set('subColor', v)}
-                disabled={disabled}
-              />
-            </div>
-
-            <Field label="人物">
-              <fieldset className="grid grid-cols-2 gap-1.5" disabled={disabled}>
-                <legend className="sr-only">人物</legend>
-                <SegmentOption name={`${uid}-person`} value="without" checked={value.personOption === 'without'} onSelect={() => set('personOption', 'without')} label="入れない" />
-                <SegmentOption name={`${uid}-person`} value="with" checked={value.personOption === 'with'} onSelect={() => set('personOption', 'with')} label="入れる" />
-              </fieldset>
-            </Field>
-
-            <Field label="追加の指示" note="任意" htmlFor={`${uid}-custom`}>
-              <TextArea
-                id={`${uid}-custom`}
-                rows={2}
-                maxLength={CUSTOM_PROMPT_MAX}
-                disabled={disabled}
-                value={value.customPrompt}
-                placeholder="例: 桜の花びらと餃子・生ビールの写真風。和風で温かみのある雰囲気"
-                onChange={(event) => set('customPrompt', event.target.value)}
-                className="w-full"
-              />
-            </Field>
-          </>
-        ) : (
-          <Field label="作りたい画像の説明" note={`${FREE_PROMPT_MAX}文字まで`} htmlFor={`${uid}-free`}>
-            <TextArea
-              id={`${uid}-free`}
-              rows={6}
-              maxLength={FREE_PROMPT_MAX}
-              disabled={disabled}
-              value={value.freePrompt}
-              placeholder="例: 餃子と生ビールの写真風ビジュアル。木のテーブル、温かい照明、文字は入れない"
-              onChange={(event) => set('freePrompt', event.target.value)}
-              className="w-full"
-            />
-            <p className="text-micro text-ink-faint">書いた文がそのまま生成の指示になります。文字を入れたいときはその文字も書いてください。</p>
-          </Field>
-        )}
-
-        <Field label="枚数">
-          <fieldset className="grid grid-cols-4 gap-1.5" disabled={disabled}>
-            <legend className="sr-only">枚数</legend>
-            {Array.from({ length: maxCount }, (_, i) => i + 1).map((n) => (
-              <SegmentOption
-                key={n}
-                name={`${uid}-count`}
-                value={String(n)}
-                checked={value.count === n}
-                onSelect={() => set('count', n)}
-                label={`${n}枚`}
-              />
             ))}
+            {value.textLines.length < TEXT_LINE_MAX ? (
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() =>
+                  setLines([...value.textLines, ''], [...alignEmphasis(value.textLines, value.emphasisLines), false])
+                }
+                className={v8Layout ? styles.v8LineAdd : "inline-flex items-center gap-1 self-start text-caption font-semibold text-action hover:underline "}
+              >
+                <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+                行を足す
+              </button>
+            ) : null}
+          </div>
+        </Field>
+
+        <ColorRoles value={value} onPick={(key, next) => set(key, next)} disabled={disabled} v8Layout={v8Layout} />
+
+        <Field v8Layout={v8Layout}
+          label="人物"
+          note={v8Layout ? undefined : "写真に人を入れるかどうか"}
+        >
+          {/*
+            * ★BG-B `z14gEG`：人物は素の2択（丸＋ラベル）を間隔 20 で左から並べる。
+            * カード（枠つきの箱）ではありません。2026-10-06 オーナー指示
+            *「人物のボタンも太くてスマートじゃない」どおり。
+            */}
+          <fieldset className="flex items-center gap-5" disabled={disabled}>
+            <legend className="sr-only">人物</legend>
+            <SaveErrorField names={["personOption","value.personOption"]}><Radio name={`${uid}-person`} value="without" size={v8Layout ? "medium" : "small"} checked={value.personOption === 'without'} onChange={() => set('personOption', 'without')}>
+              入れない
+            </Radio></SaveErrorField>
+            <SaveErrorField names={["personOption","value.personOption"]}><Radio name={`${uid}-person`} value="with" size={v8Layout ? "medium" : "small"} checked={value.personOption === 'with'} onChange={() => set('personOption', 'with')}>
+              入れる
+            </Radio></SaveErrorField>
           </fieldset>
         </Field>
+
+        {/*
+          * ★BG-B `ELZIS`：枚数の注記は2つとも「つくる枚数」に付く。
+          * 置き場所も絵のまま——`KCFAX`「一度に 4 枚まで」はラベル行
+          * （4択の上）、`swcu2`「同じ条件で…」は4択の下。
+          */}
+        <Field v8Layout={v8Layout}
+          label="つくる枚数"
+          note={`一度に ${maxCount} 枚まで`}
+          footNote={v8Layout ? undefined : "同じ条件で指定した枚数ぶん作ります（絵柄は毎回少しずつ変わります）"}
+        >
+          {/*
+            * ★BG-B `SLgY5`：枚数は区切りスイッチ（灰色の器に4つのチップ）。
+            * カードを4つ並べる形ではありません。器が role="group"
+            * aria-label="枚数" を持つので、外側に fieldset+legend「枚数」を
+            * 重ねない（group が2つになる）。操作停止は disabled で渡す。
+            */}
+          <SaveErrorField names={["count","value.count"]}><SegmentedControl
+            aria-label="枚数"
+            size="panel"
+            equalWidth={v8Layout}
+            disabled={disabled}
+            options={Array.from({ length: maxCount }, (_, i) => ({
+              value: String(i + 1),
+              label: v8Layout ? `${i + 1}` : `${i + 1}枚`,
+            }))}
+            value={String(value.count)}
+            onChange={(next) => set('count', Number(next))}
+          /></SaveErrorField>
+        </Field>
+
+        {monthRemaining ? <p className="text-caption text-ink-secondary" aria-live="polite">{`今月の残り ${usage?.month.remaining ?? '—'}枚`}</p> : null}
+        <UsageBars usage={usage ?? null} heading={v8Layout ? false : usageHeading} v8Layout={v8Layout} />
+
+        <LimitState usage={usage ?? null} onReload={onReloadUsage} compact />
+
+        {/*
+          * 「1040 × 1040 で書き出します」（★BG-B `GcuH5`）はここに出さない。
+          * 絵では下部追従バーの中ほど（左=残り枚数／中=サイズ／右=ボタン）。
+          * 画面側（`app/hq/banners/project/page.tsx`・`v8/hq-banners/project.tsx`）の
+          * 下の帯で `exportSizeText()` を出す。
+          */}
       </div>
-    </aside>
+    </Card>
   )
 }
 
@@ -325,137 +418,203 @@ function referenceTitle(image: BannerImage): string {
   return image.media.filename.replace(/\.[a-z0-9]+$/i, '') || '画像'
 }
 
+/*
+ * 行ごとの「強調」（Pencil ★修正案 `g64HOD`・2026-10-06 承認、決まり 2〜4）。
+ *
+ * 高さ 26・左右の余白 9・角丸 999・文字 11/600。行番号と入力欄の右、同じ行に置く。
+ * 入っていないとき＝地 canvas・枠 hairline・文字 ink-secondary。
+ * 入っているとき＝地 accent-soft・枠 accent-deep 1.5・文字 accent-deep。
+ * 丸やタグの印は出さない（押した状態は地と枠と文字の色だけで示す）。
+ * 読み上げには `aria-pressed` で入り切りを伝え、名前は「1行目を強調」にする。
+ *
+ * 見た目は `generation-panel.module.css` にまとめる。承認した見え方は同じで、
+ * 直書きの色と任意の大きさを画面側に残さないため（共通の約束 design-debt）。
+ */
+function EmphasisToggle({
+  v8Layout = false,
+  index,
+  on,
+  disabled,
+  onToggle,
+}: {
+  v8Layout?: boolean
+  index: number
+  on: boolean
+  disabled?: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      aria-label={`${index + 1}行目を強調`}
+      disabled={disabled}
+      onClick={onToggle}
+      className={`${styles.emphasis} ${v8Layout ? styles.v8Emphasis : ""} ${on ? styles.emphasisOn : styles.emphasisOff}`}
+    >
+      強調
+    </button>
+  )
+}
+
+/**
+ * 脇のパネルの1項目（ラベル行＋中身）。
+ *
+ * ラベルの字は ★BG-B の板どおり **12px・600・`$ink`**（`text-caption font-semibold`）。
+ * 共通部品の既定（`text-label` = 13px・500）より板が優先です
+ * （`docs/v8-design-rules.md` §1 の2「画面ごとに、その板の絵のとおり」＞ §1 の4「共通部品」）。
+ * 13px だと日本語ラベルが1文字あたり約1px太り、右の一言が板より5〜7px外へずれます。
+ */
 function Field({
+  v8Layout = false,
   label,
   note,
+  noteSpread,
+  footNote,
   htmlFor,
   help,
   children,
 }: {
+  v8Layout?: boolean
   label: string
+  /**
+   * ラベルの**すぐ右**に添える一言。**入れる前に読んでおく**たぐい
+   * （上限・単位・任意かどうか）。例: ★BG-B `KCFAX`「一度に 4 枚まで」。
+   *
+   * ★BG-B のラベル行は8本のうち7本が **gap 6 の左詰め**（`Z69t7`・`iENp8`・`PVn0V`・
+   * `U4lxzo`・`AOkUL`・`b3r9d`・`VH9vI`。`justifyContent` の指定なし＝左詰め、`alignItems: center`）。
+   * なので既定は左詰め。右端へ寄せるのは `noteSpread` のときだけ。
+   */
   note?: string
+  /**
+   * ラベル行を両端に開く（ラベル左・一言右）。★BG-B で唯一そうなっている
+   * `KqqEY`（項目 画像に入れるテキスト・gap 8・`space_between`）のための口。
+   * ここだけ一言が226px・2行に折れて右端まで届くため、絵では両端に開いています。
+   * 板では label と note の上辺がそろうので縦は `items-start`。
+   */
+  noteSpread?: boolean
+  /**
+   * 中身の**下**に置く一言。選んだあとの結果を説明するたぐい。
+   * 例: ★BG-B `swcu2`「同じ条件で指定した枚数ぶん作ります…」。
+   * 絵では4択の下にあるので、`note` と同じ行にまとめない。
+   */
+  footNote?: string
   htmlFor?: string
   help?: ReactNode
   children: ReactNode
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-2">
+      <div className={noteSpread ? 'flex items-start justify-between gap-2' : 'flex items-center gap-1.5'}>
         {htmlFor ? (
-          <label htmlFor={htmlFor} className="text-label font-bold text-ink">{label}</label>
+          <label htmlFor={htmlFor} className={v8Layout ? styles.v8Caption : "shrink-0 text-caption font-semibold text-ink"}>{label}</label>
         ) : (
-          <span className="text-label font-bold text-ink">{label}{help ? <span className="ml-1">{help}</span> : null}</span>
+          <span className={v8Layout ? styles.v8Caption : "shrink-0 text-caption font-semibold text-ink"}>{label}</span>
         )}
-        {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
+        {note ? <span className={v8Layout ? styles.v8SmallMuted : "min-w-0 text-micro text-ink-faint"}>{note}</span> : null}
+        {help ? <HelpTip label={`${label}の補足`}>{help}</HelpTip> : null}
       </div>
       {children}
+      {footNote ? <p className="text-nano text-ink-faint">{footNote}</p> : null}
+    </div>
+  )
+}
+
+/** 現在の用途を短く示し、大きさの選択肢は窓で開く。 */
+function OutputSize({
+  name,
+  presets,
+  value,
+  disabled,
+  onSelect,
+  v8Layout = false,
+}: {
+  name: string
+  presets: BannerPreset[]
+  value: string
+  disabled?: boolean
+  onSelect: (key: string) => void
+  v8Layout?: boolean
+}) {
+  const [opened, setOpened] = useState(false)
+  const selected = presets.find((preset) => preset.key === value)
+
+  return (
+    <div data-design-node="xy4EW" className="flex flex-col gap-2">
+      <p className="truncate text-caption text-ink" title={selected ? `${presetCardLabel(selected)}・${presetSizeLabel(selected)}` : undefined}>
+        {selected ? `${presetCardLabel(selected)}・${presetSizeLabel(selected)}` : '用途と大きさを選んでください'}
+      </p>
+      <div className="flex justify-center"><Button disabled={disabled} onClick={() => setOpened(true)}>大きさを変える</Button></div>
+      <Dialog footerAlign="center" open={opened} title="用途と大きさを選ぶ" onCancel={() => setOpened(false)} cancelLabel="閉じる">
+        <SaveErrorField names={["key", "preset.key", "value"]}>
+          <RadioCardGroup legend="出力サイズ" columns={2}>
+            {presets.map((preset) => (
+              <RadioCard key={preset.key} name={name} value={preset.key} checked={value === preset.key}
+                disabled={disabled} onChange={(key) => { onSelect(key); setOpened(false) }} variant="compact"
+                compactTypography={v8Layout ? 'banner' : 'default'} title={presetCardLabel(preset)} note={presetSizeLabel(preset)} />
+            ))}
+          </RadioCardGroup>
+        </SaveErrorField>
+      </Dialog>
     </div>
   )
 }
 
 /**
- * 切り抜きのプレビュー（R120）。生成元の枠（APIの大きさの比率）の中に、
- * 用途の寸法の比率の窓を、選んだ位置（上・中央・下）で置く。
- * 縦横比が同じ用途では窓が枠いっぱいになる（切り抜き無し・拡大だけ）。
+ * 色の4つの役割。Pencil ★BG-B `KkTNS`。
+ *
+ * ベース＝背景、メイン＝主役、サブ＝差し色、強調＝目立たせたい文字。
+ * 色そのものは共通の「色を選ぶ」（★BG-2 `P8ZUj`）で選ぶ。
  */
-export function CropPreview({ preset, crop }: { preset: BannerPreset; crop: BannerCropPosition }) {
-  const api = /^(\d+)x(\d+)$/.exec(preset.apiSize)
-  const sourceW = api ? Number(api[1]) : preset.targetWidth
-  const sourceH = api ? Number(api[2]) : preset.targetHeight
-  // cover で用途寸法へ拡大したとき、元画像のどの範囲が残るか。
-  const scale = Math.max(preset.targetWidth / sourceW, preset.targetHeight / sourceH)
-  const windowW = Math.min((preset.targetWidth / (sourceW * scale)) * 100, 100)
-  const windowH = Math.min((preset.targetHeight / (sourceH * scale)) * 100, 100)
-  const top = crop === 'top' ? 0 : crop === 'bottom' ? 100 - windowH : (100 - windowH) / 2
-  const left = (100 - windowW) / 2
-  return (
-    <div>
-      <div
-        role="img"
-        aria-label={`生成後にこの範囲で${preset.targetWidth}×${preset.targetHeight}に整えます`}
-        className="relative w-full overflow-hidden rounded-mini bg-canvas-sunken"
-        style={{ aspectRatio: `${sourceW} / ${sourceH}` }}
-      >
-        <div
-          aria-hidden="true"
-          className="absolute border-2 border-dashed border-ink-faint bg-canvas"
-          style={{ width: `${windowW}%`, height: `${windowH}%`, top: `${top}%`, left: `${left}%` }}
-        />
-      </div>
-      <p className="mt-1 text-micro text-ink-faint">
-        生成後にこの範囲で{preset.targetWidth}×{preset.targetHeight}に整えます
-      </p>
-    </div>
-  )
-}
-
-/** モード切替の1つ。Pencil `h9nAp5`。共通の選ぶ部品で出す。 */
-function ModeOption({ name, value, checked, disabled, onSelect, label }: { name: string; value: string; checked: boolean; disabled?: boolean; onSelect: () => void; label: string }) {
-  return (
-    <RadioCard name={name} value={value} checked={checked} disabled={disabled} onChange={onSelect} title={label} />
-  )
-}
-
-/** 人物・枚数の選択肢。Pencil `UgooV` / `ndNQM`。共通の選ぶ部品で出す。 */
-function SegmentOption({ name, value, checked, onSelect, label }: { name: string; value: string; checked: boolean; onSelect: () => void; label: string }) {
-  return (
-    <RadioCard name={name} value={value} checked={checked} onChange={onSelect} title={label} />
-  )
-}
-
-/** 色の見本＋HEX。Pencil `l69Th` / `l6UwE`。見本を押すか、HEXを直接書く。 */
-function ColorPicker({
-  name,
-  label,
-  note,
-  swatches,
+export function ColorRoles({
   value,
-  onChange,
+  onPick,
   disabled,
+  v8Layout = false,
 }: {
-  name: string
-  label: string
-  note?: string
-  swatches: readonly string[]
-  value: string | null
-  onChange: (next: string | null) => void
+  value: BannerGenerationInput
+  onPick: (key: BannerColorRoleKey, next: string | null) => void
   disabled?: boolean
+  v8Layout?: boolean
 }) {
-  const invalid = value !== null && value !== '' && !isHexColor(value)
+  // いま使っている色を「このデザインの色」として見せ、役割どうしで使い回せるようにする。
+  const used = Array.from(new Set(COLOR_ROLES.map((role) => value[role.key]).filter((c): c is string => Boolean(c))))
   return (
-    <fieldset className="flex flex-col gap-1.5" disabled={disabled}>
-      <legend className="flex w-full items-baseline justify-between gap-2">
-        <span className="text-label font-bold text-ink">{label}</span>
-        {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
-      </legend>
-      <div className="flex flex-wrap gap-1.5">
-        {swatches.map((hex) => {
-          const checked = (value ?? '').toUpperCase() === hex
-          return (
-            <RadioCard
-              key={hex}
-              name={name}
-              value={hex}
-              checked={checked}
-              onChange={() => onChange(hex)}
-              title={hex}
-              note={<span aria-hidden="true" style={{ backgroundColor: hex }} className="border-hairline inline-block h-4 w-4 rounded-full border" />}
-            />
-          )
-        })}
+    <div className={v8Layout ? "flex flex-col gap-1.5" : "flex flex-col gap-2"}>
+      <div className="flex items-center gap-1.5">
+        <span className={v8Layout ? styles.v8ColorTitle : "shrink-0 text-caption font-semibold text-ink"}>{v8Layout ? '色' : 'カラー'}</span>
+        {v8Layout ? null : <span className="min-w-0 text-micro text-ink-faint">4つの役割で指定します</span>}
       </div>
-      <TextField
-        aria-label={`${label} のHEX`}
-        value={value ?? ''}
-        placeholder="#RRGGBB"
-        maxLength={7}
-        invalid={invalid}
-        onChange={(event) => {
-          const raw = event.target.value.trim()
-          onChange(raw === '' ? null : raw.startsWith('#') ? raw.toUpperCase() : `#${raw.toUpperCase()}`)
-        }}
-        className="w-full"
-      />
-    </fieldset>
+      {/*
+        4つの役割の並び。縦の間隔は板から逆算する。板の上下のピッチは
+        （`VVBfu`メインカラー y1355 → `ZdLJ8`サブカラー y1420）65px。
+        実画面の 1 区画は 題18 + 組の中の間隔6 + 色の枠36 = 60px なので、
+        縦の間隔は 4px（`gap-y-1`）でピッチ 64 になり板と 1px 差に収まる。
+        6px にすると板ちょうどだが、`size-scale-contract.test.tsx` の
+        「4の倍数でない gap 段を増やさない」ラチェットに引っかかるので 4px を採る。
+        横は板どおり 12px のままにする。
+      */}
+      <div className={v8Layout ? "grid grid-cols-2 gap-x-2 gap-y-2" : "grid grid-cols-2 gap-x-3 gap-y-1"}>
+        {COLOR_ROLES.map((role) => (
+          <div key={role.key} className={v8Layout ? "flex flex-col gap-1" : "flex flex-col gap-1.5"}>
+            <span className={v8Layout ? styles.v8SmallMuted : "text-caption font-semibold text-ink"}>{v8Layout ? role.label.replace("カラー", "") : role.label}</span>
+            <ColorWell
+              block
+              label={role.label}
+              value={value[role.key] ?? null}
+              fallback={role.sample}
+              savedColors={used}
+              disabled={disabled}
+              onChange={(next) => onPick(role.key, next)}
+            />
+          </div>
+        ))}
+      </div>
+      {/* 補足（Pencil `pQlYK`）。色の役割の意味を言葉で置いておく。 */}
+      <div className="rounded-mini bg-canvas-sunken p-3">
+        <p className={v8Layout ? styles.v8SmallTitle : "text-caption font-semibold text-ink"}>色の決め方</p>
+        <p className={v8Layout ? styles.v8ColorNote : "mt-1 text-micro text-ink-secondary"}>{v8Layout ? 'ベースは背景、メインは見出しの文字、サブは飾り、強調は値段や締切など目立たせたい所に使います。' : '色をタップすると、好きな色を選べる画面が開きます。画面の中の色をそのまま拾うスポイトも使えます。ベースは背景、メインは主役、サブは差し色、強調は特に目立たせたい文字に使います。'}</p>
+      </div>
+    </div>
   )
 }

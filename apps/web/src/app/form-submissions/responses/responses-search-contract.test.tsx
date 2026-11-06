@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fetchUrls: string[] = []
 const fetchApi = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -21,7 +22,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams('id=form-1'),
 }))
@@ -65,7 +66,7 @@ function mockResponses() {
 }
 
 function input(): HTMLInputElement {
-  const found = host.querySelector('#form-response-filter')
+  const found = host.querySelector('input[aria-label="名前・答えで探す（全件から）"]')
   if (!(found instanceof HTMLInputElement)) throw new Error('search input not found')
   return found
 }
@@ -85,6 +86,7 @@ async function settle(milliseconds: number) {
 
 describe('N-171/N-179 検索条件の一覧・CSV共有', () => {
   beforeEach(() => {
+    window.history.replaceState(null, '', '/form-submissions/responses?id=form-1')
     fetchUrls.length = 0
     fetchApi.mockReset()
     mockResponses()
@@ -102,6 +104,9 @@ describe('N-171/N-179 検索条件の一覧・CSV共有', () => {
   })
 
   it('検索語を打つと一覧取得にqが付き、CSVの全ページ取得にも同じqが付く', async () => {
+    // happy-dom がCSVのblobへページ移動すると、URLに残した検索語まで消える。
+    // 書き出し要求を確認する間はファイル取得だけを止める。
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     await act(async () => {
       root.render(<FormResponsesPage />)
     })
@@ -134,5 +139,55 @@ describe('N-171/N-179 検索条件の一覧・CSV共有', () => {
     for (const url of exported) {
       expect(url).toContain(`q=${encodeURIComponent('駐車場')}`)
     }
+  })
+})
+
+describe('MKQyJ 後処理の札（済み・未完）', () => {
+  beforeEach(() => {
+    fetchUrls.length = 0
+    fetchApi.mockReset()
+    fetchApi.mockImplementation((async (url: string) => {
+      fetchUrls.push(url)
+      if (url.startsWith('/api/forms/form-1/submissions')) {
+        return {
+          success: true,
+          data: {
+            items: [
+              { id: 'sub-done', formId: 'form-1', friendId: 'friend-1', friendName: '済みさん', data: { q1: 'はい' }, postActions: { state: 'completed', pending: [] }, createdAt: '2026-09-01T10:00:00+09:00' },
+              { id: 'sub-open', formId: 'form-1', friendId: 'friend-2', friendName: '未完さん', data: { q1: 'いいえ' }, postActions: { state: 'failed', pending: ['tag'] }, createdAt: '2026-09-02T10:00:00+09:00' },
+              { id: 'sub-plain', formId: 'form-1', friendId: 'friend-3', friendName: '記録なしさん', data: { q1: 'どちらでも' }, postActions: null, createdAt: '2026-09-03T10:00:00+09:00' },
+            ],
+            total: 3,
+            page: 1,
+            limit: 20,
+          },
+        }
+      }
+      return { success: true, data: formDetail }
+    }) as typeof fetchApi)
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+
+  afterEach(() => {
+    act(() => {
+      root.unmount()
+    })
+    host.remove()
+    vi.restoreAllMocks()
+  })
+
+  it('終わりは済み・未完ありは未完・記録なしは札なし', async () => {
+    await act(async () => {
+      root.render(<FormResponsesPage />)
+    })
+    await settle(50)
+    await act(async () => {
+      ;([...host.querySelectorAll('[role="tab"]')].find((tab) => tab.textContent?.includes('1件ずつ見る')) as HTMLElement).click()
+    })
+    expect(host.textContent).toContain('済み')
+    expect(host.textContent).toContain('未完')
+    expect(host.textContent).not.toContain('後処理に未完があります')
   })
 })

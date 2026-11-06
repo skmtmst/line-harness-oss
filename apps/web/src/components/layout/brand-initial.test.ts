@@ -7,11 +7,17 @@ import { brandInitial } from './brand-initial'
  * 「株」が出ていた（#1190）。
  */
 describe('アイコンに出す会社名の1文字', () => {
-  it('頭の法人格を外してから1文字目を取る', () => {
-    expect(brandInitial('株式会社 然')).toBe('然')
-    expect(brandInitial('株式会社むすび')).toBe('む')
-    expect(brandInitial('一般社団法人 日本〇〇協会')).toBe('日')
-    expect(brandInitial('合同会社テスト')).toBe('テ')
+  it('頭の法人格・記号を外してから1文字目を取る', () => {
+    expect([
+      brandInitial('株式会社 然'),
+      brandInitial('株式会社むすび'),
+      brandInitial('一般社団法人 日本〇〇協会'),
+      brandInitial('合同会社テスト'),
+      brandInitial('（株）然'),
+      brandInitial('(株) 然-NEN-'),
+      brandInitial('Shed Products株式会社'),
+      brandInitial(' ・ 株式会社 然'),
+    ]).toEqual(['然', 'む', '日', 'テ', '然', '然', 'S', '然'])
   })
 
   it('うしろに付く法人格も外す', () => {

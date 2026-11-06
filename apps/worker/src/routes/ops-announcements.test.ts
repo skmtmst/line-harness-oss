@@ -1,27 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const mail = vi.hoisted(() => ({ send: vi.fn(async (_env: unknown, _m: { to: string; subject: string; body: string }) => {}) }));
 vi.mock('../services/plain-mail.js', () => ({ sendPlainMail: mail.send }));
+const noticeConnect = vi.hoisted(() => ({ prepare: vi.fn() }));
+const botProfile = vi.hoisted(() => ({ fetch: vi.fn(async () => ({} as { displayName?: string })) }));
+vi.mock('../lib/bot-profile.js', () => ({ fetchBotProfile: botProfile.fetch }));
+vi.mock('../services/notice-line-connect.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../services/notice-line-connect.js')>(),
+  prepareNoticeLineConnection: noticeConnect.prepare,
+}));
+vi.mock('../lib/step-up.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../lib/step-up.js')>(),
+  sensitiveStepUpSatisfied: async () => true,
+}));
 const line = vi.hoisted(() => ({ pushMessage: vi.fn(async (_to: string, _messages: unknown[]) => ({})), replyMessage: vi.fn(async () => ({})) }));
 vi.mock('@line-crm/line-sdk', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/line-sdk')>('@line-crm/line-sdk');
-  return { ...actual, LineClient: vi.fn().mockImplementation(() => line) };
+  return { ...actual, LineClient: vi.fn().mockImplementation(function () { return line; }) };
 });
 
 const { opsAnnouncements } = await import('./ops-announcements.js');
 const { hqNotices } = await import('./hq-notices.js');
 const { processDueAnnouncements, tryLinkStaffByCode } = await import('../services/platform-announcements.js');
 
-/** ★V6 37-7 お知らせ配信と契約者専用LINE（決定 2026-09-18 案A）。 */
+/**
+ * 統括のお知らせ配信と契約者専用 LINE の登録案内を検証する。設計図 ★37-7 と照合する。
+ */
 
 let testDb: SqliteD1;
 
 function env(): Env['Bindings'] {
-  return { DB: testDb.db, ADMIN_PUBLIC_URL: 'https://admin.example.com', CONTACT_EMAIL: 'ops@example.com' } as Env['Bindings'];
+  return { DB: testDb.db, ADMIN_PUBLIC_URL: 'https://admin.example.com', CONTACT_EMAIL: 'ops@example.com', WORKER_PUBLIC_URL: 'https://stg-api.musubo.jp', LINE_CREDENTIAL_ENCRYPTION_KEY: btoa('q'.repeat(32)) } as Env['Bindings'];
 }
 function app(staff: AuthenticatedStaff) {
   const instance = new Hono<Env>();
@@ -43,6 +56,9 @@ beforeEach(() => {
   mail.send.mockReset();
   line.pushMessage.mockReset();
   line.replyMessage.mockReset();
+  noticeConnect.prepare.mockReset();
+  botProfile.fetch.mockReset();
+  botProfile.fetch.mockResolvedValue({});
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_key, plan_status) VALUES ('tenant-a', '株式会社サンプル', 'active', 'standard', 'active')`).run();
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_key, plan_status) VALUES ('tenant-b', 'カフェ ムスビ', 'active', 'light', 'trialing')`).run();
   testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '坂本 真人', 'owner', 'k0', NULL)`).run();
@@ -55,6 +71,17 @@ beforeEach(() => {
 });
 
 describe('契約者専用LINEの設定', () => {
+  it('Messaging APIだけで接続した公式アカウントを指定し、正しい友だち追加URLを出す', async () => {
+    noticeConnect.prepare.mockResolvedValue({ accessToken: 'fixture-token', profile: { displayName: 'musubo契約者様 問い合わせ/通知', pictureUrl: null, basicId: '@540qlkhn' } });
+    const response = await app(master).request('/api/ops/notice-line-account/connect', json({ channelId: '2011579318', channelSecret: 'fixture-secret', basicId: '@540qlkhn' }));
+    expect(response.status).toBe(201);
+    expect(noticeConnect.prepare).toHaveBeenCalledWith(expect.objectContaining({ webhookUrl: 'https://stg-api.musubo.jp/webhook/2011579318' }));
+    const account = testDb.raw.prepare('SELECT login_channel_id, liff_id, line_basic_id FROM line_accounts WHERE channel_id = ?').get('2011579318') as { login_channel_id: string | null; liff_id: string | null; line_basic_id: string };
+    expect(account).toMatchObject({ login_channel_id: null, liff_id: null, line_basic_id: '@540qlkhn' });
+    const after = await (await app(master).request('/api/ops/notice-line-account')).json() as { data: { current: { addFriendUrl: string } } };
+    expect(after.data.current.addFriendUrl).toBe('https://line.me/R/ti/p/@540qlkhn');
+  });
+
   it('運営会社のアカウントだけを候補にし、指定を保存する', async () => {
     const list = await (await app(master).request('/api/ops/notice-line-account')).json() as { data: { currentId: string | null; candidates: Array<{ id: string }> } };
     expect(list.data.currentId).toBeNull();
@@ -67,6 +94,16 @@ describe('契約者専用LINEの設定', () => {
     expect(after.data.current.addFriendUrl).toBe('https://line.me/R/ti/p/@musubo');
     const forbidden = await app(ownerA).request('/api/ops/notice-line-account');
     expect(forbidden.status).toBe(403);
+  });
+
+  it('LINE側で通知専用の表示名を変えた後は、設定画面と登録案内へ新しい名前を返す', async () => {
+    await app(master).request('/api/ops/notice-line-account', json({ lineAccountId: 'ops-oa' }, 'PUT'));
+    botProfile.fetch.mockResolvedValue({ displayName: 'musubo契約者様 通知専用' });
+    const settings = await (await app(master).request('/api/ops/notice-line-account')).json() as { data: { current: { name: string }; candidates: Array<{ id: string; name: string }> } };
+    expect(settings.data.current.name).toBe('musubo契約者様 通知専用');
+    expect(settings.data.candidates.find((candidate) => candidate.id === 'ops-oa')?.name).toBe('musubo契約者様 通知専用');
+    const guide = await (await app(ownerA).request('/api/hq/notices/line-registration')).json() as { data: { accountName: string } };
+    expect(guide.data.accountName).toBe('musubo契約者様 通知専用');
   });
 });
 
@@ -155,6 +192,9 @@ describe('契約者専用LINEの登録案内と紐づけ', () => {
     const info = await (await app(ownerA).request('/api/hq/notices/line-registration')).json() as { data: { available: boolean; addFriendUrl: string; code: string; linked: boolean } };
     expect(info.data).toMatchObject({ available: true, addFriendUrl: 'https://line.me/R/ti/p/@musubo', linked: false });
     expect(info.data.code).toMatch(/^\d{6}$/);
+    const pendingStatus = await (await app(ownerA).request('/api/hq/notices/line-registration/status')).json() as { data: { linked: boolean } };
+    expect(pendingStatus.data.linked).toBe(false);
+    expect(botProfile.fetch).toHaveBeenCalledTimes(1);
     const again = await (await app(ownerA).request('/api/hq/notices/line-registration')).json() as { data: { code: string } };
     expect(again.data.code).toBe(info.data.code);
 
@@ -167,10 +207,14 @@ describe('契約者専用LINEの登録案内と紐づけ', () => {
     expect(await tryLinkStaffByCode(env(), { lineAccountId: 'ops-oa', friendId: 'f-a', text: '000000', reply })).toBe(true);
     expect(replies[0]).toContain('見つからない');
     expect(await tryLinkStaffByCode(env(), { lineAccountId: 'ops-oa', friendId: 'f-a', text: info.data.code, reply })).toBe(true);
-    expect(replies[1]).toContain('山田 太郎');
+    expect(replies[1]).toContain('紐づきました');
+    expect(replies[1]).not.toContain(ownerA.name);
     const row = testDb.raw.prepare(`SELECT notice_friend_id FROM staff_members WHERE id = 'owner-a'`).get() as { notice_friend_id: string };
     expect(row.notice_friend_id).toBe('f-a');
     const linked = await (await app(ownerA).request('/api/hq/notices/line-registration')).json() as { data: { linked: boolean; code: string | null } };
     expect(linked.data).toMatchObject({ linked: true, code: null });
+    const linkedStatus = await (await app(ownerA).request('/api/hq/notices/line-registration/status')).json() as { data: { linked: boolean } };
+    expect(linkedStatus.data.linked).toBe(true);
+    expect(botProfile.fetch).toHaveBeenCalledTimes(3);
   });
 });

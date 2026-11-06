@@ -1,0 +1,3 @@
+.form { margin: 0; }
+/* フォームが間隔の唯一の持ち主。直下の共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
+:global(:root) .form > :global([data-design-part='notice']) { margin-block: 0; }

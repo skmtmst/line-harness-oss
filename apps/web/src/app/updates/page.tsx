@@ -1,19 +1,22 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { PageTitle } from '@/components/templates/page-frame'
+
 import { useEffect, useState } from 'react'
-import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
+import Button from '@/components/shared/button'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatDateTime } from '@/lib/format'
+import { updateRunStatusLabel } from '@/lib/status-labels'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
-// self-update を構成した環境 (create-line-harness セットアップ) でのみ設定される。
+// self-update を構成した環境でのみ設定される。
 // 未設定 = 自動アップデート非構成環境なので、この画面は fetch せず案内のみ表示する。
 const ADMIN_KEY = process.env.NEXT_PUBLIC_ADMIN_API_KEY
-const MANUAL_UPDATE_GUIDE_URL =
-  'https://github.com/Shudesu/line-harness-oss/blob/main/docs/wiki/26-Manual-Update.md' 
 
 interface Row {
   id: string
@@ -43,8 +46,10 @@ async function fetchHistory(adminKey: string): Promise<Row[]> {
 
 export default function UpdatesPage() {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
+  const [fromHq, setFromHq] = useState(false)
 
   useEffect(() => {
+    setFromHq(new URLSearchParams(window.location.search).get('from') === 'hq')
     if (!ADMIN_KEY) {
       setState({ kind: 'unconfigured' })
       return
@@ -56,7 +61,7 @@ export default function UpdatesPage() {
         // 運用者を驚かせる赤エラーではなく状況の説明を出す。
         const msg = e instanceof Error ? e.message : String(e)
         if (/ 40[13]$/.test(msg)) setState({ kind: 'unconfigured' })
-        else setState({ kind: 'error', message: msg })
+        else setState({ kind: 'error', message: describeApiFailure(e, '更新履歴の読み込み') })
       })
   }, [])
 
@@ -65,7 +70,8 @@ export default function UpdatesPage() {
   return (
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <h1 className="text-ink text-xl font-semibold">アップデート履歴</h1>
+      <PageTitle as="h1" className="text-ink text-xl font-semibold">アップデート履歴</PageTitle>
+      {fromHq ? <div><Button href="/hq">統括へ戻る</Button></div> : null}
       {state.kind === 'unconfigured' && (
         <>
           <div><NoteBar>この環境では自動アップデートが構成されていないため、履歴はありません。</NoteBar></div>
@@ -74,15 +80,14 @@ export default function UpdatesPage() {
               kind="empty"
               emptyPreset="readonly"
               title="更新履歴はまだありません"
-              description="自動アップデートは create-line-harness でセットアップした環境で利用できます。自前でデプロイしている場合は手動アップデートガイドをご覧ください。"
-              action={<Button href={MANUAL_UPDATE_GUIDE_URL} target="_blank" rel="noreferrer">手動アップデートガイドを開く</Button>}
+              description="musubo の更新は運営が行います。この画面には、自動で更新した記録だけが出ます。"
             />
           </section>
         </>
       )}
       {state.kind === 'error' && (
         <Notice tone="warn" className="mb-4">
-          履歴を取得できませんでした（{state.message}）。時間をおいて再読み込みしてください。
+          {state.message}
         </Notice>
       )}
       {state.kind === 'ready' && rows.length === 0 && (
@@ -102,13 +107,7 @@ export default function UpdatesPage() {
               {rows.map((r) => (
                 <Tr key={r.id}>
                   <Td className="text-ink-secondary whitespace-nowrap tabular-nums">
-                    {new Date(r.started_at).toLocaleString('ja-JP', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {formatDateTime(r.started_at)}
                   </Td>
                   <Td className="font-mono text-xs">
                     <span className="block truncate" title={`${r.from_version} → ${r.to_version}`}>
@@ -117,7 +116,7 @@ export default function UpdatesPage() {
                   </Td>
                   <Td>
                     <StatusBadge tone={statusTone(r.status)} size="compact">
-                      {r.status}
+                      {updateRunStatusLabel(r.status)}
                     </StatusBadge>
                   </Td>
                   <Td>
@@ -125,9 +124,8 @@ export default function UpdatesPage() {
                     r.rollback_expires_at &&
                     Date.now() < r.rollback_expires_at ? (
                       /*
-                        **押しても何も起きない口を置かない**（`docs/v6-common-rules.md`
-                        §7-10「出す＝使える」）。戻す仕組みは画面から使えないので、
-                        押し口ではなく文で理由を出す。以前はブラウザの `alert()` で
+                        **押しても何も起きない口を置かない**（`docs/v8-design-rules.md` §5「出す＝使える」）。戻す仕組みは画面から使えないので、
+                        押し口ではなく文で理由を出す。以前はブラウザの `alert` で
                         「rollback not implemented in MVP — use CLI」と内部語を出していた。
                       */
                       <span className="text-ink-faint text-xs">

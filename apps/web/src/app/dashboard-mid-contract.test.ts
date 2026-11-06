@@ -1,4 +1,5 @@
-import fs from 'node:fs'
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
+const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -26,7 +27,7 @@ describe('ダッシュボード点検・中の契約(#491)', () => {
     // DASH-09: null は取得中。アカウント切替直後に前の経路を残さない。
     expect(PAGE).toContain('routes={routes ?? []}')
     expect(QR).toContain('const routes = routesProp ?? fetchedRoutes')
-    expect(QR).toContain('if (!open || routesProp) return')
+    expect(QR).toContain('if (!open || routesProp || resource) return')
     expect(QR.match(/api\.entryRoutes\.list\(\)/g)).toHaveLength(1)
   })
 
@@ -45,6 +46,6 @@ describe('ダッシュボード点検・中の契約(#491)', () => {
   it('中7:知らない種類の通知も行き先があり、押して何も起きない tap にしない', () => {
     expect(code(NOTIFY)).toContain("return '/updates'")
     expect(code(NOTIFY)).not.toContain('return null')
-    expect(PAGE).toContain('router.push(destination)')
+    expect(PAGE).toContain('dashboardNotificationDestination')
   })
 })

@@ -1,5 +1,6 @@
+import { seedCleanPhotoScans } from '../test-utils/photo-scans.js';
 /*
- * #666 N-004: 写真一覧の口を実D1（bootstrap.sql を流した SQLite）で固定する。
+ *  写真一覧の口を実D1（bootstrap.sql を流した SQLite）で固定する。
  *
  * ダッシュボードの「写真審査 確認待ち N件」は全件を数えるのに、深掘り先の
  * 一覧は 200 枚で打ち切られていた。201 枚目以降へ到達できないと、押した
@@ -64,6 +65,7 @@ function seed(raw: Database.Database): void {
   // 別アカウントの写真。ページングで混ざってはいけない。
   insert.run('photo-other', 'friend-b', 'pet-b', 'k/other', 'legacy-other',
     '2026-12-31T00:00:00.000', '2026-12-31T00:00:00.000', 'account-b', 'https://cdn.test/other.jpg');
+  seedCleanPhotoScans(raw);
 }
 
 function harness(database: D1Database) {
@@ -169,7 +171,7 @@ describe('写真一覧のページング(#666 N-004)', () => {
   });
 
   /*
-   * #931 N-308: q= は実SQLに当てて確かめる。ESCAPE 句が実際に動くこと、
+   *  q= は実SQLに当てて確かめる。ESCAPE 句が実際に動くこと、
    * LIKE の記号を含む語が記号として効かないこと、アカウント境界が
    * 検索でも崩れないことをここで固定する。
    */

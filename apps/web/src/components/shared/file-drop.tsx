@@ -1,17 +1,18 @@
 'use client'
 
 import { Ban, FileText, LoaderCircle, RotateCcw, Upload, X } from 'lucide-react'
-import { useId, useRef, useState, type ClipboardEventHandler, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ClipboardEventHandler, type ReactNode } from 'react'
 import Button from './button'
 import IconButton from './icon-button'
+import { usePermissionLockTip } from './permission-lock-tip'
 import styles from './file-drop.module.css'
 
 /**
- * ファイルを落とす場所。Pencil ★V7 `NQMnx`「★V7 添付ファイル・ファイルを落とす場所」。
+ * ファイルを落とす場所。Pencil ★V8（V8.pen）「ファイルを落とす欄」。
  *
  * 受信箱の返信欄・配信の画像・登録メディアの取り込みでばらばらだった見せ方をそろえる。
  * 形の手本は kobra.systems の Attachment・Magnetic Dropzone
- * （コードは写していない。docs/v7-reference-ui-adoption.md §5）。
+ * （コードは写していない）。
  * 引き寄せる動きは採らない（控えめに）。大きさは状態が変わっても変えない。
  *
  * - ボタン（「ファイルを選ぶ」）でも選べる。キーボード・スマホはここから
@@ -22,23 +23,32 @@ import styles from './file-drop.module.css'
  */
 export default function FileDropzone({
   previewState,
+  icon,
+  invalid = false,
+  variant = 'default',
   title,
   hint,
   accept,
   multiple = false,
   disabled = false,
+  lockedReason,
   busy = false,
   busyTitle = '取り込んでいます…',
   busyNote,
   rejectTitle = 'このファイルは追加できません',
   rejectHint,
   chooseLabel = 'ファイルを選ぶ',
+  secondary,
   onFiles,
   onPaste,
   className,
   'aria-label': ariaLabel,
 }: {
   /** 見本・検証用にドラッグ状態を固定する。指定時はドラッグ操作で見た目が変わらない。 */
+  icon?: ReactNode
+  invalid?: boolean
+  /** upload は欄全体がファイル選択の入口（内側のボタンを出さない）。 */
+  variant?: 'default' | 'video' | 'composer' | 'upload'
   previewState?: 'active' | 'reject'
   /** 見出し（「ここに画像を落とす」など）。 */
   title: string
@@ -48,6 +58,8 @@ export default function FileDropzone({
   accept?: string
   multiple?: boolean
   disabled?: boolean
+  /** 権限による選択・ドロップ・貼り付けの拒否理由。secondary の操作は呼び出し側で制御する。 */
+  lockedReason?: string
   /** 取り込み中。押せなくなり、進みの表示に切り替わる。 */
   busy?: boolean
   busyTitle?: string
@@ -56,6 +68,8 @@ export default function FileDropzone({
   rejectTitle?: string
   rejectHint?: ReactNode
   chooseLabel?: string
+  /** 欄の中に添える別の入れ方（「ライブラリから選ぶ」など）。押しても欄のファイル選びは開かない。 */
+  secondary?: ReactNode
   /** 選ばれた・落とされたファイル。形式の検査は呼び出し側で行う。 */
   onFiles: (files: File[]) => void
   /** 貼り付け（Cmd+V）も受けるときに渡す。渡さなければ貼り付けは無視される。 */
@@ -66,14 +80,20 @@ export default function FileDropzone({
   const inputRef = useRef<HTMLInputElement>(null)
   const dragCount = useRef(0)
   const [drag, setDrag] = useState<'idle' | 'active' | 'reject'>('idle')
-  const interactive = !disabled && !busy
+  const interactive = !disabled && !busy && !lockedReason
+  const wholeZonePicker = variant === 'composer' || variant === 'upload'
+  const lock = usePermissionLockTip<HTMLDivElement>(wholeZonePicker ? lockedReason : undefined)
+  const { disabled: _nativeDisabled, ...zoneLockHandlers } = lock.handlers ?? {}
+  useEffect(() => {
+    if (lockedReason) { dragCount.current = 0; setDrag('idle') }
+  }, [lockedReason])
 
   const openPicker = () => {
     if (interactive) inputRef.current?.click()
   }
 
   // 見本固定があればそれを見せ、無ければ今のドラッグ状態を見せる。
-  const shown = previewState ?? drag
+  const shown = lockedReason ? 'idle' : previewState ?? drag
 
   const checkDrag = (event: React.DragEvent) => {
     event.preventDefault()
@@ -105,18 +125,26 @@ export default function FileDropzone({
     if (files.length > 0) onFiles(multiple ? files : files.slice(0, 1))
   }
 
-  return (
+  return (<>
     <div
-      role="group"
+      ref={lock.ref}
+      role={variant === 'upload' ? disabled && !lockedReason ? 'group' : 'button' : variant === 'composer' ? 'button' : 'group'}
+      aria-disabled={variant === 'upload' && !interactive || undefined}
       aria-label={ariaLabel ?? title}
       aria-busy={busy || undefined}
+      aria-invalid={invalid || undefined}
+      data-invalid={invalid || undefined}
+      data-input-field
       data-design-node="NQMnx"
+      data-variant={variant}
       data-drag={shown}
       data-busy={busy || undefined}
-      data-disabled={disabled || undefined}
+      data-disabled={disabled || Boolean(lockedReason) || undefined}
       className={[styles.zone, className].filter(Boolean).join(' ')}
+      tabIndex={wholeZonePicker && (interactive || lockedReason) ? 0 : undefined}
+      onKeyDown={(event) => { if (wholeZonePicker && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openPicker() } }}
       onClick={(event) => {
-        // input 自身の click はここへ泡立ってくる。拾うと input.click() が再帰する。
+        // input 自身の click はここへ泡立ってくる。拾うと input.click が再帰する。
         if ((event.target as HTMLElement | null)?.closest('input[type="file"]')) return
         openPicker()
       }}
@@ -124,41 +152,48 @@ export default function FileDropzone({
       onDragOver={checkDrag}
       onDragLeave={leaveDrag}
       onDrop={dropFiles}
-      onPaste={onPaste}
+      onPaste={lockedReason ? (event) => { event.preventDefault(); event.stopPropagation() } : onPaste}
+      {...zoneLockHandlers}
     >
       {busy ? (
         <>
-          <LoaderCircle aria-hidden="true" size={24} className={styles.spin} />
+          <LoaderCircle aria-hidden="true" size={20} className={styles.spin} />
           <p className={styles.zoneTitle}>{busyTitle}</p>
           {busyNote ? <p className={styles.zoneHint}>{busyNote}</p> : null}
         </>
       ) : shown === 'reject' ? (
         <>
-          <Ban aria-hidden="true" size={24} className={styles.rejectIcon} />
+          <Ban aria-hidden="true" size={20} className={styles.rejectIcon} />
           <p className={styles.rejectTitle}>{rejectTitle}</p>
           {rejectHint ? <p className={styles.zoneHint}>{rejectHint}</p> : null}
         </>
       ) : (
         <>
-          <Upload aria-hidden="true" size={24} className={shown === 'active' ? styles.activeIcon : styles.idleIcon} />
+          {icon ?? <Upload aria-hidden="true" size={20} className={shown === 'active' ? styles.activeIcon : styles.idleIcon} />}
           <p className={shown === 'active' ? styles.activeTitle : styles.zoneTitle}>
             {shown === 'active' ? '離すと追加します' : title}
           </p>
-          {shown === 'active' ? null : hint ? <p className={styles.zoneHint}>{hint}</p> : null}
-          {shown === 'active' ? null : (
+          {shown === 'active' || variant === 'video' ? null : hint ? <p className={styles.zoneHint}>{hint}</p> : null}
+          {shown === 'active' || !secondary ? null : (
+            <span className={styles.secondary} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{secondary}</span>
+          )}
+          {shown === 'active' || wholeZonePicker ? null : (
             <Button
               type="button"
               disabled={!interactive}
+              lockedReason={lockedReason}
               onClick={(event) => {
                 event.stopPropagation()
                 openPicker()
               }}
             >
+              {variant === 'video' ? <Upload size={16} aria-hidden="true" /> : null}
               {chooseLabel}
             </Button>
           )}
         </>
       )}
+      {variant === 'video' && hint && shown === 'idle' && !busy ? <p className={styles.zoneHint}>{hint}</p> : null}
       <input
         ref={inputRef}
         type="file"
@@ -172,11 +207,13 @@ export default function FileDropzone({
           const files = [...(event.target.files ?? [])]
           // 同じファイルを選び直せるよう、毎回空に戻す。
           event.target.value = ''
+          if (lockedReason) return
           if (files.length > 0) onFiles(multiple ? files : files.slice(0, 1))
         }}
       />
     </div>
-  )
+    {lock.node}
+  </>)
 }
 
 function matchesAccept(item: DataTransferItem, accept?: string): boolean {
@@ -198,7 +235,7 @@ function matchesAccept(item: DataTransferItem, accept?: string): boolean {
 }
 
 /**
- * 添付ファイルの行。Pencil ★V7 `NQMnx`「1. 添付ファイルの行」。
+ * 添付ファイルの行。Pencil ★V8（V8.pen）「ファイルを落とす欄」の添付ファイルの行。
  *
  * - 行の高さ 56・縮小画像 36（画像は 1px の薄い縁）。`thumbnail` に縮小画像を渡す
  * - 名前は 1 行で省略し、全文は `title` で。補足（種類・大きさ）は `meta`
@@ -214,6 +251,8 @@ export function AttachmentRow({
   errorText,
   onRemove,
   onRetry,
+  disabled,
+  lockedReason,
   thumbnail,
   tone = 'document',
   className,
@@ -232,6 +271,9 @@ export function AttachmentRow({
   onRemove?: () => void
   /** 渡すと「選び直す」を出す。error 用。 */
   onRetry?: () => void
+  disabled?: boolean
+  /** 権限による外す・選び直す操作の拒否理由。 */
+  lockedReason?: string
   /** 縮小画像（36px に収まる img など）。無いときは書類の印になる。 */
   thumbnail?: ReactNode
   /** 縮小画像の地。写真は薄い緑、書類は薄い灰（設計 NQMnx）。 */
@@ -250,7 +292,7 @@ export function AttachmentRow({
       className={[styles.row, className].filter(Boolean).join(' ')}
     >
       <span aria-hidden="true" className={styles.thumb} data-tone={tone}>
-        {thumbnail ?? <FileText size={18} className={styles.thumbIcon} />}
+        {thumbnail ?? <FileText size={20} className={styles.thumbIcon} />}
       </span>
       <span className={styles.rowBody}>
         <span className={styles.rowName} title={name}>{name}</span>
@@ -275,11 +317,11 @@ export function AttachmentRow({
         ) : null}
       </span>
       {status === 'error' && onRetry ? (
-        <IconButton aria-label={`「${name}」を選び直す`} aria-describedby={describedId} onClick={onRetry}>
+        <IconButton aria-label={`「${name}」を選び直す`} aria-describedby={describedId} disabled={disabled} lockedReason={lockedReason} onClick={onRetry}>
           <RotateCcw aria-hidden="true" size={16} />
         </IconButton>
       ) : onRemove ? (
-        <IconButton aria-label={`「${name}」を外す`} onClick={onRemove}>
+        <IconButton aria-label={`「${name}」を外す`} disabled={disabled} lockedReason={lockedReason} onClick={onRemove}>
           <X aria-hidden="true" size={16} />
         </IconButton>
       ) : null}

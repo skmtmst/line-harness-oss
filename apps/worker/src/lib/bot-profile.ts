@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * LINE公式アカウントの看板（表示名・アイコン・ベーシックID）を LINE から読む。
  *

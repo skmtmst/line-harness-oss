@@ -1,0 +1,130 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
+// @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {fireEvent} from '@testing-library/react';
+import {beforeEach,afterEach,it,expect,vi} from 'vitest';
+const f=vi.hoisted(()=>({push:vi.fn(),create:vi.fn(),test:vi.fn(),save:vi.fn(),publish:vi.fn(),role:'owner' as string|null,account:'synthetic-account'}));
+vi.mock('@/lib/staff-role',async original=>({...await original<typeof import('@/lib/staff-role')>(),useStaffRole:()=>f.role}));
+vi.mock('next/link',()=>({default:({children,...props}:React.ComponentProps<'a'>)=><a {...props}>{children}</a>}));
+vi.mock('next/navigation',()=>({useRouter:()=>({push:f.push,replace:vi.fn()}),useSearchParams:()=>new URLSearchParams('')}));
+vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:f.account,accounts:[],loading:false})}));
+vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{}}));
+vi.mock('@/lib/api',async(importOriginal)=>({...await importOriginal<typeof import('@/lib/api')>(),api:{featureSettings:{visibility:async()=>({success:true,data:{features:{}}})},commonActions:{resources:async()=>({success:true,data:{commonActions:[]}})},mileage:{createReward:f.create,testReward:f.test,saveRewardDraft:f.save,publishReward:f.publish}}}));
+import Editor from '@/v8/mileage/reward-edit';
+let root:ReturnType<typeof createRoot>,host:HTMLDivElement;
+beforeEach(()=>{
+ vi.clearAllMocks();f.role = verifiedStaffRole('owner');f.account='synthetic-account';let n=0;
+ f.create.mockImplementation(async(_account,draft)=>({success:true,data:{id:`synthetic-${++n}`,status:'draft',currentDraftVersionId:`v-${n}`,currentVersion:{revision:1},...draft}}));
+ f.save.mockResolvedValue({success:true,data:{id:'synthetic-1',currentDraftVersionId:'v-1',currentVersion:{revision:2}}});
+ f.test.mockResolvedValue({success:true,data:{canDeliver:true,requiredMiles:100}});
+ window.history.replaceState(null,'','/');
+ (globalThis as typeof globalThis & {IS_REACT_ACT_ENVIRONMENT:boolean}).IS_REACT_ACT_ENVIRONMENT=true;
+ host=document.createElement('div');document.body.append(host);root=createRoot(host);
+});
+afterEach(async()=>{await act(async()=>root.unmount());host.remove()});
+async function click(text:string){const b=([...host.querySelectorAll('button')].find(x=>x.textContent?.includes(text)) ?? querySupplementaryPageAction(text));expect(b).toBeTruthy();await act(async()=>{b!.click()})}
+async function input(id:string,value:string){await act(async()=>{fireEvent.change(host.querySelector('#'+id)!,{target:{value}})})}
+it('OPS-C01 交換テスト後の保存は同じ下書きを継続する',async()=>{
+ await act(async()=>root.render(<Editor/>));
+ await input('reward-name','synthetic reward');await input('reward-miles','100');
+ await click('自分で交換をテスト');
+ expect(f.create).toHaveBeenCalledTimes(1);expect(f.test).toHaveBeenCalledWith('synthetic-1','synthetic-account');
+ expect(host.textContent).toContain('交換テストに合格しました');
+ await click('下書きを保存');
+ expect(f.create).toHaveBeenCalledTimes(1);expect(f.save).not.toHaveBeenCalled(); // ：変えていない保存済みの下書きは再送しない。
+ expect(f.push).toHaveBeenCalled();
+});
+
+it.each([null,'staff','viewer'])('役割%sでは保存・公開・交換テストを出さず変更APIも呼ばない',async role=>{
+ f.role=verifiedStaffRole(role);
+ await act(async()=>root.render(<Editor/>));
+ if(role===null) expect(host.querySelector('[data-read-only-notice]')).toBeNull();
+ else expect(host.querySelector('[data-read-only-notice]')?.textContent).toBe(role==='viewer'?READ_ONLY_MESSAGE:PERMISSION_LOCK_SUMMARY.feature);
+ expect(host.textContent).toContain('一覧へ戻る');
+ expect([...host.querySelectorAll('button')].some(button=>/下書きを保存|保存して出す|自分で交換をテスト/.test(button.textContent??''))).toBe(false);
+ expect(f.create).not.toHaveBeenCalled();expect(f.save).not.toHaveBeenCalled();expect(f.test).not.toHaveBeenCalled();
+});
+it('公開だけ失敗したら下書きを重ねず、入力変更後は新しい版で公開する',async()=>{
+ const { ApiError } = await import('@/lib/api')
+ f.publish.mockReset().mockRejectedValueOnce(new ApiError(500,'人工の公開失敗')).mockResolvedValue({success:true,data:{id:'synthetic-1',status:'published'}})
+ f.save.mockResolvedValue({success:true,data:{id:'synthetic-1',currentDraftVersionId:'v-2',currentVersion:{id:'v-2',revision:2}}})
+ await act(async()=>root.render(<Editor/>))
+ await input('reward-name','人工の特典');await input('reward-miles','100')
+ await click('保存して出す')
+ const confirm=([...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='使い道を公開') ?? querySupplementaryPageAction('使い道を公開'))!
+ await act(async()=>{confirm.click();confirm.click()})
+ expect(f.create).toHaveBeenCalledTimes(1)
+ expect(f.publish).toHaveBeenCalledTimes(1)
+ expect(host.textContent).toContain('できた分：マイルの使い道の下書き')
+ expect(host.textContent).toContain('残り：公開')
+ expect(host.textContent).toContain('入力は残っています')
+ await input('reward-name','変更した特典')
+ await click('残りだけもう一度')
+ expect(f.create).toHaveBeenCalledTimes(1)
+ expect(f.save).toHaveBeenCalledTimes(1)
+ expect(f.publish.mock.calls.map(call=>call.slice(0,4))).toEqual([
+  ['synthetic-1','synthetic-account','v-1',1],['synthetic-1','synthetic-account','v-2',2],
+ ])
+})
+
+it('公開失敗後に確認を閉じて再試行すると対象をもう一度確認する',async()=>{
+ const { ApiError } = await import('@/lib/api')
+ f.publish.mockReset().mockRejectedValueOnce(new ApiError(500,'人工の公開失敗')).mockResolvedValue({success:true,data:{id:'synthetic-1',status:'published'}})
+ await act(async()=>root.render(<Editor/>))
+ await input('reward-name','人工の特典');await input('reward-miles','100')
+ await click('保存して出す')
+ const confirm=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='使い道を公開')!
+ await act(async()=>{confirm.click()})
+ expect(f.publish).toHaveBeenCalledTimes(1)
+ const dialog=document.querySelector('[role="dialog"]')!
+ const cancel=[...dialog.querySelectorAll('button')].find(b=>b.textContent?.trim()==='キャンセル')!
+ await act(async()=>{cancel.click()})
+ await click('残りだけもう一度')
+ expect(f.publish).toHaveBeenCalledTimes(1)
+ expect(document.querySelector('[role="dialog"]')?.textContent).toContain('LINEアカウント')
+ const retry=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='使い道を公開')!
+ await act(async()=>{retry.click()})
+ expect(f.publish).toHaveBeenCalledTimes(2)
+})
+
+it('公開確認に操作対象を表示する',async()=>{
+ await act(async()=>root.render(<Editor/>))
+ await input('reward-name','人工の特典');await input('reward-miles','100')
+ await click('保存して出す')
+ const dialog = document.querySelector('[role="dialog"]')
+ expect(dialog?.textContent).toContain('LINEアカウント')
+ expect(dialog?.textContent).toContain('環境')
+})
+
+it('確認後にアカウントを切り替えて戻しても古い確定では公開しない',async()=>{
+ await act(async()=>root.render(<Editor/>))
+ await input('reward-name','人工の特典');await input('reward-miles','100')
+ await click('保存して出す')
+ const confirm=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='使い道を公開')!
+ const key=Object.keys(confirm).find(item=>item.startsWith('__reactProps$'))!
+ const oldConfirm=(confirm as unknown as Record<string,{onClick:()=>void}>)[key].onClick
+ await act(async()=>{f.account='other-account';root.render(<Editor/>)})
+ await act(async()=>{f.account='synthetic-account';root.render(<Editor/>)})
+ await act(async()=>oldConfirm())
+ expect(f.create).not.toHaveBeenCalled();expect(f.publish).not.toHaveBeenCalled()
+})
+
+it('下書き保存の応答を待つ間にアカウントが変わったら公開しない',async()=>{
+ let resolve!: (value: unknown) => void
+ f.create.mockImplementationOnce(()=>new Promise(r=>{resolve=r}))
+ await act(async()=>root.render(<Editor/>))
+ await input('reward-name','人工の特典');await input('reward-miles','100')
+ await click('保存して出す')
+ const confirm=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='使い道を公開')!
+ await act(async()=>{confirm.click()})
+ await act(async()=>{f.account='other-account';root.render(<Editor/>)})
+ await act(async()=>{f.account='synthetic-account';root.render(<Editor/>)})
+ await act(async()=>{resolve({success:true,data:{id:'synthetic-1',currentDraftVersionId:'v-1',currentVersion:{revision:1}}})})
+ expect(f.publish).not.toHaveBeenCalled()
+})
+
+afterEach(() => { verifiedStaffRole(null) })

@@ -1,6 +1,7 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * 複数選択。Pencil ★V7 `WUVcz` §2。欄・候補の決まりは Combobox と同じ。
+ * 複数選択。Pencil ★V8（V8.pen）「複数選ぶ（札＋N）」。欄・候補の決まりは Combobox と同じ。
  *
  *   札     地 $shell・高さ 26・角丸 13・余白 [0,6,0,8]・文字 13・太字 $ink
  *          点 8・外す印 12 $ink-faint。入り切らない分は「+N」（枠 $hairline）
@@ -14,7 +15,7 @@
   min-width: 0;
 }
 
-.field {
+.field:not([data-choice-field]) {
   box-sizing: border-box;
   display: flex;
   width: 100%;
@@ -22,12 +23,17 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 7px 8px;
+  padding: 6px 8px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
   cursor: text;
   transition: border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+:root .field:not([data-choice-field]):not(.open):not(.invalid) {
+  border-color: var(--color-control-border);
+  box-shadow: var(--control-shadow);
 }
 
 .open {
@@ -41,7 +47,7 @@
 
 .disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .chip {
@@ -50,7 +56,7 @@
   align-items: center;
   gap: 6px;
   padding: 0 6px 0 8px;
-  border-radius: 13px;
+  border-radius: var(--radius-card);
   background: var(--color-shell);
   color: var(--color-ink);
   font-size: var(--text-label);
@@ -72,7 +78,7 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--color-ink-faint);
   cursor: pointer;
@@ -84,8 +90,8 @@
 }
 
 .chipRemove svg {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
 }
 
 .overflow {
@@ -94,7 +100,7 @@
   align-items: center;
   padding: 0 8px;
   border: 1px solid var(--color-hairline);
-  border-radius: 13px;
+  border-radius: var(--radius-card);
   background: transparent;
   color: var(--color-ink-secondary);
   font: inherit;
@@ -119,7 +125,7 @@
 }
 
 .input::placeholder {
-  color: var(--color-ink-faint);
+  color: var(--color-placeholder);
   opacity: 1;
 }
 
@@ -131,20 +137,20 @@
  * 外側の欄に ring を出す（:focus-within）。中の input の輪郭は消し、
  * 外枠の ring を正本にする（focus-visible-contract の例外として許可）。
  */
-.field:focus-within {
-  outline: 2px solid var(--color-action);
+.field:not([data-choice-field]):focus-within {
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
 .input:focus-visible {
-  outline: none;
+  outline: 1px solid transparent;
 }
 
 .chipRemove:focus-visible,
 .overflow:focus-visible,
 .clearAll:focus-visible,
 .create:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -158,16 +164,10 @@
   max-height: 280px;
   overflow-y: auto;
   padding: 6px;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
   /* beautiful-shadows md（date-field と同じ影） */
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / 6%),
-    0 1px 1px -0.5px rgb(0 0 0 / 6%),
-    0 3px 3px -1.5px rgb(0 0 0 / 6%),
-    0 6px 6px -3px rgb(0 0 0 / 6%),
-    0 12px 12px -6px rgb(0 0 0 / 6%),
-    0 24px 24px -12px rgb(0 0 0 / 6%);
+  box-shadow: var(--shadow-card);
   transform-origin: top center;
   animation: multi-select-in var(--motion-fast) var(--motion-ease-out);
 }
@@ -175,7 +175,7 @@
 @keyframes multi-select-in {
   from {
     opacity: 0;
-    scale: 0.97;
+    scale: var(--popover-enter-scale);
   }
 }
 
@@ -201,7 +201,7 @@
 
 .clearAll:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .list {
@@ -231,7 +231,7 @@
 
 .option[aria-disabled='true'] {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 /* 行の印は見た目だけ。押すのは行なので、印へは操作を通さない。 */
@@ -244,7 +244,7 @@
   width: 8px;
   height: 8px;
   flex: 0 0 auto;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
 }
 
 .dot[data-dot='green'] {
@@ -329,7 +329,7 @@
   height: 16px;
   flex: 0 0 auto;
   border: 2px solid var(--color-hairline);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   border-top-color: var(--color-ink-faint);
   animation: multi-select-spin var(--motion-slow) linear infinite;
 }
@@ -360,4 +360,28 @@
     font-size: var(--text-lead);
   }
 }
+
+/*
+ * ★V8 仕上げ3回目（M10）⑤：候補は少し下から 200ms
+ * （…・選ぶ欄・選ぶ箱と同じ速さ・同じ出方）。互換経路は 120ms のまま。
+ */
+:root .popup {
+  animation-name: multi-select-v8-in;
+  animation-duration: var(--motion-base);
 }
+
+@keyframes multi-select-v8-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+}
+
+/* 箱ごと薄くした時は、中の押せない部品を重ねて薄くしない。 */
+html:root .disabled :is(button, input, textarea):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-enabled-opacity); }

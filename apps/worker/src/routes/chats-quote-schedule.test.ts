@@ -1,5 +1,5 @@
 /*
- * 引用返信と送信予約(N-025)のルート対照。
+ * 引用返信と送信予約のルート対照。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物の chats ルートを当て、
  * LINE clientだけを止める。
@@ -11,12 +11,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const pushMessage = vi.fn().mockResolvedValue({ sentMessages: [{}] });
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({ pushMessage })),
+  LineClient: vi.fn().mockImplementation(function () { return ({ pushMessage }); }),
 }));
 
 const { chats } = await import('./chats.js');
@@ -252,7 +252,7 @@ describe('送信予約(N-025)', () => {
     expect(scheduledRows()).toHaveLength(1);
   });
 
-  // #977: 読み込み直しでクライアントの操作キーが新規発行されても、
+  // 読み込み直しでクライアントの操作キーが新規発行されても、
   // 「対象・内容・送信予定時刻」が同じ処理中の予約はサーバー側で再利用する。
   test('同じ版を別キーで再登録しても既存の予約を返し、行は1件のまま', async () => {
     const at = future();
@@ -272,7 +272,7 @@ describe('送信予約(N-025)', () => {
     expect(rows[0].status).toBe('scheduled');
   });
 
-  // #977: 連続クリックや通信中の再試行が並行に届いても処理中は最大1件。
+  // 連続クリックや通信中の再試行が並行に届いても処理中は最大1件。
   test('同じ版の予約を並行して2件投げても処理中の行は1件', async () => {
     const at = future();
     const [a, b] = await Promise.all([
@@ -286,7 +286,7 @@ describe('送信予約(N-025)', () => {
     expect(rows[0].status).toBe('scheduled');
   });
 
-  // #977: 送信中(sending)の行も照合対象。claim済みでも同じ版を二重登録しない。
+  // 送信中(sending)の行も照合対象。claim済みでも同じ版を二重登録しない。
   test('送信中に進んだ同じ版への再登録も新しい行を作らない', async () => {
     const at = future();
     const created = await postSchedule({ content: 'あとで', scheduledAt: at }, KEY1);
@@ -372,5 +372,22 @@ describe('送信予約(N-025)', () => {
     expect(past.status).toBe(400);
     const missing = await patchScheduled('no-such', { content: 'x' });
     expect(missing.status).toBe(404);
+  });
+});
+
+
+describe('ブロック・解除済み相手の送信禁止', () => {
+  test('手動送信も予約作成も拒否し、送信と予約が残らない', async () => {
+    sqlite.raw.prepare("UPDATE friends SET is_following = 0 WHERE id = 'fr-1'").run();
+    for (const response of [
+      await postSend({ content: '送らない' }, KEY1),
+      await postSchedule({ content: '送らない', scheduledAt: '2099-01-01T00:00:00Z' }, KEY2),
+    ]) {
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ code: 'FRIEND_NOT_FOLLOWING' });
+    }
+    expect(pushMessage).not.toHaveBeenCalled();
+    expect(outbox()).toHaveLength(0);
+    expect(scheduledRows()).toHaveLength(0);
   });
 });

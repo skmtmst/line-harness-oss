@@ -34,7 +34,8 @@ describe('モバイル固定ヘッダーと現在地（#975 U037/U038）', () =>
   it('1280px 未満では上部バーを畳み、2本のヘッダーを同時に占有させない', () => {
     // TopBar を無印の div で包んで畳む。部品側の display（CSS Module）に
     // utilities の hidden が負けないよう、TopBar 自身には乗せない。
-    expect(TOP_BAR).toContain('<div className="hidden xl:block">')
+    // v8-topbar-wrap は ★V8 で 1024px から帯を出すための印（globals.css）。
+    expect(TOP_BAR).toContain('className="hidden xl:block v8-topbar-wrap"')
     expect(APP_SHELL_CSS).toContain('@media (max-width: 1279.98px)')
   })
 

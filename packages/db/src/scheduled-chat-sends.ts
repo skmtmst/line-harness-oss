@@ -1,4 +1,6 @@
-// N-025 (#927): 1対1トークの送信予約の状態機械を DB で持つ。
+import {normalizeScheduledAt} from './scheduled-chat-time.js';
+export {normalizeScheduledAt} from './scheduled-chat-time.js';
+// 1対1トークの送信予約の状態機械を DB で持つ。
 // 時系列: scheduled -> sending(lease付きclaim) -> sent / failed / cancelled。
 // retryableな失敗はscheduledへ戻し、scheduled_atをずらして再送する。
 
@@ -40,18 +42,6 @@ export type ScheduledChatSendRow = {
   updated_at: string;
 };
 
-/**
- * 予約時刻の入力をUTCのISO8601('Z')へ正規化する。
- * '+09:00'などオフセット付きのまま保存すると、due判定の文字列比較で
- * 順序が崩れるため、書き込み境界で必ずここを通す。
- */
-export function normalizeScheduledAt(value: string): string {
-  const time = Date.parse(value);
-  if (!Number.isFinite(time)) {
-    throw new Error('scheduled_at must be an ISO 8601 datetime');
-  }
-  return new Date(time).toISOString();
-}
 
 /**
  * 予約の新規作成。idempotency_keyの一意制約で、同じ作成要求の再送は
@@ -59,7 +49,7 @@ export function normalizeScheduledAt(value: string): string {
  *
  * さらに「対象(friend×LINEアカウント)・内容(種別・本文・引用)・送信予定時刻」が
  * 一致する処理中(scheduled/sending)の予約があれば、別キーの要求も新しい行を
- * 作らずその既存行を返す(#977)。読み込み直しでクライアントの操作キーが
+ * 作らずその既存行を返す。読み込み直しでクライアントの操作キーが
  * 新規発行されても、同じ版の予約はサーバー側で最大1件に保つ。
  *
  * 挿入は単一の INSERT ... SELECT ... WHERE NOT EXISTS なので、並行する
@@ -218,7 +208,7 @@ export async function listPendingScheduledChatSends(
   return result.results;
 }
 
-export type ScheduledSendMutationResult = 'updated' | 'not_found' | 'locked';
+export type ScheduledSendMutationResult = 'updated' | 'not_found' | 'locked' | 'too_late';
 
 /**
  * 予約の取消。status='scheduled'の行だけをCASで書き換える。
@@ -226,7 +216,7 @@ export type ScheduledSendMutationResult = 'updated' | 'not_found' | 'locked';
  */
 export async function cancelScheduledChatSend(
   db: D1Database,
-  input: { id: string; friendId: string; staffId: string; now?: string },
+  input: { id: string; friendId: string; staffId: string; now?: string; reason?: string },
 ): Promise<ScheduledSendMutationResult> {
   const now = input.now ?? new Date().toISOString();
   const result = await db
@@ -235,16 +225,19 @@ export async function cancelScheduledChatSend(
           SET status = 'cancelled',
               cancelled_by_staff_id = ?,
               cancelled_at = ?,
+              cancellation_reason = ?,
               lease_token = NULL,
               lease_expires_at = NULL,
               updated_at = ?
-        WHERE id = ? AND friend_id = ? AND status = 'scheduled'`,
+        WHERE id = ? AND friend_id = ? AND status = 'scheduled'
+          AND julianday(scheduled_at) >= julianday(?) + 60.0/86400`,
     )
-    .bind(input.staffId, now, now, input.id, input.friendId)
+    .bind(input.staffId, now, input.reason ?? null, now, input.id, input.friendId, now)
     .run();
   if ((result.meta?.changes ?? 0) === 1) return 'updated';
   const row = await getScheduledChatSend(db, input.id);
-  return !row || row.friend_id !== input.friendId ? 'not_found' : 'locked';
+  return !row || row.friend_id !== input.friendId ? 'not_found'
+    : row.status === 'scheduled' && Date.parse(row.scheduled_at) - Date.parse(now) < 60_000 ? 'too_late' : 'locked';
 }
 
 /**
@@ -297,6 +290,13 @@ export async function claimDueScheduledChatSends(
   const leaseExpiresAt = new Date(
     Date.parse(input.now) + leaseMs,
   ).toISOString();
+
+  // 旧版の中断行にも、24時間後に同じキーで再送する権利はない。
+  await db.prepare(`UPDATE scheduled_chat_sends SET status='failed',failed_at=?,
+    last_error_code='LINE_RETRY_KEY_EXPIRED',last_error='届いたか分からないため確認が必要です',
+    lease_token=NULL,lease_expires_at=NULL,updated_at=?
+    WHERE status='sending' AND lease_expires_at < ? AND julianday(?) - julianday(updated_at) >= 1`)
+    .bind(input.now,input.now,input.now,input.now).run();
 
   // 前のclaimが返ってこなかった分を回収する。
   await db

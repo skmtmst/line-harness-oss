@@ -1,17 +1,17 @@
 // @vitest-environment happy-dom
 /*
- * ★V7 処理の進み（xiHO8）。
+ * ★管理画面 処理の進み（xiHO8）。
  * 4つの段階・読み上げ（role=progressbar と aria-valuenow、10% ごとの role=status）・
  * scaleX の伸び・止める／失敗のボタンの出し分けを見る。
  */
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import Progress from './progress'
+import Progress, { ProgressBar, StepMark } from './progress'
 
 afterEach(() => cleanup())
 
-describe('処理の進み（★V7 xiHO8）', () => {
+describe('処理の進み（★管理画面 xiHO8）', () => {
   it('準備中は数が無い棒（aria-valuenow なし）で、背景処理の断りを出す', () => {
     render(<Progress state="preparing" title="送る準備をしています" note="宛先を数えています。この画面を閉じても止まりません。" />)
     const bar = screen.getByRole('progressbar', { name: '送る準備をしています' })
@@ -87,5 +87,56 @@ describe('処理の進み（★V7 xiHO8）', () => {
     expect(screen.getByRole('progressbar', { name: '送っています' }).getAttribute('aria-valuenow')).toBe('100')
     rerender(<Progress state="active" title="送っています" percent={-5} />)
     expect(screen.getByRole('progressbar', { name: '送っています' }).getAttribute('aria-valuenow')).toBe('0')
+  })
+})
+
+
+it('単独の進みの棒は範囲外や非数の値を収め、読み上げ名と割合を持つ', () => {
+  const { rerender } = render(<ProgressBar value={120} label="配信の進み" />)
+  const bar = screen.getByRole('progressbar', { name: '配信の進み' })
+  expect(bar.getAttribute('aria-valuenow')).toBe('100')
+  rerender(<ProgressBar value={-5} label="配信の進み" />)
+  expect(bar.getAttribute('aria-valuenow')).toBe('0')
+  rerender(<ProgressBar value={Number.NaN} label="配信の進み" />)
+  expect(bar.getAttribute('aria-valuenow')).toBe('0')
+  rerender(<ProgressBar value={62.5} label="配信の進み" />)
+  expect(bar.getAttribute('aria-valuenow')).toBe('62.5')
+})
+
+it.each([false, true])('reduce=%sでも連続更新は値を先に描き、棒の幅を変えない', reduced => {
+  vi.stubGlobal('matchMedia', () => ({ matches: reduced }))
+  try {
+    const view = render(<ProgressBar value={10} label="進み" />)
+    const bar = screen.getByRole('progressbar', { name: '進み' })
+    for (const value of [60, 15, 100]) {
+      view.rerender(<ProgressBar value={value} label="進み" />)
+      expect(bar.getAttribute('aria-valuenow')).toBe(String(value))
+      expect((bar.firstElementChild as HTMLElement).style.transform).toBe(`scaleX(${value / 100})`)
+      expect((bar.firstElementChild as HTMLElement).style.width).toBe('')
+    }
+  } finally { vi.unstubAllGlobals() }
+})
+
+describe('はじめにやることの進み：段の数に区切った緑', () => {
+  it('6 段のうち 5 段済みなら、緑の段が 5・地の色の段が 1', () => {
+    render(<ProgressBar appearance="onboarding" value={5} max={6} label="はじめにやることの進み" />)
+    const bar = screen.getByRole('progressbar', { name: 'はじめにやることの進み' })
+    expect(bar.getAttribute('aria-valuenow')).toBe('5')
+    expect(bar.getAttribute('aria-valuemax')).toBe('6')
+    const segments = [...bar.children]
+    expect(segments).toHaveLength(6)
+    expect(segments.filter((segment) => segment.hasAttribute('data-on'))).toHaveLength(5)
+  })
+  it('割合（max=100）や段の多い物は 1 本の棒のまま', () => {
+    render(<ProgressBar appearance="onboarding" value={40} label="割合" />)
+    expect(screen.getByRole('progressbar', { name: '割合' }).hasAttribute('data-segmented')).toBe(false)
+  })
+  it('済みの印は押せない丸。済みだけ ✓ を描く', () => {
+    const { container } = render(<><StepMark done /><StepMark done={false} /></>)
+    const marks = [...container.querySelectorAll('[data-step-mark]')]
+    expect(marks.map((mark) => mark.getAttribute('data-step-mark'))).toEqual(['done', 'todo'])
+    expect(marks.every((mark) => mark.getAttribute('aria-hidden') === 'true' && !mark.matches('button, input, [role]'))).toBe(true)
+    expect(marks[0].querySelector('svg')).not.toBeNull()
+    expect(marks[1].querySelector('svg')).toBeNull()
   })
 })

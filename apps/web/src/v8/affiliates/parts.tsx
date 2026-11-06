@@ -1,0 +1,146 @@
+'use client'
+
+import { statusLabel } from '@/lib/status-labels'
+import SharedStatusPill from '@/components/shared/status-pill'
+import { type ReactNode } from 'react'
+import { Bookmark } from 'lucide-react'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import Button from '@/components/shared/button'
+import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
+import Notice from '@/components/shared/notice'
+import ListState from '@/components/shared/list-state'
+import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
+import Select from '@/components/shared/select'
+import styles from './affiliates.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
+
+/*
+ * 成果とアフィリエイトの各タブで同じ形の部品（道具の段・よく使う絞り込み・件数・
+ * 状態の札・空と失敗の1枚・行の「…」）。形は一覧の型と共通部品に任せ、
+ * ここは並べ方だけを持つ。
+ */
+
+export const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
+
+/** 道具の段の右：「よく使う絞り込み」（左に印）。 */
+export function SavedSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string
+  options: Array<{ value: string; label: string }>
+  onChange: (value: string) => void
+}) {
+  return (
+    <ListToolbarOptional label="保存した絞り込み">
+      <SaveErrorField names={["value"]}><Select size="content" icon={<Bookmark size={16} aria-hidden="true" />} aria-label="よく使う絞り込み" showChevron={false} value={value} options={options} onChange={onChange} /></SaveErrorField>
+    </ListToolbarOptional>
+  )
+}
+
+/** 道具の段の右端：1ページに出す件数（10・20・50）。 */
+export function PerPageSelect({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  return (
+    <div data-per-page-select>
+      <SaveErrorField names={["value"]}><Select
+        aria-label="1ページに出す件数"
+        size="page-size"
+        value={String(value)}
+        onChange={(next) => onChange(Number(next))}
+        options={PAGE_SIZE_OPTIONS}
+      /></SaveErrorField>
+    </div>
+  )
+}
+
+/** 道具の段の先頭に置く帯（案内・失敗・済んだ知らせ）。1行を取る。 */
+export function ToolbarNotices({
+  info,
+  warn,
+  error,
+  success,
+  children,
+}: {
+  info?: ReactNode
+  warn?: ReactNode
+  error?: string
+  success?: string
+  children?: ReactNode
+}) {
+  return (
+    <>
+      {info ? <div className={styles.fullRow}><Notice tone="info">{info}</Notice></div> : null}
+      {warn ? <div className={styles.fullRow}><Notice tone="warn">{warn}</Notice></div> : null}
+      {error ? <div className={styles.fullRow}><Notice tone="danger" message={error} /></div> : null}
+      {success ? <div className={styles.fullRow}><Notice tone="success" message={success} /></div> : null}
+      {typeof children === 'string' ? statusLabel(children) : children}
+    </>
+  )
+}
+
+export interface AffiliateToolbarProps {
+  narrow: boolean
+  notices: ReactNode
+  search: { placeholder: string; value: string; onChange: (value: string) => void }
+  /** 札（状態で絞り込む）。 */
+  chips?: ReactNode
+  /** 右：よく使う絞り込み・件数など。 */
+  trailing?: ReactNode
+  /** 1152 の板の1段目の頭（作るボタン・フォルダ選び）。 */
+  narrowLead?: ReactNode
+}
+
+/** 道具は1段。狭い板の作成・フォルダはListPageの畳んだ口へ任せる。 */
+export function AffiliateToolbar({ notices, search, chips, trailing }: AffiliateToolbarProps) {
+  return (
+    <div className={styles.wideTools}>
+      {notices}
+      <ListToolbar
+        search={{ placeholder: search.placeholder, value: search.value, width: 240, onChange: search.onChange }}
+        filters={chips}
+        trailing={trailing}
+      />
+    </div>
+  )
+}
+
+/** 状態の札（点つき）。tone は色の種類。 */
+export function StatusPill({ tone, children }: { tone: 'active' | 'warn' | 'danger' | 'neutral'; children: ReactNode }) {
+  return (
+    <SharedStatusPill tone={tone === 'active' ? 'success' : tone === 'warn' ? 'warning' : tone}>{typeof children === 'string' ? statusLabel(children) : children}</SharedStatusPill>
+  )
+}
+
+/** 空・絞り込みで0件・失敗の1枚（見本帳 ）。 */
+export function StateCard({
+  tone = 'empty',
+  icon,
+  title,
+  description,
+  action,
+}: {
+  tone?: 'empty' | 'error'
+  icon?: ReactNode
+  title: string
+  description?: string
+  action?: ReactNode
+}) {
+  return <ListState kind={tone === 'error' ? 'error' : 'empty'} icon={icon} title={title} description={description} action={action} />
+}
+
+/** 失敗の1枚の「もう一度試す」。 */
+export function RetryButton({ onRetry }: { onRetry: () => void }) {
+  return <Button type="button" onClick={onRetry}>もう一度読み込む</Button>
+}
+
+/** 行の右端の「…」。メニューの目印が行を1段増やさないよう箱で包む。 */
+export function RowMenu({ label, items }: { label: string; items: ActionMenuItem[] }) {
+  if (items.length === 0) return null
+  return (
+    <span className={styles.menuBox}>
+      <SharedRowMenu label={label} items={items} />
+    </span>
+  )
+}

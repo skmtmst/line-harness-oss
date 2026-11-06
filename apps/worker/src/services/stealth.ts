@@ -1,29 +1,18 @@
-// =============================================================================
-// Stealth Delivery — Rate limiting, jitter, and human-like sending patterns
-// =============================================================================
 
-/**
- * Add random jitter to a delay in milliseconds.
- * Returns base + random(0, jitterRange) ms.
- */
+
+/** 同時の集中を避けるため、基準遅延へランダムなミリ秒を加える。 */
 export function addJitter(baseMs: number, jitterRangeMs: number): number {
   return baseMs + Math.floor(Math.random() * jitterRangeMs);
 }
 
-/**
- * Sleep for a given number of milliseconds.
- */
+
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Add random variation to message text to avoid identical bulk messages.
- * Inserts zero-width spaces or slight punctuation variations.
- */
+/** 同じ大量送信の文面が完全一致しないよう、ゼロ幅文字や小さな句読点の違いを加える。 */
 export function addMessageVariation(text: string, index: number): string {
-  // Use different unicode whitespace characters at random positions
-  // This makes each message slightly unique without visible differences
+  // 見た目を変えずに差を付けるため、異なる Unicode の空白をランダムな位置へ入れる。
   const variations = [
     '\u200B', // zero-width space
     '\u200C', // zero-width non-joiner
@@ -31,7 +20,7 @@ export function addMessageVariation(text: string, index: number): string {
     '\uFEFF', // zero-width no-break space
   ];
 
-  // Deterministic but unique per-message variation
+  // メッセージごとに一定の入力から異なる変化を決める。
   const varChar = variations[index % variations.length];
   const position = (index * 7 + 3) % Math.max(text.length, 1);
 
@@ -40,30 +29,13 @@ export function addMessageVariation(text: string, index: number): string {
 }
 
 /**
- * バッチ送信用のステアリング遅延を計算する。
- * LINEのレート制限回避と自然な送信パターンを維持しつつ、
- * Cloudflare Workerの実行時間制限（30秒）内に全バッチが完了するように調整。
- *
- * 合計遅延の上限: 20秒（30秒制限に対してAPI呼び出し分の余裕を確保）
- *
- * **batchSize は呼び出し側が実際に使っている 1 バッチの人数を渡す。**
- * ここを間違えると合計遅延の上限が成り立たなくなる。以前は 500（multicast の
- * 上限）を直書きしていたため、1 バッチ 10 人で回る経路ではバッチ数を 50 分の 1 に
- * 見積もっていた。5000 人なら実際は 500 バッチあるのに 10 バッチのつもりで遅延を
- * 配り、合計 20 秒のはずが 18 分ぶん sleep する状態だった（時間バジェットで
- * 打ち切られるので stall はしないが、5 分ごとの cron 1 回につき数十人しか
- * 進まなくなる）。
- *
- * **実際にこれが起きるのは `dedup-broadcast.ts`（複アカ重複除外）だけ。**
- * そちらは sleep が `if (personalized)` の手前にあるので、差し込みありでも通る。
- * `broadcast.ts` の差し込み経路は `if (personalized) { ... }` のブロックから
- * return / break / continue で必ず抜けるので、この関数まで到達しない
- * （あちらで渡している batchSize は常に 500 になる）。
- *
+ * LINE のレート制限と自然な送信間隔を守り、Worker の実行時間に API 呼出の余裕を残すため、全バッチの合計遅延を20秒以内にする。
+ * 実際の1バッチ人数を使わないとバッチ数を過小評価して遅延が膨らむため、呼出元の batchSize を必須とする。
+ * dedup-broadcast の差し込み経路は10人単位でもここを通る。broadcast の差し込み経路はここへ到達せず、通常 multicast は500人単位となる。
  * @param totalMessages 送信対象の総メッセージ数
- * @param batchIndex 現在のバッチインデックス（0始まり）
- * @param batchSize 1 バッチの人数。multicast なら 500、差し込みありの push なら 10
- * @returns このバッチ送信前の遅延（ミリ秒）
+ * @param batchIndex 現在のバッチ番号（0始まり）
+ * @param batchSize 実際の1バッチ人数。multicast は500、差し込み push は10
+ * @returns バッチ送信前の遅延（ミリ秒）
  */
 export function calculateStaggerDelay(
   totalMessages: number,
@@ -90,22 +62,15 @@ export function calculateStaggerDelay(
   return addJitter(baseDelay, Math.min(baseDelay * 0.2, 500));
 }
 
-/**
- * Calculate jittered delivery time for step delivery.
- * Adds random minutes (±5 min) to scheduled delivery to avoid
- * all scenario deliveries firing at exactly the same time.
- */
+/** 同じ瞬間に配信が集中しないよう、予定へ最大前後5分の揺らぎを加える。 */
 export function jitterDeliveryTime(scheduledAt: Date): Date {
-  const jitterMinutes = Math.floor(Math.random() * 10) - 5; // -5 to +5 minutes
+  const jitterMinutes = Math.floor(Math.random() * 10) - 5; // 前後5分の範囲で変える。
   const result = new Date(scheduledAt);
   result.setMinutes(result.getMinutes() + jitterMinutes);
   return result;
 }
 
-/**
- * Rate limiter for LINE API calls.
- * LINE rate limit is 100,000 messages/min, but we stay well under.
- */
+/** LINE API の上限に十分な余裕を持たせ、送信速度を制限する。 */
 export class StealthRateLimiter {
   private callCount = 0;
   private windowStart = Date.now();
@@ -120,13 +85,13 @@ export class StealthRateLimiter {
   async waitForSlot(): Promise<void> {
     const now = Date.now();
 
-    // Reset window if expired
+
     if (now - this.windowStart >= this.windowMs) {
       this.callCount = 0;
       this.windowStart = now;
     }
 
-    // If we've hit the limit, wait for the window to reset
+    // 上限に達したら、制限窓が更新されるまで待つ。
     if (this.callCount >= this.maxCallsPerWindow) {
       const waitTime = this.windowMs - (now - this.windowStart) + addJitter(100, 500);
       await sleep(waitTime);

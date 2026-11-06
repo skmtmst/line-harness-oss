@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 
 /*
- * #935 N-304: 過去の予約日時を「予約」として受け付けない。
+ *  過去の予約日時を「予約」として受け付けない。
  * 通すと次のtickで即送され、「予約した」のに「今届いた」になる。
  * 新規作成口(POST /columns)と一覧の予約口(POST /columns/:id/deliver)の両方で、
  * DBを触る前に400で断ることを確かめる。
@@ -75,9 +75,9 @@ describe('コラムの配信予約（POST /columns/:id/deliver）', () => {
       scheduledAt: '2020-01-01T00:00:00+09:00',
     });
     expect(res.status).toBe(400);
-    const body = await res.json() as { success: boolean; error: string };
+    const body = await res.json() as { success: boolean; error: string; code: string };
     expect(body.success).toBe(false);
-    expect(body.error).toBe('past_datetime');
+    expect(body.code).toBe('past_datetime');
     expect(mocks.queueColumnDelivery).not.toHaveBeenCalled();
   });
 
@@ -87,8 +87,8 @@ describe('コラムの配信予約（POST /columns/:id/deliver）', () => {
       scheduledAt: 'not-a-date',
     });
     expect(res.status).toBe(400);
-    const body = await res.json() as { success: boolean; error: string };
-    expect(body.error).toBe('scheduled_at_invalid');
+    const body = await res.json() as { success: boolean; error: string; code: string };
+    expect(body.code).toBe('scheduled_at_invalid');
     expect(mocks.queueColumnDelivery).not.toHaveBeenCalled();
   });
 
@@ -124,8 +124,8 @@ describe('コラムの新規作成（POST /columns）', () => {
       scheduledAt: '2020-01-01T00:00:00+09:00',
     }));
     expect(res.status).toBe(400);
-    const body = await res.json() as { success: boolean; error: string };
-    expect(body.error).toBe('past_datetime');
+    const body = await res.json() as { success: boolean; error: string; code: string };
+    expect(body.code).toBe('past_datetime');
     expect(mocks.prepare).not.toHaveBeenCalled();
     expect(mocks.queueColumnDelivery).not.toHaveBeenCalled();
   });
@@ -135,13 +135,13 @@ describe('コラムの新規作成（POST /columns）', () => {
       scheduledAt: 'not-a-date',
     }));
     expect(res.status).toBe(400);
-    const body = await res.json() as { success: boolean; error: string };
-    expect(body.error).toBe('scheduled_at_invalid');
+    const body = await res.json() as { success: boolean; error: string; code: string };
+    expect(body.code).toBe('scheduled_at_invalid');
     expect(mocks.prepare).not.toHaveBeenCalled();
   });
 
   /*
-   * NEN-06: 下書き保存は配信日時があっても配信待ち行列を作らない。
+   * 下書き保存は配信日時があっても配信待ち行列を作らない。
    * 日時は下書きの「配信したい日時」として delivery_at に残るだけで、
    * 予約は一覧の「この内容で予約する」（POST /columns/:id/deliver）の
    * 明示操作だけが行う。

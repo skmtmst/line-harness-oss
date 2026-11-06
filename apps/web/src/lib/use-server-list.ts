@@ -2,8 +2,11 @@
 
 import { createElement, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
+import { useListSnapshot } from './use-list-snapshot'
 import ListState from '@/components/shared/list-state'
 import { LIST_REQUEST_TIMEOUT_MS } from '@/lib/request-timeout'
+import { classifyApiFailure } from '@/components/shared/api-error-message'
+import { readListUrlParam, writeListUrlParam } from '@/components/shared/list-url-state'
 
 export type ServerListSort = ReadonlyArray<Readonly<{
   field: string
@@ -63,8 +66,10 @@ export function serverListStateView({
   error,
   retry,
 }: StateViewInput): ReactElement | null {
-  if (loading && itemCount === 0) return createElement(ListState, { kind: 'loading' })
-  if (error) return createElement(ListState, { kind: 'error', onRetry: retry })
+  if (loading && !loaded && itemCount === 0) return createElement(ListState, { kind: 'loading' })
+  // m23m: 捕まえた失敗をそのまま渡す。403 は権限の案内・再試行なし、
+  // 429 は待ち案内になる（ListState の `error` が言い分ける）。
+  if (error) return createElement(ListState, { kind: 'error', error, onRetry: retry })
   if (loaded && itemCount === 0) return createElement(ListState, { kind: 'empty' })
   return null
 }
@@ -80,11 +85,17 @@ export function useOffsetServerList<T>({
   load,
   initialLimit = DEFAULT_LIMIT,
   requestTimeoutMs = LIST_REQUEST_TIMEOUT_MS,
+  pageUrlKey,
 }: {
   /** 絞り込み・アカウント等を直列化したキー。変わると1ページ目へ戻る。 */
   requestKey: string
   load: (request: { page: number; limit: number }, signal: AbortSignal) => Promise<ServerListResponse<T>>
   initialLimit?: number
+  /**
+   * ページを URL に置く鍵（例 `'page'`。動きの点検 5 番）。渡すと、戻る・
+   * 再読み込みで同じページに戻る。渡さなければ今までどおり内側だけで持つ。
+   */
+  pageUrlKey?: string
   /*
    * #625: 応答しない要求をこの時間で打ち切り、失敗表示＋再試行へ落とす。
    * 検索語の異常な長さや経路の沈黙で「読み込んでいます」が消えない事故を防ぐ。
@@ -92,33 +103,59 @@ export function useOffsetServerList<T>({
   requestTimeoutMs?: number
 }) {
   const [navigation, setNavigation] = useState({ requestKey, page: 1 })
-  const [state, setState] = useState<LoadState<T>>(() => initialState(initialLimit))
   const [retryVersion, setRetryVersion] = useState(0)
   const page = navigation.requestKey === requestKey ? navigation.page : 1
+  const { value: state, setValue: setState } = useListSnapshot<LoadState<T>>(JSON.stringify([requestKey, page, initialLimit]), initialState(initialLimit))
+  /*
+   * URL のページは最初に描けた一覧にだけ使う。読み込んだ直後は絞り込みの値も
+   * URL から入ってきて requestKey が一度変わるので、その切り替えでは
+   * 1 ページ目へ戻さず URL のページを使う。一覧が出た後の切り替えは今までどおり 1 へ。
+   */
+  const urlPageRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!pageUrlKey) return
+    const fromUrl = Number(readListUrlParam(pageUrlKey, '1'))
+    if (!Number.isSafeInteger(fromUrl) || fromUrl <= 1) return
+    urlPageRef.current = fromUrl
+    setNavigation((current) => ({ ...current, page: fromUrl }))
+  }, [pageUrlKey])
 
   useEffect(() => {
     if (navigation.requestKey !== requestKey) {
-      setNavigation({ requestKey, page: 1 })
-      setState(initialState(initialLimit))
+      const keep = urlPageRef.current
+      setNavigation({ requestKey, page: keep ?? 1 })
+      if (pageUrlKey && keep === null) writeListUrlParam(pageUrlKey, '')
+      /*
+       * 条件の切り替えでは、スナップショットの鍵で旧行と旧件数を隠す。
+       * 同じ条件の再取得だけ、いまの行と件数を残して読み直す。
+       */
+      setState((current) => ({ ...current, loading: true, error: null }))
       return
     }
 
     const controller = new AbortController()
-    setState((current) => ({ ...current, items: [], loaded: false, loading: true, error: null }))
+    /*
+     * 同じ条件で行が出ているときは残し、画面側へ `refreshing` を渡す。
+     * 未取得の条件では ListState の読み込み表示を出す。
+     */
+    setState((current) => ({ ...current, loading: true, error: null }))
     /*
      * #625: 応答なしで「読み込んでいます」が残り続けないよう、時間切れで
      * 失敗状態へ落とす。abort で通信も止める。時間切れ後に遅れて成功しても
      * aborted 判定で捨てるので、失敗表示のまま再試行へ進める。
+     * 前の行を残した読み直しでも時間切れは失敗表示へ落とす（残った行の
+     * まま「読み込み中」のままにしない）。失敗の案内と再試行を出す。取得済みの行は残す。
      */
     const timeout = setTimeout(() => {
       controller.abort()
-      setState((current) => (current.loading && current.items.length === 0
-        ? { ...current, loaded: false, loading: false, error: new Error('一覧の読み込みが時間切れになりました') }
+      setState((current) => (current.loading
+        ? { ...current, loading: false, error: new Error('一覧の読み込みが時間切れになりました') }
         : current))
     }, requestTimeoutMs)
     void load({ page, limit: initialLimit }, controller.signal).then(
       (response) => {
         if (controller.signal.aborted) return
+        urlPageRef.current = null
         setState({
           items: response.items,
           total: response.total ?? 0,
@@ -132,19 +169,22 @@ export function useOffsetServerList<T>({
       },
       (error: unknown) => {
         if (controller.signal.aborted) return
-        setState((current) => ({ ...current, loaded: false, loading: false, error: asError(error) }))
+        // 通信の失敗では前の行を残す。権限を失ったときだけ隠す。
+        setState((current) => ({ ...current, ...(classifyApiFailure(error) === 'forbidden' ? { items: [], loaded: false } : {}), loading: false, error: asError(error) }))
       },
     ).finally(() => clearTimeout(timeout))
     return () => {
       clearTimeout(timeout)
       controller.abort()
     }
-  }, [initialLimit, load, navigation.requestKey, page, requestKey, requestTimeoutMs, retryVersion])
+  }, [initialLimit, load, navigation.requestKey, page, requestKey, requestTimeoutMs, retryVersion, setState])
 
   const setPage = useCallback((nextPage: number) => {
     const safePage = Number.isSafeInteger(nextPage) && nextPage > 0 ? nextPage : 1
+    urlPageRef.current = null
     setNavigation((current) => ({ ...current, page: safePage }))
-  }, [])
+    if (pageUrlKey) writeListUrlParam(pageUrlKey, safePage > 1 ? String(safePage) : '')
+  }, [pageUrlKey])
   const retry = useCallback(() => setRetryVersion((version) => version + 1), [])
   const pageCount = serverListPageCount(state.total, state.limit)
 
@@ -154,6 +194,10 @@ export function useOffsetServerList<T>({
     pageCount,
     setPage,
     retry,
+    /*
+     * 同じ条件の行を残した読み直し中。画面側の RefreshCover へ渡す。
+     */
+    refreshing: state.loading && state.loaded,
     stateView: serverListStateView({
       loaded: state.loaded,
       loading: state.loading,
@@ -175,7 +219,7 @@ export function useCursorServerList<T>({
   initialLimit?: number
 }) {
   const [activeKey, setActiveKey] = useState(requestKey)
-  const [state, setState] = useState<LoadState<T>>(() => initialState(initialLimit))
+  const { value: state, setValue: setState } = useListSnapshot<LoadState<T>>(requestKey, initialState(initialLimit))
   const [retryVersion, setRetryVersion] = useState(0)
   const requestId = useRef(0)
   const activeController = useRef<AbortController | null>(null)
@@ -189,7 +233,6 @@ export function useCursorServerList<T>({
     activeController.current = controller
     setState((current) => ({
       ...current,
-      ...(replace ? { items: [], loaded: false } : {}),
       loading: true,
       error: null,
     }))
@@ -210,11 +253,11 @@ export function useCursorServerList<T>({
     } catch (error) {
       if (controller.signal.aborted || requestId.current !== id) return
       lastFailedCursor.current = cursor
-      setState((current) => ({ ...current, loaded: current.items.length > 0, loading: false, error: asError(error) }))
+      setState((current) => ({ ...current, ...(classifyApiFailure(error) === 'forbidden' ? { items: [], loaded: false } : { loaded: current.items.length > 0 }), loading: false, error: asError(error) }))
     } finally {
       if (activeController.current === controller) activeController.current = null
     }
-  }, [initialLimit, load])
+  }, [initialLimit, load, setState])
 
   useEffect(() => () => activeController.current?.abort(), [])
 
@@ -223,7 +266,8 @@ export function useCursorServerList<T>({
       requestId.current += 1
       activeController.current?.abort()
       setActiveKey(requestKey)
-      setState(initialState(initialLimit))
+      lastFailedCursor.current = undefined
+      setState((current) => ({ ...current, loading: true, error: null }))
       return
     }
     void request(undefined, true)
@@ -243,6 +287,7 @@ export function useCursorServerList<T>({
 
   return {
     ...state,
+    refreshing: state.loading && state.loaded,
     hasNext: Boolean(state.nextCursor),
     loadNext,
     retry,

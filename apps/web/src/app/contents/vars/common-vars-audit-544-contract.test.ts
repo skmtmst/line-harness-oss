@@ -1,32 +1,25 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { impactCsv } from './impact-review'
+import { impactCsv } from '@/v8/common-vars-edit/impact'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const EXPORT_PANEL = readFileSync(join(HERE, 'export-panel.tsx'), 'utf8')
-const IMPACT_REVIEW = readFileSync(join(HERE, 'impact-review.tsx'), 'utf8')
-const WORKER_EXPORT = readFileSync(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'common-var-exports.ts'), 'utf8')
-const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
-const API = readFileSync(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
-const MOCK_API = readFileSync(join(HERE, '..', '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
-const FIXTURES = readFileSync(join(HERE, '..', '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'fixtures.mjs'), 'utf8')
+const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
+const EXPORT_PANEL = readUiSource(join(HERE, '../../../v8/common-vars/export-panel.tsx'), 'utf8')
+const IMPACT_REVIEW = readUiSource(join(HERE, '../../../v8/common-vars-edit/edit.tsx'), 'utf8')
 
+/*
+ * CSVまわりの動き（一括削除の上限・一覧の上限の知らせ・値欄の上限・撮影モックの予約口・CSVの無害化）は
+ * 描いて押す試験と口の試験が守る：`src/v8/common-vars/list-delete.test.tsx`・`list-view.test.tsx`、
+ * `edit/page-behavior.test.tsx`、`scripts/visual-qa/common-var-schedules-mock.test.ts`、
+ * Worker の `common-var-exports.test.ts`（式注入文字を1セルへ保つ）。
+ */
 describe('#544 N7/L1 CSVの数式インジェクション対策と共通化', () => {
-  it('一覧CSVは端末生成をやめ、無害化はサーバ側の共有関数に集約する', () => {
-    // N-192: 画面側の commonVarsCsv は撤去し、worker の台帳付き出力へ移した。
-    // 無害化は db package の protectCsvCell を通す（実値検証は route 試験側）。
+  it('一覧CSVを端末で作る形や、画面だけの無害化に戻さない', () => {
     expect(EXPORT_PANEL).not.toContain('commonVarsCsv')
     expect(PAGE).not.toContain('commonVarsCsv')
-    expect(WORKER_EXPORT).toContain('protectCsvCell')
-    expect(IMPACT_REVIEW).toContain("from '@/lib/presentation'")
     expect(IMPACT_REVIEW).not.toContain('function csvCell')
-  })
-
-  it('一覧CSVの各行は全セルを無害化してから結合する', () => {
-    expect(WORKER_EXPORT).toMatch(/map\(\(cell\) => protectCsvCell\(cell\)\)/)
   })
 
   it('影響一覧CSVは差し替え後の文を無害化する', () => {
@@ -38,42 +31,5 @@ describe('#544 N7/L1 CSVの数式インジェクション対策と共通化', ()
       }],
     } as never)
     expect(csv).toContain("\"'@evil\"")
-  })
-})
-
-describe('#544 N1 一括削除の件数上限', () => {
-  it('上限は20件で、超えたら確認口を打たず絞り込みを案内する', () => {
-    expect(PAGE).toContain('const MAX_BATCH_DELETE_COUNT = 20')
-    expect(PAGE).toContain('selected.size > MAX_BATCH_DELETE_COUNT')
-    expect(PAGE).toContain('一度に削除できるのは')
-    expect(PAGE).toContain('フォルダや検索で絞り込んで分けて削除してください')
-  })
-})
-
-describe('#544 N2 一覧の件数上限と絞り込み誘導', () => {
-  it('上限で切られたら黙らず、絞り込み誘導を出す', () => {
-    expect(API).toContain('CommonVarsListResponse')
-    expect(PAGE).toContain('vars.meta?.limited')
-    expect(PAGE).toContain('表示は最初の200件までです。フォルダや検索で絞り込んでください。')
-  })
-})
-
-describe('#544 N4 編集画面の値欄に入力上限を付ける', () => {
-  it('値欄は200文字までで、数値種別は登録画面と同じ扱いにする', () => {
-    // 日付・日時種別は★V7の選択部品（文字数制限の概念がない）で、文章・数値種別だけが入力欄のまま。
-    expect(EDIT_PAGE).toContain('<DateField id="cv-value"')
-    expect(EDIT_PAGE).toContain('<DateTimeField id="cv-value"')
-    expect(EDIT_PAGE).toMatch(/maxLength=\{item\.type === 'number' \? undefined : 200\}/)
-  })
-})
-
-describe('#544 N9 撮影モックに予約口を足す', () => {
-  it('予約一覧・登録・削除の口と固定の予約データを用意する', () => {
-    expect(FIXTURES).toContain('COMMON_VAR_SCHEDULES')
-    expect(MOCK_API).toContain('COMMON_VAR_SCHEDULES')
-    expect(MOCK_API).toContain('commonVarSchedules')
-    expect(MOCK_API).toContain('common-vars/')
-    expect(MOCK_API).toContain('/schedules')
-    expect(MOCK_API).toContain('common-var-schedule-new')
   })
 })

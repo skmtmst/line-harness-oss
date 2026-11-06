@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import Notice, { type NoticeTone } from './notice'
+import Notice from './notice'
 
 export type NoteTone = 'info' | 'success' | 'warn' | 'danger'
 
@@ -23,15 +23,18 @@ export default function NoteBar({
   help,
   helpLabel,
   helpHref,
+  icon,
   children,
 }: {
   tone?: NoteTone
   /** 帯の右に置く操作。 */
   action?: ReactNode
   className?: string
+  /** 左の図柄の差し替え（Notice と同じ）。省略時は種類の既定印。 */
+  icon?: ReactNode
   /**
    * 読まなくても操作できる定義だけの補足。帯の文のすぐ右の「？」へ入れる
-   * （★V7・§2-1b）。帯自体は残す。警告・失敗・操作の結果は入れない。
+   * （★管理画面・§2-1b）。帯自体は残す。警告・失敗・操作の結果は入れない。
    */
   help?: ReactNode
   /** 「？」の見出し。省略時は「この案内」。 */
@@ -42,12 +45,13 @@ export default function NoteBar({
 }) {
   return (
     <Notice
-      tone={tone as NoticeTone}
+      tone={tone}
       action={action}
       className={className}
       help={help}
       helpLabel={helpLabel}
       helpHref={helpHref}
+      icon={icon}
     >
       {children}
     </Notice>

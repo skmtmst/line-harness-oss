@@ -15,7 +15,8 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import DashboardPage from './page'
+// 共通ダッシュボード本体の境界/既存カードを検査する。業種の入口分岐はhome.test.tsxが検査する。
+import DashboardPage from '@/v8/dashboard/dashboard'
 
 const fixture = vi.hoisted(() => ({
   accountId: 'account-a' as string | null,
@@ -197,16 +198,14 @@ describe('PERF-01 補足データはカードごとに独立して反映する',
     // 健全性の応答は来ていないが、写真審査カードは確定値を出す。
     expect(host.textContent).toContain('確認待ち 3件')
     // 予約カードも件数（集計APIの todayActiveTotal）が出る。
-    const bookingsCard = Array.from(host.querySelectorAll('h3'))
+    const bookingsCard = Array.from(host.querySelectorAll('[data-kpi-presentation] p[title]'))
       .find((node) => node.textContent?.trim() === '今日の予約')
-    expect(bookingsCard?.parentElement?.parentElement?.textContent).toContain('1')
-    // 今後の予定カードは読み込みスケルトンを抜け、明細を出している。
-    const upcoming = Array.from(host.querySelectorAll('h2'))
-      .find((node) => node.textContent?.trim() === '今後の予定')
-    const upcomingCard = upcoming?.closest('[class*="rounded"]')?.parentElement?.textContent
-      ?? upcoming?.parentElement?.parentElement?.parentElement?.textContent
-    expect(upcomingCard).toContain('相談')
-    expect(upcomingCard).not.toContain('読み込めませんでした')
+    expect(bookingsCard?.closest('[data-kpi-presentation]')?.textContent).toContain('1')
+    // ：帯の数から同じ予約の内訳を開く。
+    const card = host.querySelector('[data-kpi-presentation="band"][aria-label="今日の予約"]') ?? Array.from(host.querySelectorAll('[data-kpi-presentation="band"]')).find(node => node.textContent?.includes('今日の予約'))!
+    const detail = card.querySelector<HTMLButtonElement>('button[aria-label="今日の予約の内訳を見る"]')!
+    await act(async () => { detail.click() })
+    expect(host.querySelector('[role="region"][aria-label="内訳"]')?.textContent).toContain('相談')
     // 健全性依存のカードは未取得と偽らず、確認中のまま待つ。
     expect(host.textContent).toContain('確認中')
   })
@@ -216,9 +215,9 @@ describe('PERF-01 補足データはカードごとに独立して反映する',
     await render()
 
     expect(host.textContent).toContain('確認待ち 3件')
-    const bookingsCard = Array.from(host.querySelectorAll('h3'))
+    const bookingsCard = Array.from(host.querySelectorAll('[data-kpi-presentation] p[title]'))
       .find((node) => node.textContent?.trim() === '今日の予約')
-    expect(bookingsCard?.parentElement?.parentElement?.textContent).toContain('1')
+    expect(bookingsCard?.closest('[data-kpi-presentation]')?.textContent).toContain('1')
     // 健全性の失敗は接続状態カードの「未取得」として出る。
     expect(host.textContent).toContain('未取得')
   })

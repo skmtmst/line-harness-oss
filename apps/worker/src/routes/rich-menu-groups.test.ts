@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 
-// Mock @line-crm/db so we can drive the route purely from this test file.
+// route の動作に集中できるよう、DB だけを差し替える。
 const dbMocks = {
   getRichMenuGroups: vi.fn(),
   getRichMenuGroupById: vi.fn(),
@@ -13,8 +13,11 @@ const dbMocks = {
   clearRichMenuAssignmentsForGroup: vi.fn(),
   jstNow: vi.fn(),
   createRichMenuGroup: vi.fn(),
-  updateRichMenuGroupMeta: vi.fn(),
-  replaceRichMenuPages: vi.fn(),
+  saveRichMenuGroupDraft: vi.fn(
+    async (): Promise<
+      { ok: true; version: number } | { ok: false; reason: string; currentVersion: number | null }
+    > => ({ ok: true, version: 2 }),
+  ),
   deleteRichMenuGroup: vi.fn(),
   setRichMenuPageImage: vi.fn(),
   pageBelongsToGroup: vi.fn(),
@@ -41,7 +44,7 @@ const dbMocks = {
   restartRichMenuManualPublishRequest: vi.fn(),
   markRichMenuGroupUnpublished: vi.fn(),
   getTrackedLinkById: vi.fn(),
-  // N-163: 検索語の正規化は route 側でも使うので実装をそのまま置く。
+  // 検索語の正規化は route 側でも使うので実装をそのまま置く。
   normalizeRichMenuSearchText: (value: string) => value.toLowerCase().replace(/[\s　]+/g, ''),
   listRichMenuGroupIdsByAreaLabel: vi.fn(async () => new Set<string>()),
   duplicateRichMenuGroupAtomic: vi.fn(),
@@ -95,7 +98,7 @@ const accountAccessMocks = {
 };
 vi.mock('../services/account-access.js', () => accountAccessMocks);
 
-// Re-import after mock so the module picks up mocked deps.
+// モック登録後に再読込し、差し替えた依存を使う。
 const { richMenuGroups } = await import('./rich-menu-groups.js');
 
 type TestEnv = {
@@ -123,9 +126,7 @@ function makeR2Stub(): R2Bucket {
   } as any;
 }
 
-// Minimal D1 stub for routes that issue ad-hoc SQL outside the @line-crm/db
-// helpers (例: GET /api/rich-menu-groups の thumbnail JOIN クエリ)。
-// 空 results / null を返すことで route の「サムネなし」分岐を通す。
+// DB ヘルパ以外の SQL は空の results/null を返し、サムネイルなしの route 分岐を試す。
 function makeMinimalDbStub(): D1Database {
   const empty = { results: [] };
   return {
@@ -380,9 +381,9 @@ describe('GET /api/rich-menu-groups/:groupId', () => {
   });
 });
 
-// ----- POST preview-targets / schedule / GET usages (V6 12-1-B/D/F) -----
+// ----- POST preview-targets / schedule / GET usages (12-1-B/D/F) -----
 
-describe('V6 targeting preview and publish schedule', () => {
+describe('targeting preview and publish schedule', () => {
   test('削除確認へ割当台帳の現在表示人数を返す', async () => {
     dbMocks.getRichMenuDeleteImpact.mockResolvedValue({
       group: { id: 'g1', accountId: 'acc-1', name: 'メニュー', status: 'published' },
@@ -468,7 +469,7 @@ describe('V6 targeting preview and publish schedule', () => {
     });
 
     expect(res.status).toBe(503);
-    expect((await res.json() as { error: string }).error).toContain('対象条件');
+    expect((await res.json() as { error: string; code: string }).error).toContain('対象条件');
   });
 
   test('公開予約は実行キーが無ければ保存しない', async () => {
@@ -482,7 +483,7 @@ describe('V6 targeting preview and publish schedule', () => {
       body: JSON.stringify({ mode: 'scheduled', startsAt: '2026-09-10T01:00:00.000Z' }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toContain('Idempotency-Key');
+    expect((await res.json() as { error: string; code: string }).error).toContain('Idempotency-Key');
   });
 
   test('一般スタッフは公開予約を作れない', async () => {
@@ -722,7 +723,7 @@ describe('POST /api/rich-menu-groups', () => {
       }),
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).toMatch(/richmenuswitch/i);
   });
 
@@ -740,7 +741,7 @@ describe('POST /api/rich-menu-groups', () => {
       }),
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).toMatch(/duplicat/i);
   });
 
@@ -792,6 +793,23 @@ describe('POST /api/rich-menu-groups', () => {
 
 // ----- PATCH /api/rich-menu-groups/:groupId -----
 
+describe('押したら6つの保存API', () => {
+  const choices = [
+    { intent: 'url', actionData: { uri: 'https://example.com' }, actionType: 'uri' },
+    { intent: 'text', actionData: { text: '予約したい' }, actionType: 'message' },
+    { intent: 'booking', actionData: { menuId: 'menu-1' }, actionType: 'uri' },
+    { intent: 'form', formId: 'form-1', actionData: {}, actionType: 'uri' },
+    { intent: 'booking_history', actionData: {}, actionType: 'uri' },
+    { intent: 'visit_stamp', actionData: { cardId: 'card-1' }, actionType: 'uri' },
+  ];
+  test.each(choices)('既存のDB種類で保存し、選択先を落とさない: $intent', async choice => {
+    dbMocks.createRichMenuGroup.mockResolvedValue({ id: 'new', account_id: 'a', name: '案内', chat_bar_text: '開く', size: 'large', default_page_id: null, is_default_for_all: 0, status: 'draft', created_at: '', updated_at: '', pages: [] });
+    const response = await setupApp().request('/api/rich-menu-groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accountId: 'a', name: '案内', chatBarText: '開く', size: 'large', pages: [{ name: '案内', orderIndex: 0, areas: [{ boundsX: 0, boundsY: 0, boundsWidth: 100, boundsHeight: 100, ...choice }] }] }) });
+    expect(response.status).toBe(200);
+    expect(dbMocks.createRichMenuGroup).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ pages: [expect.objectContaining({ areas: [expect.objectContaining(choice)] })] }));
+  });
+});
+
 describe('PATCH /api/rich-menu-groups/:groupId', () => {
   test('404 when group missing', async () => {
     dbMocks.getRichMenuGroupById.mockResolvedValue(null);
@@ -816,7 +834,10 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
   });
 
   test('updates meta fields', async () => {
-    dbMocks.getRichMenuGroupById.mockResolvedValue({ id: 'g1' });
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', targeting_enabled: 0, targeting_condition: null,
+    });
+    dbMocks.saveRichMenuGroupDraft.mockResolvedValue({ ok: true, version: 2 });
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
       id: 'g1', account_id: 'a', name: 'new', chat_bar_text: 'バー', size: 'large',
       default_page_id: null, is_default_for_all: 1, status: 'draft', publishing_at: null,
@@ -826,17 +847,22 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
     const res = await app.request('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'new', isDefaultForAll: true }),
+      body: JSON.stringify({ expectedVersion: 1, name: 'new', isDefaultForAll: true }),
     });
     expect(res.status).toBe(200);
-    expect(dbMocks.updateRichMenuGroupMeta).toHaveBeenCalledWith(expect.anything(), 'g1', {
-      name: 'new', isDefaultForAll: true,
+    // /meta も pages も saveRichMenuGroupDraft の1件で確定する。
+    expect(dbMocks.saveRichMenuGroupDraft).toHaveBeenCalledWith(expect.anything(), 'g1', {
+      meta: { name: 'new', isDefaultForAll: true },
+      pages: undefined,
+      expectedVersion: 1,
     });
-    expect(dbMocks.replaceRichMenuPages).not.toHaveBeenCalled();
   });
 
   test('replaces pages when pages key present', async () => {
-    dbMocks.getRichMenuGroupById.mockResolvedValue({ id: 'g1' });
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', targeting_enabled: 0, targeting_condition: null,
+    });
+    dbMocks.saveRichMenuGroupDraft.mockResolvedValue({ ok: true, version: 2 });
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
       id: 'g1', account_id: 'a', name: 'x', chat_bar_text: 'x', size: 'large',
       default_page_id: null, is_default_for_all: 0, status: 'draft', publishing_at: null,
@@ -847,6 +873,7 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        expectedVersion: 1,
         pages: [
           { name: 'p1', orderIndex: 0, areas: [] },
           { name: 'p2', orderIndex: 1, areas: [] },
@@ -854,14 +881,63 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
       }),
     });
     expect(res.status).toBe(200);
-    expect(dbMocks.replaceRichMenuPages).toHaveBeenCalledWith(
+    expect(dbMocks.saveRichMenuGroupDraft).toHaveBeenCalledWith(
       expect.anything(),
       'g1',
-      expect.arrayContaining([
-        expect.objectContaining({ name: 'p1' }),
-        expect.objectContaining({ name: 'p2' }),
-      ]),
+      expect.objectContaining({
+        expectedVersion: 1,
+        pages: expect.arrayContaining([
+          expect.objectContaining({ name: 'p1' }),
+          expect.objectContaining({ name: 'p2' }),
+        ]),
+      }),
     );
+  });
+
+  test('版なしの保存は 400 で書かない', async () => {
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', targeting_enabled: 0, targeting_condition: null,
+    });
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'new' }),
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.saveRichMenuGroupDraft).not.toHaveBeenCalled();
+  });
+
+  test('古い版の保存は 409 で書かない', async () => {
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', targeting_enabled: 0, targeting_condition: null,
+    });
+    dbMocks.saveRichMenuGroupDraft.mockResolvedValueOnce({
+      ok: false, reason: 'version_conflict', currentVersion: 3,
+    });
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: 1, name: 'new' }),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  test('保存先が消えていたら 404（版の不一致ではなく不在）', async () => {
+    dbMocks.getRichMenuGroupById.mockResolvedValue({
+      id: 'g1', targeting_enabled: 0, targeting_condition: null,
+    });
+    dbMocks.saveRichMenuGroupDraft.mockResolvedValueOnce({
+      ok: false, reason: 'version_conflict', currentVersion: null,
+    });
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/g1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: 1, name: 'new' }),
+    });
+    expect(res.status).toBe(404);
   });
 });
 
@@ -1297,10 +1373,9 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
       method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-2' },
     });
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({
+    await expect(res.json()).resolves.toMatchObject({
       success: false,
-      error: 'ページ「基本メニュー」の「送信ボタン」: 送信テキストを入力してください',
-    });
+      error: 'ページ「基本メニュー」の「送信ボタン」: 送信テキストを入力してください', fields: expect.any(Object) });
     // 所有者付きで解放する。
     expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(
       expect.anything(),
@@ -1354,7 +1429,7 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
   });
 });
 
-// ----- #502中 (PR #552): 優先順一括・冪等キー・作成時フォルダ・条件上限・外部応答の固定文言 -----
+// ----- 中 : 優先順一括・冪等キー・作成時フォルダ・条件上限・外部応答の固定文言 -----
 
 describe('POST /api/rich-menu-groups/reorder-priorities (#502中)', () => {
   test('id配列を1回でそろえ直す', async () => {
@@ -1368,7 +1443,7 @@ describe('POST /api/rich-menu-groups/reorder-priorities (#502中)', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true, data: { updated: 3 } });
     // 個別PATCHは使わない。1 batch で3件そろえる。
-    expect(dbMocks.updateRichMenuGroupMeta).not.toHaveBeenCalled();
+    expect(dbMocks.saveRichMenuGroupDraft).not.toHaveBeenCalled();
   });
 
   test('足りない・余分・重複のidは400で何も書かない', async () => {
@@ -1424,7 +1499,7 @@ describe('POST /api/rich-menu-groups/:groupId/apply-to-tag (#502中)', () => {
       body: JSON.stringify({ mode: 'bulk-link', tagId: null }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toContain('Idempotency-Key');
+    expect((await res.json() as { error: string; code: string }).error).toContain('Idempotency-Key');
     expect(dbMocks.getFollowingLineUserIdsByTag).not.toHaveBeenCalled();
   });
 
@@ -1512,7 +1587,7 @@ describe('人数プレビューの権限と複雑さ上限 (#502中)', () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toContain('複雑');
+    expect((await res.json() as { error: string; code: string }).error).toContain('複雑');
   });
 });
 
@@ -1527,7 +1602,7 @@ describe('外部応答の固定文言 (#502中)', () => {
       { method: 'POST' },
     );
     expect(res.status).toBe(404);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).not.toContain('external detail leak');
     expect(body.error).toContain('見つかりません');
     fetchSpy.mockRestore();

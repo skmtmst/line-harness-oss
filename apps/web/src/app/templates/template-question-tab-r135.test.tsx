@@ -7,6 +7,7 @@
  */
 
 import React from 'react'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 
@@ -62,6 +63,9 @@ vi.mock('@/lib/api', () => ({
 }))
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/templates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
     setItem: () => {},
@@ -114,7 +118,7 @@ describe('R135 質問タブと絞り込み札の分離', () => {
       fireEvent.click(screen.getByRole('tab', { name: /質問/ }))
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '未使用' }))
+      fireEvent.click(screen.getByRole('button', { name: '使っていない' }))
     })
     // タブは質問のまま。
     expect(screen.getByRole('tab', { name: /質問/ }).getAttribute('aria-selected')).toBe('true')
@@ -124,3 +128,6 @@ describe('R135 質問タブと絞り込み札の分離', () => {
     expect(tableText('メッセージ2')).toBeNull()
   })
 })
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())

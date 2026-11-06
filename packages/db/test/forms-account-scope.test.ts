@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { getFormsWithStats } from '../src/forms.js';
+import { getFormsWithStats } from '../src/forms/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 function setup(): D1Database {
@@ -32,6 +32,10 @@ function setup(): D1Database {
     CREATE TABLE form_opens (
       id TEXT PRIMARY KEY, form_id TEXT NOT NULL, friend_id TEXT,
       opened_at TEXT NOT NULL, is_test INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE form_submit_claims (
+      form_id TEXT NOT NULL, submission_id TEXT,
+      status TEXT NOT NULL, updated_at TEXT NOT NULL
     );
 
     INSERT INTO line_accounts VALUES

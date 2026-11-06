@@ -1,0 +1,48 @@
+/*
+ * ★V8-B  会員のつき合わせ。外側・数の帯・表の枠は取り込みの記録（screen.module.css）と同じ。
+ * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-st2-id-*・--tpl-sb-*）。
+ */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-ctl-gap);
+}
+
+.sortBox {
+  flex-shrink: 0;
+}
+
+.note {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  max-width: 100%;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 追加決まり1: 続きの読み込みは左に置く。1つだけ中央に浮かせない。 */
+.more {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-group-gap);
+}
+
+.detailPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-sb-group-gap);
+}

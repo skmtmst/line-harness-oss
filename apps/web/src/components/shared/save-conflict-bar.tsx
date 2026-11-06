@@ -1,6 +1,7 @@
 'use client'
 
 import Notice from './notice'
+import Button from './button'
 import styles from './save-conflict-bar.module.css'
 
 export type SaveConflictBarProps = {
@@ -26,7 +27,7 @@ export type SaveConflictBarProps = {
  * `z-[60]` を手書きさせると、共通部品を通らない直書きとして design-debt に
  * 数えられる。
  *
- * 見た目は共通の `Notice`（tone=error）をそのまま使う。独自の配色を作らない。
+ * 見た目は共通の `Notice`（tone=danger）をそのまま使う。独自の配色を作らない。
  *
  * **読み上げについて。**覆いが出ているあいだは `aria-modal` の外にあるため、
  * 読み上げソフトがここへ辿り着けないことがある。見えていることは実ブラウザ
@@ -40,14 +41,9 @@ export default function SaveConflictBar({
 }: SaveConflictBarProps) {
   return (
     <div className={styles.bar} data-design-part="save-conflict-bar">
-      <div className={styles.inner}>
-        <Notice tone="danger" message={message} className={styles.notice} />
-        {actionLabel && onAction ? (
-          <button type="button" onClick={onAction} data-qa={actionQa} className={styles.action}>
-            {actionLabel}
-          </button>
-        ) : null}
-      </div>
+      <Notice tone="danger" message={message} className={styles.inner} action={actionLabel && onAction ? (
+        <Button onClick={onAction} data-qa={actionQa}>{actionLabel}</Button>
+      ) : null} />
     </div>
   )
 }

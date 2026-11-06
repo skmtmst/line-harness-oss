@@ -10,10 +10,18 @@
  * 違うのは `kind` だけ。フォルダは `folders.kind` で画面ごとに分かれている。
  */
 
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useOptionalAccount } from '@/contexts/account-context'
+import { useContext, useLayoutEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
-import type { Folder } from '@line-crm/shared'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from './overlay-utils'
+import { InlineDetailHoldingContext } from './use-inline-detail-guard'
+import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared'
+import FolderEditorDialog from './folder-editor-dialog'
+import { describeFolderFailure } from './folder-failure'
+import { folderDisplayColor } from './folder-dot'
+import { notifyToast } from './toast'
 
 /** フォルダの色。全画面で同じ8色を使う。 */
 export const FOLDER_COLORS = [
@@ -27,6 +35,12 @@ export const FOLDER_COLORS = [
   '#6B7280',
 ]
 
+/** 既存の保存色を保ち、色の選択肢は名前で読み上げる。 */
+export const FOLDER_COLOR_NAMES: Record<string, string> = {
+  '#3B82F6': '青', '#10B981': '緑', '#F59E0B': '黄', '#EF4444': '赤',
+  '#8B5CF6': '紫', '#EC4899': 'ピンク', '#06B6D4': '水色', '#6B7280': 'グレー',
+}
+
 export interface FolderAddDialogProps {
   /** `folders.kind`。'broadcast' / 'scenario' など。 */
   kind: string
@@ -38,8 +52,8 @@ export interface FolderAddDialogProps {
    */
   folder?: Folder
   /**
-   * フォルダの持ち主のLINE公式アカウント。アカウント単位の kind
-   * （template など）では必ず渡す。渡さないと共有（未所属）のフォルダになる。
+   * フォルダの持ち主のLINE公式アカウント。明示指定を優先する。
+   * 作成時の未指定は現在の選択アカウントを使い、共通操作の権限はAPIで確認する。
    */
   accountId?: string | null
   /** 窓の下に出す一言。「消しても中身は未分類に残る」など。 */
@@ -48,7 +62,17 @@ export interface FolderAddDialogProps {
   placeholder?: string
   onClose: () => void
   /** 追加できたら呼ぶ。一覧を読み直す。 */
-  onAdded: () => void
+  onAdded: (folder?: Folder) => void
+  /**
+   * ほかの人が先に直した・消した（409・404）ときにフォルダの一覧を読み直す。
+   * 消されていたときは読み直したあと窓を閉じる（onClose）。
+   */
+  onReload?: () => void | Promise<void>
+  /** 保持した保存操作でも、送信直前の現在の権限を確かめる。未指定は従来どおり。 */
+  canSaveNow?: () => boolean
+  confirmLockedReason?: string
+  /** 本人の確認中など、権限の理由を出さない普通の無効状態。 */
+  confirmDisabled?: boolean
 }
 
 export default function FolderAddDialog({
@@ -59,102 +83,76 @@ export default function FolderAddDialog({
   placeholder = '例: 01_キャンペーン',
   onClose,
   onAdded,
+  onReload,
+  canSaveNow,
+  confirmLockedReason,
+  confirmDisabled,
 }: FolderAddDialogProps) {
+
+  const selectedAccount = useOptionalAccount()
+  const targetAccountId = accountId === undefined ? selectedAccount?.selectedAccountId : accountId
   const [name, setName] = useState(folder?.name ?? '')
-  const [color, setColor] = useState(folder?.color ?? FOLDER_COLORS[0])
+  const [color, setColor] = useState<string | null>((folder ? folderDisplayColor(folder) : FOLDER_SELECT_COLORS[0].value))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [nameError, setNameError] = useState('')
+  const initialColor = folder ? folderDisplayColor(folder) : FOLDER_SELECT_COLORS[0].value
+  const dirty = name !== (folder?.name ?? '') || color !== initialColor
+  const guard = useUnsavedGuard({ dirty: dirty || saving, busy: saving, onDiscard: onClose })
+  const depth = useContext(OverlayDepthContext)
+  const onHoldingChange = useContext(InlineDetailHoldingContext)
+  const source = useRef(Symbol('folder'))
+  useLayoutEffect(() => { onHoldingChange?.(source.current, dirty || saving) }, [dirty, saving, onHoldingChange])
+  useLayoutEffect(() => () => { onHoldingChange?.(source.current, false) }, [onHoldingChange])
 
   const add = async () => {
+    if (confirmDisabled || confirmLockedReason) return
+    if (canSaveNow && !canSaveNow()) { setError('権限が変わったため、フォルダの保存を中止しました。'); return }
     const trimmed = name.trim()
     if (!trimmed || saving) return
     setSaving(true)
     setError('')
+    setNameError('')
     try {
       // `api.folders.update` の実体は部分更新をそのまま送る。変数にまとめて、
       // 名前だけ直して選んだ色を捨てる以前の挙動へ戻さない。
       const folderUpdates = { name: trimmed, color }
       const res = folder
         ? await api.folders.update(folder.id, folderUpdates, accountId ?? undefined)
-        : await api.folders.create({ kind, name: trimmed, color, accountId })
+        : await api.folders.create({ kind, name: trimmed, color, accountId: targetAccountId })
       if (!res.success) {
         setError(res.error)
         return
       }
-      onAdded()
+      guard.disarm()
+      onAdded(res.data)
       onClose()
-    } catch {
-      setError(folder ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした')
+    } catch (caught) {
+      // 理由ごとに言い分ける（共通の describeFolderFailure）。入力した名前と色は残す。
+      const failure = describeFolderFailure(caught, 'save')
+      if (failure.kind === 'missing') {
+        notifyToast(failure.message, { tone: 'error' })
+        await onReload?.()
+        onClose()
+        return
+      }
+      if (failure.kind === 'conflict') await onReload?.()
+      if (failure.nameError) setNameError(failure.nameError)
+      else setError(failure.message)
     } finally {
       setSaving(false)
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-xl">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-ink text-base font-bold">{folder ? 'フォルダを直す' : 'フォルダを追加'}</h2>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
-        {note && <p className="text-ink-faint mt-1 text-xs leading-relaxed">{note}</p>}
+  return <><FolderEditorDialog open
+    title={folder ? 'フォルダを直す' : 'フォルダを追加'} description={note}
+    name={name} onNameChange={(next) => { setName(next); setNameError('') }} color={color} onColorChange={setColor}
+    nameError={nameError || undefined}
+    allowClear
+    placeholder={placeholder} busy={saving} error={error || undefined}
+    confirmLockedReason={confirmLockedReason} confirmDisabled={confirmDisabled}
+    onCancel={onClose} onConfirm={() => void add()} confirmLabel={folder ? '保存する' : '追加する'}
+  />
+  <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></>
 
-        <label className="mt-4 block">
-          <span className="text-ink-secondary mb-1 block text-xs font-medium">
-            フォルダ名 <span className="text-danger">*</span>
-          </span>
-          <input
-            type="text"
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && name.trim()) void add()
-            }}
-            placeholder={placeholder}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
-          />
-        </label>
-
-        <div className="mt-3">
-          <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
-          <div className="flex flex-wrap gap-2">
-            {FOLDER_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                aria-label={`色 ${c}`}
-                aria-pressed={color === c}
-                style={{ backgroundColor: c }}
-                className={`rounded-pill h-7 w-7 ${color === c ? 'ring-accent ring-2 ring-offset-2' : ''}`}
-              />
-            ))}
-          </div>
-        </div>
-
-        {error && <p className="text-danger mt-3 text-xs">{error}</p>}
-
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm"
-          >
-            やめる
-          </button>
-          <button
-            type="button"
-            onClick={() => void add()}
-            disabled={saving || !name.trim()}
-            className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
-          >
-            {saving ? (folder ? '保存中…' : '追加中…') : (folder ? '変更を保存' : '追加する')}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 }

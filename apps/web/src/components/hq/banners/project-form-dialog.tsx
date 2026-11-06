@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useId, useState } from 'react'
-import Dialog from '@/components/shared/dialog'
+import Button from '@/components/shared/button'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import type { BannerProject } from '@/lib/hq-banners'
 
@@ -53,16 +54,27 @@ export default function ProjectFormDialog({
     onSubmit({ name: trimmed, description: description.trim() })
   }
 
+  // : 名前が空のまま作らせない。変えるときは名前が入っている。
+  const canSubmit = !busy && (Boolean(project) || name.trim() !== '')
   return (
     <Dialog
       open={open}
       title={project ? '名前と説明を変える' : 'プロジェクトを作る'}
-      description={project ? undefined : '案件やキャンペーンごとに1つ作ります。中で生成した画像は、あとでアカウントへ渡せます。'}
+      description={project ? undefined : '案件やキャンペーンごとに作ります。画像はプロジェクトの中で生成・取り込みします。'}
       confirmLabel={project ? '変更を保存' : 'プロジェクトを作る'}
       busy={busy}
       error={localError || error}
       onConfirm={submit}
       onCancel={onCancel}
+      designNode="W7Z57"
+      footer={
+        <DialogActions>
+          <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
+          <Button variant="primary" onClick={submit} disabled={!canSubmit} busy={busy} busyLabel="保存しています…">
+            {project ? '変更を保存' : '＋ 作って開く'}
+          </Button>
+        </DialogActions>
+      }
     >
       <form
         className="flex flex-col gap-4"
@@ -72,7 +84,7 @@ export default function ProjectFormDialog({
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <label htmlFor={`${uid}-name`} className="text-label font-bold text-ink">プロジェクト名</label>
+          <label htmlFor={`${uid}-name`} className="text-label font-medium text-ink">プロジェクト名</label>
           <TextField
             id={`${uid}-name`}
             value={name}
@@ -86,7 +98,7 @@ export default function ProjectFormDialog({
         </div>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between">
-            <label htmlFor={`${uid}-description`} className="text-label font-bold text-ink">説明</label>
+            <label htmlFor={`${uid}-description`} className="text-label font-medium text-ink">説明</label>
             <span className="text-micro text-ink-faint">任意</span>
           </div>
           <TextArea

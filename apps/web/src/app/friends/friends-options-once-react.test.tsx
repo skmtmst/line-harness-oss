@@ -81,6 +81,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   await act(async () => { root.unmount() })
   host.remove()
   vi.unstubAllGlobals()
@@ -92,8 +93,11 @@ function count(bare: string): number {
 
 describe('友だち一覧の選択肢は取り直さない（V6R-S1-b）', () => {
   it('対応マークが後から有効になっても、タグ・担当者・シナリオは1回ずつ', async () => {
+    // 待ちは偽の時計で進める（本物の時間を待たない）。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await act(async () => { root.render(<FriendsPage />) })
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 100)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(100) })
+    vi.useRealTimers()
 
     expect(count('/api/support-marks')).toBe(1)
     expect(count('/api/tags')).toBe(1)

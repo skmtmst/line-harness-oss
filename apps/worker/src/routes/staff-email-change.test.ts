@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 
 /*
- * N-433(#957)。本人のメール変更は確認メールを経て確定する契約試験。
+ *。本人のメール変更は確認メールを経て確定する契約試験。
  * 実D1で通し、即時切り替えをしないこと・使い切り・期限・旧宛先への
  * 知らせを確かめる。
  */
@@ -163,7 +163,7 @@ describe('本人のメール変更 (N-433)', () => {
          (id, name, email, role, api_key, is_active, invite_status)
        VALUES ('member-1', '対象の人', 'member@example.test', 'staff', 'member-key', 1, 'active')`,
     ).run();
-    const response = await app('admin-actor', 'admin').request('/api/staff/member-1', {
+    const response = await app('self-1', 'admin').request('/api/staff/member-1', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'member-new@example.test' }),
     }, bindings());

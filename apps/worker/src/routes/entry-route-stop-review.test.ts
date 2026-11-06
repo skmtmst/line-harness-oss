@@ -1,6 +1,7 @@
+import { signedLiffState, mockLineIdToken } from '../test-utils/liff-oauth.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// N-244 独立レビュー差し戻し: 同じPRで直す4点の直接テスト。
+// 停止した流入経路の公開 URL・LIFF・Webhook・引継の境界を、実際の入口から確かめる。
 // 1. /auth/oauth と PC版 /auth/line の開始時にも停止判定し、停止前ページから
 //    停止後に押した場合を拒否する (410)。active・不存在は従来どおり通す。
 // 2. 停止ref由来では OAuth callback のアカウント共通シナリオを含め
@@ -9,6 +10,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //    fallback しない (実行可能 fallback があっても)。不存在は維持する。
 // 4. 停止判定のDB読取失敗は fail-open せず、安全に受付・帰属・シナリオを止める。
 const dbMocks = {
+  getLineAccountLoginChannels: vi.fn().mockResolvedValue([
+    { id: 'account-main', tenant_id: null, login_channel_id: '2000000000' },
+  ]),
   getLineAccounts: vi.fn().mockResolvedValue([
     { id: 'account-main', login_channel_id: '2000000000' },
   ]),
@@ -18,7 +22,7 @@ const dbMocks = {
   getFriendByLineUserIdForAccount: vi.fn(),
   upsertFriend: vi.fn(),
   createUser: vi.fn().mockResolvedValue({ id: 'U-uuid' }),
-  getUserByEmail: vi.fn().mockResolvedValue(null),
+  getUserByEmailForAccess: vi.fn().mockResolvedValue(null),
   linkFriendToUser: vi.fn().mockResolvedValue(undefined),
   getEntryRouteByRefCode: vi.fn().mockResolvedValue(null),
   getEntryRouteByRefCodeAny: vi.fn().mockResolvedValue(null),
@@ -32,7 +36,7 @@ const dbMocks = {
   getAffiliateById: vi.fn().mockResolvedValue(null),
   addTagToFriend: vi.fn().mockResolvedValue(undefined),
   getLineAccountByChannelId: vi.fn().mockResolvedValue(null),
-  getLineAccountById: vi.fn().mockResolvedValue(null),
+  getLineAccountById: vi.fn().mockResolvedValue({ id: 'account-main', login_channel_id: '2000000000', tenant_id: null }),
   isLineAccountTenantActive: vi.fn().mockResolvedValue(true),
   getScenarios: vi.fn().mockResolvedValue([]),
   getFriendAddScenarioIds: vi.fn().mockResolvedValue([]),
@@ -46,7 +50,7 @@ const dbMocks = {
 vi.mock('@line-crm/db', () => dbMocks);
 
 const attachTagAndFireSideEffects = vi.fn().mockResolvedValue({ added: true });
-vi.mock('../services/friend-tag-attach.js', () => ({ attachTagAndFireSideEffects }));
+vi.mock('../features/friends/friend-tag-attach.js', () => ({ attachTagAndFireSideEffects }));
 
 const notifyAffiliateFriendAdd = vi.fn().mockResolvedValue(undefined);
 vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateFriendAdd }));
@@ -79,6 +83,7 @@ const env = {
   WORKER_URL: 'https://worker.example.com',
   LINE_LOGIN_CHANNEL_ID: '2000000000',
   LINE_LOGIN_CHANNEL_SECRET: 'secret',
+  LINE_CHANNEL_SECRET: 'test-oauth-secret',
   LINE_CHANNEL_ACCESS_TOKEN: 'env-token',
 } as unknown as import('../index.js').Env['Bindings'];
 
@@ -155,9 +160,10 @@ function lineStart(ref: string, ua?: string) {
   );
 }
 
-function callback(ref: string) {
-  const state = btoa(JSON.stringify({ ref }));
-  return call(`/auth/callback?code=abc&state=${encodeURIComponent(state)}`);
+async function callback(ref: string) {
+  const signed = await signedLiffState(env.LINE_CHANNEL_SECRET, { ref });
+  const state = signed.state;
+  return call(`/auth/callback?code=abc&state=${encodeURIComponent(state)}`, { headers: { Cookie: signed.cookie } });
 }
 
 function sendFormLink(body: Record<string, unknown>) {
@@ -179,7 +185,7 @@ function link(ref: string) {
 function intent(ref: string) {
   return call('/api/liff/friend-add-intent', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer [REDACTED]' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mockLineIdToken('2000000000')}` },
     body: JSON.stringify({ ref, source: 'liff' }),
   });
 }

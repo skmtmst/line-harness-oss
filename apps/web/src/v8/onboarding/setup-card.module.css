@@ -1,0 +1,67 @@
+/* はじめにやること（Bdfxm）：余白 20・間 14・角丸 12・影のカード。行は高さ 56・間 12。 */
+.card {
+  --sc-pad: 20px;
+  --sc-gap: 14px;
+  --sc-row-h: 56px;
+  --sc-title-lh: 24px;
+  --sc-body-lh: 20px;
+  --sc-caption-lh: 18px;
+  --sc-small-icon: 16px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+}
+
+.title {
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 700;
+  line-height: var(--sc-title-lh);
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.count {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  white-space: nowrap;
+}
+
+.rowIcon {
+  width: var(--polish-icon-control);
+  height: var(--polish-icon-control);
+  flex: none;
+  color: var(--color-ink-faint);
+}
+
+.alertIcon { color: var(--color-status-warn-deep); }
+
+.done {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+}
+
+.doneIcon {
+  width: var(--polish-icon-control);
+  height: var(--polish-icon-control);
+  flex: none;
+  color: var(--color-accent-deep);
+}
+
+.doneText {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { ATTRIBUTION_WINDOW_DAYS } from './affiliate-attribution.js';
 import { boundedListLimit, nonNegativeListOffset } from './utils.js';
 
@@ -15,7 +16,7 @@ import { boundedListLimit, nonNegativeListOffset } from './utils.js';
 //   ref_tracking.created_at / friends.created_at can be JST ISO (+09:00) or a
 //   SQLite datetime('now') space-separated UTC string. Raw string comparison
 //   mixes formats and produces boundary errors. Every window / ordering check
-//   below uses julianday() so it compares real instants regardless of format.
+//   below uses julianday so it compares real instants regardless of format.
 
 // ── friendAdds: attributed-at-add-time last-touch ────────────────────────────
 //
@@ -560,7 +561,7 @@ export interface JourneyEvent {
 /**
  * Time-ordered (ascending) journey for one friend: ref_tracking touches,
  * the friend_add moment, form submissions, and conversions. A single UNION ALL
- * over the four sources ordered by julianday() so mixed timestamp formats sort
+ * over the four sources ordered by julianday so mixed timestamp formats sort
  * by true instant.
  */
 export async function getFriendJourney(
@@ -795,14 +796,14 @@ export interface ConversionApprovalRow {
    */
   offerActionsIncomplete: boolean;
   /**
-   * 成果地点が属するLINEアカウント。キューのアカウント絞り(N-218)は
+   * 成果地点が属するLINEアカウント。キューのアカウント絞りは
    * scope と同じ `cp.line_account_id` で数える。未割当の地点は null。
    */
   lineAccountId: string | null;
   /** アカウント名。削除済み・未割当は null（画面側で未設定と出す）。 */
   lineAccountName: string | null;
   /**
-   * IDEA-16: 成果の起こりになった注文番号（記録時に metadata へ残した
+   * 成果の起こりになった注文番号（記録時に metadata へ残した
    * 根拠）。注文由来でない成果は null。検索と詳細の根拠表示に使う。
    */
   orderNumber: string | null;
@@ -849,7 +850,7 @@ export async function getConversionApprovalQueue(
   const limit = boundedListLimit(opts.limit, 200);
   const offset = nonNegativeListOffset(opts.offset);
   const scopeCondition = opts.scope.allowedAccountIds.length > 0
-    ? `(cp.line_account_id IN (${opts.scope.allowedAccountIds.map(() => '?').join(',')})${opts.scope.includeUnassigned ? ' OR cp.line_account_id IS NULL' : ''})`
+    ? `(cp.line_account_id IN (${sqlIdSet(opts.scope.allowedAccountIds).sql})${opts.scope.includeUnassigned ? ' OR cp.line_account_id IS NULL' : ''})`
     : opts.scope.includeUnassigned ? 'cp.line_account_id IS NULL' : '1 = 0';
 
   // dup_keys: identity_keys shared by >=2 distinct attributed-conversion friends
@@ -966,7 +967,7 @@ export async function getConversionApprovalQueue(
       ORDER BY julianday(ce.created_at) DESC, ce.id DESC
       LIMIT ? OFFSET ?`,
     )
-    .bind(status, ...opts.scope.allowedAccountIds, limit, offset)
+    .bind(status, ...(opts.scope.allowedAccountIds.length ? sqlIdSet(opts.scope.allowedAccountIds).binds : []), limit, offset)
     .all<{
       event_id: string;
       created_at: string;

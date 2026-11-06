@@ -1,0 +1,26 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.field { display: flex; align-items: center; gap: var(--tap-action-gap); width: 100%; min-width: 0; min-height: var(--tap-action-row-h); padding: var(--tap-action-pad); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); color: var(--color-ink); text-align: left; cursor: pointer; }
+
+.field[aria-invalid=true] { border-color: var(--color-danger); }
+.field:disabled { opacity: var(--tpl-disabled-opacity, .5); cursor: not-allowed; }
+.field[data-permission-locked] { opacity: var(--tpl-disabled-opacity, .5); cursor: not-allowed; }
+.field[data-permission-locked] .change { color: var(--color-ink-secondary); }
+.item[data-permission-locked] { cursor: not-allowed; }
+.selection { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tap-action-gap); flex: 1; min-width: 0; }
+.placeholder { color: var(--color-placeholder); font-size: var(--text-body); }
+.change { color: var(--color-action); font-size: var(--text-caption); white-space: nowrap; }
+.rows { display: flex; flex-direction: column; gap: 0; }
+.item { display: flex; align-items: center; gap: var(--tap-action-gap); min-height: var(--tap-action-row-h); font-size: var(--text-body); cursor: pointer; }
+.item > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item[data-selected] { background: var(--color-accent-soft); }
+.tagName { display: inline-flex; align-items: center; gap: var(--tap-action-gap); min-width: 0; }
+.tagName > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.searchRow { display: flex; align-items: center; gap: var(--tap-action-gap); }
+.count { flex: 1; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.create { display: flex; gap: var(--tap-action-gap); align-items: center; }
+.error { color: var(--color-danger); font-size: var(--text-caption); }
+}
+
+/* 印と文字の上下の真ん中をそろえる（差 0.5 以内。§6.5 の 2）。英数字の書体は字の箱が上に寄るので、共通の補正値で文字を下げる。 */
+:root .field > :is(.selection, .change) { translate: 0 var(--text-optical-shift); }/* 誤り＋焦点は赤1本（青を重ねない）。層の外に置く（全体の青輪より勝つため）。 */

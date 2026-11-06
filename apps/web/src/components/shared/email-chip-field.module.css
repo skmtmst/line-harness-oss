@@ -1,0 +1,9 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.root { display: flex; flex-direction: column; align-items: stretch; gap: var(--polish-space-row); min-width: 0; }
+.root > span { align-self: flex-start; max-width: 100%; }
+.address { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.remove { display: inline-flex; flex: none; align-items: center; border: 0; background: transparent; color: inherit; cursor: pointer; border-radius: var(--radius-control); }
+.remove:focus-visible { outline: 2px solid var(--color-accent-deep); outline-offset: 2px; }
+.error { color: var(--color-danger); font-size: var(--text-caption); }
+}

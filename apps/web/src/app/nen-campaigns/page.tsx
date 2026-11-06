@@ -1,11 +1,14 @@
 'use client'
 
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
@@ -17,7 +20,9 @@ import {
   type NenDeliveryList,
   type NenFlowMetrics,
 } from '@/lib/api'
-import { NenOverview, type ColumnDeliveryPlan, type FriendOption, type NenCoupon, type NenKpis, type NenTab } from './nen-overview'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import type { ColumnDeliveryPlan, FriendOption, NenCoupon, NenKpis, NenTab } from '@/v8/nen-campaigns/display'
+import NenCampaignsV8 from '@/v8/nen-campaigns/list'
 import { defaultScheduleLocal, jstMonthRange } from './nen-period'
 
 type Notice = { tone: 'success' | 'error'; text: string }
@@ -38,7 +43,7 @@ function isTab(value: string | null): value is NenTab {
 }
 
 /**
- * NEN配信。★V6 37-6（`z4q1K`）／37-6-A（`u66A0`）。
+ * NEN配信。★管理画面 37-6（`z4q1K`）／37-6-A（`u66A0`）。
  *
  * 数値カード（今月・先月・開封・注文・届かなかった）は月の範囲で実口から取る。
  * タブごとに必要なものだけ取り、失敗はそのタブの帯で示す（点検 #512 の中3）。
@@ -46,11 +51,26 @@ function isTab(value: string | null): value is NenTab {
 export default function NenCampaignsPage() {
   usePageTitle('NEN配信')
   const { selectedAccountId } = useAccount()
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
+  const [loadedAccountScope, setLoadedAccountScope] = useState<number | null>(null)
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
   const [tab, setTab] = useState<NenTab>('auto')
   const [settings, setSettings] = useState<NenCampaignSetting[]>([])
   const [columns, setColumns] = useState<NenColumn[]>([])
   // コラム一覧は口の既定200件で打ち切られる。全体件数を保持し、一覧へ出す（#935 N-300）。
   const [columnsTotal, setColumnsTotal] = useState<number | null>(null)
+  /* WEB231（V8）：200本より先のコラムを続けて読む。アカウントが変わったら足さない。 */
+  const loadMoreColumns = async () => {
+    if (!selectedAccountId) return
+    const accountId = selectedAccountId
+    const res = await api.nenCampaigns.columns(accountId, { offset: columns.length, limit: 200 })
+    if (!res.success) throw new Error('load_more_failed')
+    if (accountId !== selectedAccountIdRef.current) return
+    setColumns((current) => [...current, ...res.data.filter((item) => !current.some((known) => known.id === item.id))])
+    setColumnsTotal(res.pagination?.total ?? columnsTotal)
+  }
   const [friends, setFriends] = useState<FriendOption[]>([])
   const [kpis, setKpis] = useState<NenKpis | null>(null)
   const [flowMetrics, setFlowMetrics] = useState<NenFlowMetrics | null>(null)
@@ -62,8 +82,8 @@ export default function NenCampaignsPage() {
   const [savingCoupon, setSavingCoupon] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
-  const [previewCampaignKey, setPreviewCampaignKey] = useState<string | null>(null)
-  const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null)
+  const [previewCampaignKey, setPreviewCampaignKey] = useDetailPanelUrl('campaign')
+  const [selectedColumnId, setSelectedColumnId] = useDetailPanelUrl('column')
   const [audienceCount, setAudienceCount] = useState<number | null>(null)
   const [plan, setPlan] = useState<ColumnDeliveryPlan>(() => ({ when: 'now', scheduledAt: defaultScheduleLocal(new Date()) }))
   const [introDraft, setIntroDraft] = useState('')
@@ -78,11 +98,12 @@ export default function NenCampaignsPage() {
   tabRef.current = tab
 
   /*
-    数値カード帯はどのタブでも同じ4枚（★V6 37-6）。今月と先月を月の範囲で取る。
+    数値カード帯はどのタブでも同じ4枚（★管理画面 37-6）。今月と先月を月の範囲で取る。
     自動配信・停止中・コラムは同じ取得で足りる。送った履歴だけ別に取る。
   */
   const loadTab = useCallback(async (next: NenTab) => {
     const sequence = ++loadSequence.current
+    const generation = accountScope.current.generation
     setLoading(true)
     if (!selectedAccountId) {
       setSettings([]); setColumns([]); setColumnsTotal(null); setKpis(null)
@@ -102,14 +123,11 @@ export default function NenCampaignsPage() {
       loadedTabs.current.add(next)
       setLoading(false)
     }
-    try {
-      if (next === 'history') {
-        const deliveryRes = await api.nenCampaigns.deliveries(selectedAccountId, { limit: 20 })
-        if (sequence !== loadSequence.current) return
-        if (!deliveryRes.success) return fail('送った履歴を読み込めませんでした。')
-        setDeliveryList(deliveryRes.data); done()
-        return
-      }
+    /*
+      数の帯とタブの件数（設定・コラム・今月の数）。どのタブでも同じものを使う。
+      読めたら true。読めないときは false（帯は「—」のまま）。
+    */
+    const loadShared = async (): Promise<boolean> => {
       const now = new Date()
       const thisMonth = jstMonthRange(now)
       const lastMonth = jstMonthRange(now, -1)
@@ -122,11 +140,10 @@ export default function NenCampaignsPage() {
         api.nenCampaigns.deliveries(selectedAccountId, { from: lastMonth.from, to: lastMonth.to, limit: 1 }),
         api.nenCampaigns.birthdayCoupon(selectedAccountId),
       ])
-      if (sequence !== loadSequence.current) return
-      if (!settingRes.success || !columnRes.success || !flowRes.success || !columnMetricRes.success || !thisMonthRes.success || !lastMonthRes.success) {
-        return fail(next === 'columns' ? 'コラムの情報を読み込めませんでした。' : '自動配信の情報を読み込めませんでした。')
-      }
+      if (sequence !== loadSequence.current || generation !== accountScope.current.generation) return false
+      if (!settingRes.success || !columnRes.success || !flowRes.success || !columnMetricRes.success || !thisMonthRes.success || !lastMonthRes.success) return false
       setSettings(settingRes.data); setColumns(columnRes.data)
+      setLoadedAccountScope(generation)
       setColumnsTotal(columnRes.pagination?.total ?? columnRes.data.length)
       setFlowMetrics(flowRes.data); setColumnMetrics(columnMetricRes.data)
       if (couponRes.success) setCoupon(couponRes.data)
@@ -148,6 +165,27 @@ export default function NenCampaignsPage() {
       // 数値カードは全タブで共通なので、自動配信・停止中・コラムの3つをまとめて読み込み済みにする。
       for (const shared of ['auto', 'columns', 'paused'] as NenTab[]) loadedTabs.current.add(shared)
       setTabErrors((current) => ({ ...current, auto: '', columns: '', paused: '' }))
+      return true
+    }
+    try {
+      if (next === 'history') {
+        /*
+          URLで送った履歴を直接開いたときは、共通の数の帯がまだ無い。履歴と一緒に読む
+          （★V8-B  は履歴でも帯に数が出る）。帯が読めなくても履歴は出す。
+        */
+        const [deliveryRes] = await Promise.all([
+          api.nenCampaigns.deliveries(selectedAccountId, { limit: 20 }),
+          loadedTabs.current.has('auto') ? Promise.resolve(true) : loadShared().catch(() => false),
+        ])
+        if (sequence !== loadSequence.current) return
+        if (!deliveryRes.success) return fail('送った履歴を読み込めませんでした。')
+        setDeliveryList(deliveryRes.data); done()
+        return
+      }
+      if (!(await loadShared())) {
+        if (sequence !== loadSequence.current) return
+        return fail(next === 'columns' ? 'コラムの情報を読み込めませんでした。' : '自動配信の情報を読み込めませんでした。')
+      }
       done()
     } catch { fail('情報を読み込めませんでした。通信を確認してください。') }
   }, [selectedAccountId])
@@ -156,7 +194,6 @@ export default function NenCampaignsPage() {
   loadTabRef.current = loadTab
   useEffect(() => {
     loadedTabs.current.clear()
-    setSelectedColumnId(null)
     void loadTab(tabRef.current)
   }, [loadTab])
   useEffect(() => {
@@ -207,6 +244,7 @@ export default function NenCampaignsPage() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
     dirty: introDirty,
     busy: savingColumnId !== null,
+    handlesLocalLink: (destination) => destination.searchParams.has('column'),
   })
   const [pendingColumnSelect, setPendingColumnSelect] = useState<{ id: string | null } | null>(null)
   const selectColumn = (id: string | null) => {
@@ -228,7 +266,21 @@ export default function NenCampaignsPage() {
       await api.nenCampaigns.setEnabled(selectedAccountId, setting.campaignKey, nextEnabled)
       updateDraft(setting.campaignKey, { isEnabled: nextEnabled })
       setNotice({ tone: 'success', text: `${setting.label}を${nextEnabled ? '動かしました' : '止めました'}。` })
-    } catch { setNotice({ tone: 'error', text: `${setting.label}を切り替えられませんでした。` }) }
+      return true
+    } catch (caught) {
+      /*
+       * M501: 混雑（429）の案内は共通部品に任せる。画面で状態を見分けて
+       * 文言を書き分けず、失敗そのままを渡す（Retry-After は口が返さない
+       * ため、共通部品の「少し待ってから」の案内を使う）。
+       */
+      setNotice({
+        tone: 'error',
+        text: describeApiFailure(caught, `${setting.label}の切り替え`, {
+          forbidden: `${setting.label}を切り替える権限がありません。権限を確認してください。`,
+        }),
+      })
+      return false
+    }
     finally { setSaving(null) }
   }
   const testSend = async (setting: NenCampaignSetting) => {
@@ -239,6 +291,7 @@ export default function NenCampaignsPage() {
   }
   const deliverColumn = async (column: NenColumn, scheduledAt?: string) => {
     if (!selectedAccountId) return
+    setNotice(null)
     try {
       const result = await api.nenCampaigns.deliverColumn(column.id, { accountId: selectedAccountId, scheduledAt })
       if (!result.success) throw new Error(result.error)
@@ -246,24 +299,46 @@ export default function NenCampaignsPage() {
       setNotice({ tone: 'success', text: result.data.queued === 0
         ? `「${column.title}」はすでに配信待ちに入っているか、いま送れる相手がいません。`
         : scheduledAt ? `「${column.title}」を${result.data.queued}人分 予約しました。` : `「${column.title}」を${result.data.queued}人分 配信待ちに入れました。` })
-      await loadTab('columns')
+      void loadTab('columns')
+      return true
     } catch (caught) {
       setNotice({ tone: 'error', text: caught instanceof ApiError && caught.code === 'past_datetime'
         ? '予約日時が過去になっています。いまより先の日時を選び直してください。'
         : 'コラムを配信予約できませんでした。コラムの配信が停止中でないか確認してください。' })
+      return false
     }
   }
   const saveColumnMessage = async (column: NenColumn) => {
     if (!selectedAccountId || !introDraft.trim()) { setNotice({ tone: 'error', text: '紹介文を入力してください。' }); return }
     setSavingColumnId(column.id)
     try {
-      await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, introDraft)
-      setColumns((current) => current.map((item) => item.id === column.id ? { ...item, introText: introDraft } : item))
+      // M507: 開いたときの版を添える。ほかの人が先に保存していたら409で止まる。
+      const saved = await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, introDraft, column.updatedAt)
+      // 版を成功応答の新しい版へ進める。入力は残したままにする。
+      setColumns((current) => current.map((item) => item.id === column.id
+        ? { ...item, introText: introDraft, updatedAt: saved.data?.updatedAt ?? item.updatedAt }
+        : item))
       setNotice({ tone: 'success', text: `「${column.title}」の紹介文を保存しました。` })
-    } catch { setNotice({ tone: 'error', text: 'コラムの紹介文を保存できませんでした。' }) } finally { setSavingColumnId(null) }
+    } catch (caught) {
+      // M507: 競合時は最新の紹介文を読み直し、入力は残したまま比べながら
+      // 保存し直せるようにする。
+      if (caught instanceof ApiError && caught.status === 409 && caught.code === 'VERSION_CONFLICT') {
+        const latest = (caught.data as { latest?: { introText?: string; updatedAt?: string } } | null)?.latest
+        if (latest) {
+          setColumns((current) => current.map((item) => item.id === column.id
+            ? { ...item, introText: latest.introText ?? item.introText, updatedAt: latest.updatedAt ?? item.updatedAt }
+            : item))
+        } else {
+          await loadTab('columns')
+        }
+        setNotice({ tone: 'error', text: 'ほかの人が先に紹介文を保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。' })
+        return
+      }
+      setNotice({ tone: 'error', text: 'コラムの紹介文を保存できませんでした。' })
+    } finally { setSavingColumnId(null) }
   }
   /*
-    ★V6 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届く。
+    ★管理画面 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届く。
     ここでは、宛先（LINEアカウント）が決まらずに未割り当てのまま残っている分を、
     選択中のアカウントへ割り当てて一覧に出す。
   */
@@ -281,10 +356,27 @@ export default function NenCampaignsPage() {
     } catch { setNotice({ tone: 'error', text: 'ECのコラムを取り込めませんでした。通信の状態を確認して、もう一度お試しください。' }) }
     finally { setImporting(false) }
   }
+  /*
+   * M506: 複製中はボタンを押せなくし、要求キーで二重押し・再送を1本に収める。
+   * キーは複製元ごとに持ち回り、成功したら捨てる（次の複製は別の試行）。
+   */
+  const [duplicatingColumnId, setDuplicatingColumnId] = useState<string | null>(null)
+  const duplicateKeysRef = useRef<Record<string, string>>({})
   const duplicateColumn = async (column: NenColumn) => {
-    if (!selectedAccountId) return
-    try { const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId); if (!result.success) throw new Error(); setNotice({ tone: 'success', text: `「${column.title}」を下書きへ複製しました。` }); await loadTab('columns'); setSelectedColumnId(result.data.id) }
+    if (!selectedAccountId || duplicatingColumnId) return
+    setDuplicatingColumnId(column.id)
+    const requestKey = duplicateKeysRef.current[column.id]
+      ?? (duplicateKeysRef.current[column.id] = crypto.randomUUID())
+    try {
+      const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId, { idempotencyKey: requestKey })
+      if (!result.success) throw new Error()
+      delete duplicateKeysRef.current[column.id]
+      setNotice({ tone: 'success', text: result.replayed ? `「${column.title}」の複製は既にありました。複製を開きました。` : `「${column.title}」を下書きへ複製しました。` })
+      await loadTab('columns')
+      setSelectedColumnId(result.data.id)
+    }
     catch { setNotice({ tone: 'error', text: 'コラムを複製できませんでした。' }) }
+    finally { setDuplicatingColumnId(null) }
   }
   const testColumn = async (column: NenColumn) => {
     if (!selectedAccountId || !testFriendId) { setNotice({ tone: 'error', text: 'テスト送信先を選択してください。' }); return }
@@ -364,57 +456,32 @@ export default function NenCampaignsPage() {
     if (!loadedTabs.current.has(next)) void loadTab(next)
   }
 
-  if (loading && loadedTabs.current.size === 0) return <div className="p-6"><ListState kind="loading" /></div>
+  if (loading && loadedTabs.current.size === 0) return <ListState kind="loading" />
 
   /*
-    ヘッダー操作。★V6 37-6 の「配信を追加」は、自動配信の種類が実キー固定（追加口が無い）
-    ため置かない。コラムは ★V6 37-6-A どおり「ECのコラムを取り込む」（未割り当て分の割り当て）。
+    ヘッダー操作。★管理画面 37-6 の「配信を追加」は、自動配信の種類が実キー固定（追加口が無い）
+    ため置かない。コラムは ★管理画面 37-6-A どおり「ECのコラムを取り込む」（未割り当て分の割り当て）。
     #618: 一覧に件数があっても未選択でも届くよう、新規作成入口「コラムを書く」
     （/nen-campaigns/columns/new・日時あり下書き保存）をヘッダーに置く。
   */
   const headerAction = tab === 'columns' ? (
     <span className="flex flex-wrap items-center justify-end gap-2">
       <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
-      <Button type="button" disabled={importing || !selectedAccountId} onClick={() => void importColumns()}>{importing ? '取り込んでいます…' : 'ECのコラムを取り込む'}</Button>
+      <Button type="button" disabled={importing || !selectedAccountId} onClick={() => void importColumns()} busy={importing} busyLabel="取り込んでいます…">ECのコラムを取り込む</Button>
     </span>
   )
     : tab === 'history' ? <Button type="button" disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>
       : null
 
-  return (
+  /*
+   * #935 N-301: 紹介文の入力途中で画面を離れる／別コラムへ移るときの確認。
+   * 管理画面・v8 のどちらの見た目でも同じ確認を出す（v8 にだけ無く、移動が黙って止まっていた：監査 WEB-315）。
+   */
+  const leaveDialogs = (
     <>
-      {/*
-        ★V7 `x63W5x`：タブの失敗をページ上の帯に出さない。一覧の場所の
-        ListState error だけにまとめる（同じ失敗を2回出さない）。
-        失敗の文言（`tabErrors`）と取り直し（`loadTab`）は NenOverview へ渡す。
-      */}
-      <NenOverview
-        topAction={headerAction}
-        tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
-        tabError={tabErrors[tab]} onRetryTab={() => loadTab(tab)}
-        kpisFailed={kpis === null && (tabErrors.auto !== '' || tabErrors.columns !== '' || tabErrors.paused !== '')}
-        flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
-        friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId}
-        loading={loading} notice={notice}
-        saving={saving} testing={testing}
-        previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}
-        onToggleSetting={(setting) => void toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
-        coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
-        selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} audienceCount={audienceCount}
-        columnsTotal={columnsTotal}
-        plan={plan} onPlanChange={setPlan}
-        introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
-        onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
-        onDuplicateColumn={(column) => void duplicateColumn(column)} onTestColumn={(column) => void testColumn(column)}
-        onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
-        onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
-      />
-      {/* #935 N-301: 紹介文の入力途中で画面を離れる／別コラムへ移るときの確認。 */}
-      <ConfirmDialog primaryAction="cancel"
+      <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        title="入力した紹介文が保存されていません"
-        description="このまま移動すると、入力した紹介文は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
+        subject="入力した紹介文"
         cancelLabel="書き続ける"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
@@ -432,6 +499,34 @@ export default function NenCampaignsPage() {
         }}
         onCancel={() => setPendingColumnSelect(null)}
       />
+    </>
+  )
+
+  return (
+    <>
+      <NenCampaignsV8
+        topAction={headerAction}
+        tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
+        tabError={tabErrors[tab]} onRetryTab={() => loadTab(tab)}
+        kpisFailed={kpis === null && (tabErrors.auto !== '' || tabErrors.columns !== '' || tabErrors.paused !== '')}
+        flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
+        friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId} currentAccountData={loadedAccountScope === accountScope.current.generation}
+        loading={loading} notice={notice}
+        saving={saving} testing={testing}
+        previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}
+        onToggleSetting={(setting) => toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
+        coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
+        selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} audienceCount={audienceCount}
+        columnsTotal={columnsTotal}
+        onLoadMoreColumns={loadMoreColumns}
+        plan={plan} onPlanChange={setPlan}
+        introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
+        onDeliverColumn={(column, scheduledAt) => deliverColumn(column, scheduledAt)}
+        onDuplicateColumn={(column) => void duplicateColumn(column)} duplicatingColumnId={duplicatingColumnId} onTestColumn={(column) => void testColumn(column)}
+        onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
+        onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
+      />
+      {leaveDialogs}
     </>
   )
 }

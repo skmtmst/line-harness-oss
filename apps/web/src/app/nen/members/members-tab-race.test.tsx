@@ -13,7 +13,8 @@ import type { NenMemberListData, NenMemberRow, NenRankSettingsData } from '@/lib
 const m = vi.hoisted(() => ({ members: vi.fn() }))
 vi.mock('@/lib/nen-ranks-api', () => ({ nenRanksApi: { members: m.members } }))
 
-import MembersTab from './members-tab'
+import MembersTab from '@/v8/nen-members/list'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
 const flush = () => act(async () => { await Promise.resolve() })
 
@@ -64,11 +65,11 @@ describe('R56 会員一覧の応答の取り違え', () => {
     m.members.mockImplementation((accountId: string) => new Promise((resolve) => {
       resolvers.set(accountId, resolve as never)
     }))
-    const v = render(<MembersTab accountId="A" settingsStatus="ready" settings={settings} />)
+    const v = render(<MembersTab accountId="A" settings={settings} />)
     await flush()
     expect(m.members).toHaveBeenCalledWith('A', expect.anything())
 
-    v.rerender(<MembersTab accountId="B" settingsStatus="ready" settings={settings} />)
+    v.rerender(<MembersTab accountId="B" settings={settings} />)
     await flush()
     expect(m.members).toHaveBeenCalledWith('B', expect.anything())
 

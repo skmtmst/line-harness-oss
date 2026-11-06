@@ -1,6 +1,7 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * 候補つき入力（1つ選ぶ）。Pencil ★V7 `WUVcz` §1。
+ * 候補つき入力（1つ選ぶ）。Pencil ★V8（V8.pen）「候補から選ぶ」。
  *
  *   欄     高さ 40・余白 [0,12]・角丸 8・枠 $hairline（開いている間は $accent-deep）
  *   候補   欄の 6px 下・幅は欄と同じ・角丸 12・余白 6・影 $shadow-float
@@ -18,7 +19,7 @@
   min-width: 0;
 }
 
-.field {
+.field:not([data-choice-field]) {
   box-sizing: border-box;
   display: flex;
   width: 100%;
@@ -29,10 +30,14 @@
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
-  transition: border-color var(--motion-fast) var(--motion-ease-out);
 }
 
 /* 開いている間は緑の枠。1.5px に見せるため date-field と同じく内側に足す。 */
+:root .field:not([data-choice-field]):not(.open):not(.invalid) {
+  border-color: var(--color-control-border);
+  box-shadow: var(--control-shadow);
+}
+
 .open {
   border-color: var(--color-accent-deep);
   box-shadow: inset 0 0 0 0.5px var(--color-accent-deep);
@@ -43,7 +48,7 @@
 }
 
 .disabled {
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .input {
@@ -57,7 +62,7 @@
 }
 
 .input::placeholder {
-  color: var(--color-ink-faint);
+  color: var(--color-placeholder);
   opacity: 1;
 }
 
@@ -69,18 +74,18 @@
  * 外側の欄に ring を出す（:focus-within）。中の input の輪郭は消し、
  * 外枠の ring を正本にする（focus-visible-contract の例外として許可）。
  */
-.field:focus-within {
-  outline: 2px solid var(--color-action);
+.field:not([data-choice-field]):focus-within {
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
 .input:focus-visible {
-  outline: none;
+  outline: 1px solid transparent;
 }
 
 .trailing:focus-visible,
 .create:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -109,13 +114,13 @@
 }
 
 .clear svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 .trailing:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .popup {
@@ -127,16 +132,10 @@
   max-height: 240px;
   overflow-y: auto;
   padding: 6px;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
   /* beautiful-shadows md（date-field と同じ影） */
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / 6%),
-    0 1px 1px -0.5px rgb(0 0 0 / 6%),
-    0 3px 3px -1.5px rgb(0 0 0 / 6%),
-    0 6px 6px -3px rgb(0 0 0 / 6%),
-    0 12px 12px -6px rgb(0 0 0 / 6%),
-    0 24px 24px -12px rgb(0 0 0 / 6%);
+  box-shadow: var(--shadow-card);
   transform-origin: top center;
   animation: combobox-in var(--motion-fast) var(--motion-ease-out);
 }
@@ -144,7 +143,28 @@
 @keyframes combobox-in {
   from {
     opacity: 0;
-    scale: 0.97;
+    scale: var(--popover-enter-scale);
+  }
+}
+
+/*
+ * ★V8 仕上げ（M10）：候補は少し下から 200ms（窓・メニューと同じ速さ）。
+ * 互換経路は 120ms のまま。
+ */
+:root .popup {
+  animation-name: combobox-v8-in;
+  animation-duration: var(--motion-base);
+}
+
+@keyframes combobox-v8-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -173,9 +193,28 @@
   background: var(--color-canvas-sunken);
 }
 
+/*
+ * ★V8 仕上げ（M10-2）：探す欄の乗せた・候補の動き。
+ * 枠は 120ms で色が変わり、候補の行に乗せたときの薄い背景も 120ms。
+ * 開く動きは候補の箱が持つ。
+ */
+:root .field:not([data-choice-field]) {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+:root .field:not([data-choice-field]):hover {
+  background: var(--color-canvas-sunken);
+}
+
+:root .option {
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
 .option[aria-disabled='true'] {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 /* タグの識別点。色は呼び出し側が dot で選ぶ（既定なし）。 */
@@ -183,7 +222,7 @@
   width: 8px;
   height: 8px;
   flex: 0 0 auto;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
 }
 
 .dot[data-dot='green'] {
@@ -211,7 +250,7 @@
 }
 
 .match {
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .hint {
@@ -273,7 +312,7 @@
   height: 16px;
   flex: 0 0 auto;
   border: 2px solid var(--color-hairline);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   border-top-color: var(--color-ink-faint);
   animation: combobox-spin var(--motion-slow) linear infinite;
 }
@@ -302,7 +341,7 @@
 
 /* タッチ端末は指の当たり・拡大防止のため欄だけ 44px・16px（行の高さは設計どおり）。 */
 @media (pointer: coarse) {
-  .field {
+  .field:not([data-choice-field]) {
     height: 44px;
   }
 
@@ -311,3 +350,18 @@
   }
 }
 }
+
+/*
+ * 触り心地 5 回目（司令塔の許可）：★V8 の「探して選ぶ欄」は、ほかの入れる欄・選ぶ欄と同じ高さ 36。
+ * 絵（友だちを選ぶ欄など）に合わせる。互換経路は 40 のまま。指で触る画面の 44 も変えない。
+ */
+@layer components {
+@media not (pointer: coarse) {
+  :root .field:not([data-choice-field]) {
+    height: var(--tpl-ux5-combobox-h);
+  }
+}
+}
+
+/* 箱ごと薄くした時は、中の押せない部品を重ねて薄くしない。 */
+html:root .disabled :is(button, input, textarea):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-enabled-opacity); }

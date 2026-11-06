@@ -111,7 +111,7 @@ const NON_PAGE_PREFIXES = [
 const ROUTES = listRoutes();
 const ROUTE_SET = new Set(ROUTES);
 
-describe('画面の一覧', () => {
+describe('静的に書き出す画面の住所と必要な入口を維持する', () => {
   it('動的セグメントの画面が無い（静的書き出しでは書き出せない）', () => {
     // [id] のような画面はビルド時に全IDが分からないと書き出せない。
     // 詳細画面はクエリ（?id=）で表す。
@@ -189,7 +189,7 @@ describe('画面の一覧', () => {
   });
 });
 
-describe('行き止まり', () => {
+describe('画面に存在しない住所へのリンクを入れない', () => {
   it('画面から出ているリンクの行き先がすべて実在する', () => {
     const broken: string[] = [];
     for (const { file, target } of collectInternalLinks()) {
@@ -206,7 +206,7 @@ describe('行き止まり', () => {
   });
 });
 
-describe('旧ルートのリダイレクト', () => {
+describe('旧住所の転送とクエリを扱う専用の入口を維持する', () => {
   const legacy = [
     ['/duplicates', '/friends'],
     ['/users', '/friends'],
@@ -234,7 +234,7 @@ describe('旧ルートのリダイレクト', () => {
     expect(line).toContain('308');
   });
 
-  it('/affiliates は _redirects に戻さず、画面側が ?tab= を保って /conversions へ送る', () => {
+  it('/affiliates は _redirects に戻さず、画面側で統合後のタブを開く', () => {
     // Pages の _redirects はクエリを条件にできない。静的 308 で
     // /conversions?tab=affiliates へ固定すると、/affiliates?tab=offers の
     // tab が落ちる。受け皿は /affiliates の page.tsx（クライアント側で

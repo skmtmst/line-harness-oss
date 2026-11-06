@@ -1,3 +1,4 @@
+import { csvCell } from '@/lib/presentation'
 type BroadcastDetailExport = {
   title: string
   status: string
@@ -12,11 +13,6 @@ type BroadcastDetailExport = {
 
 const STATUS_LABELS: Record<string, string> = {
   draft: '下書き', scheduled: '予約済み', sending: '送信中', sent: '送信済み',
-}
-
-function csvCell(value: string | number): string {
-  const text = String(value)
-  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
 }
 
 /** 画面に表示している実測値だけを、1配信1行のCSVへする。 */

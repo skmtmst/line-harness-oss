@@ -1,5 +1,5 @@
 /**
- * 統括から運営へのお問い合わせ（★V6 36-3）の型と小さな計算。
+ * 統括から運営へのお問い合わせ（★管理画面 36-3）の型と小さな計算。
  * API の形は `apps/worker/src/routes/hq-support.ts` が正本。
  */
 
@@ -32,11 +32,11 @@ export interface HqSupportRequest {
   createdAt: string
   /** 運営側のチケット番号（#MB-0312）。古い行は番号なし。 */
   ticketLabel?: string
-  /** 運営からの返信（★V6 37-6）。登録メールにも同じ内容が届く。 */
+  /** 運営からの返信（★管理画面 37-6）。登録メールにも同じ内容が届く。 */
   replies?: Array<{ id: string; authorName: string; body: string; createdAt: string }>
 }
 
-/** 1 件のやり取り（★V6 36-3-A）。最初の本文は `body`、2 通目以降が `messages`。 */
+/** 1 件のやり取り（★管理画面 36-3-A）。最初の本文は `body`、2 通目以降が `messages`。 */
 export type HqSupportMessage = {
   id: string
   authorKind: 'tenant' | 'ops'
@@ -56,12 +56,6 @@ export const SUPPORT_BODY_MAX = 4000
 export const SUPPORT_ATTACHMENT_MAX = 3
 export const SUPPORT_ATTACHMENT_BYTES_MAX = 5 * 1024 * 1024
 export const SUPPORT_ATTACHMENT_TYPES = ['image/png', 'image/jpeg'] as const
-
-export const SUPPORT_STATUS_LABELS: Record<HqSupportStatus, string> = {
-  open: '受付済み',
-  answered: '回答済み',
-  closed: '解決',
-}
 
 export interface HqSupportInput {
   kind: HqSupportKind | ''

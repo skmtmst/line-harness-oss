@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, within, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import ConversionsPage from './page'
+import ConversionsPage from '@/app/affiliates/page'
+import EditPage from './edit/page'
+const editNavigation = vi.hoisted(() => ({ query: '' }))
 
 /*
  * N-252 #658: 成果地点を編集する導線を、本物のReactで確かめる。
@@ -21,8 +24,9 @@ const net = vi.hoisted(() => ({
 
 vi.mock('next/link', () => ({ default: () => null }))
 // N-264: 一覧は ?highlight= を読む。試験ではクエリ無しとして返す。
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useSearchParams: () => new URLSearchParams(`tab=points&${editNavigation.query}`),
+  useRouter: () => ({ replace: () => {}, push: (href: string) => { editNavigation.query = href.split('?')[1] ?? '' } }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
@@ -88,6 +92,7 @@ function installFetch() {
         success: true, data: { id: 'point-a', version: 4, revisionId: 'rev-1', movedUsages: 1, updatedAt: '' },
       }), { status: net.reviseStatus, headers: { 'Content-Type': 'application/json' } })
     }
+    if (path.startsWith('/api/staff/me')) return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (path.startsWith('/api/conversions/definitions')) {
       return new Response(JSON.stringify(listBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
@@ -99,7 +104,7 @@ function installFetch() {
   })
 }
 
-/** 非GETの送信は `getCsrfToken()` が localStorage を読む。無いと送る前に落ちる。 */
+/** 非GETの送信は `getCsrfToken` が localStorage を読む。無いと送る前に落ちる。 */
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>()
   get length() { return this.values.size }
@@ -155,12 +160,16 @@ async function type(node: HTMLInputElement, value: string) {
 
 /** 一覧から詳細を開き、編集の窓まで進める。詳細は行の「その他操作」メニューの中。 */
 async function openEditDialog() {
-  await click(byLabel('購入のその他操作'))
-  await click(byText('中身を見る'))
+  await click(byLabel('成果地点「購入」の操作'))
+  await click(byText('成果地点の詳細を見る'))
   await click(byText('編集'))
+  expect(editNavigation.query).toContain('id=')
+  await act(async () => { root.render(React.createElement(EditPage)) })
+  await act(async () => { await Promise.resolve() })
 }
 
 beforeEach(() => {
+  editNavigation.query = ''
   net.calls = []
   net.reviseStatus = 200
   net.reviseBody = null
@@ -273,7 +282,8 @@ describe('編集も起点に合う金額の決め方にする', () => {
           success: true, data: { id: 'point-x', version: 4, revisionId: 'rev-1', movedUsages: 1, updatedAt: '' },
         }), { status: net.reviseStatus, headers: { 'Content-Type': 'application/json' } })
       }
-      if (path.startsWith('/api/conversions/definitions')) {
+      if (path.startsWith('/api/staff/me')) return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (path.startsWith('/api/conversions/definitions')) {
         return new Response(JSON.stringify({ ...listBody(), data: { ...listBody().data, items } }),
           { status: 200, headers: { 'Content-Type': 'application/json' } })
       }
@@ -286,16 +296,19 @@ describe('編集も起点に合う金額の決め方にする', () => {
   }
 
   async function openEditDialogFor(name: string) {
-    await click(byLabel(`${name}のその他操作`))
-    await click(byText('中身を見る'))
+    await click(byLabel(`成果地点「${name}」の操作`))
+    await click(byText('成果地点の詳細を見る'))
     await click(byText('編集'))
+  expect(editNavigation.query).toContain('id=')
+  await act(async () => { root.render(React.createElement(EditPage)) })
+  await act(async () => { await Promise.resolve() })
   }
 
   /** 金額の決め方欄の知らせ。窓が開いていないときは落ちる。 */
   function amountNotice(): string | null {
     const trigger = byLabel('金額の決め方')
     expect(trigger, '編集の窓が開いていません').toBeTruthy()
-    return trigger!.closest('label')?.querySelector('[role="status"]')?.textContent ?? null
+    return trigger!.closest('[data-label-size]')?.querySelector('[role="status"]')?.textContent ?? null
   }
 
   /** 金額の決め方の候補を開いて文字を全部読む。 */
@@ -333,6 +346,59 @@ describe('編集も起点に合う金額の決め方にする', () => {
   })
 })
 
+describe('S4-OR 編集の数えない条件は空のかたまりを黙って落とさない', () => {
+  /** 編集の窓の中の or 追加ボタン。作成と同じ共通部品。 */
+  function orAddButton(): HTMLElement | undefined {
+    return [...document.body.querySelectorAll('button')]
+      .find((node) => node.getAttribute('aria-label') === 'いずれか条件のかたまりを足す')
+  }
+
+  /** 編集の窓の中の条件の足し口。最初は1つ、or 追加で2つ。 */
+  function kindPickers(): HTMLElement[] {
+    return [...document.body.querySelectorAll('button')]
+      .filter((node) => node.getAttribute('aria-label') === '追加する条件を選ぶ')
+  }
+
+  async function pickKind(field: HTMLElement, query: string) {
+    await click(field)
+    const dialog = screen.getByRole('dialog', { name: '条件を選ぶ', hidden: true })
+    await click(within(dialog).getByRole('radio', { name: query, hidden: true }))
+    await click(within(dialog).getByRole('button', { name: '条件を足す', hidden: true }))
+  }
+
+  it('空の or かたまりのまま決めると案内が出て、版上げの口は呼ばれない', async () => {
+    await mount()
+    await openEditDialog()
+    expect(kindPickers()).toHaveLength(1)
+    await click(orAddButton())
+    expect(kindPickers()).toHaveLength(2)
+    await click(byText('この内容にする'))
+
+    expect(document.body.textContent).toContain('空の「いずれか」の条件のかたまりがあります')
+    expect(net.calls.filter((call) => call.path.includes('/revise'))).toHaveLength(0)
+    // 窓は開いたまま。下書きも残る。
+    expect(kindPickers()).toHaveLength(2)
+  })
+
+  it('かたまりに条件を入れると決められ、除外として送られる', async () => {
+    await mount()
+    await openEditDialog()
+    await click(orAddButton())
+    await pickKind(kindPickers()[1], '行動スコア')
+    /* 編集の窓は数えない条件の人数を出さないので、条件を入れても数え上げの口は呼ばない。 */
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 500)) })
+    expect(net.calls.filter((call) => call.path.includes('/segments'))).toHaveLength(0)
+    await click(byText('この内容にする'))
+
+    const revise = net.calls.find((call) => call.path.includes('/revise'))
+    expect(revise, '編集の口が呼ばれていません').toBeTruthy()
+    const exclusion = (revise!.body as { sourceConfig: { exclusion: {
+      groups: Array<{ rules: Array<{ type: string }> }> } | null } }).sourceConfig.exclusion
+    expect(exclusion?.groups).toHaveLength(1)
+    expect(exclusion?.groups?.[0].rules[0].type).toBe('score_range')
+  })
+})
+
 describe('停止済み成果地点の編集導線', () => {
   it('停止済みの成果地点には編集の導線を出さない', async () => {
     const stopped = { ...DEFINITION, status: 'stopped', stoppedAt: '2026-09-02T00:00:00.000+09:00' }
@@ -340,7 +406,8 @@ describe('停止済み成果地点の編集導線', () => {
       const raw = typeof input === 'string' ? input : String(input)
       const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
       net.calls.push({ path, method: init?.method ?? 'GET', body: null })
-      if (path.startsWith('/api/conversions/definitions')) {
+      if (path.startsWith('/api/staff/me')) return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (path.startsWith('/api/conversions/definitions')) {
         return new Response(JSON.stringify({ ...listBody(), data: { ...listBody().data, items: [stopped] } }),
           { status: 200, headers: { 'Content-Type': 'application/json' } })
       }
@@ -348,8 +415,8 @@ describe('停止済み成果地点の編集導線', () => {
         { status: 200, headers: { 'Content-Type': 'application/json' } })
     })
     await mount()
-    await click(byLabel('購入のその他操作'))
-    await click(byText('中身を見る'))
+    await click(byLabel('成果地点「購入」の操作'))
+    await click(byText('成果地点の詳細を見る'))
     // 詳細は開いている（この判定が空振りしないことを先に確かめる）。
     // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
     expect(byLabel('閉じる')).toBeTruthy()

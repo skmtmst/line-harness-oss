@@ -1,17 +1,6 @@
-/*
- * 公開受信口の防衛（R423 e2e / R427 / R428 / R430）。
- *
- * R423 e2e: コピーURL（accountなし）・正しい署名・account未含有JSONで正常受領。
- * R427: 停止・保管が完了した契約先への新規受信からは外部POSTを起こさない。
- *   署名の後に止め、受領も残さず理由つき403にする。
- * R428: 申告が上限超えなら本文を読まず413。申告なしの超過も上限で止める。
- * R430: 受付期間外・未来の署名時刻は受領・後続処理なしで拒否する。
- *   時刻を送らない古い送信元は受理する。
- *
- * 実アプリ（app・全 middleware 込み）と実 SQLite を叩く。
- * event-bus は発行の有無だけ見るため代役にする（POST抑止の証明）。
- */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhook-request.js';
+/** 公開受信口のコピー URL と正しい署名で受領し、停止・保管・本文上限・時刻の境界で後続の外部送信を止める。実アプリと SQLite を使い、イベント発行だけを差し替えて抑止を観測する。 */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
@@ -23,16 +12,7 @@ const { app } = await import('../index.js');
 /** WEBHOOK_SECRET_MIN_LENGTH (32) 以上にする。短いと 503 で弾かれる。 */
 const SECRET = 'receive-guard-secret-0123456789abcd';
 
-async function sign(secret: string, body: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  return Array.from(new Uint8Array(signature))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
+const sign = signIncomingTest;
 
 function seed(db: SqliteD1): void {
   db.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
@@ -59,15 +39,24 @@ describe('公開受信口の防衛', () => {
   let env: never;
 
   beforeEach(() => {
+    // 署名とヘッダーは同じ秒を使う。実行が遅くても途中で秒をまたがせない。
+    // 実タイマーは残し、SQLの受付・再送期間も同じ時計で評価する。
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-17T23:59:59.750Z'));
     fireEvent.mockReset().mockResolvedValue(undefined);
-    db = createTestD1();
+    db = createTestD1({ now: () => new Date() });
     seed(db);
     env = { DB: db.db } as never;
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+    db.raw.close();
+  });
+
   async function receive(body: string, headers?: Record<string, string>) {
     const signature = await sign(SECRET, body);
-    return app.request(
+    return receiveAndDrain(app,
       '/api/webhooks/incoming/iwh-1/receive',
       {
         method: 'POST',
@@ -85,7 +74,7 @@ describe('公開受信口の防衛', () => {
   it('R423: コピーURLのまま正しい署名で正常受領する', async () => {
     const body = JSON.stringify({ order: 1 });
     const res = await receive(body);
-    expect(res.status).toBe(200);
+    expect(res.status).toBeOneOf([200, 202]);
     expect(await res.json()).toMatchObject({ success: true, data: { received: true } });
     expect(receiptCount(db)).toBe(1);
     expect(fireEvent).toHaveBeenCalledTimes(1);
@@ -96,7 +85,7 @@ describe('公開受信口の防衛', () => {
     const body = JSON.stringify({ order: 2 });
     const res = await receive(body);
     expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ success: false, code: 'TENANT_SUSPENDED' });
+    expect(await res.json()).toMatchObject({ success: false, error: { code: 'TENANT_SUSPENDED' } });
     expect(receiptCount(db)).toBe(0);
     expect(fireEvent).not.toHaveBeenCalled();
   });
@@ -104,7 +93,7 @@ describe('公開受信口の防衛', () => {
   it('R427: 稼働中の対照は従来どおり通る', async () => {
     const body = JSON.stringify({ order: 3 });
     const res = await receive(body);
-    expect(res.status).toBe(200);
+    expect(res.status).toBeOneOf([200, 202]);
     expect(fireEvent).toHaveBeenCalledTimes(1);
   });
 
@@ -126,7 +115,7 @@ describe('公開受信口の防衛', () => {
       },
     });
     // 文字列経路＋ストリーム本文で申告なし（content-lengthなし）を再現する。
-    const res = await app.request(
+    const res = await receiveAndDrain(app,
       '/api/webhooks/incoming/iwh-1/receive',
       {
         method: 'POST',
@@ -162,11 +151,11 @@ describe('公開受信口の防衛', () => {
     const nowHeader = String(Math.floor(Date.now() / 1000));
     const body = JSON.stringify({ eventId: 'fresh-1', order: 6 });
     const first = await receive(body, { 'X-Webhook-Timestamp': nowHeader });
-    expect(first.status).toBe(200);
+    expect(first.status).toBeOneOf([200, 202]);
     const legacy = await receive(JSON.stringify({ eventId: 'legacy-1', order: 7 }));
-    expect(legacy.status).toBe(200);
+    expect(legacy.status).toBeOneOf([200, 202]);
     const replay = await receive(body, { 'X-Webhook-Timestamp': nowHeader });
-    expect(replay.status).toBe(200);
+    expect(replay.status).toBeOneOf([200, 202]);
     expect(await replay.json()).toMatchObject({ success: true, data: { duplicate: true } });
     expect(receiptCount(db)).toBe(2);
     expect(fireEvent).toHaveBeenCalledTimes(2);

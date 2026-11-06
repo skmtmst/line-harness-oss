@@ -1,5 +1,5 @@
 /*
- * P0-1 統合ユーザーの物理削除ガード。実 SQLite + bootstrap.sql に本物の
+ * 統合ユーザーの物理削除ガード。実 SQLite + bootstrap.sql に本物の
  * ルータを通す。DB は本物なので、関連が残る・消えるの両方を見張れる。
  */
 import { readFileSync } from 'node:fs';
@@ -9,7 +9,7 @@ import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const mocks = vi.hoisted(() => ({ scope: vi.fn() }));
 vi.mock('../services/account-access.js', () => ({

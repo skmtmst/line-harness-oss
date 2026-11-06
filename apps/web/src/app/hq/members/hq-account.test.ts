@@ -1,135 +1,44 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
+/*
+ * 統括のアカウントメニュー・お問い合わせ・メンバー管理の決まり。
+ * 動き（メニューの行と行き先・ログアウト・キーボード・最上層の器、表・招待の役割・送る口、
+ * お問い合わせの必須と送信、画面名）は描いて押す試験が見る：
+ * components/hq/sidebar-account-menu-react・members/hq-account-react・members/members-failure-react。
+ * ここに残すのは、戻してはいけない古い形の禁止の見張りと、ブラウザでしか測れない寸法（v8-guard へ移すまで）だけ。
+ */
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8')
 const menu = read('../../../components/hq/account-menu.tsx')
-const sidebar = read('../../../components/layout/sidebar.tsx')
-const members = read('./page.tsx')
-const support = read('../support/page.tsx')
-const settings = read('../settings/page.tsx')
+const menuCss = read('../../../components/hq/account-menu.module.css')
+const members = read('../../../v8/hq/members.tsx')
+const support = read('../../../v8/hq/support.tsx')
 const topBar = read('../../../components/shell/app-top-bar.tsx')
 
-/**
- * ★V6 36-1（アカウントメニュー）・36-3（お問い合わせ）・36-5（メンバー管理）の見張り。
- * 正本は Pencil `V6正本.pen` と `docs/v6-requirements/v6-36-hq-account-billing-requirements-draft.md`。
- */
 describe('統括の左下アカウントメニュー', () => {
-  it('統括のサイドバーだけに置き、アカウントの画面は下端に何も置かない（§1-2 の例外）', () => {
-    expect(sidebar).toContain("{isHq ? <HqAccountMenu /> : <div className={styles.footer} />}")
-  })
-
-  it('メニューにはメンバー管理・課金プラン・お問い合わせ・ログアウトを置き、まだ無い画面（プロフィール）は出さない', () => {
-    expect(menu).toContain('href="/hq/members"')
-    expect(menu).toContain('href="/hq/billing"')
-    expect(menu).toContain('href="/hq/support"')
-    expect(menu).toContain('logoutAndGoToLogin')
+  it('まだ無い画面（プロフィール）・準備中の行・独自のログアウト・古い置き方・下に足す札へ戻さない', () => {
     expect(menu).not.toMatch(/href="\/hq\/profile"/)
     expect(menu).not.toContain('準備中')
-  })
-
-  it('ログアウトはトップバーと同じ処理を使う', () => {
-    expect(topBar).toContain('logoutAndGoToLogin')
     expect(topBar).not.toContain('auth/logout')
-  })
-
-  it('Esc で閉じて押した要素へフォーカスを戻し、外側の押下は器（MenuPortal）に任せる', () => {
-    expect(menu).toContain("event.key === 'Escape'")
-    expect(menu).toContain('triggerRef.current?.focus()')
-    expect(menu).toContain('onClose={() => setOpen(false)}')
-    expect(menu).not.toContain("addEventListener('mousedown'")
+    expect(menu).not.toContain('absolute bottom-full left-0')
+    expect(menu).not.toContain('{chip ? <PlanChip chip={chip} /> : null}')
+    expect(menu).not.toContain('billingNote')
   })
 
   /*
-   * 狭い画面（1152px）の脇メニューの中でメニューを開いて Esc を押すと、
-   * 脇メニューまで閉じて焦点がハンバーガーへ奪われていた。
-   * 脇メニュー側（sidebar.tsx）も同じ document の Escape を聞いているため、
-   * こちらは捕捉（capture）で先に受け取り、そこで伝播を止める。
+   * 2026-10-06 の直し（Pencil 承認 `LINE-Harness-V8-B.pen` の `s6kZt/wmfIZ`）。
+   * 幅240固定・行の高さ40は happy-dom では測れないので、ブラウザの崩れの見張りへ移すまで文字で持つ。
    */
-  it('Esc は捕捉で先に受け取り伝播を止めるので、脇メニューは閉じない', () => {
-    expect(menu).toContain("document.addEventListener('keydown', onKey, true)")
-    expect(menu).toContain("document.removeEventListener('keydown', onKey, true)")
-    expect(menu).toContain('event.stopPropagation()')
-    // 脇メニュー側は Esc で閉じたあとハンバーガーへ焦点を戻す作りのまま。
-    expect(sidebar).toContain('menuButtonRef.current?.focus()')
-  })
-
-  it('開いたメニューは最上層の器に出し、運営コンソールと同じ整え方にする（承認 s6kZt/wmfIZ）', () => {
-    expect(menu).toContain('<MenuPortal')
-    expect(menu).toContain("getAnchor={() => triggerRef.current}")
-    expect(menu).toContain('w-60 rounded-md border border-hairline bg-canvas py-2 shadow-lg')
-    expect(menu).toContain("style={{ position: 'static' }}")
-    expect(menu).toContain('flex h-10 items-center gap-2.5 px-3.5')
-    expect(menu).toContain('h-px bg-divider-soft')
-    // 脇メニューの幅に合わせて下から生やす古い形には戻さない。
-    expect(menu).not.toContain('absolute bottom-full left-0')
-  })
-
-  it('行の右に説明の字を置かず、頭の課金の一言は役目の札のとなりに1行だけ出す', () => {
-    expect(menu).not.toContain('権限者・担当アカウント')
-    expect(menu).not.toContain('プランと支払い')
-    expect(menu).toContain('const planNote = chip ?')
-    expect(menu).toContain('<span className="truncate text-nano text-ink-faint">{planNote}</span>')
-    // 色の付いた札も、下に足す日付の行も開いたメニューの頭には出さない。
-    expect(menu).not.toContain('まで・{daysLeft}')
-    expect(menu).not.toContain('次回の更新 {billing.currentPeriodEndsLabel}')
-  })
-
-  it('統括の脇メニューの下には版の情報も設定の歯車も出さない（承認 s6kZt/wCdWg）', () => {
-    expect(sidebar).toContain('{preview || isHq ? null : <SidebarVersion />}')
-    expect(sidebar).not.toContain('統括の設定')
+  it('開いたメニューは幅240で固定し、行の高さは40', () => {
+    expect(menuCss).toContain('width: 240px')
+    expect(menuCss).toContain('height: 40px')
   })
 })
 
-describe('メンバー管理（36-5）', () => {
-  it('旧「統括設定」はメンバー管理へ転送する', () => {
-    expect(settings).toContain("router.replace('/hq/members?tab=tenant')")
-  })
-
-  it('タブは ?tab= で切り替え、権限者と統括の情報を1画面に置く', () => {
-    expect(members).toContain("params.get('tab') === 'tenant'")
-    expect(members).toContain("router.replace(next === 'tenant' ? '/hq/members?tab=tenant' : '/hq/members')")
-    expect(members).toContain('api.tenants.updateName(trimmed)')
-  })
-
-  it('招待は管理者と閲覧のみだけを選べる（担当者は統括の権限者にしない）', () => {
-    const dialog = read('../../../components/hq/members/member-dialog.tsx')
-    expect(dialog).toContain("{ value: 'admin', label: '管理者（すべて操作できる）' }")
-    expect(dialog).toContain("{ value: 'viewer', label: '閲覧のみ（見るだけ）' }")
-    expect(dialog).not.toContain("value: 'staff'")
-    expect(members).toContain("managementContext: 'hq'")
-  })
-
-  it('表は共通の DataTable で、最終ログインと再送を出す', () => {
-    expect(members).toContain('<DataTable>')
-    expect(members).toContain('api.staff.lastLogins()')
-    expect(members).toContain('api.staff.resendInvite(member.id)')
-    expect(members).toContain('（あなた）')
-  })
-
-  it('保存は下部追従バーにしか置かない', () => {
-    expect(members).toContain('<StickyBar')
-    expect(members).toContain('統括名を保存')
-  })
-})
-
-describe('お問い合わせ（36-3）', () => {
-  it('種類・件名・本文は必須、アカウントと画像は任意', () => {
-    expect(support).toContain('label="種類" required')
-    expect(support).toContain('label="件名" required')
-    expect(support).toContain('label="本文" required')
-    expect(support).toContain('label="関係する店舗" note="任意"')
-    expect(support).toContain('accept="image/png,image/jpeg"')
-  })
-
-  it('送信は下部追従バーにしか置かず、控えが届くことを状態文で言う', () => {
-    expect(support).toContain('<StickyBar')
-    expect(support).toContain('送信すると、控えが登録メールアドレスにも届きます')
-    expect(support).toContain('api.hqSupport.create(')
-  })
-
-  it('画面名はトップバーだけに出す', () => {
-    expect(support).toContain("usePageTitle('お問い合わせ')")
-    expect(members).toContain("usePageTitle('メンバー管理')")
+describe('メンバー管理（36-5）・お問い合わせ（36-3）', () => {
+  it('タブの住所・下部追従バー・独自の h1 へ戻さない', () => {
+    expect(members).not.toContain('?tab=')
+    expect(support).not.toContain('<StickyBar')
     expect(support).not.toContain('<h1')
     expect(members).not.toContain('<h1')
   })

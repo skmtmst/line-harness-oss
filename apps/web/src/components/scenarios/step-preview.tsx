@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * 1通目の下見（設計 `V6 5 kk8dz 1通目設定` の右側）。
+ * 1通目の下見（設計 `管理画面 5 kk8dz 1通目設定` の右側）。
  *
  * 設計は1枚。トーク画面と同じ並びで、**いつ届くか**を帯で出し、その下に
  * **何が届くか**を吹き出しで出す。2枚に割ると、時刻と中身を別々に見ることになり、
@@ -13,6 +13,7 @@
 
 import { Clock } from 'lucide-react'
 import LinePreview from '@/components/shared/line-preview'
+import StickerPreview from '@/components/shared/sticker-preview'
 import Notice from '@/components/shared/notice'
 import styles from './step-preview.module.css'
 import type { DeliveryMode } from '@line-crm/shared'
@@ -21,6 +22,7 @@ import type { StepMessageKind } from './message-type-tabs'
 import type { MessageKindState } from './message-kind-fields'
 
 export interface StepPreviewProps {
+  accountName?: string
   deliveryMode: DeliveryMode
   offsetDays: number
   /** absolute_time のときの配信時刻 "HH:MM"。 */
@@ -44,6 +46,12 @@ export interface StepPreviewProps {
    * 2通目以降の編集で 1通目と案内すると、前後の流れを取り違える。
    */
   stepOrder?: number
+  /**
+   * R236: 送ったあとどうするか。右の設定サマリーの「配信後」に出す。
+   * 省略時は次へ進む（送ったあとの既定）。一時停止の編集欄がある画面は
+   * その値を渡す。渡さないと、一時停止中も「次へ進む」のまま残る。
+   */
+  afterSend?: 'continue' | 'pause'
 }
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
@@ -77,9 +85,7 @@ function formatJst(date: Date): string {
  *   時刻で指定 … 購読開始の日から N日後の、決めた時刻
  *   経過時間   … 購読開始から N日と M時間後
  *
- * 時刻で指定は、**その日の配信時刻をもう過ぎていれば翌日**になる
- * （worker の computeNextDeliveryAt と同じ扱い）。0日後を選んだのに
- * 過去の時刻を出すと、実際の配信とずれて見える。
+ * 時刻で指定した日時が過去なら、実際の配信と同じく現在時刻にする。
  */
 export function computeDeliveryAt(
   start: Date,
@@ -102,7 +108,7 @@ export function computeDeliveryAt(
     const m = Number.isFinite(parts[1]) ? (parts[1] as number) : 0
     at.setDate(at.getDate() + offsetDays)
     at.setHours(h, m, 0, 0)
-    if (at.getTime() < start.getTime()) at.setDate(at.getDate() + 1)
+    if (at.getTime() < start.getTime()) return new Date(start.getTime())
     return at
   }
   at.setDate(at.getDate() + offsetDays)
@@ -171,24 +177,6 @@ function scheduleWords(
   return parts.length === 0 ? 'すぐに' : `${parts.join('と')}後`
 }
 
-/**
- * その日の配信時刻を過ぎていて、翌日送りになったか。
- *
- * 「当日の10:00」と書いてあるのに日付が翌日になると、設定を間違えたのかと
- * 疑うことになる。理由をその場に出す。
- */
-function rolledToNextDay(
-  start: Date,
-  at: Date,
-  mode: DeliveryMode,
-  offsetDays: number,
-): boolean {
-  if (mode !== 'absolute_time') return false
-  const expected = new Date(start.getTime())
-  expected.setDate(expected.getDate() + offsetDays)
-  return at.getDate() !== expected.getDate() || at.getMonth() !== expected.getMonth()
-}
-
 /** 実際の友だち情報を作らず、LINEプレビューだけ安全な例へ置き換える。 */
 export function renderPreviewBody(body: string): string {
   return body
@@ -197,6 +185,7 @@ export function renderPreviewBody(body: string): string {
 }
 
 export default function StepPreview({
+  accountName,
   deliveryMode,
   offsetDays,
   deliveryTime,
@@ -210,6 +199,7 @@ export default function StepPreview({
   kindState,
   audienceLabel,
   stepOrder = 1,
+  afterSend = 'continue',
 }: StepPreviewProps) {
   const stepLabel = `${stepOrder}通目`
   const start = nowJst()
@@ -227,8 +217,8 @@ export default function StepPreview({
     offsetHours,
     offsetMinutes,
   )
-  const words = scheduleWords(deliveryMode, offsetDays, deliveryTime, offsetHours, offsetMinutes)
-  const rolled = !timeMissing && rolledToNextDay(start, at, deliveryMode, offsetDays)
+  const immediate = !timeMissing && deliveryMode === 'absolute_time' && at.getTime() === start.getTime()
+  const words = immediate ? 'すぐ' : scheduleWords(deliveryMode, offsetDays, deliveryTime, offsetHours, offsetMinutes)
 
   return (
     <aside
@@ -238,12 +228,13 @@ export default function StepPreview({
       {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。届く日時は見える札のまま残す。 */}
       <div className="-mx-4 -mt-4 mb-4">
         <LinePreview
-          caption={<span className="inline-flex items-center gap-1"><Clock aria-hidden size={13} strokeWidth={1.75} />{timeMissing ? `時刻を入れると届く日時が出ます（${stepLabel}）` : `${words}に届きます（${stepLabel}）`}</span>}
+          accountName={accountName}
+          caption={<span className="inline-flex items-center gap-1"><Clock aria-hidden size={16} strokeWidth={1.8} />{timeMissing ? `時刻を入れると届く日時が出ます（${stepLabel}）` : `${words}に届きます（${stepLabel}）`}</span>}
         >
           {templateName ? (
             <Bubble>
               <span className="text-ink-faint text-micro">テンプレート</span>
-              <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+              <span className="text-ink mt-0.5 block text-label font-medium">{templateName}</span>
             </Bubble>
           ) : body.trim() ? (
             <Bubble>{renderPreviewBody(body)}</Bubble>
@@ -267,7 +258,7 @@ export default function StepPreview({
         {/* 届く日時の帯（設計 h=26 r=full 11/600 アイコン13）。 */}
         <p className="flex justify-center">
           <span className={`${styles.band} bg-accent-soft text-accent-deep rounded-pill flex items-center gap-1 px-2.5 text-micro font-semibold`}>
-            <Clock aria-hidden size={13} strokeWidth={1.75} />
+            <Clock aria-hidden size={16} strokeWidth={1.8} />
             {timeMissing ? '時刻が未入力です' : `${words}・${formatJst(at)}`}
           </span>
         </p>
@@ -275,7 +266,7 @@ export default function StepPreview({
         {templateName ? (
           <Bubble>
             <span className="text-ink-faint text-micro">テンプレート</span>
-            <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+            <span className="text-ink mt-0.5 block text-label font-medium">{templateName}</span>
           </Bubble>
         ) : kind === 'image' ? (
           imageUrl ? (
@@ -293,14 +284,14 @@ export default function StepPreview({
           <>
             {question.intro?.trim() ? <Bubble>{question.intro}</Bubble> : null}
             <Bubble>
-              <span className="text-ink block text-label font-bold">
+              <span className="text-ink block text-label font-medium">
                 {question.text.trim() || '（質問文がまだ空です）'}
               </span>
               <span className="mt-2 block space-y-1.5">
                 {question.choices.map((choice, i) => (
                   <span
                     key={i}
-                    className={`rounded-control block px-3 py-2 text-center text-label font-bold ${
+                    className={`rounded-control block px-3 py-2 text-center text-label font-medium ${
                       i === 0
                         ? 'bg-accent-deep text-on-accent'
                         : 'border-hairline text-ink-secondary border'
@@ -316,7 +307,7 @@ export default function StepPreview({
           templateName ? (
             <Bubble>
               <span className="text-ink-faint text-micro">カルーセル</span>
-              <span className="text-ink mt-0.5 block text-label font-bold">{templateName}</span>
+              <span className="text-ink mt-0.5 block text-label font-medium">{templateName}</span>
               <span className="text-ink-faint mt-1 block text-micro">
                 実際の見た目は、カルーセルの編集画面で確かめられます。
               </span>
@@ -327,7 +318,7 @@ export default function StepPreview({
         ) : kind === 'location' ? (
           kindState?.location.latitude && kindState.location.longitude ? (
             <Bubble>
-              <span className="text-ink block text-label font-bold">
+              <span className="text-ink block text-label font-medium">
                 {kindState.location.title.trim() || '場所'}
               </span>
               {kindState.location.address.trim() && (
@@ -347,13 +338,7 @@ export default function StepPreview({
         ) : kind === 'sticker' ? (
           kindState?.sticker.stickerId ? (
             <Bubble>
-              {/* 目印なので次の最適化には載せない。 */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${kindState.sticker.stickerId}/android/sticker.png`}
-                alt="スタンプ"
-                className="h-20 w-20"
-              />
+              <StickerPreview stickerId={kindState.sticker.stickerId} size={80} />
             </Bubble>
           ) : (
             <Placeholder>スタンプを選ぶと、ここに出ます</Placeholder>
@@ -390,14 +375,9 @@ export default function StepPreview({
         )}
       </div>
 
-      {/*
-        「当日の10:00」と書いてあるのに日付が翌日になると、設定を間違えたのかと
-        疑うことになる。理由をその場に出す。
-      */}
-      {rolled && (
+      {immediate && (
         <Notice tone="warn" className="mt-2">
-          いまはもう {deliveryTime} を過ぎているため、翌日になります。
-          購読開始が {deliveryTime} より前なら、その日のうちに届きます。
+          設定した時刻を過ぎているため、すぐに送ります。
         </Notice>
       )}
 
@@ -433,7 +413,14 @@ export default function StepPreview({
             label="送信数"
             value={templateName ? 'テンプレート 1通' : `${kind === 'text' ? 'テキスト' : 'メッセージ'} 1通`}
           />
-          <SummaryRow label="配信後" value="次のステップへ進む" />
+          {/*
+            R236: 送信後を「ここで一時停止する」にしても、ここだけ
+            「次のステップへ進む」のまま残っていた。隣の設定内容の札
+            （scenario-step-audience.ts の describeAfterSend）と同じ
+            言い方にそろえる。部品から画面側の関数を読まないので、
+            同じ2つの値をここで出す。
+          */}
+          <SummaryRow label="配信後" value={afterSend === 'pause' ? '送信後に一時停止' : '次へ進む'} />
         </dl>
       </section>
     </aside>

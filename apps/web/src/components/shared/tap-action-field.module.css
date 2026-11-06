@@ -1,0 +1,174 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+
+/*
+ * 「押したら」の共通の欄（YPzmo）。値は globals.css の [data-theme="v8"] の --tap-action-*。
+ * 画面側で上書きしない（幅は呼び出し側の箱で決める）。
+ */
+.withExtras { width: 100%; min-width: 0; }
+.withExtras { container: tap-action / inline-size; }
+.pickRow { text-align: left; cursor: pointer; }
+.pickRow:disabled { cursor: not-allowed; }
+.pickRow:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+.root {
+  display: flex;
+  min-width: 0;
+  gap: var(--tap-action-gap);
+}
+
+.row {
+  align-items: center;
+}
+
+.labeledRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr); align-items: start; }
+.labeledRow > * { min-width: 0; }
+.labeledRow .body { display: block; }
+
+.stack {
+  flex-direction: column;
+}
+
+.grid { flex-direction: column; }
+.grid .body { flex: none; flex-direction: column; align-items: stretch; gap: var(--tap-action-gap); }
+.choices { border: 0; margin: 0; padding: 0; min-width: 0; }
+.choiceGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.choice { position: relative; display: flex; align-items: center; gap: var(--tap-action-gap); min-width: 0; min-height: var(--tap-action-row-h); padding: var(--tap-action-pad); border-radius: var(--radius-control); color: var(--color-ink); font-size: var(--text-body); font-weight: var(--polish-weight-label); cursor: pointer; }
+.choiceInput { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.choice:has(:checked) { background: var(--color-choice-selected); color: var(--color-accent-deep); outline: 1px solid var(--color-selection-border); outline-offset: -1px; }
+.choice:has(:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+.choice:hover:not(:has(:checked)) { background: var(--color-canvas-sunken); }
+
+.row .kind {
+  flex: 0 0 var(--tap-action-kind-w);
+  min-width: 0;
+}
+
+.row .kind :global(*) {
+  max-width: 100%;
+}
+
+.body {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: 0;
+}
+
+.stack .body {
+  flex: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--tap-action-gap);
+}
+
+.icon {
+  width: var(--tap-action-icon);
+  height: var(--tap-action-icon);
+  flex: none;
+}
+
+.readKind,
+.readBody {
+  display: flex;
+  align-items: center;
+  gap: var(--tap-action-gap);
+  min-width: 0;
+  min-height: var(--tap-action-row-h);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+
+.readKind {
+  font-weight: 600;
+}
+
+.readText,
+.readBody {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fixed {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tap-action-row-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 作ってあるものを選ぶ1行（選んだもの＋［選ぶ］／［変える］）。 */
+.pickRow {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--tap-action-gap);
+  width: 100%;
+  min-width: 0;
+  height: var(--tap-action-row-h);
+  padding: var(--tap-action-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.pickText {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  gap: var(--tap-action-gap);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* LIFF が無い店で LIFF の要る動きを選んだとき。 */
+
+.liffText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.liffLink {
+  flex: none;
+  margin-left: auto;
+  color: var(--color-action);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.liffLink:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+@container tap-action (max-width: 479px) {
+  .row { flex-direction: column; align-items: stretch; }
+  .row .kind { flex: none; width: 100%; }
+}
+
+@container v8-page (width < 1100px) {
+  .labeledRow { grid-template-columns: minmax(0, 1fr); }
+  .row { flex-direction: column; align-items: stretch; }
+  .row .kind { flex: none; width: 100%; }
+  .row .body { flex: none; }
+}
+
+/* 選ぶ窓（共通の EntityPicker）で候補を読めなかったときの理由。 */
+.pickerEmpty {
+  margin: 0;
+  padding: var(--tap-action-option-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+}
+
+@container v8-page (width < 1100px) {
+  .row { flex-direction: column; align-items: stretch; }
+  .row .kind, .row .body { flex: none; }
+  .row .body { align-items: stretch; }
+}

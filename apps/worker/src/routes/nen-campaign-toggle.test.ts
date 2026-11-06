@@ -2,11 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared';
 
-/*
- * 一覧の停止・再開（PUT .../enabled）が本文の長さに関わらず必ず実行できる
- * ことを見張る（#659 差し戻し2点目）。同じ設定を更新する通常のPUT
- * （本文検査あり）と挙動を比べる。
- */
+/** 停止・再開は本文長に影響されず操作できることを、本文検査を持つ通常の更新と比較して確かめる。 */
 
 const mocks = vi.hoisted(() => ({
   canAccess: vi.fn(),

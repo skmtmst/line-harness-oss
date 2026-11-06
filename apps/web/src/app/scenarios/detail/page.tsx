@@ -3,7 +3,7 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import TargetMissing from '@/components/shared/target-missing'
-import ScenarioDetailClient from './scenario-detail-client'
+import ScenarioDetailV8 from '@/v8/scenario-detail/detail'
 
 function ScenarioDetailPageContent() {
   const searchParams = useSearchParams()
@@ -20,13 +20,13 @@ function ScenarioDetailPageContent() {
       />
     )
   }
-  return <ScenarioDetailClient scenarioId={id} showStarted={showStarted} />
+  return <ScenarioDetailV8 scenarioId={id} showStarted={showStarted} />
 }
 
 // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
 export default function ScenarioDetailPage() {
   return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中…</div>}>
       <ScenarioDetailPageContent />
     </Suspense>
   )

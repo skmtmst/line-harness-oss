@@ -1,15 +1,22 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
+import EntitySelect from '@/components/shared/entity-select'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+
 import { ApiError, fetchApi } from '@/lib/api'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
+import { InboxInputBox } from '@/components/shared/inbox-composer'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll, type VisiblePollHandle } from '@/lib/visible-polling'
 import TemplatePicker from '@/components/chats/template-picker'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+
+import { ConversationHead } from '@/v8/inbox-chat/public/conversation-head/index'
+import { formatDateTime } from '@/lib/format'
+import Button from '@/components/shared/button'
+import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 /**
  * メールの往復。受信箱（/chats）の中央ペインで使う。
@@ -71,12 +78,7 @@ function mergeMessages(current: EmailMessage[], incoming: EmailMessage[]): Email
 }
 
 function dateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(iso)
 }
 
 export function EmailThreadBackButton({ onBack }: { onBack: () => void }) {
@@ -88,7 +90,7 @@ export function EmailThreadBackButton({ onBack }: { onBack: () => void }) {
       aria-label="戻る"
     >
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 19l-7-7 7-7" />
       </svg>
     </button>
   )
@@ -101,7 +103,7 @@ function EmailThreadHeader({ children }: { children: React.ReactNode }) {
      * 顧客情報は2行目へ折り返す。1行に固定すると 320/390px で件名や
      * 右の操作が潰れて、誰へ返すのか読めなかった。LINE のトークと同じ組み方。
      */
-    <div className="flex min-h-[66px] flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3">
+    <div className="flex min-h-[66px] flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-hairline bg-canvas px-4 py-3">
       {children}
     </div>
   )
@@ -113,6 +115,7 @@ export default function EmailThread({
   onChanged,
   customerInfoOpen = false,
   onOpenCustomerInfo,
+  onCloseCustomerInfo,
 }: {
   threadId: string
   /** スマホでメール一覧へ戻る。LINEのトークと同じ位置に出す。 */
@@ -121,7 +124,10 @@ export default function EmailThread({
   onChanged?: () => void
   customerInfoOpen?: boolean
   onOpenCustomerInfo?: () => void
+  /** ★V8：会話の頭の「右の列の出し入れ」で閉じる口。 */
+  onCloseCustomerInfo?: () => void
 }) {
+
   const [detail, setDetail] = useState<EmailDetail | null>(null)
   const [reply, setReply] = useState('')
   /*
@@ -168,7 +174,7 @@ export default function EmailThread({
   useEffect(() => {
     let cancelled = false
     void fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(
-      '/api/operators',
+      '/api/operators?channel=email',
     )
       .then(res => {
         // 担当を選べないだけ。返信そのものは続けられる。
@@ -258,7 +264,7 @@ export default function EmailThread({
           })
           setLoadError('')
           if (!quiet) {
-            window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+            window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: scrollMotion() }), 50)
           }
           return true
         }
@@ -377,7 +383,7 @@ export default function EmailThread({
     try {
       const res = await fetchApi<{ success: boolean; error?: string }>(
         `/api/support/email/threads/${encodeURIComponent(myThread)}/assignee`,
-        { method: 'PATCH', body: JSON.stringify({ staffId, revision: detail?.thread.revision }) },
+        { method: 'PATCH', body: JSON.stringify({ staffId: staffId?.startsWith('staff:') ? staffId.slice(6) : staffId, revision: detail?.thread.revision }) },
       )
       if (latestThreadRef.current !== myThread) return
       if (!res.success) {
@@ -483,6 +489,7 @@ export default function EmailThread({
   }
 
   const closeMemoEditor = () => {
+    if (memoSaving) return
     // 閉じたあとに届く保存結果は画面へ適用しない(INBOX-25)。
     memoSaveGenRef.current += 1
     setMemoDraft(detail?.thread.notes ?? '')
@@ -495,7 +502,6 @@ export default function EmailThread({
    * フォーカス、Tab は窓の中で回り、Escape で閉じ、閉じたら
    * 「内部メモ」ボタンへフォーカスを戻す。保存中は Escape で閉じない。
    */
-  const memoDialogRef = useOverlayFocus(showMemoEditor, closeMemoEditor, memoSaving)
 
   /*
    * INBOX-25/26: メモの保存は「保存を始めたスレッドと版」に結びつける。
@@ -522,7 +528,7 @@ export default function EmailThread({
       )
       if (isStale()) return
       if (!res.success) {
-        setMemoError(res.error || '内部メモを保存できませんでした')
+        setMemoError(res.error || '内部メモを保存できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       setDetail((current) => current && current.thread.id === myThread ? {
@@ -542,7 +548,7 @@ export default function EmailThread({
         // 書いた下書きは残す。消すと入れ直しになる。
         setMemoError('他の担当者が先に更新しています。会話を読み直してから保存し直してください。')
       } else {
-        setMemoError('内部メモを保存できませんでした')
+        setMemoError('内部メモを保存できませんでした。時間をおいて、もう一度お試しください。')
       }
     } finally {
       // 閉じた・切り替わったあとも「保存中」の印は必ず下ろす。
@@ -564,7 +570,7 @@ export default function EmailThread({
             INBOX-28: 初回の読み込み失敗は空白にせず、理由と再試行を出す。
             空の会話とは見せ分ける。再試行はキーボードでも押せる。
           */}
-          <p>{loadError || '会話を読み込み中...'}</p>
+          <p>{loadError || '会話を読み込み中…'}</p>
           {loadError ? (
             <button
               type="button"
@@ -581,76 +587,30 @@ export default function EmailThread({
 
   return (
     <>
-      <EmailThreadHeader>
-        <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
-          <EmailThreadBackButton onBack={onBack} />
-          <div className="min-w-0">
-            {/*
-              U008: 長い件名が狭い幅で切れても、押すと(キーボードでも)
-              全文に広げられる。title でも全文を確認できる。
-            */}
-            <button
-              type="button"
-              title={detail.thread.subject}
-              aria-expanded={headerSubjectExpanded}
-              onClick={() => setHeaderSubjectExpanded((v) => !v)}
-              className={`block w-full text-left text-sm font-medium text-ink ${headerSubjectExpanded ? 'whitespace-normal break-all' : 'truncate'}`}
-            >
-              {detail.thread.subject}
-            </button>
-            <p
-              className="text-ink-faint mt-0.5 truncate text-xs"
-              title={`${detail.thread.customer_name || detail.thread.customer_email} ・ メール`}
-            >
-              {detail.thread.customer_name || detail.thread.customer_email} ・ メール
-            </p>
-          </div>
-        </div>
-        {/* LINE のトークと同じ並び：対応 ・ 担当 ・ 顧客情報。 */}
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-          <label className="flex items-center gap-1.5 text-xs">
-            {/*
-              U010: 「対応」「担当」の短い文字が縦に割れないよう、
-              ラベルは1行で保ち、収まらないときは行ごと次へ落とす。
-            */}
-            <span className="text-ink-faint whitespace-nowrap">対応</span>
-            <Select
-              aria-label="対応"
-              value={detail.thread.status}
-              onChange={(value) => void updateStatus(value as ThreadStatus)}
-              options={[
-                { value: 'unread', label: '未対応' },
-                { value: 'in_progress', label: '対応中' },
-                { value: 'on_hold', label: '保留' },
-                { value: 'resolved', label: '対応済み' },
-              ]}
-            />
-          </label>
-          <label className="flex items-center gap-1.5 text-xs">
-            <span className="text-ink-faint whitespace-nowrap">担当</span>
-            <Select
-              aria-label="担当"
-              value={detail.thread.assigned_staff_id ?? ''}
-              onChange={(value) => void updateAssignee(value || null)}
-              options={[
-                { value: '', label: '未割り当て' },
-                ...operators.map((op) => ({ value: op.id, label: op.name })),
-              ]}
-            />
-          </label>
-          {!customerInfoOpen && onOpenCustomerInfo && (
-            <button
-              type="button"
-              onClick={onOpenCustomerInfo}
-              className="whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
-            >
-              顧客情報を開く
-            </button>
-          )}
-        </div>
-      </EmailThreadHeader>
+      {(
+        /*
+         * ★V8：LINE の会話と同じ頭（ConversationHead）。名前の下に「メール・件名」。
+         * 対応状況・担当は1つだけ選ぶメニュー（四角のチェックは使わない。オーナー指摘）。
+         */
+        <ConversationHead
+          name={detail.thread.customer_name || detail.thread.customer_email}
+          sub={`メール・${detail.thread.subject}`}
+          subTitle={`${detail.thread.customer_email}・メール・${detail.thread.subject}`}
+          onBack={onBack}
+          operator={{
+            value: detail.thread.assigned_staff_id ? `staff:${detail.thread.assigned_staff_id}` : 'unassigned',
+            operators,
+            onChange: (next) => { void updateAssignee(next === 'unassigned' ? null : next) },
+          }}
+          status={{ value: detail.thread.status, onChange: (next) => void updateStatus(next) }}
+          panel={onOpenCustomerInfo ? {
+            open: customerInfoOpen,
+            onToggle: () => (customerInfoOpen ? onCloseCustomerInfo?.() : onOpenCustomerInfo()),
+          } : undefined}
+        />
+      )}
 
-      <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto bg-[#F7F8F6] p-4">
+      <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto bg-canvas-sunken p-4">
         {/*
           PERF-11: 初回は新しい側の100件だけ。もっと古い履歴があるときは
           押した分だけ上へ足す。取りこぼしを見せないため hasMoreOlder が
@@ -658,41 +618,36 @@ export default function EmailThread({
         */}
         {detail.hasMoreOlder ? (
           <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={() => void loadOlder()}
-              disabled={olderLoading}
-              className="rounded-full border border-[#E5E7EB] bg-canvas px-3 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6] disabled:opacity-50"
-            >
-              {olderLoading ? '読み込み中...' : '過去のメッセージを読み込む'}
-            </button>
+            <Button variant="secondary" className="rounded-pill px-3 py-1.5 text-xs text-action disabled:opacity-50 h-auto whitespace-normal" type="button" onClick={() => loadOlder()} disabled={olderLoading}>
+              {olderLoading ? '読み込み中…' : '過去のメッセージを読み込む'}
+            </Button>
           </div>
         ) : null}
         {detail.messages.map((message) => (
           <div key={message.id} className={`flex items-end gap-2 ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className={`max-w-[86%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[72%] ${
+              className={`max-w-[86%] rounded-card px-4 py-3 shadow-card sm:max-w-[72%] ${
                 message.direction === 'outgoing'
-                  ? 'rounded-br-md bg-[#c9f4d8] text-ink'
-                  : 'rounded-bl-md bg-canvas text-ink'
+                  ? 'rounded-br-mini bg-accent-soft text-ink'
+                  : 'rounded-bl-mini bg-canvas text-ink'
               }`}
             >
               <p className="text-sm leading-6 break-words whitespace-pre-wrap">{message.body_text}</p>
-              <p className="mt-2 text-right text-[10px] text-ink-faint">
+              <p className="mt-2 text-right text-nano text-ink-faint">
                 {dateTime(message.created_at)}
-                {message.direction === 'outgoing' ? ' ・ 送信済み' : ''}
+                {message.direction === 'outgoing' ? '・送信済み' : ''}
               </p>
             </div>
             {message.direction === 'outgoing' && (
               <div className="flex w-12 shrink-0 flex-col items-center">
                 <div
-                  className="bg-action text-on-action flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold"
+                  className="bg-action text-on-action flex h-8 w-8 items-center justify-center rounded-pill text-micro font-bold"
                   title={message.sent_by_staff_name ?? '担当者情報なし'}
                 >
                   {(message.sent_by_staff_name ?? '担').charAt(0)}
                 </div>
                 <span className="text-ink-faint mt-1 w-full truncate text-center text-micro">
-                  {message.sent_by_staff_name ?? '担当者'}
+                  {message.sent_by_staff_name ?? 'スタッフ'}
                 </span>
               </div>
             )}
@@ -701,7 +656,7 @@ export default function EmailThread({
         <div ref={bottomRef} />
       </div>
 
-      <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-[#E5E7EB] bg-canvas px-4 py-3">
+      <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-hairline bg-canvas px-4 py-3">
         {/*
           上段。LINE のトークと同じ：テンプレートを選択 ・ 送信の設定 …… 改行のしかた。
           U010: 横に収まらなければ次の行へ折り返す。1行に固定したままだと
@@ -709,28 +664,15 @@ export default function EmailThread({
         */}
         <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowTemplatePicker(true)}
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
-            >
+            <Button variant="secondary" className="shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs text-action h-auto" type="button" onClick={() => setShowTemplatePicker(true)}>
               ▧ テンプレートを選択
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowComposerOptions(v => !v)}
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
-            >
+            </Button>
+            <Button variant="secondary" className="shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs text-action h-auto" type="button" onClick={() => setShowComposerOptions(v => !v)}>
               ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
-            </button>
-            <button
-              type="button"
-              onClick={openMemoEditor}
-              aria-expanded={showMemoEditor}
-              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]"
-            >
+            </Button>
+            <Button variant="secondary" className="shrink-0 items-center whitespace-nowrap px-3 py-2 text-xs text-ink-secondary h-auto" type="button" onClick={openMemoEditor} aria-expanded={showMemoEditor}>
               内部メモ
-            </button>
+            </Button>
           </div>
           <span className="text-ink-faint shrink-0 text-xs">
             {sendMode === 'enter' ? 'Shift + Enter で改行' : 'Enter で改行'}
@@ -769,62 +711,19 @@ export default function EmailThread({
           </div>
         )}
 
-        {showMemoEditor && typeof document !== 'undefined' && createPortal(
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101828]/45 p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="email-internal-memo-title"
-            onClick={closeMemoEditor}
-          >
-            <div
-              ref={memoDialogRef}
-              className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-[14px] border border-[#E5E7EB] bg-canvas shadow-2xl"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-start justify-between gap-3 border-b border-[#E5E7EB] px-5 py-4">
-                <div>
-                  <h2 id="email-internal-memo-title" className="text-ink text-base font-bold">内部メモ</h2>
-                  <p className="text-ink-faint mt-1 text-xs">担当者だけに表示され、相手には送信されません。</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeMemoEditor}
-                  disabled={memoSaving}
-                  aria-label="閉じる"
-                  className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
-                >
-                  <X aria-hidden="true" className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="px-5 py-4">
-                <label htmlFor="email-internal-memo" className="text-xs font-semibold text-[#667085]">メモ内容</label>
-                <textarea
-                  id="email-internal-memo"
-                  value={memoDraft}
-                  onChange={(event) => setMemoDraft(event.target.value)}
-                  rows={7}
-                  autoFocus
-                  placeholder="メモを追加"
-                  className="mt-2 w-full resize-y rounded-lg border border-[#D0D5DD] bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
-                />
-                {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
-              </div>
-              <div className="flex justify-end gap-2 border-t border-[#E5E7EB] px-5 py-4">
-                <button type="button" onClick={closeMemoEditor} className="rounded-lg border border-[#E5E7EB] bg-canvas px-4 py-2 text-sm font-semibold text-[#667085] hover:bg-[#F7F8F6]">キャンセル</button>
-                <button
-                  type="button"
-                  onClick={() => void saveMemo()}
-                  disabled={memoSaving || memoDraft === (detail.thread.notes ?? '')}
-                  className="rounded-lg bg-accent-deep px-4 py-2 text-sm font-semibold text-on-accent hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {memoSaving ? '保存中...' : '保存'}
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+        <Dialog open={showMemoEditor} title="内部メモ" busy={memoSaving}
+          description="担当者だけに表示され、相手には送信されません。"
+          onCancel={closeMemoEditor}
+          footer={<DialogActions>
+            <Button type="button" disabled={memoSaving} onClick={closeMemoEditor}>キャンセル</Button>
+            <Button variant="primary" type="button" busy={memoSaving} busyLabel="保存中…" onClick={() => saveMemo()} disabled={memoSaving || memoDraft === (detail.thread.notes ?? '')}>保存する</Button>
+          </DialogActions>}>
+          <label htmlFor="email-internal-memo" className="text-xs font-semibold text-ink-faint">メモ内容</label>
+          <SharedTextArea id="email-internal-memo" value={memoDraft} disabled={memoSaving}
+            onChange={(event) => setMemoDraft(event.target.value)} rows={7} autoFocus placeholder="メモを追加"
+            className="mt-2 w-full resize-y rounded-control border border-hairline bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/15" />
+          {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
+        </Dialog>
 
         {threadStalled && (
           <p className="text-danger mb-2 text-xs">
@@ -839,8 +738,8 @@ export default function EmailThread({
           </p>
         )}
         {error && <p className="text-danger mb-2 text-xs">{error}</p>}
-        <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
-          <textarea
+        <InboxInputBox>
+          <SharedTextArea
             value={reply}
             onChange={(e) => setReplyDraft(e.target.value)}
             onCompositionStart={() => { isComposingRef.current = true }}
@@ -880,19 +779,16 @@ export default function EmailThread({
             <span className="text-ink-faint min-w-0 truncate text-xs" title="差出人 contact-shed@nen-petfood.com">
               差出人 contact-shed@nen-petfood.com
             </span>
-            <button
-              onClick={() => void sendReply()}
-              disabled={!reply.trim() || sending}
-              className="shrink-0 whitespace-nowrap rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {sending ? '送信中...' : 'メールで返信'}
-            </button>
+            <Button variant="primary" className="shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto" onClick={() => sendReply()} disabled={!reply.trim() || sending} busy={sending} busyLabel="送信中…" widthReserve="idle">
+              {'メールで返信'}
+            </Button>
           </div>
-        </div>
+        </InboxInputBox>
       </div>
 
       {/* 選ぶと本文が入力欄に入る。送る前に直せる（LINE 側と同じ部品）。 */}
       <TemplatePicker
+        channel="email"
         open={showTemplatePicker}
         onClose={() => setShowTemplatePicker(false)}
         onPick={(content) => {

@@ -1,7 +1,6 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 
-// Mock the DB package — /t/:linkId route reads the link via getTrackedLinkById
-// and records clicks via recordLinkClick (fire-and-forget in waitUntil).
+// リンク取得とクリック記録を DB ヘルパで差し替え、/t/:linkId の入口を試す。
 const dbMocks = {
   getTrackedLinks: vi.fn(),
   getTrackedLinkById: vi.fn(),
@@ -27,6 +26,8 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
+const jobs=vi.hoisted(()=>({record:vi.fn(),process:vi.fn()}));
+vi.mock('../services/tracked-click-steps.js',()=>({recordTrackedClick:jobs.record,processTrackedClick:jobs.process}));
 const { trackedLinks } = await import('./tracked-links.js');
 
 const LINE_UA =
@@ -42,7 +43,7 @@ interface ScenarioRow {
   line_account_id: string | null;
 }
 
-/** Minimal D1 mock covering the raw queries in resolveLinkAccount(). */
+/** resolveLinkAccount の直接 SQL だけに対応する最小の D1 試験実装。 */
 function makeDb(state: { accounts?: AccountRow[]; scenarios?: ScenarioRow[] }): D1Database {
   return {
     prepare(sql: string) {
@@ -114,6 +115,8 @@ function request(env: Record<string, unknown>, ua: string, path = '/t/link-1') {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  jobs.record.mockImplementation(async(_db,plan)=>({id:'click-1',plan:{...plan,clickedAt:'2026-09-09T10:00:00.000+09:00'}}));
+  jobs.process.mockResolvedValue(undefined);
   dbMocks.recordLinkClick.mockResolvedValue({});
   dbMocks.getTrackedLinkBaseUrl.mockResolvedValue(null);
   dbMocks.getUrlReachConversionPoints.mockResolvedValue([]);
@@ -121,25 +124,12 @@ beforeEach(() => {
 });
 
 describe('GET /t/:linkId — per-account LIFF resolution', () => {
-  test('line user lookup is scoped to the account that owns the link', async () => {
-    dbMocks.getTrackedLinkByIdOrShortCode.mockResolvedValue(
-      makeLink({ line_account_id: 'acc-lookup' }),
-    );
-    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue({ id: 'friend-1' });
-    const env = {
-      DB: makeDb({}),
-      LIFF_URL: 'https://liff.line.me/2009554425-4IMBmLQ9',
-      WORKER_URL: 'https://worker.example.com',
-    };
-
-    const res = await request(env, 'Mozilla/5.0 Safari/605.1.15', '/t/link-1?lu=U-line-user');
-
-    expect(res.status).toBe(302);
-    expect(dbMocks.getFriendByLineUserIdForAccount).toHaveBeenCalledWith(
-      env.DB,
-      'U-line-user',
-      'acc-lookup',
-    );
+  test('unsigned LINE user ID is anonymous without a friend lookup', async () => {
+    dbMocks.getTrackedLinkByIdOrShortCode.mockResolvedValue(makeLink({ line_account_id: 'acc-lookup' }));
+    const env = { DB: makeDb({}), WORKER_URL: 'https://worker.example.com' };
+    expect((await request(env, 'Safari', '/t/link-1?lu=U-line-user')).status).toBe(302);
+    expect(dbMocks.getFriendByLineUserIdForAccount).not.toHaveBeenCalled();
+    expect(jobs.record).toHaveBeenCalledWith(env.DB, expect.objectContaining({ friendId: null }));
   });
 
   test('link owned by an account redirects LINE in-app clicks to that account LIFF', async () => {
@@ -223,7 +213,7 @@ describe('GET /t/:linkId — short codes', () => {
     });
     dbMocks.getUrlReachConversionPoints.mockResolvedValue([{ id: 'point-a' }]);
     // 本物のhelper側の決定的試験と同じ拒否。routeはこの例外を握ってeventを作らない。
-    dbMocks.trackConversion.mockRejectedValueOnce(new Error('conversion_account_mismatch'));
+    jobs.process.mockRejectedValueOnce(new Error('conversion_account_mismatch'));
     const env = {
       DB: makeDb({}),
       WORKER_URL: 'https://worker.example.com',
@@ -237,11 +227,10 @@ describe('GET /t/:linkId — short codes', () => {
     );
     expect(res.status).toBe(302);
     await Promise.allSettled(waits);
-    expect(dbMocks.trackConversion).toHaveBeenCalledWith(env.DB, {
-      conversionPointId: 'point-a',
-      friendId: 'friend-b',
-      metadata: JSON.stringify({ via: 'tracked_link', trackedLinkId: 'uuid-link-a' }),
-    });
+    expect(jobs.record).toHaveBeenCalledWith(env.DB,expect.objectContaining({
+      linkId:'uuid-link-a',friendId:null,accountId:'acc-a',conversionPointIds:[],
+    }));
+    expect(jobs.process).toHaveBeenCalledWith(env,'click-1',expect.objectContaining({friendId:null,conversionPointIds:[]}));
   });
 
   test('short-code URLs resolve and record the click against the link UUID', async () => {
@@ -268,8 +257,8 @@ describe('GET /t/:linkId — short codes', () => {
     expect(res.headers.get('location')).toBe('https://example.com/lp');
     expect(dbMocks.getTrackedLinkByIdOrShortCode).toHaveBeenCalledWith(env.DB, 'Ab3xY9k');
     await Promise.allSettled(waits);
-    // Click must be recorded against the UUID, not the short code
-    expect(dbMocks.recordLinkClick).toHaveBeenCalledWith(env.DB, 'uuid-link-1', null);
+    // クリックは短縮コードでなく、リンクの UUID へ記録する。
+    expect(jobs.record).toHaveBeenCalledWith(env.DB,expect.objectContaining({linkId:'uuid-link-1',friendId:null}));
   });
 
   test('LINE in-app LIFF round-trip keeps the same /t identifier', async () => {
@@ -287,4 +276,12 @@ describe('GET /t/:linkId — short codes', () => {
       encodeURIComponent('https://worker.example.com/t/Ab3xY9k'),
     );
   });
+});
+
+test('a failed LIFF identity exchange completes anonymously without another LIFF redirect', async () => {
+  dbMocks.getTrackedLinkByIdOrShortCode.mockResolvedValue(makeLink({ line_account_id: 'acc-1b' }));
+  const env = { DB: makeDb({}), LIFF_URL: 'https://liff.line.me/fixture' };
+  const response = await request(env, LINE_UA, '/t/link-1?identity=');
+  expect(response.headers.get('location')).toBe('https://example.com/lp');
+  expect(jobs.record).toHaveBeenLastCalledWith(env.DB, expect.objectContaining({ friendId: null }));
 });

@@ -2,8 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 
 /**
- * 点検 #489 の「中」9・10・11・16 の再発防止。
- * 口の形だけを見る検査（文面の有無ではなく応答の状態と実効を見る）。
+ * 通知ルールの入口を通し、応答状態と実効のある操作を確かめる。
  */
 
 const dbMocks = vi.hoisted(() => ({

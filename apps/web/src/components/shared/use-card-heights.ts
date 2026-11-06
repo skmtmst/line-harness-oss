@@ -1,0 +1,114 @@
+'use client'
+import { useLayoutEffect, useRef } from 'react'
+
+/** 横に並ぶカードの高さを高い方へそろえる。同じ幅の列（カードの格子）と data-card-height="equal" の段が対象。縦並びと "natural" の段では解除する。 */
+export function sameWidths(row: readonly HTMLElement[]): boolean {
+  const widths = row.map(card => card.getBoundingClientRect().width)
+  const max = Math.max(...widths), min = Math.min(...widths)
+  return max > 0 && (max - min) / max <= 0.1
+}
+
+const groups = new WeakMap<HTMLElement, { users: number; release: () => void }>()
+export function useCardHeights() {
+  const ref = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const card = ref.current
+    if (!card) return
+    const css = getComputedStyle(card)
+    const outline = css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0
+    // outline・影で枠が確定したら、使用寸法を解決するborder幅は読まない。
+    const framed = outline || css.boxShadow !== 'none' || ['Top', 'Right', 'Bottom', 'Left'].some(side => parseFloat(css.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0)
+    // Cardを枠のない入力段として使う画面へ、箱用の余白を足さない。
+    card.toggleAttribute('data-card-unframed', !framed)
+  })
+  useLayoutEffect(() => {
+    const parent = ref.current?.parentElement
+    if (!parent) return
+    const view = parent.ownerDocument.defaultView
+    if (!view?.requestAnimationFrame || !view.cancelAnimationFrame) return
+    const existing = groups.get(parent)
+    if (existing) existing.users++
+    else {
+      let frame = 0, width = -1, released = false
+      const originals = new Map<HTMLElement, string>()
+      const actionHeights = new Map<HTMLElement, string>()
+      const restoreActionHeights = () => {
+        for (const [slot, minHeight] of actionHeights) slot.style.minHeight = minHeight
+        actionHeights.clear()
+      }
+      const restoreCards = () => {
+        for (const [card, style] of originals) card.style.cssText = style
+        originals.clear()
+      }
+      const measure = () => {
+        if (released) return
+        view.cancelAnimationFrame(frame)
+        frame = view.requestAnimationFrame(() => {
+          if (released) return
+          restoreActionHeights()
+          const cards = [...parent.children].filter((el): el is HTMLElement => el instanceof HTMLElement && el.matches('[data-design-part="card"]'))
+          if (cards.length < 2) { restoreCards(); return }
+          const layout = getComputedStyle(parent)
+          const horizontal = layout.display.includes('grid') || layout.display.includes('flex') && layout.flexDirection === 'row'
+          if (!horizontal || parent.dataset.cardHeight === 'natural') {
+            // 高さを揃えない段では、呼び出し側の幅・高さを保つ。
+            for (const card of cards) {
+              const original = originals.get(card)
+              if (original !== undefined) { card.style.cssText = original; originals.delete(card) }
+            }
+            return
+          }
+          for (const card of cards) {
+            if (!originals.has(card)) originals.set(card, card.style.cssText)
+            card.style.minHeight = '0'; card.style.height = 'auto'; card.style.alignSelf = 'flex-start'
+          }
+          const rows = new Map<number, HTMLElement[]>()
+          for (const card of cards) {
+            const y = Math.round(card.getBoundingClientRect().top / 4)
+            rows.set(y, [...rows.get(y) ?? [], card])
+          }
+          if (parent.dataset.cardHeight === 'equal') {
+            const actionRows = [...rows.values()].filter(row => row.length > 1).map(row => row.map(card =>
+              [...card.children].find((child): child is HTMLElement => child instanceof HTMLElement && child.hasAttribute('data-card-actions')),
+            )).filter((slots): slots is HTMLElement[] => slots.every(slot => slot !== undefined))
+            const sizes = actionRows.map(slots => ({ slots, height: Math.max(...slots.map(slot => slot.getBoundingClientRect().height)) }))
+            for (const { slots, height } of sizes) for (const slot of slots) {
+              actionHeights.set(slot, slot.style.minHeight)
+              slot.style.minHeight = `${height}px`
+            }
+          }
+          for (const row of rows.values()) {
+            const heights = row.map(card => card.getBoundingClientRect().height)
+            const max = Math.max(...heights)
+            // 同じ幅の列に並ぶカード（カードの格子）は、高さの差に関係なく高い方へそろえる。
+            // 幅の違う本文と横の欄（main と aside）は別の役目なので、印の無い段ではそろえない。
+            if (row.length > 1 && (parent.dataset.cardHeight === 'equal' || sameWidths(row))) for (const card of row) card.style.minHeight = `${max}px`
+          }
+        })
+      }
+      const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+        const next = parent.getBoundingClientRect().width
+        if (next !== width) { width = next; measure() }
+      })
+      observer?.observe(parent)
+      const Observer = parent.ownerDocument.defaultView?.MutationObserver
+      const mutations = Observer ? new Observer(measure) : null
+      mutations?.observe(parent, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['data-card-height'] })
+      parent.addEventListener('load', measure, true)
+      void document.fonts?.ready.then(measure)
+      measure()
+      groups.set(parent, { users: 1, release: () => {
+        released = true
+        observer?.disconnect(); mutations?.disconnect(); view.cancelAnimationFrame(frame)
+        parent.removeEventListener('load', measure, true)
+        restoreActionHeights()
+        restoreCards()
+      } })
+    }
+    return () => {
+      const group = groups.get(parent)
+      if (group && --group.users === 0) { group.release(); groups.delete(parent) }
+    }
+  }, [])
+  return ref
+}

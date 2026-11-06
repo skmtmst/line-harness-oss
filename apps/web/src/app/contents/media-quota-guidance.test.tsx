@@ -8,7 +8,7 @@ import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { MediaQuota } from '@/lib/api'
-import { MediaQuotaGuidance } from './media-quota-guidance'
+import { MediaQuotaGuidance } from '@/v8/contents/media-quota-guidance'
 
 afterEach(() => cleanup())
 

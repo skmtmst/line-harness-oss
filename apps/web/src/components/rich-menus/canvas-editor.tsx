@@ -1,35 +1,14 @@
 'use client'
+import type { Area } from './area-types'
+export type { Area } from './area-types'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { RICH_MENU_DIMENSIONS, type RichMenuAreaIntent } from '@line-crm/shared'
-import Notice from '@/components/shared/notice'
 import { intentLabelOf } from '@/components/rich-menus/area-properties'
-
-export type Area = {
-  id: string
-  boundsX: number
-  boundsY: number
-  boundsWidth: number
-  boundsHeight: number
-  /**
-   * LINE に登録するときの動きの種類。intent から決まる。
-   * datetimepicker・clipboard は新しい2種。DB へは postback に載るが、
-   * 画面が送る段階では intent から決めた本来の種類を載せる。
-   */
-  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch' | 'datetimepicker' | 'clipboard'
-  actionData: Record<string, unknown>
-  /** 運用者から見た「何をするボタンか」。 */
-  intent?: RichMenuAreaIntent | null
-  /** 管理用のボタン名。 */
-  label?: string | null
-  /** 押されたときに付けるタグ。 */
-  tagIds?: string[]
-  /** 押されたときに足すスコア。 */
-  scoreChange?: number | null
-  templateId?: string | null
-  formId?: string | null
-  trackedLinkId?: string | null
-}
+import Notice from '@/components/shared/notice'
+import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AreaIcon } from './area-icon'
+import styles from './canvas-v8.module.css'
+export { AreaIcon } from './area-icon'
 
 const SNAP_PX = 4
 const MIN_AREA = 20
@@ -64,6 +43,14 @@ type Props = {
   onDeleteArea: (id: string) => void
   preview?: boolean
   onPreviewAction?: (area: Area) => void
+  appearance?: 'default' | 'v8'
+  /** 作成画面が持つ面一覧と重複させない。 */
+  showAreaList?: boolean
+  showTools?: boolean
+  /** 拡大の切り替えの帯を出す。既定は showTools と同じ。 */
+  showZoom?: boolean
+  /** 画像の幅の上限（px）。渡すと、置き場の幅に合わせてこの幅まで縮める（採用案 Wmch0 は 320）。 */
+  maxWidth?: number
 }
 
 function snap(value: number, others: number[]): number {
@@ -101,13 +88,37 @@ export function CanvasEditor({
   onDeleteArea,
   preview = false,
   onPreviewAction,
+  appearance = 'default',
+  showAreaList = true,
+  showTools = true,
+  showZoom,
+  maxWidth,
 }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
   const dims = RICH_MENU_DIMENSIONS[size]
-  const [scale, setScale] = useState(0.3)
+  const [scale, setScale] = useState(appearance === 'v8' ? 0.24 : 0.3)
   const [drag, setDrag] = useState<DragState>(null)
-  /** 上限に当たったときの知らせ。**`alert()` の代わりに画面へ残す。** */
+  /** 上限に当たったときの知らせ。**`alert` の代わりに画面へ残す。** */
   const [limitNotice, setLimitNotice] = useState('')
+
+  useEffect(() => {
+    if (appearance !== 'v8' || (showTools && maxWidth === undefined)) return
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const fit = () => {
+      const width = viewport.getBoundingClientRect().width
+      if (width <= 0) return
+      // 採用案 Wmch0：置き場の幅いっぱい、maxWidth まで。
+      if (maxWidth !== undefined) setScale(Math.min(width, maxWidth) / dims.width)
+      // 絵（・）：画像は左右に 22 ずつ空けて、幅は 600 まで（1152 の板で 480）。
+      else setScale(Math.min(width - 44, 600) / dims.width)
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [appearance, showTools, dims.width, maxWidth])
 
   function toImageCoord(clientX: number, clientY: number) {
     // 描画前は ref がまだ無い。非null断言の代わりに原点へ倒す。
@@ -220,7 +231,7 @@ export function CanvasEditor({
         if (w >= MIN_AREA && h >= MIN_AREA) {
           /*
             LINEの上限（1ページに20個）を先に止める。超えて足すと、保存や
-            登録のときに断られる。**`alert()` では出さない**——見た目が
+            登録のときに断られる。**`alert` では出さない**——見た目が
             ブラウザ任せで、画像比較にも写らない。画面に文で残す。
           */
           if (areas.length >= 20) {
@@ -317,38 +328,39 @@ export function CanvasEditor({
           {limitNotice}
         </Notice>
       )}
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-gray-500 text-xs">ズーム</span>
+      {(showZoom ?? showTools) ? <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-ink-faint text-xs">ズーム</span>
         {[0.25, 0.3, 0.5, 0.75, 1].map((s) => (
           <button
             key={s}
             onClick={() => setScale(s)}
-            className={`px-2 py-0.5 text-xs rounded ${
+            className={`px-2 py-0.5 text-xs rounded-mini ${
               Math.abs(scale - s) < 0.01
-                ? 'bg-gray-800 text-white'
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                ? 'bg-ink text-on-accent'
+                : 'bg-shell hover:bg-shell-gray text-ink-secondary'
             }`}
           >
             {Math.round(s * 100)}%
           </button>
         ))}
-        <span className="ml-3 text-xs text-gray-400">
+        <span className="ml-3 text-xs text-ink-faint">
           {dims.width}×{dims.height}
         </span>
         {!preview && (
-          <span className="ml-auto text-xs text-gray-400">
+          <span className="ml-auto text-xs text-ink-faint">
             空白でドラッグ → 新規矩形 / 矩形クリックか下の一覧で選択 / 矢印キーで微調整 / Delete で削除
           </span>
         )}
-      </div>
+      </div> : null}
       <div
-        className="overflow-auto border border-gray-300 bg-gray-100"
-        style={{ maxHeight: '70vh' }}
+        ref={viewportRef}
+        className={appearance === 'v8' ? styles.viewport : 'overflow-auto border border-hairline bg-shell'}
+        style={appearance === 'v8' ? undefined : { maxHeight: '70vh' }}
       >
         <div
           ref={canvasRef}
           onMouseDown={handleCanvasMouseDown}
-          className="relative bg-white"
+          className={appearance === 'v8' ? styles.canvas : 'relative bg-canvas'}
           style={{
             width: dims.width * scale,
             height: dims.height * scale,
@@ -357,7 +369,7 @@ export function CanvasEditor({
         >
           {imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <img width={2500} height={1686}
               src={imageUrl}
               alt=""
               className="absolute inset-0 w-full h-full pointer-events-none object-cover"
@@ -369,10 +381,10 @@ export function CanvasEditor({
             const borderColor = preview
               ? 'transparent'
               : overlap
-                ? '#dc2626'
+                ? 'var(--color-danger)'
                 : selected
-                  ? '#2563eb'
-                  : '#3b82f6'
+                  ? 'var(--color-action)'
+                  : 'var(--color-status-info)'
             return (
               <div
                 key={area.id}
@@ -401,23 +413,34 @@ export function CanvasEditor({
                         }
                       }
                 }
-                className="absolute focus-visible:outline-2 focus-visible:outline-status-info"
+                className={appearance === 'v8' ? styles.area : 'absolute focus-visible:outline-2 focus-visible:outline-status-info'}
                 style={{
                   left: area.boundsX * scale,
                   top: area.boundsY * scale,
                   width: area.boundsWidth * scale,
                   height: area.boundsHeight * scale,
-                  border: `2px solid ${borderColor}`,
+                  border: appearance === 'v8'
+                    ? `${selected ? 3 : 1}px solid ${overlap ? 'var(--color-danger)' : selected ? 'var(--color-accent-deep)' : !imageUrl ? 'var(--color-hairline)' : 'color-mix(in srgb, var(--color-canvas) 67%, transparent)'}`
+                    : `2px solid ${borderColor}`,
                   background: preview
                     ? 'transparent'
+                    : appearance === 'v8'
+                      ? selected ? 'color-mix(in srgb, var(--color-canvas) 33%, transparent)' : 'transparent'
                     : selected
-                      ? 'rgba(37,99,235,0.18)'
-                      : 'rgba(59,130,246,0.10)',
+                      ? 'color-mix(in srgb, var(--color-action) 18%, transparent)'
+                      : 'color-mix(in srgb, var(--color-status-info) 10%, transparent)',
                   cursor: preview ? 'pointer' : 'move',
                   boxSizing: 'border-box',
                 }}
               >
-                {!preview && selected &&
+                {/* 絵 Z0uO6・kmTab：面の真ん中に面の名前。押す場所がどの面かを画像の上で分かるようにする。 */}
+                {appearance === 'v8' && !preview ? (
+                  <>
+                    {area.boundsHeight * scale >= 40 ? <AreaIcon intent={area.intent} /> : null}
+                    <span className={styles.areaName}>{areaDisplayName(area, index)}</span>
+                  </>
+                ) : null}
+                {!preview && selected && showTools &&
                   ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'].map((h) => (
                     <div
                       key={h}
@@ -426,7 +449,7 @@ export function CanvasEditor({
                         position: 'absolute',
                         width: 8,
                         height: 8,
-                        background: '#2563eb',
+                        background: 'var(--color-action)',
                         ...handleStyle(h),
                       }}
                     />
@@ -442,8 +465,8 @@ export function CanvasEditor({
                 top: previewRect.y * scale,
                 width: previewRect.w * scale,
                 height: previewRect.h * scale,
-                border: '2px dashed #2563eb',
-                background: 'rgba(37,99,235,0.10)',
+                border: '2px dashed var(--color-action)',
+                background: 'color-mix(in srgb, var(--color-action) 10%, transparent)',
               }}
             />
           )}
@@ -454,10 +477,10 @@ export function CanvasEditor({
         ここから Tab → Enter で選べ、選んだあとは右の設定欄・矢印キーが効く。
         各ボタンの動きもここで読み上げられる。
       */}
-      {!preview && areas.length > 0 && (
+      {!preview && showAreaList && areas.length > 0 && (
         <div className="space-y-1">
           <h3 className="text-ink-faint text-xs font-semibold">エリア一覧</h3>
-          <ul className="border-hairline divide-hairline divide-y rounded border">
+          <ul className="border-hairline divide-hairline divide-y rounded-mini border">
             {areas.map((area, index) => {
               const selected = area.id === selectedAreaId
               const name = areaDisplayName(area, index)

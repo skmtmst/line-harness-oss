@@ -8,13 +8,13 @@ import ChatsPage from './page'
  * 受信箱の保存検索をURLへ残し、再読込・URL共有で復元する試験(N-021)。
  *
  * 本物のReact(react-dom/client)で本物の `ChatsPage` を mount し、
- * `useSearchParams()` が返すURLを試験側で書き換えて再レンダリングする。
+ * `useSearchParams` が返すURLを試験側で書き換えて再レンダリングする。
  * 差し替えるのは通信(fetch)・アカウント文脈・ルーティングだけで、
  * 画面本体・`api.ts` は実物を通す。
  *
  * URLの書き換えは「ブラウザのアドレス欄が変わる」の相当として、
  * router.push/replace の呼び出しを `nav` に記録し、試験が明示的に
- * `applyNavigation()` で `fixture.params` へ反映して再レンダリングする。
+ * `applyNavigation` で `fixture.params` へ反映して再レンダリングする。
  * unmount/remount は再読込の相当になる。
  */
 
@@ -54,7 +54,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
     selectedAccountId: fixture.accountId,
-    selectedAccount: null,
+    selectedAccount: { emailInboxEnabled: true },
     loading: false,
   }),
 }))
@@ -207,7 +207,7 @@ function chatsListQueries(): URLSearchParams[] {
 /** 「保存した検索」ドロップダウンを開く。 */
 async function openSavedViews() {
   const toggle = [...host.querySelectorAll('button')].find(
-    (button) => button.textContent?.trim() === '保存した検索',
+    (button) => button.getAttribute('aria-label') === '保存した検索',
   )
   expect(toggle).toBeTruthy()
   await act(async () => { toggle!.click() })
@@ -324,11 +324,13 @@ describe('受信箱の保存検索URL復元(N-021)', () => {
     await applyNavigation()
 
     // 手で対応状況を変える = 保存検索の条件から外れる操作。
-    const resolvedButton = [...host.querySelectorAll('button')].find(
-      (button) => button.textContent?.trim() === '対応済み',
-    )
-    expect(resolvedButton).toBeTruthy()
-    await act(async () => { resolvedButton!.click() })
+    const filters = host.querySelector<HTMLButtonElement>('button[aria-label="絞り込み"]')!
+    expect(filters).toBeTruthy()
+    await act(async () => { filters.click() })
+    await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="対応状況で絞り込む"]')!.click() })
+    const resolvedOption = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(option => option.textContent === '対応済み')!
+    expect(resolvedOption).toBeTruthy()
+    await act(async () => { resolvedOption.querySelector<HTMLButtonElement>('button')!.click() })
     await flush()
 
     // URLから savedView が外れている(channelは残る)。
@@ -428,5 +430,73 @@ describe('受信箱の保存検索URL復元(N-021)', () => {
     expect(queries[queries.length - 1].get('status')).toBe('unread')
     expect(queries[queries.length - 1].get('quickFilter')).toBe('overdue')
     expect(host.textContent).not.toContain(MISSING_VIEW_NOTICE)
+  })
+
+  it('保存した検索の件数はカンマ付きで出し、未接続なら0件にせず「—件」と理由を出す', async () => {
+    net.handler = baseHandler({
+      savedViews: () => Promise.resolve({ success: true, data: [
+        { ...overdueLineView('sv-1'), matchCount: 1234 },
+        { ...overdueLineView('sv-2'), name: '件数がまだ無い検索', matchCount: null },
+      ] }),
+    })
+    await render()
+    await flush()
+    await openSavedViews()
+
+    const row = (name: string) => [...document.body.querySelectorAll('button')]
+      .find((button) => button.getAttribute('title') === name)?.parentElement
+    expect(row('未対応・期限超過')?.textContent).toContain('1,234件')
+    expect(row('件数がまだ無い検索')?.textContent).toContain('—件')
+    expect(row('件数がまだ無い検索')?.textContent).not.toContain('0件')
+    expect(document.body.textContent).toContain('「—件」は0件ではありません。')
+  })
+
+  it('「未読だけ」と「要返信」で保存した検索を選ぶと、その2つも一覧の取得へ戻す', async () => {
+    net.handler = baseHandler({
+      savedViews: () => Promise.resolve({ success: true, data: [savedView('sv-mine', '自分の未読の要返信', {
+        version: 1, query: '', channels: ['line'], statuses: ['unread'], assignees: [], unread: 'mine',
+        quickFilter: 'reply', messageTypes: [], receivedFrom: null, receivedTo: null, sort: 'newest', due: 'all',
+      })] }),
+    })
+    await render()
+    await flush()
+    await openSavedViews()
+    await clickSavedView('自分の未読の要返信')
+    await applyNavigation()
+    await flush()
+
+    const last = chatsListQueries().at(-1)!
+    expect(last.get('unreadOnly')).toBe('1')
+    expect(last.get('quickFilter')).toBe('reply')
+  })
+
+  it('保存した検索の削除は行末の「…」の中にあり、選ぶと消す口を呼んで一覧を読み直す', async () => {
+    let views = [overdueLineView('sv-1')]
+    net.handler = (path: string, init?: RequestInit) => {
+      if (path.startsWith('/api/inbox/saved-views/sv-1') && init?.method === 'DELETE') {
+        views = []
+        return Promise.resolve({ success: true, data: null })
+      }
+      return baseHandler({ savedViews: () => Promise.resolve({ success: true, data: views }) })(path)
+    }
+    await render()
+    await flush()
+    await openSavedViews()
+    // 名前の隣に削除ボタンを常設しない。
+    expect([...document.body.querySelectorAll('button')].some((button) => button.textContent?.trim() === '保存した検索を削除')).toBe(false)
+
+    const menu = [...document.body.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === '未対応・期限超過の操作')
+    expect(menu).toBeTruthy()
+    await act(async () => { menu!.click() })
+    await flush()
+    const remove = [...document.body.querySelectorAll<HTMLElement>('[role="menuitem"], button')].find((item) => item.textContent?.trim() === '保存した検索を削除')
+    expect(remove).toBeTruthy()
+    const before = net.calls.filter((call) => call.startsWith('GET /api/inbox/saved-views')).length
+    await act(async () => { remove!.click() })
+    await flush()
+    await flush()
+
+    expect(net.calls.some((call) => call.startsWith('DELETE /api/inbox/saved-views/sv-1'))).toBe(true)
+    expect(net.calls.filter((call) => call.startsWith('GET /api/inbox/saved-views')).length).toBeGreaterThan(before)
   })
 })

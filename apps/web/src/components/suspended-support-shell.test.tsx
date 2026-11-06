@@ -20,7 +20,7 @@ vi.mock('./session-lost-notice', () => ({ default: () => null }))
 
 import AppShell from './app-shell'
 
-describe('停止中のお問い合わせシェル（V6 IwfA0）', () => {
+describe('停止中のお問い合わせシェル（管理画面 IwfA0）', () => {
   it('お問い合わせだけのメニュー、停止帯、切替なしのトップバー、利用停止中の札を出す', () => {
     const html = renderToStaticMarkup(<AppShell><div data-support-page>問い合わせフォーム</div></AppShell>)
 

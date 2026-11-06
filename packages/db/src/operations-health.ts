@@ -385,6 +385,26 @@ export async function failOperationHealthRun(
   ).bind(errorMessage.slice(0, 500), completedAt, runId).run();
 }
 
+/**
+ * 結果保存の失敗で failed になった実行枠を、同じ5分枠の押し直しで再実行する。
+ *
+ * failed の行が枠を塞いだままだと、再送は failed 行を重複扱いで返すだけで
+ * 確認処理が走らない。running に戻して呼び出し側が確認・保存をやり直せる
+ * ようにする。completed・running の行には触らない。並列の押し直しで
+ * 先に誰かが開け直したときは false を返し、呼び出し側は重複として返す。
+ */
+export async function reopenFailedOperationHealthRun(
+  db: D1Database,
+  runId: string,
+): Promise<boolean> {
+  const result = await db.prepare(
+    `UPDATE operation_health_runs
+        SET status = 'running', overall_status = 'unknown', error_message = NULL, completed_at = NULL
+      WHERE id = ? AND status = 'failed'`,
+  ).bind(runId).run();
+  return Number(result.meta?.changes ?? 0) === 1;
+}
+
 export async function getLatestOperationHealthRun(
   db: D1Database,
   lineAccountId: string,
@@ -506,6 +526,11 @@ export async function reconcileOperationHealthAlerts(
       if (current) await recordOperationAlertEvent(db, { alert: current, action: 'reopened', sourceRunId: input.runId, now });
       continue;
     }
+
+    // 配信枠が一時的に読めなくても、確認済みの注意・エラーを未確認へ下げない。
+    // 次回同じ状態に戻っただけで受領解除や再通知が起きるのを防ぐ。
+    if (result.checkKey === 'message_quota' && nextSeverity === 'unknown'
+      && (current.severity === 'warning' || current.severity === 'danger')) continue;
 
     const escalated = alertSeverityRank(nextSeverity) > alertSeverityRank(current.severity);
     const changed = await db.prepare(
@@ -688,10 +713,43 @@ export async function acknowledgeOperationAlert(
       && row.version === input.expectedVersion
       && row.acknowledged_by_id === input.actorId
       && row.acknowledgement_note === note;
-    return { status: duplicate ? 'duplicate' : 'conflict', alert: await getOperationAlert(db, row.id) };
+    if (duplicate) return { status: 'duplicate', alert: await getOperationAlert(db, row.id) };
+    /*
+     * 受領の状態更新までは成功し、受領イベントの保存だけ失敗したときの
+     * 再送を補う。行は acknowledged・版が1つ進んだまま、イベントが無い状態で
+     * 同じ版の再送は版競合になる。同じ担当者・同じ内容で版がちょうど1つ
+     * 進んでおり、対応する受領イベントが無いときだけ、欠けたイベントを足して
+     * 通知準備まで揃え、再送として返す。イベントがある通常の再送は従来どおり
+     * 競合にし、別人の更新の競合判定は弱めない。
+     */
+    const orphaned = row.status === 'acknowledged'
+      && row.version === input.expectedVersion + 1
+      && row.acknowledged_by_id === input.actorId
+      && row.acknowledgement_note === note
+      && await operationAlertAcknowledgedEventMissing(db, row.id, row.version);
+    if (orphaned) {
+      await recordOperationAlertEvent(db, { alert: row, action: 'acknowledged', actorId: input.actorId, note, now });
+      await enqueuePendingOperationAlertNotifications(db, { lineAccountId: input.lineAccountId });
+      return { status: 'duplicate', alert: await getOperationAlert(db, row.id) };
+    }
+    return { status: 'conflict', alert: await getOperationAlert(db, row.id) };
   }
   await recordOperationAlertEvent(db, { alert: row, action: 'acknowledged', actorId: input.actorId, note, now });
   return { status: 'changed', alert: await getOperationAlert(db, row.id) };
+}
+
+/** 版に対応する受領イベントが無いときだけ true。 repair の二重書きを防ぐ。 */
+async function operationAlertAcknowledgedEventMissing(
+  db: D1Database,
+  alertId: string,
+  alertVersion: number,
+): Promise<boolean> {
+  const hit = await db.prepare(
+    `SELECT 1 FROM operation_alert_events
+      WHERE alert_id = ? AND action = 'acknowledged' AND alert_version = ?
+      LIMIT 1`,
+  ).bind(alertId, alertVersion).first();
+  return hit === null;
 }
 
 /**
@@ -859,14 +917,21 @@ export async function createStepUpGrant(
     expiresAt: string;
     now?: string;
     totpStep?: number;
+    /** 発行したセッションの指紋。無いとき（APIキー経路）は結び付けない。 */
+    sessionTokenHash?: string | null;
+    /** 発行時の権限の版。権限の更新で進むと確認票は使えない。 */
+    issuedPolicyVersion?: number | null;
   },
 ): Promise<boolean> {
   const now = input.now ?? new Date().toISOString();
+  const sessionTokenHash = input.sessionTokenHash ?? null;
+  const issuedPolicyVersion = input.issuedPolicyVersion ?? null;
   if (input.totpStep === undefined) {
     await db.prepare(
       `INSERT INTO auth_step_up_grants
-         (token_hash, staff_id, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`,
-    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now).run();
+         (token_hash, staff_id, purpose, expires_at, created_at, session_token_hash, issued_policy_version)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now, sessionTokenHash, issuedPolicyVersion).run();
     return true;
   }
 
@@ -876,13 +941,13 @@ export async function createStepUpGrant(
           SET totp_last_used_step = ?, updated_at = ?
         WHERE id = ? AND (totp_last_used_step IS NULL OR totp_last_used_step < ?)`,
     ).bind(input.totpStep, now, input.staffId, input.totpStep),
-    // D1 batchは同じtransaction・接続で順に実行される。changes()が直前の
+    // D1 batchは同じtransaction・接続で順に実行される。changesが直前の
     // claim成功を示すときだけgrantを保存し、並列の同一コードを増殖させない。
     db.prepare(
       `INSERT INTO auth_step_up_grants
-         (token_hash, staff_id, purpose, expires_at, created_at)
-       SELECT ?, ?, ?, ?, ? WHERE changes() = 1`,
-    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now),
+         (token_hash, staff_id, purpose, expires_at, created_at, session_token_hash, issued_policy_version)
+       SELECT ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1`,
+    ).bind(input.tokenHash, input.staffId, input.purpose, input.expiresAt, now, sessionTokenHash, issuedPolicyVersion),
     db.prepare(
       `DELETE FROM auth_step_up_attempts
         WHERE staff_id = ?
@@ -941,6 +1006,30 @@ export async function reserveStepUpAttempt(
   } : null;
 }
 
+/**
+ * 入力上限で止めたとき、次に試せるまでの秒数。
+ *
+ * 10分窓の開始から数える。行が無い・読めないときは窓全体（10分）を返す。
+ * 画面は「約N分待ってからやり直してください」と出す。
+ */
+export async function stepUpAttemptRetryAfterSeconds(
+  db: D1Database,
+  staffId: string,
+  now = new Date().toISOString(),
+): Promise<number> {
+  const windowSeconds = Math.round(STEP_UP_ATTEMPT_WINDOW_MS / 1000);
+  try {
+    const row = await db.prepare(
+      'SELECT window_started_at FROM auth_step_up_attempts WHERE staff_id = ?',
+    ).bind(staffId).first<{ window_started_at: string }>();
+    if (!row) return windowSeconds;
+    const resetAt = Date.parse(row.window_started_at) + STEP_UP_ATTEMPT_WINDOW_MS;
+    return Math.max(1, Math.ceil((resetAt - Date.parse(now)) / 1000));
+  } catch {
+    return windowSeconds;
+  }
+}
+
 /** 二段階認証の初回設定確認について、10分間に5回までの試行枠を確保する。 */
 export async function reserveTwoFactorSetupAttempt(
   db: D1Database,
@@ -995,14 +1084,29 @@ export async function clearStepUpAttempts(db: D1Database, staffId: string): Prom
 
 export async function consumeStepUpGrant(
   db: D1Database,
-  input: { tokenHash: string; staffId: string; purpose: string; now?: string },
+  input: {
+    tokenHash: string; staffId: string; purpose: string; now?: string;
+    /**
+     * 使おうとしている要求のセッション指紋（無いときは null）。
+     * 確認票の発行セッションと違う・発行セッションが消えていたら使えない。
+     * 確認票側の結び付けが無い（移行前）は従来どおり通す。
+     */
+    sessionTokenHash?: string | null;
+  },
 ): Promise<boolean> {
   const now = input.now ?? new Date().toISOString();
   const result = await db.prepare(
     `UPDATE auth_step_up_grants SET consumed_at = ?
       WHERE token_hash = ? AND staff_id = ? AND purpose = ?
-        AND consumed_at IS NULL AND expires_at > ?`,
-  ).bind(now, input.tokenHash, input.staffId, input.purpose, now).run();
+        AND consumed_at IS NULL AND expires_at > ?
+        AND (session_token_hash IS NULL OR session_token_hash = ?)
+        AND (session_token_hash IS NULL OR EXISTS (
+          SELECT 1 FROM admin_sessions
+          WHERE token_hash = auth_step_up_grants.session_token_hash
+            AND staff_id = auth_step_up_grants.staff_id))
+        AND (issued_policy_version IS NULL OR issued_policy_version = (
+          SELECT policy_version FROM staff_members WHERE id = auth_step_up_grants.staff_id))`,
+  ).bind(now, input.tokenHash, input.staffId, input.purpose, now, input.sessionTokenHash ?? null).run();
   return Number(result.meta?.changes ?? 0) === 1;
 }
 
@@ -1051,6 +1155,27 @@ export async function saveOperationRequestReceipt(
   ).bind(input.action, input.actorId, input.idempotencyKey, input.requestHash,
     input.resourceId, input.createdAt ?? new Date().toISOString()).run();
   return Number(result.meta?.changes ?? 0) === 1;
+}
+
+/**
+ * 対象に結び付いた再実行記録があるか。
+ *
+ * 停止・復旧は状態確定のあとで receipt を保存する。receipt の保存だけ失敗すると
+ * 状態だけ残り、同じキー・版の再送は版競合になる。再送の修復では「誰かの完了した
+ * 要求がこの対象を持っているか」で、他人の確定済み要求の横取りか、置き去りの
+ * 部分実行かを見分ける。記録がある対象は他人の確定済みとして競合のままにする。
+ */
+export async function hasOperationRequestReceiptForResource(
+  db: D1Database,
+  action: string,
+  resourceId: string,
+): Promise<boolean> {
+  const hit = await db.prepare(
+    `SELECT 1 FROM operation_request_receipts
+      WHERE action = ? AND resource_id = ?
+      LIMIT 1`,
+  ).bind(action, resourceId).first();
+  return hit !== null;
 }
 
 export type OperationDeploymentEventInput = {

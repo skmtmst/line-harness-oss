@@ -24,7 +24,7 @@ export const BULK_SLOT_MAX_RANGE_DAYS = 731;
 export class BulkSlotRangeError extends Error {
   constructor(rangeDays: number) {
     super(
-      `期間が長すぎます。開始日から終了日まで${BULK_SLOT_MAX_RANGE_DAYS}日(約2年)以内にしてください` +
+      `期間が長すぎます。開始日から終了日まで${BULK_SLOT_MAX_RANGE_DAYS}日（約2年）以内にしてください` +
         `(現在${rangeDays}日)`,
     );
     this.name = 'BulkSlotRangeError';

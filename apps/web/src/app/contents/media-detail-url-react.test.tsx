@@ -2,6 +2,8 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 import type { MediaItem } from '@line-crm/shared'
 
 const fixture = vi.hoisted(() => ({
@@ -57,6 +59,7 @@ vi.mock('@/lib/api', () => {
         list: () => Promise.resolve({ success: true, data: [], unfiledCount: 0 }),
       },
       media: {
+        counts: () => Promise.resolve({ success: true, data: { total: 1, byKind: { image: 1, video: 0, audio: 0, file: 0 }, unused: 1, archived: 0 } }),
         list: (accountId: string) => Promise.resolve({
           success: true,
           data: {
@@ -144,10 +147,13 @@ async function waitForText(text: string) {
   expect(host.textContent).toContain(text)
 }
 
-function detailButton(filename = MEDIA_A.filename): HTMLButtonElement {
-  const button = host.querySelector<HTMLButtonElement>(`button[aria-label="${filename}の使用箇所"]`)
+async function openDetails(filename = MEDIA_A.filename) {
+  const menu = host.querySelector<HTMLButtonElement>(`button[aria-label="${filename}のその他操作"]`)
+  if (!menu) throw new Error('操作メニューがありません')
+  await act(async () => { menu.click(); await settle() })
+  const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '使用箇所を見る')
   if (!button) throw new Error('詳細ボタンがありません')
-  return button
+  await act(async () => { button.click(); await settle() })
 }
 
 beforeEach(() => {
@@ -180,13 +186,13 @@ describe('登録メディア詳細のURL復元（N-196）', () => {
     await renderPage()
     await waitForText(MEDIA_A.filename)
 
-    await act(async () => { detailButton().click(); await settle() })
+    await openDetails()
     expect(window.location.pathname).toBe('/contents')
     expect(new URLSearchParams(window.location.search).get('id')).toBe('media-a')
     await waitForText('ファイルのこと')
 
     await act(async () => { window.history.back(); await settle() })
-    await waitForText('ファイルを入れる')
+    await waitForText('メディアを登録する')
     expect(new URLSearchParams(window.location.search).get('id')).toBeNull()
 
     await act(async () => { window.history.forward(); await settle() })
@@ -224,7 +230,7 @@ describe('登録メディア詳細のURL復元（N-196）', () => {
     window.history.replaceState({}, '', '/contents?id=media-a')
     fixture.pendingDetail = { resolve: () => undefined }
     await renderPage()
-    expect(host.textContent).toContain('メディアの詳細を読み込んでいます')
+    expect(host.querySelector('[aria-busy="true"][aria-label="メディアの詳細を読み込んでいます"]')).toBeTruthy()
 
     const pending = fixture.pendingDetail
     fixture.accountId = 'account-b'
@@ -238,5 +244,18 @@ describe('登録メディア詳細のURL復元（N-196）', () => {
     })
     expect(host.textContent).not.toContain(MEDIA_A.filename)
     expect(host.textContent).toContain(MEDIA_B.filename)
+  })
+})
+
+describe('登録メディア一覧の数の帯（O7hUt7）', () => {
+  it('4つの数とアーカイブの案内が出る', async () => {
+    await renderPage()
+    await waitForText(MEDIA_A.filename)
+    await waitForText('どこでも使っていない')
+    await waitForText('使っている容量')
+    await waitForText('一覧と新規選択から外したもの')
+    // 画面の説明は題の横の「？」1つの中（洗い出し 74）。
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="この画面の説明"]')!.click() })
+    await waitForText('使っているメディアは消せません')
   })
 })

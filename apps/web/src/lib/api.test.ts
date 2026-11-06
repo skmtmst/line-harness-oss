@@ -50,6 +50,20 @@ describe('api.audit attention filter', () => {
   })
 })
 
+describe('クーポンQRの書き出し', () => {
+  it('画像の形式・大きさと紙の大きさを認証付きJSONでサーバーへ渡す', async () => {
+    const fetchSpy = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response('file'))
+    vi.stubGlobal('fetch', fetchSpy)
+    await api.entryRoutes.qrImage('route/a', 'svg', 'large')
+    await api.entryRoutes.qrPdf('route/a', 'A5')
+    expect(fetchSpy.mock.calls.map(([url, init]) => [url, init?.method, init?.credentials, init?.body])).toEqual([
+      ['https://worker.example.com/api/entry-routes/route%2Fa/qr-image', 'POST', 'include', JSON.stringify({ format: 'svg', size: 'large' })],
+      ['https://worker.example.com/api/entry-routes/route%2Fa/qr-pdf', 'POST', 'include', JSON.stringify({ paper: 'A5' })],
+    ])
+    expect(fetchSpy.mock.calls[0][1]?.headers).toMatchObject({ 'Content-Type': 'application/json' })
+  })
+})
+
 describe('bookingApi 予約設備CRUD', () => {
   it('accountをqueryへ固定し、版付きPATCH/DELETEを送る', async () => {
     const fetchSpy = vi.fn(async (_url: string | URL | Request) => new Response(
@@ -162,7 +176,7 @@ describe('api.nenMembers の写真審査運用契約', () => {
   })
 })
 
-describe('api.conversions の V6一覧・レポート契約', () => {
+describe('api.conversions の 管理画面一覧・レポート契約', () => {
   it('期間と選択中アカウントを新しい一覧・レポート・CSVへ渡す', async () => {
     const fetchSpy = vi.fn(async (url: string | URL | Request) => {
       const path = String(url)
@@ -243,7 +257,7 @@ describe('api.conversions の旧口・取得更新停止記録の契約(N-254/N-
   })
 })
 
-describe('api.friends のV6検索・本人照合契約', () => {
+describe('api.friends の管理画面検索・本人照合契約', () => {
   it('14軸のAND/ORを同じ条件JSONで一覧へ渡す', async () => {
     const fetchSpy = vi.fn(async () => new Response(
       JSON.stringify({ success: true, data: { items: [], total: 0 } }),
@@ -315,7 +329,7 @@ describe('api.friends のV6検索・本人照合契約', () => {
   })
 })
 
-describe('api.autoReplies の V6 集計・下書き契約', () => {
+describe('api.autoReplies の 管理画面 集計・下書き契約', () => {
   it('選択中のLINEアカウントを競合集計へ渡す', async () => {
     const conflict: AutoReplyConflictPair = {
       leftAutoReplyId: 'auto-reply-1',
@@ -677,8 +691,8 @@ describe('api.mileage reward draft contract', () => {
     }
 
     await api.mileage.createRewardDraft('reward/1', 'account 1')
-    await api.mileage.saveRewardDraft('reward/1', 'account 1', 'draft-version-1', draft)
-    await api.mileage.publishReward('reward/1', 'account 1')
+    await api.mileage.saveRewardDraft('reward/1', 'account 1', 'draft-version-1', 3, draft)
+    await api.mileage.publishReward('reward/1', 'account 1', 'draft-version-1', 3)
 
     expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
       'https://worker.example.com/api/mileage/rewards/reward%2F1/draft',
@@ -694,6 +708,7 @@ describe('api.mileage reward draft contract', () => {
       body: JSON.stringify({
         accountId: 'account 1',
         expectedVersionId: 'draft-version-1',
+        expectedRevision: 3,
         draft,
       }),
     })
@@ -736,7 +751,7 @@ describe('api.mileage rules contract(#532/#521)', () => {
   })
 })
 
-describe('api.mileage V6 admin contract', () => {
+describe('api.mileage 管理画面 admin contract', () => {
   it('残高・付与ルールを選択中アカウントで読み、下書きを版付きで保存する', async () => {
     const fetchSpy = vi.fn(async () => new Response(
       JSON.stringify({ success: true, data: {} }),
@@ -846,7 +861,7 @@ describe('eventsApi.createSlots', () => {
 
   it('500 slots are accepted and posted in 400/100 chunks (点検#520の中9補足)', async () => {
     // 500 と 400 の出どころ:
-    // - 500 はクライアント側の誤指定ガード(createSlots の例外。列車189で導入。
+    // - 500 はクライアント側の誤指定ガード(createSlots の例外。作業で導入。
     //   「誤指定で何千件も作らないよう」以外の根拠は無い)。
     // - 400 はサーバ側の1口上限(apps/worker/src/routes/events.ts の
     //   `body.slots.length > 400` → 422)に合わせた分割幅。
@@ -871,7 +886,7 @@ describe('eventsApi.createSlots', () => {
   })
 })
 
-describe('api.friendAddRules V6 data contract', () => {
+describe('api.friendAddRules 管理画面 data contract', () => {
   it('一覧・競合・実行結果を選択中アカウントとカーソルへ結びつける', async () => {
     const spy = vi.fn(async () => new Response(
       JSON.stringify({ success: true, data: { items: [], summary: {}, nextCursor: null } }),
@@ -888,6 +903,16 @@ describe('api.friendAddRules V6 data contract', () => {
       'https://worker.example.com/api/friend-add-rules/conflicts?account_id=account%201&kind=first_time',
       'https://worker.example.com/api/friend-add-runs?account_id=account+1&status=failed&rule_id=rule%2F1&cursor=run%2Fcursor&limit=20',
     ])
+  })
+
+  it('友だち追加のフォルダは色と冪等キーを送り、色の更新口も使える', async () => {
+    const spy = vi.fn(async () => new Response(JSON.stringify({ success: true, data: { id: 'f', name: '店頭', color: '#16a34a' } }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', spy)
+    const created = await api.friendAddRules.createFolder('account-1', '店頭', 'folder-key-00000001', '#16a34a')
+    expect(created.success && created.data.color).toBe('#16a34a')
+    expect(spy.mock.calls[0]).toEqual(['https://worker.example.com/api/friend-add-rules/folders', expect.objectContaining({ method: 'POST', body: JSON.stringify({ accountId: 'account-1', name: '店頭', color: '#16a34a' }), headers: expect.objectContaining({ 'Idempotency-Key': 'folder-key-00000001' }) })])
+    await api.friendAddRules.updateFolder('account-1', 'f/1', { color: null })
+    expect(spy.mock.calls[1]).toEqual(['https://worker.example.com/api/friend-add-rules/folders/f%2F1', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ accountId: 'account-1', color: null }) })])
   })
 
   it('フォルダ作成と公開に操作識別キーを付け、停止はルールと版から決定する', async () => {
@@ -992,7 +1017,7 @@ describe('api.actionScores rule contract', () => {
   })
 })
 
-describe('api.scenarios V6 operation contract', () => {
+describe('api.scenarios 管理画面 operation contract', () => {
   it('試算・配信記録・下書きをシナリオ専用APIへ渡す', async () => {
     const responses = [
       {
@@ -1068,95 +1093,6 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('extractApiErrorMessage', () => {
-  it('400 では error を優先して取り出す', () => {
-    expect(extractApiErrorMessage(JSON.stringify({ error: '入力してください' }), 400)).toBe(
-      '入力してください',
-    )
-  })
-
-  it('400 で error が無ければ message を使う', () => {
-    expect(extractApiErrorMessage(JSON.stringify({ message: '権限がありません' }), 400)).toBe(
-      '権限がありません',
-    )
-  })
-
-  it('JSON でない本文は表示に使わない', () => {
-    expect(extractApiErrorMessage('<html>internal details</html>', 400)).toBe('')
-  })
-
-  it('空の本文を許容する', () => {
-    expect(extractApiErrorMessage('', 400)).toBe('')
-  })
-
-  it('error が文字列でない場合は使わない', () => {
-    expect(extractApiErrorMessage(JSON.stringify({ error: { code: 500 } }), 400)).toBe('')
-  })
-
-  it('422 の検証文はそのまま運用者へ出す(#496-11)', () => {
-    expect(extractApiErrorMessage(
-      JSON.stringify({ error: 'Shift_JIS書き出しはまだ接続されていません。UTF-8を選んでください' }),
-      422,
-    )).toBe('Shift_JIS書き出しはまだ接続されていません。UTF-8を選んでください')
-  })
-
-  it.each([409, 422, 428])('%i の復旧可能な案内を表示する', (status) => {
-    expect(extractApiErrorMessage(JSON.stringify({ error: '最新の内容を確認して、もう一度お試しください' }), status))
-      .toBe('最新の内容を確認して、もう一度お試しください')
-  })
-
-  it.each([401, 403, 404, 429, 500, 502, 503])(
-    '%i の本文は内部情報を含みうるため表示しない',
-    (status) => {
-      const body = JSON.stringify({ error: 'D1_ERROR: no such table: rich_menu_groups' })
-      expect(extractApiErrorMessage(body, status)).toBe('')
-    },
-  )
-
-  it.each([400, 409, 422, 428])('%i でも内部情報は表示しない', (status) => {
-    expect(extractApiErrorMessage(JSON.stringify({ error: 'D1_ERROR: no such table: secrets' }), status)).toBe('')
-  })
-})
-
-describe('extractApiErrorCode', () => {
-  it('409や422でもsnake_caseの機械コードだけを取り出す', () => {
-    expect(extractApiErrorCode(JSON.stringify({ error: 'slot_conflict' }))).toBe('slot_conflict')
-    expect(extractApiErrorCode(JSON.stringify({ error: 'slot_not_available' }))).toBe('slot_not_available')
-    expect(extractApiErrorCode(JSON.stringify({
-      code: 'common_var_delete_blocked',
-      error: '使用先から外してください',
-    }))).toBe('common_var_delete_blocked')
-    expect(extractApiErrorCode(JSON.stringify({
-      code: 'rich_menu_delete_blocked',
-      error: '削除する前に確認してください',
-    }))).toBe('rich_menu_delete_blocked')
-    expect(extractApiErrorCode(JSON.stringify({
-      code: 'media_delete_blocked',
-      error: '先に使用先から外してください',
-    }))).toBe('media_delete_blocked')
-  })
-
-  it('判定画面の大文字コードも取り出す(#496-12)', () => {
-    expect(extractApiErrorCode(JSON.stringify({ code: 'STALE_CANDIDATE' }))).toBe('STALE_CANDIDATE')
-    expect(extractApiErrorCode(JSON.stringify({ code: 'KIND_REQUIRED' }))).toBe('KIND_REQUIRED')
-    expect(extractApiErrorCode(JSON.stringify({ code: 'COMMON_VAR_IN_USE' }))).toBe('COMMON_VAR_IN_USE')
-    expect(extractApiErrorCode(JSON.stringify({ code: 'STALE_PERSON' }))).toBe('STALE_PERSON')
-  })
-
-  it('内部文言・HTML・文字列以外はコードとして受け取らない', () => {
-    expect(extractApiErrorCode(JSON.stringify({ error: 'D1_ERROR: no such table' }))).toBeUndefined()
-    expect(extractApiErrorCode(JSON.stringify({ code: 'D1_ERROR: no such table' }))).toBeUndefined()
-    expect(extractApiErrorCode(JSON.stringify({ code: 'Failed to fetch friend rich menu: boom' }))).toBeUndefined()
-    expect(extractApiErrorCode('<html>proxy error</html>')).toBeUndefined()
-    expect(extractApiErrorCode(JSON.stringify({ error: { code: 'slot_conflict' } }))).toBeUndefined()
-  })
-
-  it('機能停止契約の固定コードだけは大文字でも受け取る', () => {
-    expect(extractApiErrorCode(JSON.stringify({ code: 'FEATURE_DISABLED' }))).toBe('FEATURE_DISABLED')
-    expect(extractApiErrorCode(JSON.stringify({ code: 'FORBIDDEN' }))).toBe('FORBIDDEN')
-  })
-})
-
 describe('機能オフの403契約', () => {
   function stubBrowser(target: EventTarget) {
     const storage = {
@@ -1201,7 +1137,7 @@ describe('機能オフの403契約', () => {
       status: 403,
       code: 'FEATURE_DISABLED',
     })
-    expect(detail).toEqual({ featureId: 'webinars' })
+    expect(detail).toEqual({ featureId: 'webinars', accountId: null })
   })
 
   it('補助データの呼び出しでは suppressFeatureDisabledEvent で案内を出さず、エラー自体は返す(#860)', async () => {
@@ -1724,5 +1660,270 @@ describe('describeSaveFailure（WRITE-01: 保存失敗の安全な理由表示�
   it('日本語のErrorメッセージはそのまま使う', () => {
     expect(describeSaveFailure(new Error('対象が見つかりません')))
       .toBe('対象が見つかりません')
+  })
+})
+
+describe('fetchApi の Retry-After 受け渡し（m23m）', () => {
+  async function failWith(status: number, headers?: Record<string, string>): Promise<InstanceType<typeof ApiError>> {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: false, error: 'rate_limited' }),
+      { status, headers: { 'content-type': 'application/json', ...(headers ?? {}) } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    try {
+      await fetchApi('/api/folders?kind=template')
+      throw new Error('投げなかった')
+    } catch (error) {
+      if (error instanceof ApiError) return error
+      throw error
+    }
+  }
+
+  it('429のRetry-After（秒）を失敗に載せる', async () => {
+    const err = await failWith(429, { 'Retry-After': '30' })
+    expect(err.status).toBe(429)
+    expect(err.retryAfterSeconds).toBe(30)
+  })
+
+  it('Retry-After（日時）は今との差を秒にする', async () => {
+    const future = new Date(Date.now() + 65 * 1000).toUTCString()
+    const err = await failWith(429, { 'Retry-After': future })
+    expect(err.retryAfterSeconds).toBeGreaterThan(0)
+    expect(err.retryAfterSeconds).toBeLessThanOrEqual(65)
+  })
+
+  it('読めないRetry-Afterは載せない', async () => {
+    const err = await failWith(429, { 'Retry-After': 'soon' })
+    expect(err.retryAfterSeconds).toBeUndefined()
+  })
+
+  it('Retry-Afterが無ければ載せない', async () => {
+    const err = await failWith(403)
+    expect(err.status).toBe(403)
+    expect(err.retryAfterSeconds).toBeUndefined()
+  })
+})
+
+describe('失敗本文の通過状態（D016）', () => {
+  async function failMessage(status: number, body: unknown): Promise<string> {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify(body),
+      { status, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+    try {
+      await fetchApi('/api/staff/invitations/accept')
+      throw new Error('投げなかった')
+    } catch (error) {
+      if (error instanceof ApiError) return error.message
+      throw error
+    }
+  }
+
+  it('410の期限切れの日本語案内を通す', async () => {
+    const message = await failMessage(410, { success: false, error: 'この招待は無効または期限切れです。管理者へ再発行を依頼してください。' })
+    expect(message).toContain('期限切れ')
+    expect(message).not.toContain('API error')
+  })
+
+  it('404の正しくないURLの日本語案内を通す', async () => {
+    const message = await failMessage(404, { success: false, error: 'この URL は正しくありません。メールの URL をそのまま開いてください' })
+    expect(message).toContain('正しくありません')
+    expect(message).not.toContain('API error')
+  })
+
+  it('500の本文は今までどおり通さない', async () => {
+    const message = await failMessage(500, { success: false, error: '何か日本語' })
+    expect(message).toBe('API error: 500')
+  })
+})
+
+describe('通信断の日本語化（R506系）', () => {
+  it('Failed to fetch を日本語にして投げ直す', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+    try {
+      await fetchApi('/api/folders?kind=template')
+      throw new Error('投げなかった')
+    } catch (error) {
+      expect(error).not.toBeInstanceOf(ApiError)
+      expect(error instanceof Error && error.message).toContain('通信できませんでした')
+      expect(error instanceof Error && error.message).not.toContain('Failed to fetch')
+    }
+  })
+
+  it('中断（AbortError）はそのまま通す', async () => {
+    const aborted = new DOMException('The operation was aborted.', 'AbortError')
+    vi.stubGlobal('fetch', vi.fn(async () => { throw aborted }))
+    await expect(fetchApi('/api/folders?kind=template')).rejects.toBe(aborted)
+  })
+})
+
+describe('実行結果の期間指定', () => {
+  it('一覧のページ送りでも期間をAPIへ送る', async () => {
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ success: true, data: [] }), { headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchSpy);
+    await api.broadcasts.list({ accountId: 'a', from: '2026-09-30', to: '2026-10-01', cursor: 20 });
+    await api.autoReplies.runs({ ruleId: 'r', from: '2026-09-30', to: '2026-10-01', offset: 20 });
+    for (const [url] of fetchSpy.mock.calls) {
+      const query = new URL(String(url)).searchParams;
+      expect(query.get('from')).toBe('2026-09-30');
+      expect(query.get('to')).toBe('2026-10-01');
+    }
+  });
+});
+
+// V8: 掲載順と掲載の契約を実際のfetch引数で確かめる。
+it('掲載順と新規掲載のID・版・冪等キーをWorkerへ渡す', async () => {
+  const fetcher = vi.fn(async (_url: unknown, _init?: RequestInit) => new Response(JSON.stringify({success:true,data:{items:[]}}),{status:200,headers:{'Content-Type':'application/json'}}))
+  vi.stubGlobal('fetch',fetcher)
+  await api.nenMembers.photoPublicationOrder('account a')
+  await api.nenMembers.savePhotoPublicationOrder({accountId:'account a',items:[{id:'pub',expectedVersion:2}]})
+  await api.nenMembers.publishPhoto('photo/a',{accountId:'account a',expectedVersion:0},'publication-key')
+  expect(String(fetcher.mock.calls[0][0])).toContain('/publications/order?accountId=account%20a')
+  expect(fetcher.mock.calls[1][1]).toMatchObject({method:'PUT',body:JSON.stringify({accountId:'account a',items:[{id:'pub',expectedVersion:2}]})})
+  expect(String(fetcher.mock.calls[2][0])).toContain('/photos/photo%2Fa/publish')
+  expect(fetcher.mock.calls[2][1]).toMatchObject({method:'POST',headers:expect.objectContaining({'Idempotency-Key':'publication-key'})})
+})
+
+describe('一斉配信動画の直接アップロード',()=>{
+  it('動画本体を署名URLへPUTし、Workerには開始と完了だけを知らせる',async()=>{
+    const file=new File(['video'],'clip.mp4',{type:'video/mp4'})
+    Object.defineProperty(file,'size',{value:150*1024*1024})
+    const fetchSpy=vi.fn(async(_url: string | URL | Request,_options?: RequestInit)=>new Response())
+      .mockResolvedValueOnce(new Response(JSON.stringify({success:true,data:{id:'session',uploadUrl:'https://r2.example/signed',requiredHeaders:{'Content-Type':'video/mp4'}}}),{status:201,headers:{'Content-Type':'application/json'}}))
+      .mockResolvedValueOnce(new Response(null,{status:200,headers:{ETag:'"etag"'}}))
+      .mockResolvedValueOnce(new Response(JSON.stringify({success:true,data:{key:'public.mp4',url:'https://worker.example.com/images/public.mp4',mimeType:'video/mp4',size:file.size}}),{status:201,headers:{'Content-Type':'application/json'}}))
+    vi.stubGlobal('fetch',fetchSpy)
+    const result=await api.broadcastMessageAssets.upload(file,'account-a')
+    expect(result.success).toBe(true)
+    expect(fetchSpy.mock.calls.map(call=>call[0])).toEqual(['https://worker.example.com/api/broadcast-message-assets/upload-sessions','https://r2.example/signed','https://worker.example.com/api/broadcast-message-assets/upload-sessions/session/complete'])
+    expect(JSON.parse(fetchSpy.mock.calls[0][1]!.body as string)).toMatchObject({lineAccountId:'account-a',sizeBytes:150*1024*1024})
+    expect(fetchSpy.mock.calls[1][1]).toMatchObject({method:'PUT',body:file,credentials:'omit'})
+    expect(JSON.parse(fetchSpy.mock.calls[2][1]!.body as string)).toEqual({etag:'"etag"'})
+  })
+  it('R2が受け付けなければ完了扱いにしない',async()=>{
+    const file=new File(['video'],'clip.mp4',{type:'video/mp4'})
+    const fetchSpy=vi.fn(async(_url: string | URL | Request,_options?: RequestInit)=>new Response())
+      .mockResolvedValueOnce(new Response(JSON.stringify({success:true,data:{id:'session',uploadUrl:'https://r2.example/signed',requiredHeaders:{}}}),{status:201,headers:{'Content-Type':'application/json'}}))
+      .mockResolvedValueOnce(new Response(null,{status:500}))
+    vi.stubGlobal('fetch',fetchSpy)
+    await expect(api.broadcastMessageAssets.upload(file,'account-a')).rejects.toThrow('動画をアップロードできませんでした')
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+})
+
+it('休業の409から画面が重なる記録の名前・日付をdataとして取得する',()=>{
+ const data={conflicts:[{id:'closure',name:'設備点検',startDate:'2026-11-10',endDate:'2026-11-11'}]};const raw=JSON.stringify({success:false,error:'休業・貸切が重なっています',code:'closure_overlap',data});
+ expect(extractApiErrorCode(raw)).toBe('closure_overlap');expect(extractApiErrorData(raw)).toEqual(data);expect(extractApiErrorMessage(raw,409)).toBe('休業・貸切が重なっています');
+});
+
+describe('件数・課金見積りの呼び出し', () => {
+  it('件数は一覧の全件取得をせず、各集計口だけを呼ぶ', async () => {
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ success: true, data: {} })));
+    vi.stubGlobal('fetch', fetchSpy);
+    await api.automations.counts('account/a');
+    await api.media.counts('account/a');
+    await api.conversionApprovals.counts();
+    await api.hqBilling.preview('standard', 'year');
+    expect(fetchSpy.mock.calls.map(args => args[0])).toEqual([
+      'https://worker.example.com/api/automations/counts?account_id=account%2Fa',
+      'https://worker.example.com/api/media/counts?accountId=account%2Fa',
+      'https://worker.example.com/api/conversions/approvals/counts',
+      'https://worker.example.com/api/hq/billing/preview?planKey=standard&interval=year',
+    ]);
+  });
+});
+
+describe('応答の合図は呼出元のアカウントを保持する', () => {
+  function listen(name: string) {
+    const target = new EventTarget();
+    const details: unknown[] = [];
+    target.addEventListener(name, event => details.push((event as CustomEvent).detail));
+    vi.stubGlobal('window', target);
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: vi.fn(), removeItem: vi.fn() });
+    vi.stubGlobal('sessionStorage', { getItem: () => null, setItem: vi.fn(), removeItem: vi.fn() });
+    return details;
+  }
+  function featureOff() {
+    return new Response(JSON.stringify({ code: 'FEATURE_DISABLED', featureId: 'webinars', accountId: 'wrong-response-account' }), { status: 403 });
+  }
+  it('遅れて届いたAの403を、先に切り替えたBの返事として通知しない', async () => {
+    const details = listen('lh-feature-disabled');
+    let finishA!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn((url: string) => url.includes('accountId=a')
+      ? new Promise<Response>(resolve => { finishA = resolve; }) : Promise.resolve(featureOff())));
+    const first = fetchApi('/api/webinars?accountId=a').catch(error => error);
+    await expect(fetchApi('/api/webinars?accountId=b')).rejects.toMatchObject({ status: 403 });
+    finishA(featureOff());
+    await first;
+    expect(details).toEqual([
+      { featureId: 'webinars', accountId: 'b' }, { featureId: 'webinars', accountId: 'a' },
+    ]);
+  });
+  it('本文・ヘッダ・明示オプションから対象を取り、本文や秘密値を合図に載せない', async () => {
+    const details = listen('lh-session-lost');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 401 })));
+    for (const options of [
+      { method: 'POST', body: JSON.stringify({ lineAccountId: 'body-account', secret: 'private-value' }) },
+      { headers: { 'X-Line-Account-Id': 'header-account' } },
+      { accountId: 'explicit-account' },
+      { method: 'POST', body: JSON.stringify({ accountIds: ['a', 'b'] }) },
+    ]) await expect(fetchApi('/api/resource', options)).rejects.toMatchObject({ status: 401 });
+    expect(details).toEqual([
+      { accountId: 'body-account' }, { accountId: 'header-account' }, { accountId: 'explicit-account' },
+      { accountId: null, accountIds: ['a', 'b'] },
+    ]);
+    expect(JSON.stringify(details)).not.toContain('private-value');
+  });
+  it('Blobとファイル保存も同じ機能オフの合図を渡す', async () => {
+    const details = listen('lh-feature-disabled');
+    vi.stubGlobal('fetch', vi.fn(async () => featureOff()));
+    const { fetchApiBlob } = await import('./api');
+    await expect(fetchApiBlob('/api/media/file?account_id=a')).rejects.toMatchObject({ status: 403 });
+    await expect(downloadApiFile('/api/media/export?lineAccountId=b', 'file.csv')).rejects.toMatchObject({ status: 403 });
+    expect(details).toEqual([
+      { featureId: 'webinars', accountId: 'a' }, { featureId: 'webinars', accountId: 'b' },
+    ]);
+  });
+});
+
+describe('フォルダAPIの追加呼び口',()=>{
+ it('バナーの種類・色・版を送り、所属の未分類を明示できる',async()=>{
+  const fetchSpy=vi.fn(async(_url:string|URL|Request,_init?:RequestInit)=>new Response(JSON.stringify({success:true,data:[]}),{status:200,headers:{'content-type':'application/json'}}));vi.stubGlobal('fetch',fetchSpy);
+  await api.hqBanners.folders.list('image');
+  await api.hqBanners.folders.create({kind:'image',name:'素材',color:'#3b82f6'});
+  await api.hqBanners.folders.update('f/1',{kind:'image',color:null,expectedRevision:2});
+  await api.hqBanners.folders.swapOrder('f/1','f/2','image',3,4);
+  await api.hqBanners.folders.delete('f/1','image',4);
+  await api.hqBanners.images.list({folderId:null});
+  expect(fetchSpy.mock.calls.map(([url])=>url)).toEqual([
+   'https://worker.example.com/api/hq/banners/folders?kind=image','https://worker.example.com/api/hq/banners/folders',
+   'https://worker.example.com/api/hq/banners/folders/f%2F1','https://worker.example.com/api/hq/banners/folders/f%2F1/swap-order',
+   'https://worker.example.com/api/hq/banners/folders/f%2F1','https://worker.example.com/api/hq/banners/images?folderId=__none__',
+  ]);
+  expect(JSON.parse(fetchSpy.mock.calls[3][1]!.body as string)).toEqual({kind:'image',withId:'f/2',expectedRevision:3,withExpectedRevision:4});
+ });
+ it('店の共通口は種類と店・版を送り、既存の特典口も残す',async()=>{
+  const fetchSpy=vi.fn(async(_url:string|URL|Request,_init?:RequestInit)=>new Response(JSON.stringify({success:true,data:[]}),{status:200,headers:{'content-type':'application/json'}}));vi.stubGlobal('fetch',fetchSpy);
+  for(const kind of ['affiliate','affiliate_offer','mileage_reward','friend_add_rule'])await api.folders.list(kind,'a/1');
+  await api.folders.swapOrder('f/1','f/2','a/1',2,3);await api.folders.delete('f/1','a/1',4);
+  await api.mileage.rewardFolders('a/1');
+  expect(fetchSpy.mock.calls.slice(0,4).map(([url])=>url)).toEqual(['affiliate','affiliate_offer','mileage_reward','friend_add_rule'].map(kind=>`https://worker.example.com/api/folders?kind=${kind}&account_id=a%2F1`));
+  expect(JSON.parse(fetchSpy.mock.calls[4][1]!.body as string)).toEqual({withId:'f/2',accountId:'a/1',expectedRevision:2,withExpectedRevision:3});
+  expect(fetchSpy.mock.calls[5][0]).toBe('https://worker.example.com/api/folders/f%2F1?account_id=a%2F1&expectedRevision=4');
+  expect(fetchSpy.mock.calls[6][0]).toBe('https://worker.example.com/api/mileage/reward-folders?accountId=a%2F1');
+ });
+});
+
+describe('受信Webhookの行うこと', () => {
+  it('版と照合方法を保って既存のconfig保存口へ送る', async () => {
+    const fetchSpy = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ success: true, data: {} }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchSpy)
+    const identityMatching = { methods: [{ kind: 'harness_friend_id' as const, path: 'friend_id' }], onNotFound: 'unmatched_box' as const }
+    await api.webhooks.incoming.saveConfig('inlet-1', 'account-1', { expectedVersion: 7, identityMatching,
+      actions: [{ refKind: 'tag', refId: 'tag-1', refVersionId: null }] })
+    expect(fetchSpy).toHaveBeenCalledWith('https://worker.example.com/api/webhooks/incoming/inlet-1/config?lineAccountId=account-1', expect.objectContaining({ method: 'PATCH' }))
+    expect(JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body))).toEqual({ expectedVersion: 7, identityMatching,
+      actions: [{ refKind: 'tag', refId: 'tag-1', refVersionId: null }] })
   })
 })

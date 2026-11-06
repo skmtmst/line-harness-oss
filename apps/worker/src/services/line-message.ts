@@ -11,10 +11,11 @@
  * 読めない中身はテキストに落とす（例外にしない）。1通の中身が壊れている
  * だけで配信全体や、その人の以降の配信まで止まると困る。
  */
+import { convertBroadcastAsset, isBroadcastAssetKind, validateImagemapMessage } from '@line-crm/shared';
 import type { Message } from '@line-crm/line-sdk';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 
-/** Remove empty text nodes and boxes with empty text from Flex JSON */
+
 function cleanEmptyNodes(obj: unknown): void {
   if (!obj || typeof obj !== 'object') return;
   const node = obj as Record<string, unknown>;
@@ -22,22 +23,22 @@ function cleanEmptyNodes(obj: unknown): void {
     if (node[key]) cleanEmptyNodes(node[key]);
   }
   if (Array.isArray(node.contents)) {
-    // First clean children recursively
+
     for (const c of node.contents as unknown[]) cleanEmptyNodes(c);
-    // Then filter out empty nodes
+
     node.contents = (node.contents as unknown[]).filter((c) => {
       if (!c || typeof c !== 'object') return true;
       const child = c as Record<string, unknown>;
-      // Remove empty text nodes
+
       if (child.type === 'text') {
         const text = child.text;
         return typeof text === 'string' && text.trim().length > 0;
       }
-      // Remove box nodes where any text child is empty (metadata rows with no value)
+      // 値のない metadata 行を表示しないよう、空のテキストを含む箱を除く。
       if (child.type === 'box' && Array.isArray(child.contents)) {
         const texts = (child.contents as Array<Record<string, unknown>>).filter(t => t.type === 'text');
         if (texts.length >= 2) {
-          // horizontal box with label + value — remove if value is empty
+          // ラベルだけの行を残さないよう、値が空なら横並びの箱ごと除く。
           const hasEmptyText = texts.some(t => typeof t.text === 'string' && t.text.trim() === '');
           if (hasEmptyText) return false;
         }
@@ -48,12 +49,24 @@ function cleanEmptyNodes(obj: unknown): void {
 }
 
 export function buildMessage(messageType: string, messageContent: string, altText?: string): Message {
+  if (isBroadcastAssetKind(messageType)) {
+    const payload = JSON.parse(messageContent);
+    const converted = convertBroadcastAsset(messageType, payload.assetName ?? '', payload);
+    if (!converted.ok) throw new Error(converted.error);
+    return buildMessage(converted.message.messageType, converted.message.messageContent, converted.message.altText);
+  }
+  if (messageType === 'imagemap') {
+    const payload = JSON.parse(messageContent);
+    const error = validateImagemapMessage(payload);
+    if (error) throw new Error(error);
+    return { type: 'imagemap', baseUrl: payload.baseUrl, baseSize: payload.baseSize, actions: payload.actions, ...(payload.video ? {video: payload.video} : {}), altText: altText || payload.altText || 'リッチメッセージ' };
+  }
   if (messageType === 'text') {
     return { type: 'text', text: messageContent };
   }
 
   if (messageType === 'image') {
-    // messageContent is expected to be JSON: { originalContentUrl, previewImageUrl }
+    // 画像の内容は originalContentUrl/previewImageUrl を含む JSON として扱う。
     try {
       const parsed = JSON.parse(messageContent) as {
         originalContentUrl: string;
@@ -65,7 +78,7 @@ export function buildMessage(messageType: string, messageContent: string, altTex
         previewImageUrl: parsed.previewImageUrl,
       };
     } catch {
-      // Fallback: treat as text if parsing fails
+      // 解析失敗時はテキストとして扱う。
       return { type: 'text', text: messageContent };
     }
   }
@@ -73,9 +86,9 @@ export function buildMessage(messageType: string, messageContent: string, altTex
   if (messageType === 'flex') {
     try {
       const contents = JSON.parse(messageContent);
-      // Remove empty text nodes (from {{#if_ref}} conditional blocks)
+      // 条件付きブロックの除去で空になったテキストを残さない。
       cleanEmptyNodes(contents);
-      // Extract first text element for altText (shown in notifications)
+      // 通知で内容が分かるよう、最初のテキストを altText に使う。
       return { type: 'flex', altText: altText || extractFlexAltText(contents), contents };
     } catch {
       return { type: 'text', text: messageContent };
@@ -173,7 +186,7 @@ export function buildMessage(messageType: string, messageContent: string, altTex
     }
   }
 
-  // Fallback
+
   return { type: 'text', text: messageContent };
 }
 

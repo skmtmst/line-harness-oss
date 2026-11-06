@@ -1,5 +1,5 @@
 /*
- * 成果承認の競合・権限・一括結果(N-208/N-209/N-213)。
+ * 成果承認の競合・権限・一括結果。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物の conversions ルートを当てる。
  * モックは LINE 通知と staff の注入だけ。保存・判定・境界の経路は本物のまま通す。
@@ -12,8 +12,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const notifyAffiliateApproval = vi.fn().mockResolvedValue(undefined);
 vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateApproval }));

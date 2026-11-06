@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import {
   getStripeEvents,
@@ -5,11 +6,12 @@ import {
   createStripeEvent,
   addTagToFriend,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
-import { listLimit } from './list-pagination.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const stripe = new Hono<Env>();
 
@@ -34,11 +36,11 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
   try {
     const friendId = c.req.query('friendId') ?? undefined;
     const eventType = c.req.query('eventType') ?? undefined;
-    const limit = listLimit(c.req.query('limit'), 100);
-    const items = await getStripeEvents(c.env.DB, { friendId, eventType, limit });
-    return c.json({
-      success: true,
-      data: items.map((e) => ({
+    const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 100 }).limit;
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const items = await getStripeEvents(c.env.DB, { friendId, eventType, limit,
+      lineAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned });
+    const responseItems = items.map((e) => ({
         id: e.id,
         stripeEventId: e.stripe_event_id,
         eventType: e.event_type,
@@ -47,11 +49,10 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
         currency: e.currency,
         metadata: e.metadata ? JSON.parse(e.metadata) : null,
         processedAt: e.processed_at,
-      })),
-    });
+      }));
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [] }));
   } catch (err) {
-    console.error('GET /api/integrations/stripe/events error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -61,7 +62,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
   try {
     const stripeSecret = c.env.STRIPE_WEBHOOK_SECRET?.trim();
     if (!stripeSecret) {
-      console.error('[stripe-webhook] STRIPE_WEBHOOK_SECRET is not configured');
+      logger.error("stripe_webhook_STRIPE_WEBHOOK_SECRET_is_not_configured");
       return c.json({ success: false, error: 'Stripe webhook is not configured' }, 503);
     }
 
@@ -148,7 +149,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
           occurredAt: event.processed_at,
         }).catch((error) => {
           // Stripeイベントは記録済み。派生スコアの失敗で再送を誘発しない。
-          console.error('stripe action score failed:', error);
+          logger.error("stripe.integrations_stripe_webhook_create_failed");
         });
       }
 
@@ -178,8 +179,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
       data: { id: event.id, stripeEventId: event.stripe_event_id, eventType: event.event_type, processedAt: event.processed_at },
     });
   } catch (err) {
-    console.error('POST /api/integrations/stripe/webhook error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

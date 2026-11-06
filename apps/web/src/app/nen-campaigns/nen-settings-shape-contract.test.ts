@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 /*
  * NEN設定の4者の形(#728)。重大1(編集画面の型ずれ)の再発防止。
  *
@@ -13,6 +14,7 @@ import { NEN_CAMPAIGN_SETTINGS } from '../../../../../scripts/visual-qa/fixtures
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..')
 const read = (relative: string): string => readFileSync(path.join(repoRoot, relative), 'utf8')
+const readApi = (relative: string): string => readApiSource(path.join(repoRoot, relative), 'utf8')
 
 function sortedKeys(values: Iterable<string>): string[] {
   return [...new Set(values)].sort()
@@ -20,7 +22,7 @@ function sortedKeys(values: Iterable<string>): string[] {
 
 /** 画面が受け取る型 NenCampaignSetting の鍵。 */
 function typeKeys(): string[] {
-  const source = read('apps/web/src/lib/api.ts')
+  const source = readApi('apps/web/src/lib/api.ts')
   const block = source.match(/export type NenCampaignSetting = \{([\s\S]*?)\n\}/)
   if (!block) throw new Error('NenCampaignSetting が見つかりません')
   return sortedKeys(
@@ -28,14 +30,16 @@ function typeKeys(): string[] {
   )
 }
 
-/** 実口 GET /api/nen-campaigns/settings が返す形の鍵。 */
+/** 実口 GET /api/nen-campaigns/settings が返す形の鍵（一覧も409の最新も同じ組み立て）。 */
 function workerKeys(): string[] {
   const source = read('apps/worker/src/routes/nen-campaigns.ts')
-  const block = source.match(/settings\.map\(\(row\) => \(\{([\s\S]*?)\}\)\) \}\);/)
+  const block = source.match(/function toCampaignSettingPayload\(row: CampaignRow\) \{([\s\S]*?)\n\}/)
   if (!block) throw new Error('settings の組み立てが見つかりません')
-  return sortedKeys(
-    [...block[1].matchAll(/^    (\w+): row\./gm)].map((found) => found[1]),
-  )
+  // 一覧は組み立てに formIssue を足して返す（409の最新には付けない）。
+  return sortedKeys([
+    ...[...block[1].matchAll(/^    (\w+): row\./gm)].map((found) => found[1]),
+    'formIssue',
+  ])
 }
 
 /** 見本の1件ぶんの鍵。 */
@@ -47,7 +51,7 @@ function fixtureKeys(): string[][] {
 
 /** 型 NenCampaignAfterAction の kind の取りうる値。 */
 function typeActionKinds(): string[] {
-  const source = read('apps/web/src/lib/api.ts')
+  const source = readApi('apps/web/src/lib/api.ts')
   const block = source.match(/export type NenCampaignAfterAction =([\s\S]*?)\n\nexport type/)
   if (!block) throw new Error('NenCampaignAfterAction が見つかりません')
   return sortedKeys(

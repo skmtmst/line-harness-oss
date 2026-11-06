@@ -170,7 +170,7 @@ describe('FRIEND-03/20 条件を人が読める形で出す', () => {
     expect(describeSavedCondition({ kind: 'last_activity', op: 'after', value: '2026-03-01' }))
       .toBe('最終反応日が 2026-03-01以降')
     expect(describeSavedCondition({ kind: 'event_booking', op: 'exists' })).toBe('イベント予約がある')
-    expect(describeSavedCondition({ kind: 'memo', op: 'exists' })).toBe('個別メモがある')
+    expect(describeSavedCondition({ kind: 'memo', op: 'exists' })).toBe('メモがある')
     expect(describeSavedCondition({ kind: 'common_event', op: 'exists', value: 'conversion' }))
       .toBe('その他のイベント「conversion」がある')
   })
@@ -197,5 +197,21 @@ describe('R185 回答フォーム・購入履歴は実行できる条件とし�
     expect(
       describeSavedCondition({ kind: 'form', op: 'exists', value: 'form-1' }, [], { forms: { 'form-1': '申込フォーム' } }),
     ).toBe('回答フォーム「申込フォーム」の回答がある')
+  })
+})
+
+import { blockToConditions as blockToConditionsB6, conditionsToEditorState as conditionsToEditorStateB6 } from './saved-search-utils'
+import { describe as describeB6, expect as expectB6, it as itB6 } from 'vitest'
+
+describeB6('来店・購入・会員ランクの絞り込み（fmToi）', () => {
+  itB6('回数・金額は下限と上限、日は期間、ランクは段で条件にし、編集状態へ戻せる', () => {
+    expectB6(blockToConditionsB6({ kind: 'visit_count', min: '3', max: '' })).toEqual([{ kind: 'visit_count', op: 'between', value: { min: 3, max: undefined } }])
+    expectB6(blockToConditionsB6({ kind: 'purchase_amount', min: '', max: '5000' })).toEqual([{ kind: 'purchase_amount', op: 'between', value: { min: undefined, max: 5000 } }])
+    expectB6(blockToConditionsB6({ kind: 'last_activity_at', from: '2026-10-01', to: '' })).toEqual([{ kind: 'last_activity_at', op: 'between', value: { from: '2026-10-01', to: undefined } }])
+    expectB6(blockToConditionsB6({ kind: 'member_tier', tierId: 't2' })).toEqual([{ kind: 'member_tier', op: 'eq', value: 't2' }])
+    expectB6(blockToConditionsB6({ kind: 'member_tier', tierId: '' })).toEqual([])
+    const state = conditionsToEditorStateB6({ all: [{ kind: 'visit_count', op: 'between', value: { min: 3 } }, { kind: 'member_tier', op: 'eq', value: 't2' }], any: [], visibility: 'all', list: { sort: 'recent', limit: 20 } } as never)
+    expectB6(state.blocks).toEqual([{ kind: 'visit_count', min: '3', max: '' }, { kind: 'member_tier', tierId: 't2' }])
+    expectB6(state.extraAll).toEqual([])
   })
 })

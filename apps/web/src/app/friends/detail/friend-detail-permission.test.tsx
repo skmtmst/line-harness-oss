@@ -1,7 +1,9 @@
-// @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+// @vitest-environment happy-dom
 
 /**
  * 友だち詳細の権限表示を本物のReactで確かめる（N-035 / N-037）。
@@ -143,11 +145,22 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       Promise.resolve({ success: true, data: { items: [], nextCursor: null } }),
     api: {
       ...actual.api,
+      // 権限の正本は staff.me。固定の偽APIへ漏らさず、この試験の役割を返す。
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: storage.get('lh_staff_role') ?? 'staff' } }) },
       friends: {
         ...actual.api.friends,
         get: () => Promise.resolve({ success: true, data: fixtures.friendDetail }),
+        addTag: (...args: unknown[]) => { net.calls.push({ name: 'friends.addTag', args }); return Promise.resolve({ success: true, data: null }) },
+        removeTag: (...args: unknown[]) => { net.calls.push({ name: 'friends.removeTag', args }); return Promise.resolve({ success: true, data: null }) },
         mileage: () => Promise.reject(new Error('mileage unavailable')),
         richMenu: () => Promise.reject(new Error('rich menu unavailable')),
+      },
+      tags: {
+        ...actual.api.tags,
+        list: (...args: unknown[]) => {
+          net.calls.push({ name: 'tags.list', args })
+          return Promise.resolve({ success: true, data: [{ id: 'tag-vip', name: 'VIP', color: '#008000', createdAt: '2026-09-01T00:00:00.000Z' }] })
+        },
       },
       friendFields: {
         ...actual.api.friendFields,
@@ -196,6 +209,7 @@ let FriendDetailPage: typeof import('./page').default
 const storage = new Map<string, string>()
 
 function setRole(role: string | null, permissions: string[] = [], viewPermissions: string[] = []) {
+  forgetStaffIdentity(); if (role) rememberStaffIdentity({ role, permissionKeys: permissions, permissionViewKeys: viewPermissions } as StaffMember)
   if (role === null) storage.delete('lh_staff_role')
   else storage.set('lh_staff_role', role)
   storage.set('lh_staff_permissions', JSON.stringify(permissions))
@@ -203,6 +217,7 @@ function setRole(role: string | null, permissions: string[] = [], viewPermission
 }
 
 beforeEach(async () => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   net.calls.length = 0
   state.fieldItems = [fixtures.textField]
@@ -257,7 +272,7 @@ async function eventually(check: () => void, timeout = 1_500): Promise<void> {
 }
 
 function buttonsByText(text: string): HTMLButtonElement[] {
-  return Array.from(host.querySelectorAll('button')).filter((b) => b.textContent === text)
+  return Array.from(document.body.querySelectorAll('button')).filter((b) => b.textContent === text)
 }
 
 function linksByText(text: string): HTMLAnchorElement[] {
@@ -274,15 +289,17 @@ async function setSelectValue(select: HTMLSelectElement, value: string) {
 }
 
 describe('N-037 staffの情報欄は読み取り専用（403と画面を一致）', () => {
-  it('管理者には入力欄と「保存」「項目を作る」が出る', async () => {
+  it('管理者には入力欄と［キャンセル］［保存する］、情報欄を管理への入口が出る', async () => {
     setRole('admin')
     await render('info')
     const input = host.querySelector<HTMLInputElement>('input[type="text"]')
     expect(input).toBeTruthy()
     expect(input!.disabled).toBe(false)
-    expect(buttonsByText('保存')).toHaveLength(1)
-    expect(linksByText('項目を作る').length).toBeGreaterThan(0)
-    expect(host.textContent).not.toContain('情報欄の値を保存できるのは')
+    expect(buttonsByText('保存する')).toHaveLength(1)
+    expect(buttonsByText('キャンセル')).toHaveLength(1)
+    // 項目を作るのは「情報欄を管理」から（下の帯は［キャンセル］［保存する］だけ・絵 ）。
+    expect(linksByText('情報欄を管理').length).toBeGreaterThan(0)
+    expect(document.body.textContent).not.toContain('保存できるのはオーナー・管理者')
   })
 
   it('staffは値を読めるが、編集欄・保存・項目追加は出ない', async () => {
@@ -291,12 +308,12 @@ describe('N-037 staffの情報欄は読み取り専用（403と画面を一致�
     const input = host.querySelector<HTMLInputElement>('input[type="text"]')
     // 値は読める（読み取り専用として表示される）
     expect(input).toBeTruthy()
-    expect(input!.disabled).toBe(true)
+    expect(input!.readOnly).toBe(true)
     expect(input!.value).toBe('既存の値')
     // 押すと403になる口は出さない
-    expect(buttonsByText('保存')).toHaveLength(0)
+    expect(buttonsByText('保存する')).toHaveLength(0)
     expect(linksByText('項目を作る')).toHaveLength(0)
-    expect(host.textContent).toContain('情報欄の値を保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。')
+    expect(document.body.textContent).toContain('保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。')
   })
 })
 
@@ -314,15 +331,15 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     await render('info')
     const [text, personal] = inputs()
     // 個人情報でない項目はサーバーも受けないため、入力欄を閉じる
-    expect(text.disabled).toBe(true)
+    expect(text.readOnly).toBe(true)
     expect(text.value).toBe('既存の値')
     // 個人情報の項目は編集できる
     expect(personal.disabled).toBe(false)
     expect(personal.value).toBe('090-0000-0000')
-    expect(buttonsByText('保存')).toHaveLength(1)
+    expect(buttonsByText('保存する')).toHaveLength(1)
     // 項目の定義を足す口はオーナー・管理者専用のまま
     expect(linksByText('項目を作る')).toHaveLength(0)
-    expect(host.textContent).toContain('個人情報')
+    expect(document.body.textContent).toContain('個人情報')
   })
 
   it('edit キーを持つ staff が個人情報を変えて保存すると saveForFriend へ届く', async () => {
@@ -335,7 +352,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
       personal.dispatchEvent(new Event('input', { bubbles: true }))
     })
     await act(async () => {
-      buttonsByText('保存')[0].click()
+      buttonsByText('保存する')[0].click()
     })
     await eventually(() => {
       const call = net.calls.find((c) => c.name === 'friendFields.saveForFriend')
@@ -349,11 +366,11 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     setRole('staff', ['/tags'], ['attribute.personal_info.view'])
     await render('info')
     const [text, personal] = inputs()
-    expect(text.disabled).toBe(true)
-    expect(personal.disabled).toBe(true)
+    expect(text.readOnly).toBe(true)
+    expect(personal.readOnly).toBe(true)
     // 値は読める
     expect(personal.value).toBe('090-0000-0000')
-    expect(buttonsByText('保存')).toHaveLength(0)
+    expect(buttonsByText('保存する')).toHaveLength(0)
     expect(linksByText('項目を作る')).toHaveLength(0)
   })
 
@@ -364,30 +381,49 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     setRole('staff', ['/tags'])
     await render('info')
     expect(inputs()).toHaveLength(1)
-    expect(host.textContent).toContain('個人情報の項目が 1 件あります。')
-    expect(host.textContent).toContain('表示には個人情報の閲覧権限が要ります。')
-    expect(buttonsByText('保存')).toHaveLength(0)
+    expect(document.body.textContent).toContain('個人情報の項目が 1 件あります。')
+    expect(document.body.textContent).toContain('表示には個人情報の閲覧権限が要ります。')
+    expect(buttonsByText('保存する')).toHaveLength(0)
   })
 })
 
+function supportEditButtons(): HTMLButtonElement[] {
+  return Array.from(document.querySelectorAll<HTMLButtonElement>('[data-customer-info-panel] section[aria-label="対応"] button')).filter(button => button.textContent?.trim() === '編集する')
+}
+
 describe('N-035 友だち詳細から担当・対応状況を変える', () => {
+  it('タグの編集は受信箱へ移動せず、その場で選んで保存する', async () => {
+    setRole('admin')
+    await render('info')
+    const edit = document.querySelector<HTMLButtonElement>('[data-customer-info-panel] section[aria-label="タグ"] button')!
+    await act(async () => { edit.click() })
+    await eventually(() => expect(document.querySelector('[data-friend-tag-editor]')).toBeTruthy())
+    expect(net.calls.some((call) => call.name === 'tags.list')).toBe(true)
+    const checkbox = document.querySelector<HTMLInputElement>('[data-friend-tag-editor] input[type="checkbox"]')!
+    await act(async () => { checkbox.click() })
+    const dialogSave = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')).find((button) => button.textContent?.trim() === '保存する')!
+    await act(async () => { dialogSave.click() })
+    await eventually(() => expect(net.calls.some((call) => call.name === 'friends.addTag' && call.args[0] === 'friend-1' && call.args[1] === 'tag-vip')).toBe(true))
+    expect(document.querySelector('[data-friend-tag-editor]')).toBeNull()
+  })
+
   it('管理者は「対応」の編集を開いて担当・対応状況を保存できる', async () => {
     setRole('admin')
     await render('timeline')
 
-    const editButtons = buttonsByText('編集')
+    const editButtons = supportEditButtons()
     expect(editButtons).toHaveLength(1)
     await act(async () => {
       editButtons[0].click()
     })
     await eventually(() => {
-      expect(host.querySelector('[data-support-editor]')).toBeTruthy()
+      expect(document.querySelector('[role="dialog"]')).toBeTruthy()
       expect(net.calls.some((c) => c.name === 'chats.get' && c.args[0] === 'friend-1')).toBe(true)
       expect(net.calls.some((c) => c.name === 'operators.list')).toBe(true)
     })
 
-    const statusSelect = host.querySelector<HTMLSelectElement>('select[aria-label="対応状況を変える"]')!
-    const operatorSelect = host.querySelector<HTMLSelectElement>('select[aria-label="担当者を変える"]')!
+    const statusSelect = document.querySelector<HTMLSelectElement>('select[aria-label="対応状況を変える"]')!
+    const operatorSelect = document.querySelector<HTMLSelectElement>('select[aria-label="担当者を変える"]')!
     // いまの値（chatDetail）が入っている
     expect(statusSelect.value).toBe('in_progress')
     expect(operatorSelect.value).toBe('op-1')
@@ -404,40 +440,43 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
       const call = net.calls.find((c) => c.name === 'chats.update')
       expect(call).toBeTruthy()
       expect(call!.args[0]).toBe('friend-1')
-      expect(call!.args[1]).toEqual({ status: 'resolved', operatorId: 'op-2', revision: 3 })
+      expect(call!.args[1]).toEqual({ status: 'resolved', operatorId: 'op-2', notes: '折り返し予定', revision: 3 })
     })
-    await eventually(() => expect(host.textContent).toContain('担当・対応状況を更新しました'))
+    await eventually(() => expect(document.body.textContent).toContain('対応状況とメモを更新しました'))
   })
 
   it('「未割り当て」を選ぶと operatorId=null で送る', async () => {
     setRole('admin')
     await render('timeline')
     await act(async () => {
-      buttonsByText('編集')[0].click()
+      supportEditButtons()[0].click()
     })
-    await eventually(() => expect(host.querySelector('[data-support-editor]')).toBeTruthy())
-    await setSelectValue(host.querySelector<HTMLSelectElement>('select[aria-label="担当者を変える"]')!, '')
+    await eventually(() => expect(document.querySelector('[role="dialog"]')).toBeTruthy())
+    await setSelectValue(document.querySelector<HTMLSelectElement>('select[aria-label="担当者を変える"]')!, '')
     await act(async () => {
       buttonsByText('保存する')[0].click()
     })
     await eventually(() => {
       const call = net.calls.find((c) => c.name === 'chats.update')
-      expect(call!.args[1]).toEqual({ status: 'in_progress', operatorId: null, revision: 3 })
+      expect(call!.args[1]).toEqual({ status: 'in_progress', operatorId: null, notes: '折り返し予定', revision: 3 })
     })
   })
 
   it('chats編集キーを持つstaffにも同じ口が出る', async () => {
     setRole('staff', ['/chats'])
     await render('timeline')
-    expect(buttonsByText('編集')).toHaveLength(1)
+    expect(supportEditButtons()).toHaveLength(1)
   })
 
   it('chats編集キーの無いstaffには編集口を出さない（受信箱への案内だけ）', async () => {
     setRole('staff', ['/friends'])
     await render('timeline')
     // 「編集」はボタンではなく受信箱へのリンクのまま
-    expect(buttonsByText('編集')).toHaveLength(0)
-    expect(linksByText('編集').length).toBeGreaterThan(0)
-    expect(host.querySelector('[data-support-editor]')).toBeNull()
+    expect(supportEditButtons()).toHaveLength(0)
+    expect(linksByText('受信箱で開く').length).toBeGreaterThan(0)
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

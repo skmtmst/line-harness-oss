@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import { getLineAccountScopeEntries } from '../src/line-accounts.js';
+import { getLineAccountScopeEntries, getLineAccountLoginChannels } from '../src/line-accounts.js';
 import { asD1 } from './d1-test-helper.js';
 
 describe('LINE account authorization scope query', () => {
@@ -19,11 +19,13 @@ describe('LINE account authorization scope query', () => {
          is_active, is_default, tenant_id, display_order)
       VALUES (?, ?, ?, 'plain-token', 'plain-secret',
               'not-valid-ciphertext', 'not-valid-ciphertext',
-              'login-id', 'login-secret', 'liff-id', 1, 0, ?, ?)
+              ?, ?, ?, 1, 0, ?, ?)
     `);
-    insert.run('default-account', 'default-channel', '既定', DEFAULT_TENANT_ID, 1);
-    insert.run('legacy-account', 'legacy-channel', '旧行', null, 2);
-    insert.run('tenant-b-account', 'tenant-b-channel', 'B', 'tenant-b', 3);
+    // 542の一意制約(login_channel_id/liff_id)に合わせ、行ごとに別値を使う。
+    // 絞り込み(tenant_id)・認証範囲の主張は変えない。
+    insert.run('default-account', 'default-channel', '既定', 'login-id-default', 'login-secret-default', 'liff-id-default', DEFAULT_TENANT_ID, 1);
+    insert.run('legacy-account', 'legacy-channel', '旧行', 'login-id-legacy', 'login-secret-legacy', 'liff-id-legacy', null, 2);
+    insert.run('tenant-b-account', 'tenant-b-channel', 'B', 'login-id-tenant-b', 'login-secret-tenant-b', 'liff-id-tenant-b', 'tenant-b', 3);
 
     const rows = await getLineAccountScopeEntries(asD1(sqlite), DEFAULT_TENANT_ID);
 
@@ -40,6 +42,11 @@ describe('LINE account authorization scope query', () => {
     expect(rows[0]).not.toHaveProperty('channel_access_token');
     expect(rows[0]).not.toHaveProperty('channel_secret');
     expect(rows[0]).not.toHaveProperty('login_channel_secret');
+    const loginChannels = await getLineAccountLoginChannels(asD1(sqlite), { accountId: 'default-account' });
+    expect(loginChannels).toEqual([{ id: 'default-account', tenant_id: DEFAULT_TENANT_ID, login_channel_id: 'login-id-default' }]);
+    expect(await getLineAccountLoginChannels(asD1(sqlite), { loginChannelId: 'login-id-tenant-b' }))
+      .toEqual([{ id: 'tenant-b-account', tenant_id: 'tenant-b', login_channel_id: 'login-id-tenant-b' }]);
+    expect(await getLineAccountLoginChannels(asD1(sqlite), { accountId: 'missing' })).toEqual([]);
     sqlite.close();
   });
 });

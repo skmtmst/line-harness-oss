@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { sqlIdSet } from './id-queries.js';
 /**
  * account_settings table helpers.
  *
@@ -5,6 +7,7 @@
  * Each setting is a JSON-encoded string so the column type never changes.
  */
 import { featureCatalogEntry, type FeatureId } from '@line-crm/shared';
+
 
 // SQL だけを組み立てる関数は D1 の型に触れないよう別ファイルへ置く。
 // scripts の型検査は Workers 型を読み込まないため、この表から
@@ -31,7 +34,7 @@ export async function getAccountSetting(
  * Retrieve several raw setting values for an account in one round trip.
  *
  * 管理APIが機能設定の束を読むとき、キーごとに getAccountSetting を投げると
- * 往復が本数分だけかかる(#633)。まとめて取って欠けたキーは「未設定」と
+ * 往復が本数分だけかかる。まとめて取って欠けたキーは「未設定」と
  * 同じ扱いにする（返値へキーが出ない）。
  */
 export async function getAccountSettings(
@@ -44,9 +47,9 @@ export async function getAccountSettings(
   const result = await db
     .prepare(
       `SELECT key, value FROM account_settings
-       WHERE line_account_id = ? AND key IN (${unique.map(() => '?').join(',')})`,
+       WHERE line_account_id = ? AND key IN (${sqlIdSet(unique).sql})`,
     )
-    .bind(accountId, ...unique)
+    .bind(accountId, ...(unique.length ? sqlIdSet(unique).binds : []))
     .all<{ key: string; value: string }>();
   return Object.fromEntries(result.results.map((row) => [row.key, row.value]));
 }
@@ -61,7 +64,7 @@ export async function setAccountSetting(
   value: string,
 ): Promise<void> {
   const id = crypto.randomUUID();
-  const now = new Date(Date.now() + 9 * 60 * 60_000)
+  const now = japanCalendar()
     .toISOString()
     .replace('Z', '+09:00');
 
@@ -109,7 +112,7 @@ export async function saveVersionedAccountSetting<T>(
     data: input.data,
   };
   const value = JSON.stringify(next);
-  const now = new Date(Date.now() + 9 * 60 * 60_000)
+  const now = japanCalendar()
     .toISOString()
     .replace('Z', '+09:00');
 
@@ -334,4 +337,21 @@ export async function setMileageManualAdjustmentPolicy(
     MILEAGE_MANUAL_ADJUSTMENT_POLICY_KEY,
     JSON.stringify({ approvalThreshold: policy.approvalThreshold }),
   );
+}
+
+/** 初期セットは実際に保存された機能の束があるときだけ完了。 */
+export async function hasSavedFeatureConfiguration(db: D1Database, accountId: string): Promise<boolean> {
+  return isSavedFeatureConfiguration(await getAccountSetting(db, accountId, 'feature.settings_bundle_v1'));
+}
+
+/** 保存された機能の束の値が「済み」と言える形か。全アカウントの集計も同じ判定を使う。 */
+export function isSavedFeatureConfiguration(value: string | null | undefined): boolean {
+  if (!value) return false;
+  try {
+    const data = JSON.parse(value);
+    const features = data?.data?.features;
+    return Number.isInteger(data.version) && data.version >= 1 && features != null
+      && typeof features === 'object' && !Array.isArray(features)
+      && Object.keys(features).length > 0 && Object.values(features).every((flag) => typeof flag === 'boolean');
+  } catch { return false; }
 }

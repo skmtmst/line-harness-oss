@@ -1,6 +1,8 @@
 'use client'
 
-import { Plus, X } from 'lucide-react'
+import choiceStyles from './choice-field.module.css'
+import { inputPlaceholder } from './input-placeholder'
+import { ChevronDown, Plus, X } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import Checkbox from '@/components/shared/checkbox'
@@ -8,6 +10,9 @@ import { OptionMatch } from './combobox'
 import type { ComboboxOption } from './combobox'
 import MenuPortal from './menu-portal'
 import styles from './multi-select.module.css'
+import { isImeComposing } from './ime'
+import { joinDescribedBy, useFieldContext } from './field-context'
+import { formatNumber } from '@/lib/format'
 
 export type MultiSelectOption = ComboboxOption
 
@@ -39,7 +44,7 @@ export interface MultiSelectProps {
 }
 
 /**
- * 複数選択。Pencil ★V7 `WUVcz`「候補つき入力・複数選択」§2。
+ * 複数選択。Pencil ★V8（V8.pen）「複数選ぶ（札＋N）」。
  *
  * 欄・候補の見た目と動きは Combobox（§1）と同じ。
  *
@@ -69,8 +74,11 @@ export default function MultiSelect({
   placeholder = '選ぶ',
   values,
 }: MultiSelectProps) {
+  // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る。
+  const field = useFieldContext()
+  const invalid = Boolean(error) || Boolean(field?.invalid)
   const generatedId = useId()
-  const inputId = id ?? `${generatedId}-input`
+  const inputId = id ?? field?.controlId ?? `${generatedId}-input`
   const listboxId = `${generatedId}-listbox`
   const errorId = `${generatedId}-error`
   const rootRef = useRef<HTMLDivElement>(null)
@@ -127,6 +135,8 @@ export default function MultiSelect({
   }
 
   const onInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    // 変換中のキー（確定の Enter・候補の上下・Esc）は日本語入力のもの。候補を選ばない。
+    if (isImeComposing(event)) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       if (!open) {
@@ -162,7 +172,7 @@ export default function MultiSelect({
     }
   }
 
-  const statusText = !open ? '' : loading ? '探しています' : `${matches.length}件の候補`
+  const statusText = !open ? '' : loading ? '探しています' : `${formatNumber(matches.length)}件の候補`
 
   return (
     <div
@@ -178,7 +188,8 @@ export default function MultiSelect({
         : null}
       <div
         ref={fieldRef}
-        className={[styles.field, open ? styles.open : null, error ? styles.invalid : null, disabled ? styles.disabled : null]
+        data-choice-field data-choice-surface="select" data-choice-invalid={invalid || undefined} data-choice-disabled={disabled || undefined}
+        className={[choiceStyles.frame, styles.field, open ? styles.open : null, invalid ? styles.invalid : null, disabled ? styles.disabled : null]
           .filter(Boolean)
           .join(' ')}
         onClick={() => {
@@ -189,7 +200,7 @@ export default function MultiSelect({
         }}
       >
         {visibleChips.map((chip) => (
-          <span key={chip.value} className={styles.chip} title={chip.label}>
+          <span key={chip.value} data-choice-chip className={styles.chip} title={chip.label}>
             {chip.dot ? <span aria-hidden="true" data-dot={chip.dot} className={styles.dot} /> : null}
             <span className={styles.chipLabel}>{chip.label}</span>
             {!disabled ? (
@@ -212,7 +223,7 @@ export default function MultiSelect({
         {overflowCount > 0 ? (
           <button
             type="button"
-            aria-label={`残り${overflowCount}件を表示`}
+            aria-label={`残り${formatNumber(overflowCount)}件を表示`}
             onMouseDown={(event) => event.preventDefault()}
             onClick={(event) => {
               event.stopPropagation()
@@ -228,18 +239,19 @@ export default function MultiSelect({
           ref={inputRef}
           id={inputId}
           type="text"
+          data-choice-trigger
           role="combobox"
           aria-label={ariaLabel}
           aria-expanded={open}
           aria-controls={listboxId}
           aria-activedescendant={open && active ? `${listboxId}-${activeMatchIndex}` : undefined}
           aria-autocomplete="list"
-          aria-invalid={Boolean(error) || undefined}
-          aria-describedby={error ? errorId : undefined}
+          aria-invalid={invalid || undefined}
+          aria-describedby={joinDescribedBy(error ? errorId : undefined, field?.describedBy)}
           aria-busy={loading || undefined}
           autoComplete="off"
           disabled={disabled}
-          placeholder={selected.length === 0 ? placeholder : undefined}
+          placeholder={selected.length === 0 ? inputPlaceholder(placeholder) : undefined}
           value={query}
           onFocus={() => {
             if (!disabled) setOpen(true)
@@ -252,6 +264,7 @@ export default function MultiSelect({
           onKeyDown={onInputKeyDown}
           className={styles.input}
         />
+        <ChevronDown data-choice-chevron aria-hidden="true" />
       </div>
       {open ? (
         <MenuPortal
@@ -267,7 +280,7 @@ export default function MultiSelect({
           style={{ position: 'static', width: '100%' }}
         >
           <div className={styles.summary}>
-            <span>{values.length}件選択中</span>
+            <span>{formatNumber(values.length)}件選択中</span>
             <button
               type="button"
               disabled={disabled || values.length === 0}

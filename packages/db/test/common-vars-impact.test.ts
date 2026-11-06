@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getCommonVarMap, getCommonVarUsageImpact } from '../src/common-vars';
+import { getCommonVarMap, getCommonVarUsageImpact } from '../src/common-vars/index';
 import { asD1 } from './d1-test-helper';
 
 describe('common variable usage impact', () => {
@@ -50,7 +50,7 @@ describe('common variable usage impact', () => {
   });
 
   /*
-    IDEA-14: 送信を始めた配信は送信開始時点の値の写し（snapshot）を持ち、
+    送信を始めた配信は送信開始時点の値の写し（snapshot）を持ち、
     共通情報を直してもその配信は変わらない。「配信中だから変わる」と
     数えると画面の説明と処理がずれるので、写しの有無で分ける。
   */

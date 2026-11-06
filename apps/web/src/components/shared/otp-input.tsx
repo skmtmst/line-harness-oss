@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, type ClipboardEvent, type KeyboardEvent } from 'react'
+import { Check } from 'lucide-react'
+import { joinDescribedBy, useFieldContext } from './field-context'
 import styles from './otp-input.module.css'
 
 /**
- * 認証コード入力（6マス）。Pencil ★V7 `xHzFK`「★ V7 共通 認証コード入力（6マス）」、1マスは `ENP7x`。
+ * 認証コード入力（6マス）。Pencil ★V8 `RfHCo`「OTP入力」、できたときは `cMbie`。
  *
  * 2段階認証・重要操作の再確認の6桁コードを、1マス1桁で入れる。
- * 動きの手本は kobra.systems の Input OTP（コードは写していない。docs/v7-reference-ui-adoption.md）。
+ * 動きの手本は kobra.systems の Input OTP（コードは写していない）。
  *
  * - 値は左から詰めた数字の列（`value`）。空いたマスを押しても、次に入れるマスへ移る
  * - 貼り付け・自動入力（iPhone・Mac のパスワード機能など）は、押した位置から振り分ける。
@@ -16,7 +18,37 @@ import styles from './otp-input.module.css'
  * - Backspace は消して前へ、Delete はそのマスを消す、←→・Home・End で移動
  * - 日本語入力の変換中は受け取らない
  * - 6マスは1つのまとまり（role="group"）。名前は `labelledBy`（見出しの id）か `label` で渡す
+ * - 全角の数字（１２３）は半角にして受ける。数字以外は入らない
+ * - 6桁そろった瞬間に `onComplete` を1回だけ呼ぶ（送るボタンを押させない）。確かめている間
+ *   （`busy`）は枠を押せない形にして輪を出し、同じ6桁を二重に送らない
+ * - 違った（`invalid` が立った）ら、6桁を消して1マス目へ戻し、枠を赤くして横に揺らす
+ *   （動きを減らす設定では揺らさない）。通った（`success`）ら緑の枠と ✓
+ * - 確かめている間・通った後も、マスは薄くせず数字を読めるまま残す
+ * - 下のボタンが回る印を出す画面は `inlineStatus={false}` で、マスのそばの輪と ✓ を出さない
  */
+/** 全角の数字を半角に。数字以外は落とす。 */
+export function otpDigits(raw: string): string {
+  return raw.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/\D/g, '')
+}
+
+/**
+ * 確かめの失敗を人の言葉に（サーバーの文をそのまま出さない所だけ置き換える）。
+ * 違うコード・回数の上限・期限切れ・使用済み。ほかはそのまま返す。
+ */
+export function otpFailureMessage(message: string, { wrongCode = 'コードが違います。もう一度入れてください' }: { wrongCode?: string } = {}): string {
+  if (/正しくありません|invalid|incorrect|違います/i.test(message)) return wrongCode
+  // 次にすることまで書いてある文（「ログインからやり直してください」など）はそのまま。
+  if (/やり直して/.test(message)) return message
+  if (/回数|too many|rate/i.test(message)) return '何度か違うコードが入りました。少し待ってから、もう一度入れてください'
+  if (/使用済み/.test(message)) return 'このコードはもう使いました。認証アプリに出ている次のコードを入れてください'
+  if (/有効時間|期限|expired/i.test(message)) {
+    return /コード/.test(message)
+      ? 'コードの時間が切れました。認証アプリに出ている新しいコードを入れてください'
+      : '時間が切れました。はじめからやり直してください'
+  }
+  return message
+}
+
 export default function OtpInput({
   value,
   onChange,
@@ -29,7 +61,14 @@ export default function OtpInput({
   invalid = false,
   disabled = false,
   autoFocus = false,
+  success = false,
+  busy = false,
+  visualLabel,
+  inlineStatus = true,
 }: {
+  /** マスのそばに確かめ中の輪と通った ✓ を出すか。ボタンが状態を言う画面では false。 */
+  inlineStatus?: boolean
+  visualLabel?: string
   value: string
   onChange: (value: string) => void
   /** 全マスがそろった瞬間に1回呼ぶ。 */
@@ -45,14 +84,55 @@ export default function OtpInput({
   invalid?: boolean
   disabled?: boolean
   autoFocus?: boolean
+  /**
+   * 確認できた（コードが合った）とき true。V8 では6マスに緑の輪郭が
+   * 順に描かれる。呼び出し側が検証結果を持っているときだけ渡す。
+   */
+  success?: boolean
+  /** 確かめを送っている間。枠を押せない形にして輪を出す（disabled と同じく入力を止める）。 */
+  busy?: boolean
 }) {
+  const field = useFieldContext()
+  describedBy = joinDescribedBy(describedBy, field?.describedBy)
   const refs = useRef<Array<HTMLInputElement | null>>([])
   /**
    * 値を変えたあとに移るマス。値が画面に反映される前に移ると、移った先が
    * 古い値を見て「空いたマスが先にある」と判断し、1マス目へ戻してしまう。
    */
   const pendingFocus = useRef<number | null>(null)
-  const digits = value.replace(/\D/g, '').slice(0, length)
+  const normalize = otpDigits
+  const digits = normalize(value).slice(0, length)
+  const locked = disabled || busy
+  const groupRef = useRef<HTMLDivElement | null>(null)
+
+  /*
+   * 違った瞬間（invalid が立った）に、6桁を消して1マス目へ戻し、揺れをはじめからやり直す。
+   * 画面が key で作り直している場合も、ここは何もしない（値はもう空）。
+   */
+  const wasInvalid = useRef(invalid)
+  const wasBusy = useRef(busy)
+  useEffect(() => {
+    // 誤りが新しく出たとき。誤りの文が出たまま打ち直して、また違った（確かめが終わった）ときも。
+    const rising = invalid && (!wasInvalid.current || (wasBusy.current && !busy))
+    wasInvalid.current = invalid
+    wasBusy.current = busy
+    if (!rising) return
+    const group = groupRef.current
+    if (group) {
+      group.removeAttribute('data-state')
+      void group.offsetWidth
+      group.setAttribute('data-state', 'error')
+    }
+    if (digits.length > 0) {
+      pendingFocus.current = 0
+      if (field?.onInvalidReset) field.onInvalidReset()
+      else onChange('')
+    } else {
+      focusSlot(0)
+    }
+    // invalid の立ち上がり・確かめの終わりだけを見る。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invalid, busy])
 
   const focusSlot = (index: number) => {
     const target = refs.current[Math.max(0, Math.min(index, length - 1))]
@@ -75,7 +155,7 @@ export default function OtpInput({
   }, [value])
 
   const commit = (next: string, focusIndex: number) => {
-    const clean = next.replace(/\D/g, '').slice(0, length)
+    const clean = normalize(next).slice(0, length)
     const target = Math.min(focusIndex, clean.length)
     // 値が変わらない（同じ数字で上書きした）ときは画面が作り直されないので、その場で移る。
     if (clean === digits) {
@@ -84,13 +164,14 @@ export default function OtpInput({
     }
     pendingFocus.current = target
     onChange(clean)
-    if (clean.length === length && digits.length !== length) onComplete?.(clean)
+    // 6桁そろった瞬間に1回だけ。確かめている間・止めている間は送らない（二重送信を防ぐ）。
+    if (clean.length === length && digits.length !== length && !locked) onComplete?.(clean)
   }
 
   /** 位置 index から数字の並びを書き込む。貼り付け・自動入力・1桁の入力で共通。 */
   const writeFrom = (index: number, incoming: string) => {
     const start = Math.min(index, digits.length)
-    const numbers = incoming.replace(/\D/g, '')
+    const numbers = normalize(incoming)
     if (!numbers) return
     const next = (digits.slice(0, start) + numbers + digits.slice(start + numbers.length)).slice(0, length)
     commit(next, start + numbers.length)
@@ -98,7 +179,7 @@ export default function OtpInput({
 
   const onKeyDown = (index: number, event: KeyboardEvent<HTMLInputElement>) => {
     if (event.nativeEvent.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
-    if (/^\d$/.test(event.key)) {
+    if (/^[0-9０-９]$/.test(event.key)) {
       event.preventDefault()
       writeFrom(index, event.key)
       return
@@ -140,52 +221,67 @@ export default function OtpInput({
     writeFrom(index, event.clipboardData.getData('text'))
   }
 
+  const renderSlot = (index: number) => (
+    <input
+      key={index}
+      ref={(node) => { refs.current[index] = node }}
+      id={index === 0 ? id : undefined}
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      autoComplete={index === 0 ? 'one-time-code' : 'off'}
+      aria-label={`${index + 1}桁目`}
+      aria-invalid={invalid || undefined}
+      disabled={locked}
+      value={digits[index] ?? ''}
+      data-input-field
+      className={styles.slot}
+      onKeyDown={(event) => onKeyDown(index, event)}
+      onPaste={(event) => onPaste(index, event)}
+      // 変換確定・自動入力・携帯のキーボードなど、keydown で数字が来ない入力はここで受ける。
+      onChange={(event) => {
+        const typed = normalize(event.target.value)
+        const current = digits[index] ?? ''
+        if (!typed) {
+          if (current) commit(digits.slice(0, index) + digits.slice(index + 1), index)
+          return
+        }
+        // 入った数字は、このマスから順に書き込む。フォーカスのたびに中身を選ぶので、
+        // 普通に打てば1桁で上書きになる。まとめて入った（自動入力・続けて打たれた）ときは順に並ぶ。
+        writeFrom(index, typed)
+      }}
+      onFocus={(event) => {
+        // 空いたマスが先にあるなら、そこへ移る（左から詰めて入れる）。
+        if (index > digits.length) {
+          focusSlot(digits.length)
+          return
+        }
+        event.currentTarget.select?.()
+      }}
+    />
+  )
+
   return (
+    <div className={styles.field}>
+      {visualLabel ? <span className={styles.label}>{visualLabel}</span> : null}
     <div
       role="group"
       aria-label={labelledBy ? undefined : (label ?? '認証コード')}
       aria-labelledby={labelledBy}
       aria-describedby={describedBy}
+      ref={groupRef}
       className={styles.group}
+      data-format="digits"
+      data-state={invalid ? 'error' : success ? 'success' : undefined}
+      aria-busy={busy || undefined}
     >
-      {Array.from({ length }, (_, index) => (
-        <input
-          key={index}
-          ref={(node) => { refs.current[index] = node }}
-          id={index === 0 ? id : undefined}
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          autoComplete={index === 0 ? 'one-time-code' : 'off'}
-          aria-label={`${index + 1}桁目`}
-          aria-invalid={invalid || undefined}
-          disabled={disabled}
-          value={digits[index] ?? ''}
-          className={styles.slot}
-          onKeyDown={(event) => onKeyDown(index, event)}
-          onPaste={(event) => onPaste(index, event)}
-          // 変換確定・自動入力・携帯のキーボードなど、keydown で数字が来ない入力はここで受ける。
-          onChange={(event) => {
-            const typed = event.target.value.replace(/\D/g, '')
-            const current = digits[index] ?? ''
-            if (!typed) {
-              if (current) commit(digits.slice(0, index) + digits.slice(index + 1), index)
-              return
-            }
-            // 入った数字は、このマスから順に書き込む。フォーカスのたびに中身を選ぶので、
-            // 普通に打てば1桁で上書きになる。まとめて入った（自動入力・続けて打たれた）ときは順に並ぶ。
-            writeFrom(index, typed)
-          }}
-          onFocus={(event) => {
-            // 空いたマスが先にあるなら、そこへ移る（左から詰めて入れる）。
-            if (index > digits.length) {
-              focusSlot(digits.length)
-              return
-            }
-            event.currentTarget.select?.()
-          }}
-        />
-      ))}
+      <span className={styles.cluster}>{[0, 1, 2].map(renderSlot)}</span>
+      <span className={styles.cluster}>{[3, 4, 5].map(renderSlot)}</span>
+      {inlineStatus && busy ? <span className={styles.spinner} aria-hidden="true" /> : null}
+      {inlineStatus && success && !busy ? <Check className={styles.check} size={20} aria-hidden="true" /> : null}
+    </div>
+    {/* 確かめている・通ったを読み上げにも伝える（見た目の輪・✓ と同じ時に）。 */}
+    <span className={styles.srOnly} role="status" aria-live="polite">{busy ? '確かめています' : success ? '確認できました' : ''}</span>
     </div>
   )
 }

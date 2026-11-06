@@ -1,3 +1,5 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
   getEcOrderDetail,
@@ -8,8 +10,9 @@ import {
   type EcActionExecutionStatus,
   type EcOrderState,
 } from '@line-crm/db';
+
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -39,12 +42,8 @@ function lineAccountId(c: Context<Env>): string | null {
 }
 
 function pagination(c: Context<Env>): { limit: number; offset: number } {
-  const rawLimit = Number(c.req.query('limit') ?? 20);
-  const rawOffset = Number(c.req.query('offset') ?? 0);
-  return {
-    limit: Number.isInteger(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 20,
-    offset: Number.isInteger(rawOffset) ? Math.max(rawOffset, 0) : 0,
-  };
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 20, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'integer', minimum: 0 } });
+  return { limit, offset };
 }
 
 async function visible(c: Context<Env>, accountId: string): Promise<boolean> {
@@ -67,9 +66,17 @@ ecOperations.get(
   async (c) => {
     const accountId = lineAccountId(c);
     const status = c.req.query('status')?.trim() || null;
+    const from = c.req.query('from')?.trim() || null;
+    const to = c.req.query('to')?.trim() || null;
     if (!accountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
     if (status && !ORDER_STATES.has(status as EcOrderState)) {
       return c.json({ success: false, error: '注文の状態が正しくありません' }, 400);
+    }
+    if ((from === null) !== (to === null)
+        || (from !== null && (!Number.isFinite(Date.parse(from)) || new Date(from).toISOString() !== from))
+        || (to !== null && (!Number.isFinite(Date.parse(to)) || new Date(to).toISOString() !== to))
+        || (from !== null && to !== null && from >= to)) {
+      return c.json({ success: false, error: '注文日の範囲が正しくありません' }, 400);
     }
     if (!await visible(c, accountId)) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
@@ -78,18 +85,18 @@ ecOperations.get(
       const page = pagination(c);
       const data = await listEcOrders(c.env.DB, {
         lineAccountId: accountId, status: status as EcOrderState | null,
+        from, to,
         query: c.req.query('query')?.trim().slice(0, 100) || '', ...page,
       });
-      return c.json({ success: true, data, pagination: { total: data.total, ...page } });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: page, sort: [{ field: 'orderedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
     } catch (error) {
-      console.error('GET /api/ec-commerce/orders error:', error);
-      return c.json({ success: false, error: '注文を確認できませんでした' }, 500);
+      throw error;
     }
   },
 );
 
 /*
- * IDEA-23: 1注文の処理状況（届いた出来事・通知・発送後の案内・成果/マイル/
+ * 1注文の処理状況（届いた出来事・通知・発送後の案内・成果/マイル/
  * スコア）をまとめて返す。一覧の各注文から「この注文の状況」を開くための口。
  */
 ecOperations.get(
@@ -109,8 +116,7 @@ ecOperations.get(
       if (!data) return c.json({ success: false, error: '注文が見つかりません' }, 404);
       return c.json({ success: true, data });
     } catch (error) {
-      console.error('GET /api/ec-commerce/orders/:id error:', error);
-      return c.json({ success: false, error: '注文の処理状況を確認できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -146,10 +152,9 @@ ecOperations.get(
         status: status as EcActionExecutionStatus | null,
         statuses: statusGroup ? groupStatuses[statusGroup] : null, ...page,
       });
-      return c.json({ success: true, data, pagination: { total: data.total, ...page } });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: page, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
     } catch (error) {
-      console.error('GET /api/ec-commerce/action-executions error:', error);
-      return c.json({ success: false, error: 'ECの処理履歴を確認できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -158,14 +163,14 @@ ecOperations.post(
   '/api/ec-commerce/action-executions/:id/retry',
   requireRole('owner', 'admin', 'staff'),
   requireEcPermission('ec.action.retry'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     type RetryBody = { lineAccountId?: unknown; expectedVersion?: unknown };
     const body = await c.req.json<RetryBody>().catch((): RetryBody => ({}));
     const key = c.req.header('Idempotency-Key')?.trim() ?? '';
     if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()
       || !Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1
       || key.length < 8 || key.length > 200) {
-      return c.json({ success: false, error: '対象アカウント、版、再実行キーを確認してください' }, 400);
+      return inputError(c, { success: false, error: '対象アカウント、版、再実行キーを確認してください' }, 400, ["lineAccountId","expectedVersion"]);
     }
     const accountId = body.lineAccountId.trim();
     if (!await visible(c, accountId)) {
@@ -194,8 +199,7 @@ ecOperations.post(
       auditLog(c, 'ec.action.retry', { kind: 'ec-action-execution', id: result.execution.id });
       return c.json({ success: true, data: result.execution }, result.kind === 'queued' ? 202 : 200);
     } catch (error) {
-      console.error('POST /api/ec-commerce/action-executions/:id/retry error:', error);
-      return c.json({ success: false, error: 'ECの処理を再試行できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -221,10 +225,9 @@ ecOperations.get(
         status: rawStatus as IdentityState,
         ...page,
       });
-      return c.json({ success: true, data, pagination: { total: data.total, ...page } });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: page, sort: [{ field: 'detectedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
     } catch (error) {
-      console.error('GET /api/ec-commerce/identity-candidates error:', error);
-      return c.json({ success: false, error: '会員のつき合わせを確認できませんでした' }, 500);
+      throw error;
     }
   },
 );

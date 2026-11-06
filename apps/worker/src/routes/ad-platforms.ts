@@ -1,7 +1,13 @@
+import { logger } from '@line-crm/shared/server';
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
+import { auditLog } from '../lib/audit-log.js';
 import {
   AD_PLATFORM_SECRET_KEYS,
+  getAdConversionRetrySource,
   getAdPlatforms,
+  connectVerifiedAdPlatform,
   getAdPlatformById,
   getAdPlatformForVerify,
   createAdPlatform,
@@ -18,11 +24,14 @@ import {
   type AdPlatformWriteScope,
 } from '@line-crm/db';
 import type { AdConversionLog } from '@line-crm/db';
-import { sendAdConversions } from '../services/ad-conversion.js';
-import type { Env } from '../index.js';
+import { fail } from '../lib/fail.js';
+
+import { verifyAdPlatformReadAccess } from '../services/ad-cost-import.js';
+import { sendAdConversions, retryAdConversion, AdConversionRetryError } from '../services/ad-conversion.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { listLimit, listPage } from './list-pagination.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 
 /**
  * 画面へ返す形。秘密の値は出さず、設定済みの鍵名だけ出す。
@@ -69,7 +78,7 @@ async function readDisplayConfig(
     const secrets = JSON.parse(await decryptCredential(p.config_encrypted, encryptionKey));
     return { values: parsed, secretKeys: Object.keys(secrets) };
   } catch (err) {
-    console.error('[ad-platforms] cannot decrypt platform secrets:', err);
+    logger.error("ad_platforms.read_display_config_failed");
     return { values: parsed, secretKeys: [] };
   }
 }
@@ -89,9 +98,11 @@ function serializeLog(log: AdConversionLog) {
   };
 }
 
+import { adEventMappings } from './ad-event-mappings.js';
 const adPlatforms = new Hono<Env>();
+adPlatforms.route('/', adEventMappings);
 
-// GET /api/ad-platforms - list visible accounts only
+// 可視範囲内の広告アカウントだけを一覧に返す。
 adPlatforms.get('/api/ad-platforms', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
@@ -110,13 +121,12 @@ adPlatforms.get('/api/ad-platforms', requireRole('owner', 'admin', 'staff'), asy
       data: await Promise.all(visible.map((item) => serializePlatform(item, key))),
     });
   } catch (err) {
-    console.error('GET /api/ad-platforms error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/ad-platforms - create
-adPlatforms.post('/api/ad-platforms', requireRole('owner'), async (c) => {
+adPlatforms.post('/api/ad-platforms', requireRole('owner'), inputJsonBoundary({"name":["string"],"displayName":["string"],"config":["object"],"lineAccountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -126,11 +136,11 @@ adPlatforms.post('/api/ad-platforms', requireRole('owner'), async (c) => {
     }>();
 
     if (!body.name || !body.config) {
-      return c.json({ success: false, error: 'name and config are required' }, 400);
+      return inputError(c, { success: false, error: 'name and config are required' }, 400, ["name","config"]);
     }
     // 帰属のない設定は送信対象にならないため、作成時に必須にする。
     if (!body.lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -139,7 +149,7 @@ adPlatforms.post('/api/ad-platforms', requireRole('owner'), async (c) => {
     // 決められていない設定キーは受け付けない。秘密は暗号化して別保管にする。
     const configError = validateAdPlatformConfig(body.name, body.config);
     if (configError) {
-      return c.json({ success: false, error: configError }, 400);
+      return inputError(c, { success: false, error: configError }, 400, ["name","config"]);
     }
     const { publicConfig, secrets } = splitAdPlatformSecrets(body.config);
     let configEncrypted: string | null = null;
@@ -173,8 +183,7 @@ adPlatforms.post('/api/ad-platforms', requireRole('owner'), async (c) => {
       throw err;
     }
   } catch (err) {
-    console.error('POST /api/ad-platforms error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -187,8 +196,21 @@ async function adPlatformWriteScope(
   return { accountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned };
 }
 
+// 読み取り疎通確認を済ませた設定だけを接続する。外部応答・鍵は返さない。
+adPlatforms.post('/api/ad-platforms/:id/connect', requireRole('owner'), inputJsonBoundary(), async c => {
+  const platform = await getAdPlatformById(c.env.DB, c.req.param('id'));
+  if (!platform?.line_account_id || !await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[platform.line_account_id])) return c.json({success:false,error:'対象が見つかりません'},404);
+  try { await verifyAdPlatformReadAccess(platform,c.env.LINE_CREDENTIAL_ENCRYPTION_KEY); }
+  catch { return c.json({success:false,error:'広告の接続を確認できませんでした。アカウントID・権限・鍵を確認してください'},502); }
+  if (!await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[platform.line_account_id])) return c.json({success:false,error:'対象が見つかりません'},404);
+  const at = new Date().toISOString();
+  if (!await connectVerifiedAdPlatform(c.env.DB,platform,at)) return c.json({success:false,error:'確認中に設定が変わりました。読み直して再確認してください'},409);
+  const data: import('@line-crm/shared').AdPlatformConnectResult = {id:platform.id,connected:true,verifiedAt:at};
+  return c.json({success:true,data});
+});
+
 // PUT /api/ad-platforms/:id - update
-adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
+adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), inputJsonBoundary({"name":["string"],"displayName":["null","string"],"config":["object"],"isActive":["boolean"],"lineAccountId":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -201,7 +223,7 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
 
     // 帰属を空に戻す変更は受け付けない。
     if (body.lineAccountId !== undefined && !body.lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
     }
     const existing = await getAdPlatformById(c.env.DB, id);
     if (!existing) {
@@ -217,10 +239,7 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
 
     // 疎通確認が済むまで有効化はできない。
     if (body.isActive === true && !existing.verified_at) {
-      return c.json(
-        { success: false, error: '接続確認（テスト送信）が済んでいません。先に接続確認をしてください' },
-        422,
-      );
+      return inputError(c, { success: false, error: '接続確認（テスト送信）が済んでいません。先に接続確認をしてください' }, 422, ["isActive"]);
     }
 
     // 設定の書き換え。秘密の指定がない鍵は今の値を残し、決められていない
@@ -231,7 +250,7 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
       const targetName = body.name ?? existing.name;
       const configError = validateAdPlatformConfig(targetName, body.config);
       if (configError) {
-        return c.json({ success: false, error: configError }, 400);
+        return inputError(c, { success: false, error: configError }, 400, ["name","config"]);
       }
       const stored = await resolveAdPlatformConfig(existing, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
       if (!stored && existing.config_encrypted) {
@@ -280,13 +299,12 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
       throw err;
     }
   } catch (err) {
-    console.error('PUT /api/ad-platforms/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// POST /api/ad-platforms/test - test conversion send (must be before :id routes)
-adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
+// test が動的 ID と解釈されないよう、/:id より先に登録する。
+adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), inputJsonBoundary({"platform":["string"],"eventName":["string"],"friendId":["string"],"lineAccountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       platform: string;
@@ -296,7 +314,7 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
     }>();
 
     if (!body.platform || !body.eventName) {
-      return c.json({ success: false, error: 'platform and eventName are required' }, 400);
+      return inputError(c, { success: false, error: 'platform and eventName are required' }, 400, ["platform","eventName"]);
     }
 
     if (body.friendId) {
@@ -306,7 +324,7 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
         .bind(body.friendId)
         .first<{ line_account_id: string | null }>();
       if (!friend) {
-        return c.json({ success: false, error: 'Friend not found' }, 404);
+        return fail(c, 404, 'FRIEND_NOT_FOUND');
       }
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friend.line_account_id])) {
         return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -354,7 +372,7 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
     // あるときの取り違えと、認可対象・実送信対象のずれを防ぐため。
     const lineAccountId = body.lineAccountId?.trim();
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -376,12 +394,11 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
       },
     });
   } catch (err) {
-    console.error('POST /api/ad-platforms/test error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// DELETE /api/ad-platforms/:id - delete
+
 adPlatforms.delete('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
   try {
     const existing = await getAdPlatformById(c.env.DB, c.req.param('id'));
@@ -403,16 +420,14 @@ adPlatforms.delete('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/ad-platforms/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // GET /api/ad-platforms/logs — conversion send logs across visible platforms
 adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const page = listPage(c.req.query('page'));
-    const limit = listLimit(c.req.query('limit'), 50);
+    const { page, limit } = parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') });
     const status = c.req.query('status')?.trim();
     const query = c.req.query('query')?.trim();
     const lineAccountId = c.req.query('lineAccountId')?.trim();
@@ -430,9 +445,9 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
       scopeBindings.push(lineAccountId);
     } else if (scope!.allowedAccountIds.length) {
       scopeClauses.push(scope!.canSeeUnassigned
-        ? `(line_account_id IN (${scope!.allowedAccountIds.map(() => '?').join(',')}) OR line_account_id IS NULL)`
-        : `line_account_id IN (${scope!.allowedAccountIds.map(() => '?').join(',')})`);
-      scopeBindings.push(...scope!.allowedAccountIds);
+        ? `(line_account_id IN (${sqlIdSet(scope!.allowedAccountIds).sql}) OR line_account_id IS NULL)`
+        : `line_account_id IN (${sqlIdSet(scope!.allowedAccountIds).sql})`);
+      scopeBindings.push(...(scope!.allowedAccountIds.length ? sqlIdSet(scope!.allowedAccountIds).binds : []));
     } else {
       scopeClauses.push(scope!.canSeeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
     }
@@ -484,7 +499,7 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
 
     return c.json({
       success: true,
-      data: {
+      data: buildOffsetListResponse({
         items: logs.results.map(serializeLog),
         total: Number(count?.total ?? 0),
         summary: {
@@ -498,11 +513,11 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
           { field: 'createdAt', direction: 'desc' },
           { field: 'id', direction: 'desc' },
         ],
-      },
+        paging: { limit, offset: (page - 1) * limit },
+      }),
     });
   } catch (err) {
-    console.error('GET /api/ad-platforms/logs error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -517,16 +532,37 @@ adPlatforms.get('/api/ad-platforms/:id/logs', requireRole('owner', 'admin', 'sta
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [platform.line_account_id])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
-    const limit = listLimit(c.req.query('limit'), 50);
+    const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 50 }).limit;
     const logs = await getAdConversionLogs(c.env.DB, id, limit);
 
-    return c.json({
+    const responseItems = logs.map(serializeLog);
+    return c.json(buildOffsetListResponse({
       success: true,
-      data: logs.map(serializeLog),
-    });
+      data: responseItems,
+      items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [],
+    }));
   } catch (err) {
-    console.error('GET /api/ad-platforms/:id/logs error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
+  }
+});
+
+/** 再送する内容や宛先は引数で受けず、保存済みの1件を使う。 */
+adPlatforms.post('/api/ad-platforms/logs/:id/retry', requireRole('owner'), inputJsonBoundary(), async (c) => {
+  try {
+    const row = await getAdConversionRetrySource(c.env.DB, c.req.param('id'));
+    if (!row?.line_account_id || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [row.line_account_id])) {
+      return c.json({ success: false, error: '送信記録が見つかりません' }, 404);
+    }
+    const data = await retryAdConversion(c.env.DB, {
+      logId: row.log_id, lineAccountId: row.line_account_id, credentialKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    });
+    auditLog(c, 'ad_conversion.retry', { kind: 'ad_conversion_log', id: row.log_id }, {
+      result: data.status === 'failed' ? 'failed' : 'success', lineAccountId: row.line_account_id,
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof AdConversionRetryError) return inputError(c, { success: false, code: error.code, error: error.message }, error.status, []);
+    throw error;
   }
 });
 

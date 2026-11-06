@@ -38,7 +38,7 @@ function parseObject(value: unknown): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
-/** Collect only reference keys whose runtime contract is known. Unknown account-local IDs fail closed. */
+/** 契約が分かる参照キーだけを集め、未知のアカウント固有 ID は安全側で拒む。 */
 export function collectJsonReferences(value: unknown): ScenarioGraphReference[] {
   const refs = new Map<string, ScenarioGraphReference>();
   const add = (kind: ScenarioGraphReferenceKind, id: unknown) => {
@@ -104,11 +104,11 @@ export type ScenarioReferenceGraph = {
   tags: Map<string, ScenarioGraphRow>;
   templates: Map<string, ScenarioGraphRow>;
   references: ScenarioGraphReference[];
-  /** Stable source snapshot; callers may bind it to an immutable preflight token. */
+  /** 安定した元スナップショットを、不変の事前確認票へ結び付けられるようにする。 */
   snapshot: string;
 };
 
-/** Opaque revision persisted by preflight so execution cannot follow a newer source graph. */
+/** 実行で新しい参照グラフへ勝手に進まないよう、不透明な版を事前確認で保存する。 */
 export async function scenarioGraphSnapshotToken(snapshot: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(snapshot));
   return `hqsg1.${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')}`;
@@ -135,7 +135,7 @@ const exactGraphRowGuard = (table: string, row: ScenarioGraphRow): ScenarioGraph
   return graphGuard(`EXISTS(SELECT 1 FROM ${table} WHERE ${columns.map(column => `${column} IS ?`).join(' AND ')})`, columns.map(column => row[column]));
 };
 
-/** Reusable D1 guards for form- and rich-menu-origin planners. */
+/** フォームとリッチメニューの計画で同じ D1 の条件検査を使う。 */
 export function scenarioGraphSourceGuardStatements(graph: ScenarioReferenceGraph): ScenarioGraphStatement[] {
   const statements: ScenarioGraphStatement[] = [];
   for (const row of graph.tags.values()) statements.push(exactGraphRowGuard('tags', row));

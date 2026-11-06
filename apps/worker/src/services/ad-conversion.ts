@@ -1,3 +1,10 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { tracedFetch as fetch } from '@line-crm/shared/server';
+import { refFromOutboxSnapshot } from './ad-conversion-snapshot.js';
+class AdConversionHttpError extends Error {
+  constructor(public readonly status: number, message: string) { super(message); }
+}
+
 /**
  * 広告CV送信サービス
  *
@@ -7,9 +14,13 @@
 
 import {
   AdConversionLeaseError,
+  getAdConversionRetrySource,
+  claimAdConversionRetry,
   claimAdConversionSend,
   claimAdConversionOutboxDue,
   enqueueAdConversionOutbox,
+  mappedAdSnapshot,
+  recoverMappedAdConversions,
   finishAdConversionSend,
   finishAdConversionOutbox,
   getAdConversionOutboxById,
@@ -26,6 +37,8 @@ import {
   type AdPlatformConfig,
   type RefTracking,
 } from '@line-crm/db';
+
+
 
 const SUPPORTED_AD_PLATFORMS = ['meta', 'x', 'google', 'tiktok'] as const;
 type SupportedAdPlatform = typeof SUPPORTED_AD_PLATFORMS[number];
@@ -77,38 +90,6 @@ async function clickSnapshotForPlatform(
     consentAt: selection.consentAt,
     context: { ipAddress: selection.ipAddress, userAgent: selection.userAgent },
     reason: selection.status,
-  };
-}
-
-function refFromOutboxSnapshot(row: AdConversionOutboxRow): RefTracking | null {
-  if (row.selection_reason !== 'eligible'
-    || !row.ref_tracking_id || !row.click_id || !row.click_id_type
-    || !row.click_recorded_at || !row.click_expires_at || !row.click_consent_at) return null;
-  let context: { ipAddress?: string | null; userAgent?: string | null } = {};
-  try {
-    context = row.click_context_json ? JSON.parse(row.click_context_json) as typeof context : {};
-  } catch {
-    return null;
-  }
-  const clicks = {
-    fbclid: null, gclid: null, twclid: null, ttclid: null,
-    [row.click_id_type]: row.click_id,
-  } as Pick<RefTracking, 'fbclid' | 'gclid' | 'twclid' | 'ttclid'>;
-  return {
-    id: row.ref_tracking_id,
-    ref_code: '',
-    friend_id: row.friend_id,
-    entry_route_id: null,
-    source_url: null,
-    ...clicks,
-    utm_source: null,
-    utm_medium: null,
-    utm_campaign: null,
-    user_agent: context.userAgent ?? null,
-    ip_address: context.ipAddress ?? null,
-    line_account_id: row.line_account_id,
-    ad_conversion_consent_at: row.click_consent_at,
-    created_at: row.click_recorded_at,
   };
 }
 
@@ -192,7 +173,7 @@ export async function sendAdConversions(
       eventValue, currency: opts?.currency, amountInMinorUnit: opts?.amountInMinorUnit,
       idempotencyKey, providerEventId, clickSnapshot,
     });
-    // 緊急停止 (#1050): ad_postback が止まっている統括は outbox へ積む
+    // 緊急停止 : ad_postback が止まっている統括は outbox へ積む
     // だけにして外部への送信試行をしない。pending の行は復旧後に
     // drainAdConversionOutbox が届ける。
     if (await isOperationCapabilityStopped(db, lineAccountId, 'ad_postback')) continue;
@@ -200,6 +181,13 @@ export async function sendAdConversions(
     // 旧行の平文は鍵なしでそのまま送る。
     const fullConfig = await resolveAdPlatformConfig(platform, opts?.credentialKey);
     if (!fullConfig) continue;
+    const priorOutbox = await getAdConversionOutboxById(db, outboxId);
+    if (priorOutbox && priorOutbox.currency !== toCurrencyCode(opts?.currency)) {
+      await db.prepare(`UPDATE ad_conversion_logs SET status = 'needs-review', error_message = 'idempotency key content mismatch'
+        WHERE ad_platform_id = ? AND friend_id = ? AND event_name = ? AND idempotency_key = ?`)
+        .bind(platform.id, friendId, eventName, idempotencyKey).run();
+      continue;
+    }
     const outboxLease = await takeAdConversionOutboxRow(db, outboxId);
     if (!outboxLease) continue; // 他が送り中・送り済み
     const outboxRow = await getAdConversionOutboxById(db, outboxId);
@@ -233,6 +221,18 @@ async function attemptPlatformSend(
     errorMessage: errorMessage ?? null,
     retryable,
   });
+
+  // 初回の送信要求から90日経ったものは、自動の再試行でも送らない。
+  if (adConversionRetryExpired(outbox.row.created_at)) {
+    await finishOutbox('failed', 'retry_expired', false);
+    return 'failed';
+  }
+
+  if (args.platform.name === 'google' && outbox.row.idempotency_key.startsWith('conversion:')) {
+    const snapshot = await mappedAdSnapshot(db, outbox.row.idempotency_key.slice('conversion:'.length), args.platform.id);
+    if (!snapshot?.googleActionId) { await finishOutbox('failed', 'google_conversion_action_missing', false); return 'failed'; }
+    args.config = { ...args.config, conversion_action_id: snapshot.googleActionId };
+  }
 
   if (outbox.row.selection_reason !== 'eligible') {
     await finishOutbox('failed', outbox.row.selection_reason, false);
@@ -279,9 +279,9 @@ async function attemptPlatformSend(
       if (!(settleError instanceof AdConversionLeaseError)) throw settleError;
     }
   };
-  const markDone = async (status: 'sent' | 'failed', errorMessage?: string): Promise<void> => {
+  const markDone = async (status: 'sent' | 'failed', errorMessage?: string, retryable = true): Promise<void> => {
     await settle(status, errorMessage);
-    await finishOutbox(status, errorMessage);
+    await finishOutbox(status, errorMessage, retryable);
   };
 
   try {
@@ -305,7 +305,7 @@ async function attemptPlatformSend(
     await markDone('sent');
     return 'sent';
   } catch (error) {
-    await markDone('failed', String(error));
+    await markDone('failed', String(error), error instanceof AdConversionHttpError ? error.status === 429 || error.status >= 500 : error instanceof TypeError || (error instanceof Error && (['AbortError', 'TimeoutError'].includes(error.name) || /fetch failed|network|connection|timed? ?out|timeout/i.test(error.message))));
     return 'failed';
   }
 }
@@ -318,6 +318,7 @@ export async function drainAdConversionOutbox(
   db: D1Database,
   opts?: { limit?: number; credentialKey?: string },
 ): Promise<{ claimed: number; sent: number; failed: number }> {
+  await recoverMappedAdConversions(db, opts?.limit ?? 100);
   const rows = await claimAdConversionOutboxDue(db, { limit: opts?.limit });
   let sent = 0;
   let failed = 0;
@@ -331,7 +332,7 @@ export async function drainAdConversionOutbox(
       if (platform.line_account_id !== row.line_account_id) {
         throw new Error(`platform account changed: ${row.ad_platform_id}`);
       }
-      // 緊急停止 (#1050): ad_postback 停止中は claim を pending へ戻して
+      // 緊急停止 : ad_postback 停止中は claim を pending へ戻して
       // 外部へ出さない。停止を失敗として数えない。
       if (await isOperationCapabilityStopped(db, row.line_account_id, 'ad_postback')) {
         await finishAdConversionOutbox(db, {
@@ -401,13 +402,14 @@ async function sendMetaConversion(
 
   const response = await fetch(url, {
     method: 'POST',
+    signal: AbortSignal.timeout(15_000),
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Meta CAPI error: ${response.status} ${errorBody}`);
+    throw new AdConversionHttpError(response.status, `Meta CAPI error: ${response.status} ${errorBody}`);
   }
 }
 
@@ -504,6 +506,7 @@ async function sendXConversion(
 
   const response = await fetch(url, {
     method: 'POST',
+    signal: AbortSignal.timeout(15_000),
     headers: {
       'Content-Type': 'application/json',
       'Authorization': authorization,
@@ -513,7 +516,7 @@ async function sendXConversion(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`X Conversion API error: ${response.status} ${errorBody}`);
+    throw new AdConversionHttpError(response.status, `X Conversion API error: ${response.status} ${errorBody}`);
   }
 }
 
@@ -522,7 +525,7 @@ export const GOOGLE_ADS_API_VERSION = 'v25';
 
 /** Googleの発生時刻形式(yyyy-MM-dd HH:mm:ss+09:00)。日本時間の壁時計で送る。 */
 export function googleConversionDateTime(now: Date = new Date()): string {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(now);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${jst.getUTCFullYear()}-${pad(jst.getUTCMonth() + 1)}-${pad(jst.getUTCDate())}`
     + ` ${pad(jst.getUTCHours())}:${pad(jst.getUTCMinutes())}:${pad(jst.getUTCSeconds())}+09:00`;
@@ -552,6 +555,7 @@ async function sendGoogleConversion(
 
   const response = await fetch(url, {
     method: 'POST',
+    signal: AbortSignal.timeout(15_000),
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${config.oauth_token}`,
@@ -562,7 +566,7 @@ async function sendGoogleConversion(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Google Ads API error: ${response.status} ${errorBody}`);
+    throw new AdConversionHttpError(response.status, `Google Ads API error: ${response.status} ${errorBody}`);
   }
   // HTTP 200 でも conversions 単位の失敗が partialFailureError に入る。見落とさない。
   let payload: unknown = null;
@@ -607,6 +611,7 @@ async function sendTikTokConversion(
 
   const response = await fetch(url, {
     method: 'POST',
+    signal: AbortSignal.timeout(15_000),
     headers: {
       'Content-Type': 'application/json',
       'Access-Token': config.access_token || '',
@@ -616,6 +621,69 @@ async function sendTikTokConversion(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`TikTok Events API error: ${response.status} ${errorBody}`);
+    throw new AdConversionHttpError(response.status, `TikTok Events API error: ${response.status} ${errorBody}`);
+  }
+}
+
+/** 日時が読めない旧行も、期限内と見なして外へ送らない。 */
+export function adConversionRetryExpired(createdAt: string, now = new Date()): boolean {
+  const timestamp = Date.parse(createdAt.includes('T') ? createdAt : `${createdAt.replace(' ', 'T')}Z`);
+  return !Number.isFinite(timestamp) || timestamp > now.getTime()
+    || now.getTime() - timestamp >= 90 * 86_400_000;
+}
+
+export class AdConversionRetryError extends Error {
+  constructor(public readonly code: string, message: string, public readonly status: 404 | 409 | 410 | 422) {
+    super(message);
+  }
+}
+
+/** 待ち行列の固定値で1件だけ再送し、送信済みの再操作は同じ結果へ戻す。 */
+export async function retryAdConversion(
+  db: D1Database, input: { logId: string; lineAccountId: string; credentialKey?: string },
+): Promise<import('@line-crm/shared').AdConversionRetryResult> {
+  const row = await getAdConversionRetrySource(db, input.logId);
+  if (!row || row.line_account_id !== input.lineAccountId) {
+    throw new AdConversionRetryError('not_found', '送信記録が見つかりません', 404);
+  }
+  if (adConversionRetryExpired(row.created_at)) {
+    throw new AdConversionRetryError('retry_expired', '初回の送信要求から90日経ったため、やり直せません', 410);
+  }
+  if (!row.provider_event_id || row.log_provider_event_id !== row.provider_event_id) {
+    throw new AdConversionRetryError('retry_snapshot_unavailable', '同じ送信の目印を確認できません', 422);
+  }
+  const result = (status: 'sent' | 'failed' | 'pending', replayed: boolean) => ({
+    logId: row.log_id, outboxId: row.id, providerEventId: row.provider_event_id!, status, replayed,
+  });
+  if (['sent', 'success'].includes(row.log_status)) return result('sent', true);
+  if (row.log_status !== 'failed' || row.status === 'sending') {
+    throw new AdConversionRetryError('retry_busy', '送信中です。結果を読み直してください', 409);
+  }
+  if (row.is_retryable !== 1 || row.selection_reason !== 'eligible' || !refFromOutboxSnapshot(row)) {
+    throw new AdConversionRetryError('not_retryable', '送信の固定情報を確認できないため、やり直せません', 422);
+  }
+  const platform = await getAdPlatformById(db, row.ad_platform_id);
+  if (!platform || platform.line_account_id !== row.line_account_id || platform.is_active !== 1) {
+    throw new AdConversionRetryError('platform_unavailable', '広告の連携が停止中か、所属先が変わっています', 409);
+  }
+  if (await isOperationCapabilityStopped(db, row.line_account_id, 'ad_postback')) {
+    throw new AdConversionRetryError('sending_stopped', '広告への送信を停止しています', 409);
+  }
+  const config = await resolveAdPlatformConfig(platform, input.credentialKey);
+  if (!config) throw new AdConversionRetryError('config_unavailable', '広告の接続設定を確認できません', 422);
+  const lease = await claimAdConversionRetry(db, row);
+  if (!lease) throw new AdConversionRetryError('retry_busy', 'ほかの処理が先に送信しました。結果を読み直してください', 409);
+  try {
+    const status = await attemptPlatformSend(db, {
+      platform, config, friendId: row.friend_id, lineAccountId: row.line_account_id!,
+      eventName: row.event_name, eventValue: row.event_value ?? undefined,
+      currency: row.currency, amountInMinorUnit: row.amount_in_minor_unit === 1,
+      idempotencyKey: row.idempotency_key, providerEventId: row.provider_event_id,
+    }, { row, lease });
+    return result(status, false);
+  } catch {
+    // 例外の本文や接続設定は応答・監査へ出さない。leaseを持つ自分の行だけ閉じる。
+    await finishAdConversionOutbox(db, { id: row.id, lease, status: 'failed', errorMessage: 'retry_send_failed' });
+    return result('failed', false);
   }
 }

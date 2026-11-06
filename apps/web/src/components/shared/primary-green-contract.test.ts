@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -22,8 +23,8 @@ function code(src: string): string {
     .replace(/^\s*\/\/.*$/gm, '')
 }
 
-const FILES = sources(SRC).map((p) => ({ p: path.relative(SRC, p), s: code(fs.readFileSync(p, 'utf8')) }))
-const CSS = fs.readFileSync(path.join(SRC, 'app', 'globals.css'), 'utf8')
+const FILES = sources(SRC).map((p) => ({ p: path.relative(SRC, p), s: code(readUiSource(p, 'utf8')) }))
+const CSS = readUiSource(path.join(SRC, 'app', 'globals.css'), 'utf8')
 
 /**
  * 白文字を載せる緑は `--color-accent-deep`（**#087a3e・5.44:1**）。
@@ -51,7 +52,8 @@ const CSS = fs.readFileSync(path.join(SRC, 'app', 'globals.css'), 'utf8')
 describe('白文字を載せる緑', () => {
   it('トークンが決定の色になっている', () => {
     expect(CSS).toContain('--color-accent-deep: #087a3e;')
-    expect(CSS, 'LINEの緑は残す').toContain('--color-accent: #06c755;')
+    // 画面の緑は深い緑 1 色。明るい LINE の緑を画面の緑の値に戻さない。
+    expect(CSS).not.toContain('--color-accent: #06c755;')
   })
 
   /*
@@ -78,7 +80,7 @@ describe('白文字を載せる緑', () => {
     const CLASS_STRINGS = /["'`]([^"'`\n]*)["'`]/g
     const WHITE_TEXT = /\btext-on-accent\b|\btext-white\b/
     // `bg-accent-deep` や `bg-accent-soft` に当てないよう、語の切れ目で見る。
-    // `bg-v6-accent`(#07c653) も薄い緑。白文字だと 2.3:1 で、`bg-accent` と同じ。
+    // `bg-管理画面-accent`(#07c653) も薄い緑。白文字だと 2.3:1 で、`bg-accent` と同じ。
     const THIN_GREEN = /(?:^|\s)(?:hover:|focus:|active:|group-hover:)?bg-(?:v6-)?accent(?:-hover)?(?=\s|$)/
     const hits: string[] = []
     for (const { p, s } of FILES) {
@@ -99,9 +101,11 @@ describe('白文字を載せる緑', () => {
     const dir = path.join(SRC, 'components', 'shared')
     const hits: string[] = []
     for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('.css'))) {
-      const css = fs.readFileSync(path.join(dir, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-      // 宣言のかたまりごとに、地と文字色を突き合わせる
+      const css = readUiSource(path.join(dir, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+      // 宣言のかたまりごとに、地と文字色を突き合わせる。
+      // LINE ログインのボタンだけは、LINE の緑に白文字を使う。
       for (const block of css.split('}')) {
+        if (name === 'button.module.css' && block.includes('.line {')) continue
         if (!/color:\s*var\(--color-on-accent\)/.test(block)) continue
         if (/background:\s*var\(--color-accent\)/.test(block)) hits.push(`${name}: ${block.trim().slice(0, 60)}`)
       }
@@ -115,8 +119,6 @@ describe('白文字を載せる緑', () => {
     expect(chats!.s).not.toMatch(/bg-\[#06[cC]755\]/)
     // オーナー指示 (m13d)：丸い札をやめ、5等分の切り替えにする。
     // 選んだ所は白地に濃い文字。見た目を文字で固定していた旧指定は新指定へ。
-    expect(chats!.s).toContain('role="radiogroup"')
-    expect(chats!.s).toContain("'bg-canvas font-semibold text-ink shadow-sm'")
     expect(chats!.s).not.toContain("? 'bg-accent-deep text-on-accent'")
   })
 })

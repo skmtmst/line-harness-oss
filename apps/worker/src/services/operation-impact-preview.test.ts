@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { getBroadcastAudiencePreview } from './broadcast-audience-preview.js';
+import { getBroadcastAudiencePreview } from '../features/broadcasts/broadcast-audience-preview.js';
 import { getOperationImpactPreview } from './operation-impact-preview.js';
 
 let testDb: ReturnType<typeof createTestD1>;
@@ -177,8 +177,7 @@ function seedScheduledBroadcasts(raw: (typeof testDb)['raw'], accountId: string,
 
 /*
   緊急停止の直前確認は「急いでいるときほど遅くなる」と本末転倒になる。
-  停止対象が増えても、確認1回あたりのクエリ本数は増えてはいけない
-  （Issue #737）。所要時間そのものは環境で揺れるため試験化せず、
+  停止対象が増えても、確認1回あたりのクエリ本数は増えてはいけない。所要時間そのものは環境で揺れるため試験化せず、
   代わりに `db.prepare` の呼び出し回数という決定的な値で固定する。
 */
 describe('緊急停止の直前確認: クエリ本数が件数に比例しない(Issue #737)', () => {

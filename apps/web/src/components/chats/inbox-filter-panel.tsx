@@ -1,11 +1,16 @@
 'use client'
 
+import { UNASSIGNED, unreadLookup } from '@/components/chats/assignee-unread'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import type { ChatStatus } from './inbox-dropdown'
+import type { InboxStats } from '@/lib/api'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Checkbox from '@/components/shared/checkbox'
-import Combobox from '@/components/shared/combobox'
+
 import Select from '@/components/shared/select'
 import { Filter, X } from 'lucide-react'
+import Button from '@/components/shared/button'
+import type { ReactNode } from 'react'
 
 /**
  * 受信箱の絞り込みパネル（設計 Pencil `bXyEA` 受信箱 絞り込みパネル）。
@@ -14,10 +19,8 @@ import { Filter, X } from 'lucide-react'
  * という操作そのものがありませんでした。** 条件が増えるほど一覧の上が
  * 埋まり、会話が見える面積が減ります。設計は右から出るパネルにまとめます。
  *
- * **繋がっていない条件は、押せない形で出します。**
- * 「期限」と「表示するメッセージ種別」は、いま絞り込める口がありません。
- * 押せるのに何も起きない操作は、無いより悪い（効いたつもりで読み違える）。
- * 出どころができたら `disabled` を外します。
+ * 期限は一覧と同じ quickFilter へ即時に反映します。
+ * まだ連携していない呼び出し元には期限の操作を出しません。
  */
 
 export type InboxFilterValue = {
@@ -25,6 +28,8 @@ export type InboxFilterValue = {
   assignee: string
   channel: 'all' | 'line' | 'email'
   unreadOnly: boolean
+  /** 一覧の期限条件。未指定の既存呼び出し元には操作を出さない。 */
+  quickFilter?: 'all' | 'reply' | 'overdue'
 }
 
 const STATUS_OPTIONS: { value: InboxFilterValue['status']; label: string }[] = [
@@ -50,6 +55,12 @@ export default function InboxFilterPanel({
   open,
   value,
   operators,
+  unassignedUnreadCount = null,
+  assigneeUnread = null,
+  assigneeUnreadStatus = 'loading',
+  slaEnabled = false,
+  emailInboxEnabled = true,
+  auxiliaryActions,
   onChange,
   onReset,
   onClose,
@@ -57,6 +68,16 @@ export default function InboxFilterPanel({
   open: boolean
   value: InboxFilterValue
   operators: { id: string; name: string }[]
+  /** 未取得・取得失敗は null。取得済みの0件とは区別する。 */
+  unassignedUnreadCount?: number | null
+  /** 担当者ごとの未読数。未取得・失敗時は名前の後ろを「—」にする。 */
+  assigneeUnread?: InboxStats['assigneeUnread'] | null
+  assigneeUnreadStatus?: 'error' | 'ready' | 'loading'
+  /** 実際の対応期限を使う場合は「期限超過」、それ以外は「1時間以上待ち」。 */
+  slaEnabled?: boolean
+  emailInboxEnabled?: boolean
+  /** 対応ルールなど、画面が持つ補助操作。 */
+  auxiliaryActions?: ReactNode
   onChange: (next: InboxFilterValue) => void
   onReset: () => void
   onClose: () => void
@@ -70,6 +91,8 @@ export default function InboxFilterPanel({
 
   if (!open) return null
   const set = (patch: Partial<InboxFilterValue>) => onChange({ ...value, ...patch })
+  const unassignedCount = unassignedUnreadCount ?? (assigneeUnreadStatus === 'error' ? null : unreadLookup(assigneeUnread)(UNASSIGNED))
+  const unassignedDescription = unassignedCount === null ? '未読 —' : `未読 ${unassignedCount}件`
 
   return (
     <div className="fixed inset-0 z-50" role="presentation">
@@ -93,13 +116,13 @@ export default function InboxFilterPanel({
         role="dialog"
         aria-modal="true"
         aria-label="絞り込み"
-        className="bg-canvas rounded-panel fixed inset-4 flex w-auto flex-col overflow-hidden shadow-2xl sm:inset-auto sm:top-16 sm:right-6 sm:w-[min(420px,calc(100vw-2rem))] sm:max-h-[calc(100dvh-5rem)] lg:right-10"
+        className="bg-canvas rounded-panel fixed inset-4 flex w-auto flex-col overflow-hidden shadow-overlay sm:inset-auto sm:top-16 sm:right-6 sm:w-[min(420px,calc(100vw-2rem))] sm:max-h-[calc(100dvh-5rem)] lg:right-10"
       >
         <header className="border-hairline flex h-14 shrink-0 items-center gap-2 border-b px-5">
-          <Filter aria-hidden="true" size={18} className="text-ink" />
+          <Filter aria-hidden="true" size={20} className="text-ink" />
           <h2 className="text-ink text-base font-bold">絞り込み</h2>
           <button type="button" onClick={onClose} aria-label="絞り込みを閉じる" className="text-ink-faint hover:bg-canvas-sunken ml-auto rounded-control p-1">
-            <X aria-hidden="true" size={18} />
+            <X aria-hidden="true" size={20} />
           </button>
         </header>
 
@@ -116,31 +139,29 @@ export default function InboxFilterPanel({
           </div>
 
           <div>
-            <span className={labelClass}>担当者</span>
+            <span className={labelClass}>担当</span>
             <div className="mt-1.5">
-              <Combobox
-                aria-label="担当者で絞り込む（パネル）"
+              <EntitySelect clearable size="full"
+                aria-label="担当者で絞り込む"
                 placeholder="すべて"
                 value={value.assignee === 'all' ? '' : value.assignee}
                 onChange={(next) => set({ assignee: next || 'all' })}
                 options={[
-                  { value: 'unassigned', label: '未割り当て' },
-                  ...operators.map((operator) => ({ value: operator.id, label: operator.name })),
+                  { value: 'unassigned', label: '未割り当て', description: unassignedDescription },
+                  ...operators.map((operator) => {
+                    // 未読数は集計の口から渡す。画面の行から数えない（ページ送りで落ちる）。
+                    const unread = assigneeUnreadStatus === 'error' ? null : unreadLookup(assigneeUnread)(operator.id)
+                    return { ...entityOptionMetadata(operator), value: operator.id, label: `${operator.name}（${unread === null ? '—' : unread}）` }
+                  }),
                 ]}
                 className="w-full"
               />
             </div>
           </div>
 
-          <div>
+          {emailInboxEnabled && <div>
             <span className={labelClass}>受信経路</span>
-            {/*
-              INBOX-04: 素の `<select>` は開いた候補が OS 側の描画で、
-              画面（DOM）に現れない。実機監査でも1回押しただけでは
-              「候補が展開せず画面変化もない」としか見えないため、
-              候補をDOMへ描く共通の Select へ換える（`inbox-dropdown.tsx`
-              が同じ理由で素の select を使わないのと同じ扱い）。
-            */}
+            {/* 候補も画面内へ描く共通の選択部品を使う。 */}
             <div className="mt-1.5">
               <Select
                 aria-label="受信経路で絞り込む"
@@ -150,7 +171,24 @@ export default function InboxFilterPanel({
                 options={CHANNEL_OPTIONS}
               />
             </div>
-          </div>
+          </div>}
+
+          {value.quickFilter !== undefined ? (
+            <div>
+              <span className={labelClass}>期限</span>
+              <Select
+                aria-label="期限で絞り込む"
+                size="full"
+                value={value.quickFilter}
+                onChange={(next) => set({ quickFilter: next as InboxFilterValue['quickFilter'] })}
+                options={[
+                  { value: 'all', label: 'すべて' },
+                  { value: 'reply', label: '要返信' },
+                  { value: 'overdue', label: slaEnabled ? '期限超過' : '1時間以上待ち' },
+                ]}
+              />
+            </div>
+          ) : null}
 
           {/*
             INBOX-16: まだ絞り込めない条件は、使える条件の下へ畳む。
@@ -160,22 +198,9 @@ export default function InboxFilterPanel({
           */}
           <details className="border-hairline rounded-control border px-3 py-2.5">
             <summary className="text-ink-faint cursor-pointer text-xs font-medium">
-              まだ使えない条件（期限・メッセージ種別）
+              まだ使えない条件（メッセージ種別）
             </summary>
             <div className="mt-3 space-y-4">
-              <div>
-                <span className={labelClass}>期限</span>
-                <Select
-                  aria-label="期限で絞り込む"
-                  size="full"
-                  value="all"
-                  disabled
-                  onChange={() => {}}
-                  options={[{ value: 'all', label: 'すべて' }]}
-                />
-                <p className="text-ink-faint mt-1 text-micro">対応期限はまだ記録していないため、この条件では絞り込めません</p>
-              </div>
-
               <div>
                 <span className={labelClass}>表示するメッセージ種別</span>
                 <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-2">
@@ -194,6 +219,7 @@ export default function InboxFilterPanel({
             aria-label="未読だけ表示"
             className="border-hairline border-t pt-3"
           >未読だけ表示</Checkbox>
+          {auxiliaryActions ? <div className="flex items-center justify-center gap-2">{auxiliaryActions}</div> : null}
         </div>
 
         {/*
@@ -205,20 +231,12 @@ export default function InboxFilterPanel({
         <footer className="border-hairline shrink-0 border-t px-5 py-3">
           <p className="text-ink-faint mb-2 text-micro">条件は選ぶとすぐ一覧に反映されます</p>
           <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={onReset}
-              className="border-hairline rounded-control text-ink-secondary hover:bg-canvas-sunken border px-4 py-2 text-sm"
-            >
+            <Button variant="secondary" className="text-ink-secondary px-4 py-2 h-auto whitespace-normal" type="button" onClick={onReset}>
               リセット
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-control bg-accent-deep text-on-accent hover:brightness-92 px-5 py-2 text-sm font-bold"
-            >
+            </Button>
+            <Button variant="primary" className="px-5 py-2 font-bold border-0 h-auto whitespace-normal" type="button" onClick={onClose}>
               閉じる
-            </button>
+            </Button>
           </div>
         </footer>
       </section>

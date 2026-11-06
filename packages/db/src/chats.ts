@@ -15,6 +15,7 @@ export interface ChatRow {
   id: string;
   friend_id: string;
   operator_id: string | null;
+  assignee_staff_id?: string | null;
   status: string;
   notes: string | null;
   last_message_at: string | null;
@@ -79,7 +80,7 @@ export async function getChats(
   const limit = boundedListLimit(opts.limit, 200);
   const offset = nonNegativeListOffset(opts.offset);
   if (opts.status && opts.operatorId) {
-    const result = await db.prepare(`SELECT * FROM chats WHERE status = ? AND operator_id = ? ORDER BY last_message_at DESC LIMIT ? OFFSET ?`)
+    const result = await db.prepare(`SELECT * FROM chats WHERE status = ? AND COALESCE(CASE WHEN assignee_staff_id IS NOT NULL THEN 'staff:' || assignee_staff_id END, operator_id) = ? ORDER BY last_message_at DESC LIMIT ? OFFSET ?`)
       .bind(opts.status, opts.operatorId, limit, offset).all<ChatRow>();
     return result.results;
   }
@@ -89,7 +90,7 @@ export async function getChats(
     return result.results;
   }
   if (opts.operatorId) {
-    const result = await db.prepare(`SELECT * FROM chats WHERE operator_id = ? ORDER BY last_message_at DESC LIMIT ? OFFSET ?`)
+    const result = await db.prepare(`SELECT * FROM chats WHERE COALESCE(CASE WHEN assignee_staff_id IS NOT NULL THEN 'staff:' || assignee_staff_id END, operator_id) = ? ORDER BY last_message_at DESC LIMIT ? OFFSET ?`)
       .bind(opts.operatorId, limit, offset).all<ChatRow>();
     return result.results;
   }
@@ -108,35 +109,36 @@ export async function getChatByFriendId(db: D1Database, friendId: string): Promi
 
 export async function createChat(
   db: D1Database,
-  input: { friendId: string; operatorId?: string },
+  input: { friendId: string; operatorId?: string; assigneeStaffId?: string },
 ): Promise<ChatRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
   // 1 friend = 1 chat 行 (idx_chats_friend_unique)。同時実行でも重複しないよう
   // WHERE NOT EXISTS + OR IGNORE で原子挿入し、挿入の成否に関わらず既存行を返して収束する。
   await db.prepare(
-    `INSERT OR IGNORE INTO chats (id, friend_id, operator_id, last_message_at, created_at, updated_at)
-     SELECT ?, ?, ?, ?, ?, ?
+    `INSERT OR IGNORE INTO chats (id, friend_id, operator_id, assignee_staff_id, last_message_at, created_at, updated_at)
+     SELECT ?, ?, ?, ?, ?, ?, ?
      WHERE NOT EXISTS (SELECT 1 FROM chats WHERE friend_id = ?)`,
   )
-    .bind(id, input.friendId, input.operatorId ?? null, now, now, now, input.friendId).run();
+    .bind(id, input.friendId, input.operatorId ?? null, input.assigneeStaffId ?? null, now, now, now, input.friendId).run();
   return (await getChatByFriendId(db, input.friendId))!;
 }
 
 export async function updateChat(
   db: D1Database,
   id: string,
-  updates: Partial<{ operatorId: string | null; status: string; notes: string; lastMessageAt: string }>,
+  updates: Partial<{ operatorId: string | null; status: string; notes: string; lastMessageAt: string; manualReply: boolean; assigneeStaffId: string | null }>,
 ): Promise<void> {
   const sets: string[] = [];
   const values: unknown[] = [];
   if (updates.operatorId !== undefined) { sets.push('operator_id = ?'); values.push(updates.operatorId); }
+  if (updates.assigneeStaffId !== undefined) { sets.push('assignee_staff_id = ?'); values.push(updates.assigneeStaffId); }
   if (updates.status !== undefined) { sets.push('status = ?'); values.push(updates.status); }
   if (updates.notes !== undefined) { sets.push('notes = ?'); values.push(updates.notes); }
   if (updates.lastMessageAt !== undefined) { sets.push('last_message_at = ?'); values.push(updates.lastMessageAt); }
   if (sets.length === 0) return;
   sets.push('revision = revision + 1');
-  if (updates.status === 'in_progress' && updates.lastMessageAt !== undefined) {
+  if (updates.status === 'in_progress' && updates.lastMessageAt !== undefined && updates.manualReply !== false) {
     sets.push('last_operator_message_at = ?');
     values.push(updates.lastMessageAt);
   }
@@ -163,7 +165,7 @@ export async function upsertChatOnMessage(
   // 適用されるが no-op 相当なので害はない。
   const chat = (await getChatByFriendId(db, friendId)) ?? (await createChat(db, { friendId }));
   const newStatus = chat.status === 'resolved' || chat.status === 'on_hold' ? 'unread' : chat.status;
-  await updateChat(db, chat.id, { status: newStatus, lastMessageAt: eventAt ?? now });
+  await updateChat(db, chat.id, { status: newStatus, lastMessageAt: eventAt ?? now, manualReply: false });
 
   // 受信の時刻を残し、初回返信の時計を巻き直す（107）。
   //

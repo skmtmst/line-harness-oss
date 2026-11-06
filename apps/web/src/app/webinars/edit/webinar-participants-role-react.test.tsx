@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -29,7 +31,7 @@ const net = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => fixture.params,
   usePathname: () => '/webinars/edit',
   useRouter: () => ({ push: vi.fn() }),
@@ -37,9 +39,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [{ id: fixture.accountId, liffId: 'liff' }], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
-vi.mock('@/components/webinars/webinar-form', () => ({ default: () => <div>基本設定</div> }))
-vi.mock('@/components/webinars/webinar-notifications', () => ({ default: () => <div>通知設定</div> }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/shared/select', () => ({
   default: ({ value, onChange, options, size: _size, ...props }: {
     value: string
@@ -145,6 +145,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   fixture.params = new URLSearchParams('id=webinar-1')
   net.calls.length = 0
   net.staffMode = false
@@ -194,7 +195,7 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
     await flush()
 
     expect(host.textContent).toContain('オーナーと管理者だけが確認できます')
-    expect(host.textContent).not.toContain('参加者をCSVで書き出す')
+    expect(host.textContent).not.toContain('CSVで書き出す')
     expect(host.textContent).not.toContain(FRIEND_NAME)
     // staff が辿っても 403 になるCSVへの導線(dead link)はDOMに存在しない。
     expect(csvLinks()).toEqual([])
@@ -208,8 +209,9 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
     await render()
     await flush()
 
-    expect(host.textContent).toContain('視聴結果')
-    expect(host.textContent).toContain('15:00') // 平均視聴時間900秒の集計は見える
+    // V8-B ：見出しは数の帯・減りの棒に変わった。集計の数が見えることを確かめる。
+    expect(host.textContent).toContain('どこで人数が減っているか')
+    expect(host.textContent).toContain('申込')
     expect(csvLinks()).toEqual([])
     expect(host.textContent).not.toContain(FRIEND_NAME)
   })
@@ -234,13 +236,13 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
     await render()
     await flush()
 
-    expect(host.textContent).toContain('参加者管理')
+    expect(host.querySelector('[data-design-node="uNsEy"]')).not.toBeNull()
     expect(host.textContent).toContain(FRIEND_NAME)
-    expect(host.textContent).toContain('参加者をCSVで書き出す')
+    expect(host.textContent).toContain('CSVで書き出す')
     // 直リンクのaタグは無く、押すと認証付きで取る（#1053）。
     expect(csvLinks()).toEqual([])
     const callsBefore = net.calls.length
-    await act(async () => { csvButton('参加者をCSVで書き出す')!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await act(async () => { csvButton('CSVで書き出す')!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
     await flush()
     expect(net.calls.slice(callsBefore).some((call) => call.includes('/api/webinars/webinar-1/participants.csv'))).toBe(true)
   })
@@ -250,7 +252,8 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
     await render()
     await flush()
 
-    expect(host.textContent).toContain('視聴結果')
+    // V8-B ``：見出しは数の帯・減りの棒に変わった。
+    expect(host.textContent).toContain('どこで人数が減っているか')
     expect(csvLinks()).toEqual([])
     const callsBefore = net.calls.length
     await act(async () => { csvButton()!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })

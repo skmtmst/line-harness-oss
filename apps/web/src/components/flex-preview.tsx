@@ -42,8 +42,13 @@ interface FlexNode {
   position?: string
   borderWidth?: string
   borderColor?: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any
+  hero?: FlexNode
+  header?: FlexNode
+  body?: FlexNode
+  footer?: FlexNode
+  justifyContent?: string
+  // 未知のLINE属性は受け入れるが、描画前に既知の型へ絞る。
+  [key: string]: unknown
 }
 
 const sizeMap: Record<string, string> = {
@@ -60,6 +65,17 @@ const spacingMap = marginMap
 function getSize(s?: string) { return s ? sizeMap[s] || s : undefined }
 function getMargin(m?: string) { return m ? marginMap[m] || m : undefined }
 function getSpacing(s?: string) { return s ? spacingMap[s] || s : undefined }
+
+/*
+ * LINE の flex:0 は「中身の幅で固定・伸ばさない」。`flex: 0`（= 0 1 0%）の
+ * ままだと基準幅 0% から最小内容幅まで縮み、日本語の短い文字が1字ずつ
+ * 縦に崩れる（E29）。最大幅で吹き出しからはみ出さない。
+ */
+function flexGrowStyle(flex: number | undefined): React.CSSProperties {
+  if (flex === undefined) return {}
+  if (flex === 0) return { flex: '0 0 auto', maxWidth: '100%' }
+  return { flex }
+}
 
 export function safeFlexAssetUrl(value?: string): string | null {
   if (!value) return null
@@ -83,13 +99,14 @@ function FlexText({ node }: { node: FlexNode }) {
     fontSize: getSize(node.size) || '14px',
     fontWeight: node.weight === 'bold' ? 700 : 400,
     color: node.color || '#111',
+    textDecoration: node.decoration === 'line-through' || node.decoration === 'underline' ? node.decoration : undefined,
     margin: 0,
     lineHeight: 1.4,
     ...(node.wrap === false ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : { wordBreak: 'break-word' }),
     ...(node.align === 'center' ? { textAlign: 'center' } : node.align === 'end' ? { textAlign: 'right' } : {}),
-    ...(node.flex !== undefined ? { flex: node.flex } : {}),
+    ...flexGrowStyle(node.flex),
   }
-  return <p style={style}>{node.text || ''}</p>
+  return <p style={style}>{Array.isArray(node.contents) && node.contents.length ? node.contents.map((span, index) => <span key={index} style={{ fontSize: span.size ? getSize(span.size) : undefined, color: span.color, fontWeight: span.weight === 'bold' ? 700 : undefined }}>{span.text ?? ''}</span>) : node.text || ''}</p>
 }
 
 function FlexButton({ node }: { node: FlexNode }) {
@@ -100,7 +117,7 @@ function FlexButton({ node }: { node: FlexNode }) {
     display: 'block',
     width: '100%',
     padding: '10px 16px',
-    borderRadius: '8px',
+    borderRadius: 'var(--radius-control)',
     fontSize: '14px',
     fontWeight: 600,
     textAlign: 'center',
@@ -133,14 +150,14 @@ function FlexImage({ node }: { node: FlexNode }) {
     objectFit: (node.aspectMode === 'cover' ? 'cover' : 'contain') as React.CSSProperties['objectFit'],
     ...(node.aspectRatio ? { aspectRatio: node.aspectRatio.replace(':', '/') } : {}),
   }
-  return <img src={url} alt="" style={style} referrerPolicy="no-referrer" loading="lazy" />
+  return <img width={1040} height={676} src={url} alt="" style={style} referrerPolicy="no-referrer" loading="lazy" />
 }
 
 function FlexIcon({ node }: { node: FlexNode }) {
   const url = safeFlexAssetUrl(node.url)
   if (!url) return null
   const s = getSize(node.size) || '16px'
-  return <img src={url} alt="" style={{ width: s, height: s, objectFit: 'contain' }} referrerPolicy="no-referrer" loading="lazy" />
+  return <img width={16} height={16} src={url} alt="" style={{ width: s, height: s, objectFit: 'contain' }} referrerPolicy="no-referrer" loading="lazy" />
 }
 
 function FlexSpacer({ node }: { node: FlexNode }) {
@@ -165,7 +182,7 @@ function FlexBox({ node }: { node: FlexNode }) {
     ...(node.paddingEnd ? { paddingRight: node.paddingEnd } : {}),
     ...(node.width ? { width: node.width } : {}),
     ...(node.height ? { height: node.height } : {}),
-    ...(node.flex !== undefined ? { flex: node.flex } : {}),
+    ...flexGrowStyle(node.flex),
     ...(isHorizontal ? { alignItems: node.gravity === 'center' ? 'center' : node.gravity === 'bottom' ? 'flex-end' : 'flex-start' } : {}),
     ...(node.align === 'center' ? { alignItems: 'center' } : node.align === 'end' ? { alignItems: 'flex-end' } : {}),
     ...(node.justifyContent ? { justifyContent: node.justifyContent === 'center' ? 'center' : node.justifyContent === 'flex-end' ? 'flex-end' : node.justifyContent === 'space-between' ? 'space-between' : node.justifyContent === 'space-around' ? 'space-around' : 'flex-start' } : {}),
@@ -185,7 +202,7 @@ function FlexBox({ node }: { node: FlexNode }) {
 function FlexNodeRenderer({ node }: { node: FlexNode }) {
   if (!node || !node.type) return null
 
-  const marginStyle: React.CSSProperties = node.margin ? { marginTop: getMargin(node.margin) } : {}
+  const marginStyle: React.CSSProperties = { ...(node.margin ? { marginTop: getMargin(node.margin) } : {}), ...flexGrowStyle(node.flex), minWidth: 0 }
 
   return (
     <div style={marginStyle}>
@@ -207,40 +224,40 @@ function FlexBubble({ bubble, maxWidth }: { bubble: FlexNode; maxWidth?: number 
   return (
     <div style={{
       width: w,
-      backgroundColor: '#fff',
-      borderRadius: '12px',
+      backgroundColor: 'var(--color-canvas)',
+      borderRadius: 'var(--radius-card)',
       overflow: 'hidden',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+      boxShadow: 'var(--shadow-card)',
       fontSize: '14px',
       position: 'relative',
     }}>
       {bubble.hero && <FlexNodeRenderer node={bubble.hero} />}
       {bubble.header && (
         <div style={{
-          backgroundColor: (bubble.header as FlexNode).backgroundColor || 'transparent',
-          padding: (bubble.header as FlexNode).paddingAll || '16px',
+          backgroundColor: bubble.header.backgroundColor || 'transparent',
+          padding: bubble.header.paddingAll || '16px',
         }}>
-          {((bubble.header as FlexNode).contents || []).map((child: FlexNode, i: number) => (
+          {(bubble.header.contents || []).map((child: FlexNode, i: number) => (
             <FlexNodeRenderer key={i} node={child} />
           ))}
         </div>
       )}
       {bubble.body && (
         <div style={{
-          backgroundColor: (bubble.body as FlexNode).backgroundColor || 'transparent',
-          padding: (bubble.body as FlexNode).paddingAll || '16px',
+          backgroundColor: bubble.body.backgroundColor || 'transparent',
+          padding: bubble.body.paddingAll || '16px',
         }}>
-          {((bubble.body as FlexNode).contents || []).map((child: FlexNode, i: number) => (
+          {(bubble.body.contents || []).map((child: FlexNode, i: number) => (
             <FlexNodeRenderer key={i} node={child} />
           ))}
         </div>
       )}
       {bubble.footer && (
         <div style={{
-          backgroundColor: (bubble.footer as FlexNode).backgroundColor || 'transparent',
-          padding: (bubble.footer as FlexNode).paddingAll || '16px',
+          backgroundColor: bubble.footer.backgroundColor || 'transparent',
+          padding: bubble.footer.paddingAll || '16px',
         }}>
-          {((bubble.footer as FlexNode).contents || []).map((child: FlexNode, i: number) => (
+          {(bubble.footer.contents || []).map((child: FlexNode, i: number) => (
             <FlexNodeRenderer key={i} node={child} />
           ))}
         </div>
@@ -299,7 +316,7 @@ function FlexUnavailable({ raw, parsed }: { raw: string; parsed?: unknown }) {
   return (
     <div
       data-flex-preview="unavailable"
-      className="border-hairline bg-canvas text-ink w-full max-w-xs rounded-lg border p-3 text-left text-xs"
+      className="border-hairline bg-canvas text-ink w-full max-w-xs rounded-control border p-3 text-left text-xs"
     >
       <p className="font-semibold">このメッセージはプレビューできません</p>
       <p className="text-ink-secondary mt-1 whitespace-pre-wrap break-words">
@@ -307,7 +324,7 @@ function FlexUnavailable({ raw, parsed }: { raw: string; parsed?: unknown }) {
       </p>
       <details className="mt-2">
         <summary className="text-ink-faint cursor-pointer text-micro">元のデータを表示</summary>
-        <pre className="bg-canvas-sunken text-ink-secondary mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded p-2 text-micro">
+        <pre className="bg-canvas-sunken text-ink-secondary mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-mini p-2 text-micro">
           {raw.length > 4000 ? `${raw.slice(0, 4000)}…` : raw}
         </pre>
       </details>

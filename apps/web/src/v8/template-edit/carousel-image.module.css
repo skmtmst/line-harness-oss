@@ -1,0 +1,2 @@
+.column { display: flex; flex-direction: column; gap: var(--tpl-cn-field-gap); width: var(--tpl-carousel-upload-w); flex-shrink: 0; }
+.filename { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); }

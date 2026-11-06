@@ -1,0 +1,222 @@
+/* ★V8「予約メニューを作る」（・競合は ）。
+   器・段・右のスマホ・下の帯は settings.module.css のクラスを使い回す。 */
+
+/* 板の頭（タブが無いので下に16の余白）。 */
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-8);
+  padding: var(--tpl-bm-20) var(--tpl-bm-24) var(--tpl-bm-16);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+/* 絵の の頭の説明は 17 の行（設定の頭と同じ 1.6 だと 19 になり、下が全部 2 ずれる）。 */
+.head > p:last-child {
+  line-height: var(--tpl-bm-17);
+}
+
+/* ===== 競合の帯（頭の下・左右の列をまたぐ） ===== */
+
+.conflictRow {
+  /* 余白は型の notice の口が持つ。 */
+  padding: 0;
+}
+
+.conflictIcon {
+  flex-shrink: 0;
+  color: var(--color-status-warn-deep);
+}
+
+.conflictText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-bm-2);
+  min-width: 0;
+}
+
+.conflictText strong {
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-14);
+  font-weight: 600;
+  line-height: var(--tpl-bm-20);
+}
+
+.conflictText p {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-13);
+  line-height: var(--tpl-bm-19);
+}
+
+/* ===== 欄 ===== */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-6);
+  min-width: 0;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 500;
+  line-height: var(--tpl-bm-20);
+}
+
+/* 3列の見出し・分類の見出し（12・灰）。 */
+.labelSmall {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  line-height: var(--tpl-bm-17);
+}
+
+.optional {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-12);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--tpl-bm-17);
+}
+
+.fieldError {
+  color: var(--color-danger);
+  font-size: var(--tpl-bm-12);
+}
+
+/* メニュー名（伸びる）と分類（200）を下ぞろえで並べる。 */
+.nameRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-bm-12);
+}
+
+.nameRow > .field:first-child {
+  flex: 1 1 0;
+}
+
+.categoryField {
+  flex-shrink: 0;
+  width: var(--tpl-bm-200);
+}
+
+/* 見出しの段と欄の段（3列）。 */
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-bm-12) var(--tpl-bm-8);
+}
+
+/* 数と単位を1つの枠に（「105 分」）。 */
+.unitSuffix,
+.unitPrefix {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-13);
+  white-space: nowrap;
+}
+
+/* 文字・間・トグル（行の高さはトグルの20）。 */
+.toggleLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-bm-12);
+  min-height: var(--tpl-bm-20);
+}
+
+/* トグル・文字（質問を出す）。 */
+.toggleLineLead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-8);
+  min-height: var(--tpl-bm-20);
+}
+
+.toggleLineLabel {
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  line-height: var(--tpl-bm-19);
+}
+
+/* ===== 予約のきまり ===== */
+
+.ruleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-bm-8);
+  height: var(--tpl-bm-35);
+  padding: 0;
+  box-shadow: var(--shadow-row-line);
+}
+
+.ruleLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-17);
+}
+
+.ruleValue {
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  line-height: var(--tpl-bm-17);
+  text-align: right;
+}
+
+.changeRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ===== そのほか（灰の段に白い小段） ===== */
+
+.moreSection {
+  background: var(--color-canvas-sunken);
+}
+
+.subSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-12);
+  padding: var(--tpl-bm-16);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.subTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-14);
+  font-weight: 700;
+  line-height: var(--tpl-bm-20);
+}
+
+.fieldStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-8);
+}
+
+.saveNote {
+  margin: 0;
+  color: var(--color-status-warn-deep);
+  font-size: var(--tpl-bm-13);
+}
+
+/* お支払いの3つの箱は横に並べる。 */
+.paymentChoices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-8); width: 100%; }
+
+/* 題の横の「？」・札（準備中）は字から 6 空ける。 */
+.titleWithMark { display: inline-flex; align-items: center; gap: var(--space-6); }
+
+.audienceRow { display: flex; align-items: center; gap: var(--space-8); font-size: var(--text-caption); cursor: pointer; }
+.audiencePreview { display: flex; align-items: center; gap: var(--space-8); }
+.audiencePreview > span { flex: none; white-space: nowrap; }

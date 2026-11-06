@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { dbTableExists } from './utils.js';
 
 export type AffiliateLifecycle = 'active' | 'paused' | 'archived';
@@ -72,6 +73,147 @@ async function sha256Hex(value: string): Promise<string> {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+// =============================================================================
+// 承認時の固定報酬の根拠 — 記録時刻の版
+// =============================================================================
+//
+// 判断記録がある成果はその版を使う。判断の保存に失敗した成果は、記録時刻に
+// 使っていた版（記録時刻以前に作られた最新の版）で旧額を保つ。版番号は作った
+// 順に振り、作った時刻も残るため、記録時刻以前の最新版は「判断が残っていれば
+// 選ばれていた版」と一致する。新しい予約時刻・CAS・追加payloadは要らない。
+//
+// - 'version' … 不変の版で価格が決まる（判断の版か、記録時刻以前の最新版。
+//   ただし最新版が記録時刻と同時刻で他に候補があるときは確定不能として null）
+// - 'legacy-live' … 版管理前の昔の案件・汎用リンク・率の紹介者・古いスキーマ。
+//   旧来どおり今の案件額を使う。版0の公開案件にも到達する（POSTの案件行
+//   INSERT成功→初版INSERT失敗で残り、同キー再送が回収する）。機能保証の変更はしない。
+// - null … 版管理下の案件なのに記録時刻の版が無い（欠落・改ざん）。
+//   承認してはならない。呼び出し側が状態を変えずに拒む。
+
+export interface ApprovalRewardVersionBasis {
+  rewardAmount: number;
+  rewardMiles: number;
+}
+
+export type ApprovalRewardBasis =
+  | { kind: 'version'; version: ApprovalRewardVersionBasis }
+  // 旧来経路の現在額。承認判断時点で読んだ値をそのまま持ち、承認・凍結・
+  // 計算で同じ値を使い回す（precheck→UPDATE→freezeの間の割り込みで
+  // 根拠がずれないようにする）。
+  | { kind: 'legacy-live'; rewardAmount: number | null; rewardMiles: number | null };
+
+/**
+ * 記録時刻以前に作られた最新の版。無ければ null。
+ *
+ * 最新の候補が記録時刻と同時刻で、他にも候補があるときは前後が決め
+ * られないため null を返す（同時刻で確定不能→呼び出し側が承認を拒む。
+ * jstNow はms精度のため、処理now採取→判断保存失敗→同じmsで新版保存
+ * という有限順序が実在する）。候補が1件だけの
+ * 同時刻はその版を使う（他に選びようが無い）。
+ */
+export async function getOfferVersionAtTime(
+  db: D1Database,
+  offerId: string,
+  at: string,
+): Promise<ApprovalRewardVersionBasis | null> {
+  const found = await db
+    .prepare(
+      `SELECT reward_amount, reward_miles, created_at FROM affiliate_offer_versions
+        WHERE offer_id = ?
+          AND julianday(created_at) <= julianday(?)
+        ORDER BY version_number DESC
+        LIMIT 2`,
+    )
+    .bind(offerId, at)
+    .all<{ reward_amount: number; reward_miles: number; created_at: string }>();
+  const top = found.results[0];
+  if (!top) return null;
+  if (found.results.length > 1) {
+    const sameInstant = await db
+      .prepare(`SELECT 1 AS same WHERE julianday(?) = julianday(?)`)
+      .bind(top.created_at, at)
+      .first<{ same: number }>();
+    if (sameInstant) return null;
+  }
+  return { rewardAmount: top.reward_amount, rewardMiles: top.reward_miles };
+}
+
+export async function resolveApprovalRewardBasis(
+  db: D1Database,
+  eventId: string,
+): Promise<ApprovalRewardBasis | null> {
+  const hasVersionTables = (await dbTableExists(db, 'affiliate_offer_versions'))
+    && (await dbTableExists(db, 'affiliate_attribution_decisions'));
+  if (!hasVersionTables) return { kind: 'legacy-live', rewardAmount: null, rewardMiles: null };
+  const row = await db
+    .prepare(
+      `SELECT ce.created_at AS recorded_at,
+              a.commission_rate AS commission_rate,
+              a.reward_mode AS reward_mode,
+              dad.offer_version_id AS decision_version_id,
+              al.offer_id AS link_offer_id,
+              off.reward_amount AS offer_reward,
+              off.reward_miles AS offer_miles
+         FROM conversion_events ce
+         JOIN affiliates a ON a.id = ce.affiliate_id
+         LEFT JOIN affiliate_attribution_decisions dad
+           ON dad.conversion_event_id = ce.id
+         LEFT JOIN affiliate_links al
+           ON al.ref_code = ce.attributed_ref_code
+          AND al.affiliate_id = ce.affiliate_id
+         LEFT JOIN affiliate_offers off ON off.id = al.offer_id
+        WHERE ce.id = ? AND ce.affiliate_id IS NOT NULL`,
+    )
+    .bind(eventId)
+    .first<{
+      recorded_at: string;
+      commission_rate: number | null;
+      reward_mode: 'none' | 'fixed' | 'rate' | null;
+      decision_version_id: string | null;
+      link_offer_id: string | null;
+      offer_reward: number | null;
+      offer_miles: number | null;
+    }>();
+  // 帰属のない行は呼び出し側が先に弾く。ここでは旧来経路に任せる。
+  if (!row) return { kind: 'legacy-live', rewardAmount: null, rewardMiles: null };
+  const rate = row.commission_rate === null ? 0 : Number(row.commission_rate);
+  // 率の紹介者は版で金額を決めない（率の版管理はこの正本の範囲外）。
+  if (row.reward_mode === 'none') return { kind: 'legacy-live', rewardAmount: 0, rewardMiles: 0 };
+  if (row.reward_mode === 'rate' || (row.reward_mode == null && rate > 0)) {
+    return { kind: 'legacy-live', rewardAmount: row.offer_reward, rewardMiles: row.offer_miles };
+  }
+  // 汎用リンク（案件なし）は旧来どおり。
+  if (!row.link_offer_id) {
+    return { kind: 'legacy-live', rewardAmount: row.offer_reward, rewardMiles: row.offer_miles };
+  }
+  if (row.decision_version_id) {
+    const decided = await db
+      .prepare(`SELECT reward_amount, reward_miles FROM affiliate_offer_versions WHERE id = ?`)
+      .bind(row.decision_version_id)
+      .first<{ reward_amount: number; reward_miles: number }>();
+    if (decided) {
+      return {
+        kind: 'version',
+        version: { rewardAmount: decided.reward_amount, rewardMiles: decided.reward_miles },
+      };
+    }
+    // 判断の指す版が無い（通常ありえない）→記録時刻で探し直す。
+  }
+  const asof = await getOfferVersionAtTime(db, row.link_offer_id, row.recorded_at);
+  if (asof) return { kind: 'version', version: asof };
+  const versionCount = await db
+    .prepare(`SELECT COUNT(*) AS n FROM affiliate_offer_versions WHERE offer_id = ?`)
+    .bind(row.link_offer_id)
+    .first<{ n: number }>();
+  // 版が1つも無い案件は旧来どおり。POSTの案件行INSERT成功→初版INSERT失敗
+  // でも到達する（同キー再送が回収する）が、版なしの一般仕様の選択は
+  // 仕様が決まるまで広げない。
+  if ((versionCount?.n ?? 0) === 0) {
+    return { kind: 'legacy-live', rewardAmount: row.offer_reward, rewardMiles: row.offer_miles };
+  }
+  return null;
+}
+
 /**
  * 承認された成果の報酬計算根拠を版として固定する共通関数。
  *
@@ -88,15 +230,23 @@ export async function ensureConversionRewardSnapshot(
   db: D1Database,
   eventId: string,
   now = new Date().toISOString(),
+  /**
+   * 承認判断時に確定した根拠。渡されたときは再解決せず同じ値を使う
+   * （precheck→UPDATE→freezeの間の割り込みで根拠がずれないようにする。
+   * 省略時はその場で確かめ直す。
+   */
+  basisOverride?: ApprovalRewardBasis | null,
 ): Promise<AffiliateRewardCalculation | null> {
-  // 付けた時点の版があれば、その版の決まりを優先する(#823)。
+  // 付けた時点の版があれば、その版の決まりを優先する。
   // 版の表が無い古いスキーマ（最小構成の単体試験など）では、
   // 従来どおり今の案件の値を使う。
   const hasVersionTables = (await dbTableExists(db, 'affiliate_offer_versions'))
     && (await dbTableExists(db, 'affiliate_attribution_decisions'));
-  const fixedRewardSelect = hasVersionTables
-    ? 'COALESCE(ov.reward_amount, off.reward_amount) AS fixed_reward'
-    : 'off.reward_amount AS fixed_reward';
+  // 判断の版があればその額。無い行の扱いは下の JS で根拠ごとに分ける
+  //（記録時刻の版で旧額を保つ）。
+  const versionRewardSelect = hasVersionTables
+    ? 'ov.reward_amount AS version_reward'
+    : 'NULL AS version_reward';
   const versionJoins = hasVersionTables
     ? `LEFT JOIN affiliate_attribution_decisions dad
          ON dad.conversion_event_id = ce.id
@@ -114,6 +264,7 @@ export async function ensureConversionRewardSnapshot(
             a.name AS affiliate_name,
             a.code AS affiliate_code,
             a.commission_rate AS commission_rate,
+            a.reward_mode AS reward_mode,
             a.tenant_id AS tenant_id,
             a.line_account_id AS affiliate_account_id,
             f.line_account_id AS friend_account_id,
@@ -123,7 +274,8 @@ export async function ensureConversionRewardSnapshot(
             off.line_account_id AS offer_account_id,
             off.id AS offer_id,
             COALESCE(off.name, ce.point_name_snapshot, cp.name, '') AS offer_name,
-            ${fixedRewardSelect}
+            ${versionRewardSelect},
+            off.reward_amount AS offer_reward
        FROM conversion_events ce
        JOIN affiliates a ON a.id = ce.affiliate_id
        JOIN friends f ON f.id = ce.friend_id
@@ -148,6 +300,7 @@ export async function ensureConversionRewardSnapshot(
     affiliate_name: string;
     affiliate_code: string;
     commission_rate: number | null;
+    reward_mode: 'none' | 'fixed' | 'rate' | null;
     tenant_id: string | null;
     affiliate_account_id: string | null;
     friend_account_id: string | null;
@@ -157,7 +310,8 @@ export async function ensureConversionRewardSnapshot(
     offer_account_id: string | null;
     offer_id: string | null;
     offer_name: string;
-    fixed_reward: number | null;
+    version_reward: number | null;
+    offer_reward: number | null;
   }>();
   if (!row || !row.affiliate_account_id) return null;
   // 版に入る入力(友だち・成果地点・リンク・案件)は、すべて紹介者と同じ
@@ -205,13 +359,13 @@ export async function ensureConversionRewardSnapshot(
   ).bind(eventId).first<{ 1: number }>();
   if (settled) return null;
 
-  // m22u R356・R357: 承認時に凍結した入力があれば、現在の設定ではなく
+  // 承認時に凍結した入力があれば、現在の設定ではなく
   // 凍結値を優先する(承認後の設定変更で過去の承認額が動かない)。
   const frozenFormula = row.frozen_formula === 'rate' || row.frozen_formula === 'fixed'
     ? row.frozen_formula
     : null;
   const liveRate = row.commission_rate === null ? 0 : Number(row.commission_rate);
-  const liveFormula: AffiliateRewardFormula = liveRate > 0 ? 'rate' : 'fixed';
+  const liveFormula: AffiliateRewardFormula = row.reward_mode === 'rate' || (row.reward_mode == null && liveRate > 0) ? 'rate' : 'fixed';
   const formula: AffiliateRewardFormula = frozenFormula ?? liveFormula;
   const rate = formula === 'rate'
     ? (row.frozen_rate === null || row.frozen_rate === undefined ? liveRate : Number(row.frozen_rate))
@@ -221,9 +375,28 @@ export async function ensureConversionRewardSnapshot(
       ? Number(row.value_snapshot ?? row.point_value ?? 0)
       : Number(row.frozen_base))
     : null;
+  // 固定報酬の出どころ。判断の版があればその額。判断が無い行は根拠を
+  // 確かめ直す：記録時刻の版があれば旧額、版管理下で版が無ければ版を
+  // 作らない（null で終え、締め・支払い・レポートから外す）。
+  let pricedFixedReward = 0;
+  if (formula === 'fixed' && row.reward_mode !== 'none') {
+    if (row.version_reward !== null && row.version_reward !== undefined) {
+      pricedFixedReward = Math.round(Number(row.version_reward));
+    } else if (!hasVersionTables) {
+      pricedFixedReward = Math.round(Number(row.offer_reward ?? 0));
+    } else {
+      const basis = basisOverride !== undefined
+        ? basisOverride
+        : await resolveApprovalRewardBasis(db, eventId);
+      if (basis === null) return null;
+      pricedFixedReward = basis.kind === 'version'
+        ? Math.round(Number(basis.version.rewardAmount))
+        : Math.round(Number(basis.rewardAmount ?? row.offer_reward ?? 0));
+    }
+  }
   const fixedReward = formula === 'fixed'
     ? (row.frozen_fixed === null || row.frozen_fixed === undefined
-      ? Math.round(Number(row.fixed_reward ?? 0))
+      ? pricedFixedReward
       : Math.round(Number(row.frozen_fixed)))
     : null;
   const amount = formula === 'rate'
@@ -363,7 +536,7 @@ export async function reverseSettledRewardOnRejection(
 }
 
 /**
- * m22u R358：締め済みの成果を却下→再承認したときの復活。
+ * 締め済みの成果を却下→再承認したときの復活。
  *
  * 締めは成果ごとに確定(credit)を1件しか持てない（UNIQUE のため再承認で
  * 新しい確定は作れない）。そのため再承認では、却下で reversed にした確定を
@@ -443,13 +616,13 @@ export function settlementWriteStatements(
     targets: SettlementWriteTarget[];
     now: string;
     /**
-     * R288: 全体締めが同時に付ける取消(entry_id 参照)の消費行。
+     * 全体締めが同時に付ける取消(entry_id 参照)の消費行。
      * 別締めに先取りされて1行でも欠けたら、報酬行もろとも巻き戻す。
      * 個別締めは渡さない(従来どおり報酬行だけを見る)。
      */
     expectedDebitEntryIds?: string[];
     /**
-     * R288: 取り込む取消行。巻き戻し文より先に積むため、ここで受け取る。
+     * 取り込む取消行。巻き戻し文より先に積むため、ここで受け取る。
      * amount は負数(差し引き)。書込みは条件付きで、別締めが先に同じ
      * 取消を付けていたら0行になる(entry_id の UNIQUE との二重構え)。
      */
@@ -513,7 +686,7 @@ export function settlementWriteStatements(
     );
   }
 
-  // R288: 取消の消費行は報酬行の直後・巻き戻し文より先に積む。
+  // 取消の消費行は報酬行の直後・巻き戻し文より先に積む。
   // 順序が逆だと巻き戻しがまだ無い行を数えて締めごと消してしまう。
   for (const line of input.debitLines ?? []) {
     statements.push(db.prepare(
@@ -529,7 +702,7 @@ export function settlementWriteStatements(
   // 巻き戻しの3文。fenceを通らなかった対象が1件でもあれば、この確定で
   // 書いた明細行 → credit → header の順に消す(子から先に消してFKを壊さない)。
   // 述語はいずれも「自分が消す表」を数えないため、途中経過に左右されない。
-  // R288: 取消の消費行も数える。別締めに先取りされて欠けたら、
+  // 取消の消費行も数える。別締めに先取りされて欠けたら、
   // 報酬行が全部書けていても締めごと消す(部分適用は残らない)。
   const writtenEntries =
     `(SELECT COUNT(*) FROM affiliate_reward_entries re
@@ -538,7 +711,7 @@ export function settlementWriteStatements(
   const writtenDebits = debitIds.length > 0
     ? ` OR (SELECT COUNT(*) FROM affiliate_settlement_lines sl2
              WHERE sl2.settlement_id = ?
-               AND sl2.entry_id IN (${debitIds.map(() => '?').join(',')})) <> ?`
+               AND sl2.entry_id IN (${sqlIdSet(debitIds).sql})) <> ?`
     : '';
   const noLinesLeft =
     `NOT EXISTS (SELECT 1 FROM affiliate_settlement_lines sl WHERE sl.settlement_id = ?)`;
@@ -548,7 +721,7 @@ export function settlementWriteStatements(
         WHERE settlement_id = ? AND (${writtenEntries} <> ?${writtenDebits})`,
     ).bind(
       input.settlementId, entryKeyPrefix.length, entryKeyPrefix, input.targets.length,
-      ...(debitIds.length > 0 ? [input.settlementId, ...debitIds, debitIds.length] : []),
+      ...(debitIds.length > 0 ? [input.settlementId, ...sqlIdSet(debitIds).binds, debitIds.length] : []),
     ),
     db.prepare(
       `DELETE FROM affiliate_reward_entries

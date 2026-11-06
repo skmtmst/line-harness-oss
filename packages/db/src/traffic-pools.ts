@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { jstNow, nextVersionToken } from './utils.js';
 import { resolveLineCredential } from './line-accounts.js';
 // =============================================================================
 // Traffic Pools — instant account switching via /pool/:slug
@@ -76,6 +76,7 @@ export interface CreateTrafficPoolInput {
   slug: string;
   name: string;
   activeAccountId: string;
+  accountIds?: string[];
 }
 
 export async function createTrafficPool(
@@ -85,30 +86,26 @@ export async function createTrafficPool(
   const id = crypto.randomUUID();
   const now = jstNow();
 
-  await db
-    .prepare(
-      `INSERT INTO traffic_pools (id, slug, name, active_account_id, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`,
-    )
-    .bind(id, input.slug, input.name, input.activeAccountId, now, now)
-    .run();
-
-  // Mirror the chosen active account into pool_accounts so the new pool isn't
-  // empty in the admin UI and getRandomPoolAccount() includes it on first use.
-  // INSERT OR IGNORE because pool_accounts.UNIQUE(pool_id, line_account_id)
-  // makes a follow-up explicit add idempotent.
-  await db
-    .prepare(
-      `INSERT OR IGNORE INTO pool_accounts (id, pool_id, line_account_id, is_active, created_at)
-       VALUES (?, ?, ?, 1, ?)`,
-    )
-    .bind(crypto.randomUUID(), id, input.activeAccountId, now)
-    .run();
+  const accountIds = [...new Set(input.accountIds ?? [input.activeAccountId])];
+  if (!accountIds.length || !accountIds.includes(input.activeAccountId)) throw new Error('Invalid pool membership');
+  await db.batch([
+    db.prepare(`INSERT INTO traffic_pools (id, slug, name, active_account_id, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 1, ?, ?)`)
+      .bind(id, input.slug, input.name, input.activeAccountId, now, now),
+    ...accountIds.map((accountId) => db.prepare(
+      `INSERT INTO pool_accounts (id, pool_id, line_account_id, is_active, created_at) VALUES (?, ?, ?, 1, ?)`,
+    ).bind(crypto.randomUUID(), id, accountId, now)),
+  ]);
 
   return (await getTrafficPoolById(db, id))!;
 }
 
+export class TrafficPoolSaveConflict extends Error {
+  constructor(public updatedAt: string) { super('traffic_pool_save_conflict'); }
+}
+
 export interface UpdateTrafficPoolInput {
+  expectedUpdatedAt?: string;
   name?: string;
   activeAccountId?: string;
   isActive?: boolean;
@@ -119,6 +116,11 @@ export async function updateTrafficPool(
   id: string,
   updates: UpdateTrafficPoolInput,
 ): Promise<TrafficPoolWithAccount | null> {
+  const existing = await getTrafficPoolById(db, id);
+  if (!existing) return null;
+  if (updates.expectedUpdatedAt !== undefined && updates.expectedUpdatedAt !== existing.updated_at) {
+    throw new TrafficPoolSaveConflict(existing.updated_at);
+  }
   const fields: string[] = [];
   const values: unknown[] = [];
 
@@ -138,13 +140,19 @@ export async function updateTrafficPool(
   if (fields.length === 0) return getTrafficPoolById(db, id);
 
   fields.push('updated_at = ?');
-  values.push(jstNow());
+  values.push(nextVersionToken(existing.updated_at));
   values.push(id);
 
-  await db
-    .prepare(`UPDATE traffic_pools SET ${fields.join(', ')} WHERE id = ?`)
+  values.push(existing.updated_at);
+  const result = await db
+    .prepare(`UPDATE traffic_pools SET ${fields.join(', ')} WHERE id = ? AND updated_at = ?`)
     .bind(...values)
     .run();
+  if (result.meta.changes !== 1) {
+    const latest = await getTrafficPoolById(db, id);
+    if (!latest) return null;
+    throw new TrafficPoolSaveConflict(latest.updated_at);
+  }
 
   return getTrafficPoolById(db, id);
 }

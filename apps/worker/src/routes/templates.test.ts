@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const mocks = {
   getTemplatesWithUsageCount: vi.fn(),
@@ -13,6 +13,7 @@ const mocks = {
   publishTemplate: vi.fn(),
   hasTemplateDraft: vi.fn().mockReturnValue(false),
   deleteTemplate: vi.fn(),
+  deleteCreatedTemplateDraft: vi.fn(),
   getCarouselTapTotals: vi.fn(),
   getFolderById: vi.fn(),
   listTemplateVersions: vi.fn().mockResolvedValue([]),
@@ -42,7 +43,10 @@ function makeApp() {
   return app;
 }
 
-const env = { DB: {} as D1Database };
+const env = { DB: {prepare:(query:string)=>{
+  if(!query.includes('FROM style_starter_items'))throw new Error('Unexpected direct query');
+  return {bind:()=>({all:async()=>({results:[]})})};
+}} as unknown as D1Database };
 
 const EMPTY_USAGE = {
   autoReplies: [],
@@ -104,6 +108,22 @@ describe('テンプレートの削除', () => {
     expect(mocks.deleteTemplate).not.toHaveBeenCalled();
   });
 
+  it('自動保存した下書きの削除では版が進んだら消さない', async () => {
+    mocks.getTemplateById.mockResolvedValue({ id: 'tpl-1', line_account_id: 'account-1', published_version: 0, draft_revision: 3 });
+    const response = await makeApp().fetch(new Request('https://example.com/api/templates/tpl-1?expectedDraftRevision=2', { method: 'DELETE' }), env);
+    expect(response.status).toBe(409);
+    expect(mocks.deleteTemplate).not.toHaveBeenCalled();
+  });
+
+  it('削除直前に版が変わったら409で止める', async () => {
+    mocks.getTemplateById.mockResolvedValue({ id: 'tpl-1', line_account_id: 'account-1', published_version: 0, draft_revision: 2 });
+    mocks.deleteCreatedTemplateDraft.mockResolvedValue(false);
+    const response = await makeApp().fetch(new Request('https://example.com/api/templates/tpl-1?expectedDraftRevision=2', { method: 'DELETE' }), env);
+    expect(response.status).toBe(409);
+    expect(mocks.deleteCreatedTemplateDraft).toHaveBeenCalledWith(env.DB, 'tpl-1', 2);
+    expect(mocks.deleteTemplate).not.toHaveBeenCalled();
+  });
+
   it('どこからも使われていなければ削除できる', async () => {
     const response = await makeApp().fetch(
       new Request('https://example.com/api/templates/tpl-1', { method: 'DELETE' }),
@@ -127,7 +147,7 @@ describe('テンプレートのLINEアカウント境界', () => {
     expect(mocks.getTemplateUsage).not.toHaveBeenCalled();
   });
 
-  // #891: 使用先の集計・詳細はテンプレートと同じアカウントの設定だけを
+  // 使用先の集計・詳細はテンプレートと同じアカウントの設定だけを
   // 対象にする。別アカウントの設定は名前も遷移先も見せられないので、
   // 数だけ数えると削除が永久に止まる。
   it('詳細の使用先はテンプレートのアカウントで絞ってDB層へ渡す', async () => {
@@ -172,7 +192,7 @@ describe('テンプレートのLINEアカウント境界', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ error: 'account_id_required' });
+    expect(await response.json()).toMatchObject({ code: 'account_id_required' , fields: expect.any(Object), error: expect.any(String) });
     expect(mocks.createTemplate).not.toHaveBeenCalled();
   });
 

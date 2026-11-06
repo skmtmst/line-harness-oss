@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createElement } from 'react'
@@ -7,14 +7,10 @@ import { describe, expect, it } from 'vitest'
 import FriendTrendTable from '../dashboard/friend-trend-table'
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
-const APP_SHELL = join(ROOT, '..', 'app-shell.tsx')
-const DASHBOARD = join(ROOT, '..', '..', 'app', 'page.tsx')
-const DASHBOARD_EDITOR = join(ROOT, '..', 'dashboard', 'dashboard-editor.tsx')
 const PENDING_INBOX = join(ROOT, '..', 'support', 'pending-inbox-card.tsx')
 const FRIEND_TREND = join(ROOT, '..', 'dashboard', 'friend-trend-table.tsx')
 const CHATS = join(ROOT, '..', '..', 'app', 'chats', 'page.tsx')
 const MENU = join(ROOT, '..', '..', 'lib', 'menu.ts')
-const CARD = join(ROOT, '..', 'shared', 'card.module.css')
 const DATA_TABLE_CSS = join(ROOT, '..', 'shared', 'data-table.module.css')
 
 // 描画して数えるための見本。1行だけ推定（行に「推定」の文字が残る形）。
@@ -28,66 +24,11 @@ const ALL_ESTIMATED_SAMPLE = [
   { date: '2026-09-20', added: 3, blocked: 0, active: 95, estimated: true },
 ]
 
-describe('Pen.dev V6を共通レイアウトの正本にする', () => {
-  const shell = readFileSync(APP_SHELL, 'utf8')
-  const dashboard = readFileSync(DASHBOARD, 'utf8')
-  const dashboardEditor = readFileSync(DASHBOARD_EDITOR, 'utf8')
+describe("Pen.dev 管理画面を共通レイアウトの正本にする", () => {
   const pendingInbox = readFileSync(PENDING_INBOX, 'utf8')
   const friendTrend = readFileSync(FRIEND_TREND, 'utf8')
   const chats = readFileSync(CHATS, 'utf8')
   const menu = readFileSync(MENU, 'utf8')
-  const card = readFileSync(CARD, 'utf8')
-
-  it('1920pxでV5正式共通メニューと本体幅の契約を使う', () => {
-    expect(shell).toContain('data-design-shell="v6-1920"')
-    expect(shell).toContain('data-design-node="J33xq"')
-    expect(shell).toContain('styles.content')
-  })
-
-  it('V4の上段と主要カードが実装から消えていない', () => {
-    // 画面の見出し「今日やること」は意図的に消した（m13m）。
-    // 上段の4枚が残っていることを見る。
-    for (const label of [
-      '対応が必要な受信',
-      '写真審査',
-      '今日の予約',
-      '出荷予定',
-      '今月の送信枠',
-      '運用アラート',
-      '接続状態',
-      '友だち数の推移',
-      '友だち追加リンク',
-    ]) expect(dashboard).toContain(label)
-  })
-
-  it('カードの影はV5共通部品から右1px・下1pxで統一する', () => {
-    expect(dashboard).toContain("import Card, { CardHeader } from '@/components/shared/card'")
-    expect(card).toContain('box-shadow: var(--shadow-card)')
-    expect(dashboard).not.toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
-  })
-
-  it('編集画面はドラッグ・キーボード・表示切替・プレビューで操作する', () => {
-    // 2026-09-03: 設計 `ZN0ov` は「「今日やること」は4枠までです」と書く。
-    // R116: ドラッグだけでは操作できない人がいるため、上下ボタンによる
-    // キーボード操作を残す（WCAG 2.5.7）。旧い「矢印禁止」の期待を更新する。
-    for (const label of ['表示するカードと位置を変更します', 'カードと配置', 'プレビュー', '4枠までです', 'ダッシュボードに反映']) {
-      expect(dashboardEditor).toContain(label)
-    }
-    for (const label of ['上部・小カード', 'メイン・横長', 'メイン・左カラム']) {
-      expect(dashboardEditor).toContain(label)
-    }
-    expect(dashboardEditor).toContain('useSortable')
-    /*
-      カードID・区分の正本は @line-crm/shared の DASHBOARD_CARD_GROUPS（DASH-01）。
-      画面と保存APIが別々の一覧を持つと、画面が送るIDをAPIが拒否する。
-      区分は today / main / right の3つで、shared 側の契約試験が固定する。
-    */
-    expect(dashboardEditor).toContain("from '@line-crm/shared'")
-    expect(dashboardEditor).toContain('DashboardGroup = DashboardCardGroup')
-    expect(dashboardEditor).toContain('上へ移動')
-    expect(dashboardEditor).toContain('下へ移動')
-    expect(dashboardEditor).toContain('KeyboardSensor')
-  })
 
   it('対応が必要な受信はV4の4列だけを出し、件数に合わせて高さを縮める', () => {
     for (const label of ['お名前', '内容', '待ち時間', '状態', 'h-fit']) {
@@ -107,22 +48,9 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
     expect(pendingInbox).not.toContain('すべて選択')
   })
 
-  it('ダッシュボード見出しの補足文を表示しない', () => {
-    expect(dashboard).not.toContain('運用状況です。')
-  })
-
-  it('ダッシュボードの画面名はV6共通トップバーだけに置く', () => {
-    expect(dashboard).not.toContain("import Header from '@/components/layout/header'")
-    expect(dashboard).not.toContain('<Header')
-    expect(dashboard).not.toContain('title="ダッシュボード"')
-    expect(dashboard).toContain('V6 `vUXKb/vwcM6`')
-    expect(dashboard).toContain('ダッシュボード編集')
-    expect(pendingInbox).toContain('h-[61px]')
-  })
-
   it('推定の説明は表の下ではなく見出しの日付のヘルプに表示する', () => {
     /*
-      ★V7（2026-09-27 オーナー決定）: 「推定」の「？」は7行に繰り返さず、
+      ★管理画面（2026-09-27 オーナー決定）: 「推定」の「？」は7行に繰り返さず、
       見出しの日付の横の共通部品に1つだけ置く。行ごとの開閉はやめたので
       行内の `aria-expanded` は無い。表の下の注釈に戻さない。
       DASH-17（ホバー専用の吹き出しに戻さない）は共通部品側が守る。
@@ -154,11 +82,11 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
   it('推移表の見出しは狭い画面でも折り返さない（DASH-27）', () => {
     const body = friendTrend.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
     /*
-      ★V7（2026-09-27 オーナー決定）: 日付の見出しに共通部品の「？」が
+      ★管理画面（2026-09-27 オーナー決定）: 日付の見出しに共通部品の「？」が
       入ったため、文言直前の `">` では見出しを特定できない。見出し5つ
       全てに `whitespace-nowrap` があることと、表が横にスクロールできる
       こと（`overflow-x-auto`）で同じ意図を守る。案内文と流入元列
-      （「すべて表示」）は ★V7 で外れた。
+      （「すべて表示」）は ★管理画面 で外れた。
     */
     // 見出しは共通 Th（大文字）で書く。素の th も同じ形とみなす。
     const headers = body.match(/<[tT]h[\s>][^>]*>/g) ?? []

@@ -1,5 +1,5 @@
 import { jstNow } from './utils.js';
-import type { HqSupportKind } from './hq-support-requests.js';
+import type { HqSupportKind } from './hq-support-types.js';
 
 export type KnowledgeReviewState = 'pending' | 'approved' | 'needs_review' | 'dismissed';
 export type KnowledgeArticleKind = 'verified' | 'answer_example';

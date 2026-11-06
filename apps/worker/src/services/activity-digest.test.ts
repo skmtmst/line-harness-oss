@@ -119,11 +119,11 @@ describe('getActivityDigest', () => {
     ]);
     expect(result.unanswered.oldestWaitMinutes).toBe(15);
     expect(bindings).toEqual([
-      ['2026-08-05T15:00:00.000', 'account-1', 501],
-      ['2026-08-05T15:00:00.000', 'account-1', 501],
-      ['2026-08-05T15:00:00.000', 'account-1', 501],
-      ['2026-08-05T06:00:00.000Z', 'account-1', 501],
-      ['2026-08-05T06:00:00.000Z', 'account-1', 501],
+      ['2026-08-05T15:00:00.000', JSON.stringify(['account-1']), 501],
+      ['2026-08-05T15:00:00.000', JSON.stringify(['account-1']), 501],
+      ['2026-08-05T15:00:00.000', JSON.stringify(['account-1']), 501],
+      ['2026-08-05T06:00:00.000Z', JSON.stringify(['account-1']), 501],
+      ['2026-08-05T06:00:00.000Z', JSON.stringify(['account-1']), 501],
     ]);
   });
 

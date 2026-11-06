@@ -1,11 +1,13 @@
 'use client'
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import DateTimeField from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
 import StatusChip from '@/components/shared/status-chip'
 import { isCurrentPreviewRequest } from './bulk-preview-request'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 interface Props {
   open: boolean
@@ -42,7 +44,7 @@ export function contentSourceLabel(step: PreviewStep): string | null {
 
 function nowJstAsLocalInput(): string {
   // JST clock-time as YYYY-MM-DDTHH:MM for DateTimeField
-  const d = new Date(Date.now() + 9 * 60 * 60_000)
+  const d = japanCalendar()
   return d.toISOString().slice(0, 16)
 }
 
@@ -103,30 +105,30 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
     <Dialog
       open={open}
       title="一括プレビュー"
-      description="起点からの各通の届く日時と内容の見本です。送りはしません。下書きの通には札を付けますが、実際の配信と友だち別の予定には入りません。"
+      description="起点からの各通の届く日時と内容の見本です。送りはしません。下書きの通には印を付けますが、実際の配信と友だち別の予定には入りません。"
       onCancel={onClose}
     >
       <div className="mb-4">
         <label className="text-ink-secondary mb-1 block text-xs font-medium">
-          起点 (購読開始日時)
+          起点（購読開始日時）
         </label>
-        <DateTimeField
+        <SaveErrorField names={["startAt","start_at"]}><DateTimeField
           value={startAt}
           onChange={setStartAt}
           aria-label="起点（購読開始日時）"
-        />
+        /></SaveErrorField>
       </div>
 
       {error && <p className="text-danger mb-3 text-sm" role="alert">{error}</p>}
 
       {loading ? (
-        <p className="text-ink-faint text-sm">読み込み中...</p>
+        <p className="text-ink-faint text-sm">読み込み中…</p>
       ) : steps && steps.length > 0 ? (
         <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           {steps.map((s) => (
             <details
               key={s.stepOrder}
-              className="border-hairline group rounded-lg border p-3"
+              className="border-hairline group rounded-control border p-3"
             >
               <summary className="flex cursor-pointer list-none items-center gap-2 text-sm">
                 <span className="text-ink-faint w-8 font-mono">#{s.stepOrder}</span>
@@ -142,7 +144,7 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
                   <p className="text-ink-faint mt-1 text-xs">{source}</p>
                 ) : null
               })()}
-              <pre className="bg-canvas-sunken text-ink-secondary mt-2 max-h-48 overflow-y-auto rounded p-2 text-xs break-words whitespace-pre-wrap">
+              <pre className="bg-canvas-sunken text-ink-secondary mt-2 max-h-48 overflow-y-auto rounded-mini p-2 text-xs break-words whitespace-pre-wrap">
                 {s.messageContent}
               </pre>
             </details>

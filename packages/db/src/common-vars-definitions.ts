@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { assertCommonVarFolder, COMMON_VARS_LIST_LIMIT, CommonVarFolderError, CommonVarKeyConflictError, CommonVarReasonRequiredError, CommonVarStatusTransitionError, CommonVarVersionConflictError, countCommonVars, createCommonVar, getCommonVarById, getCommonVarByIdIncludingArchived, getCommonVars, getCommonVarUsageImpact } from './common-vars/definitions.js';

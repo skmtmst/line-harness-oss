@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { tenantScopeMiddleware } from '../middleware/tenant-scope.js';
 import { businessAuditMiddleware } from '../middleware/business-audit.js';
@@ -11,7 +11,7 @@ import { images } from './images.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /**
- * #637 差し戻し対応。本番と同じ順序
+ *  差し戻し対応。本番と同じ順序
  * auth → tenantScope → businessAudit → feature → contents で、
  * 越境拒否の正規監査 media.download/denied が1件だけ残ることを確かめる。
  *
@@ -98,7 +98,7 @@ function mediaDownloadAudits(): AuditRow[] {
 
 beforeEach(() => {
   warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   insertAccount('acc-1', DEFAULT_TENANT_ID);
   insertAccount('acc-2', 'tenant-B');
   insertStaff('staff-contents', CONTENTS_KEY, '["/contents"]');

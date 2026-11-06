@@ -1,0 +1,76 @@
+/*
+ * 一覧の行の小さな吹き出し。トークの地（LINE の青灰）に白い受け取り側の吹き出し1つ。
+ * 高さは一覧の2行の行（60）の中に収まる 38 で固定し、中身は1行で省略する。
+ */
+.talk {
+  --thumb-h: 38px;
+  --thumb-image-w: 48px;
+  --thumb-image-h: 30px;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  height: var(--thumb-h);
+  padding-inline: var(--space-8);
+  overflow: hidden;
+  border-radius: var(--radius-mini);
+  background: var(--v8-line-screen);
+}
+
+.talk[data-tone='muted'] {
+  background: var(--color-canvas-sunken);
+}
+
+.bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  max-width: 100%;
+  min-width: 0;
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--v8-line-bubble-in-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+}
+
+.line {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon {
+  flex-shrink: 0;
+  width: var(--polish-icon-control);
+  height: var(--polish-icon-control);
+  color: var(--color-ink-secondary);
+  stroke-width: var(--polish-icon-stroke);
+}
+
+.extra {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.image {
+  display: block;
+  flex-shrink: 0;
+  width: var(--thumb-image-w);
+  height: var(--thumb-image-h);
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+  object-fit: cover;
+}
+
+.note {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

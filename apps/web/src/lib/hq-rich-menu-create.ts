@@ -1,12 +1,16 @@
-import type { Area } from '@/components/rich-menus/canvas-editor'
-import type { RichMenuCreateValue } from '@/components/rich-menus/rich-menu-create-form'
+import type { Area } from '../components/rich-menus/area-types'
+import type { RichMenuCreateValue } from '../components/rich-menus/rich-menu-create-model'
 import type { RichMenuDefinition } from './hq-templates-api'
 import { TEMPLATES } from './rich-menu-templates'
+import { tapActionFromUri, tapActionLiffUrl } from './tap-actions'
 
 export class HqRichMenuCompatibilityError extends Error {
+  /** 画面にそのまま出せる日本語の理由。 */
+  readonly reason: string
   constructor(message: string) {
     super(message)
     this.name = 'HqRichMenuCompatibilityError'
+    this.reason = message
   }
 }
 
@@ -144,4 +148,160 @@ export function richMenuCreateValueToHqDefinition(value: RichMenuCreateValue, pr
       defaultPageId: pages.some((page) => page.id === old.defaultPageId) ? old.defaultPageId : pages[0].id,
     },
   }
+}
+
+/* ───── 統括のリッチメニューを、店のリッチメニューの作る画面（v8/rich-menus/new/create.tsx）で作る口（・gobhu〜gQabc） ───── */
+
+/**
+ * 作る画面が手順①〜④の間に画面の中で持つ統括のひな形。店は手順ごとにサーバーへ下書きを保存するが、
+ * 統括のひな形は一度に保存する形なので、最後に一度だけ統括のひな形の口へ保存する。
+ */
+export interface HqRichMenuSeed {
+  /** 保存してある定義の id（新しく作るときは無い）。 */
+  id?: string
+  name: string
+  chatBarText: string
+  folderId: string | null
+  size: 'large' | 'compact'
+  /** 誰に出すか：すべての友だち（配った先の既定）／配った先で店が決める。 */
+  displayAudience: 'all' | 'store' | 'tag'
+  /** 「タグが付いた人」のタグ名。配った先の同じ名前の有効なタグで出す（displayAudience が tag のときだけ）。 */
+  displayTagName: string
+  /** トークを開いたとき、メニューを開いておくか。 */
+  defaultOpen: boolean
+  displayOrder: number
+  defaultPageId: string
+  pages: Array<{ id: string; name: string; imageR2Key: string | null; areas: Area[] }>
+}
+
+/** 統括のひな形で選べるボタンの動き（配った先の同じ名前の参照に直せるもの）。 */
+export const HQ_RICH_MENU_INTENTS = ['url', 'text', 'form', 'template', 'switch'] as const
+
+const HQ_ID = /^[A-Za-z0-9_-]{1,128}$/
+
+/** 統括のひな形の保存が持つ「誰に出すか」の広い形（タグ・開閉）。画面用の狭い型は Codex の持ち物なので、ここで読み替える。 */
+type WideMenu = { displayAudience?: 'all' | 'store' | 'tag'; displayTagName?: string; defaultOpen?: boolean }
+function audienceOf(menu: object): HqRichMenuSeed['displayAudience'] {
+  const value = (menu as WideMenu).displayAudience
+  return value === 'all' || value === 'tag' ? value : 'store'
+}
+
+export function hqRichMenuSeedFromDefinition(definition: RichMenuDefinition, folderId: string | null): HqRichMenuSeed {
+  const menu = definition.richMenu
+  return {
+    id: menu.id,
+    name: menu.name,
+    chatBarText: menu.chatBarText,
+    folderId,
+    size: menu.size,
+    displayAudience: audienceOf(menu),
+    displayTagName: (menu as WideMenu).displayTagName ?? '',
+    defaultOpen: (menu as WideMenu).defaultOpen ?? true,
+    displayOrder: menu.displayOrder ?? 0,
+    defaultPageId: menu.defaultPageId,
+    pages: menu.pages.map((page) => ({
+      id: page.id,
+      name: page.name,
+      imageR2Key: page.imageR2Key || null,
+      areas: page.areas.map((area) => {
+        // 予約・予約履歴・来店スタンプは、店の画面と同じ LIFF の URL（配った先の LIFF ID に付け替える仮の印）で持つ。
+        const wide = area as { intent?: string; actionData: Record<string, string> }
+        const liffKind = wide.intent === 'booking' || wide.intent === 'booking_history' || wide.intent === 'visit_stamp' ? wide.intent : null
+        const liffRef = liffKind === 'booking' ? wide.actionData.menuId ?? '' : liffKind === 'visit_stamp' ? wide.actionData.cardId ?? '' : ''
+        return ({
+        id: area.id,
+        boundsX: area.bounds.x,
+        boundsY: area.bounds.y,
+        boundsWidth: area.bounds.width,
+        boundsHeight: area.bounds.height,
+        actionType: liffKind ? 'uri' as const : area.actionType,
+        actionData: liffKind ? { uri: tapActionLiffUrl('{{liff_id}}', liffKind, liffRef) } : { ...area.actionData },
+        intent: liffKind ? 'url' as const : area.intent ?? null,
+        label: area.label ?? null,
+        tagIds: [...(area.tagIds ?? [])],
+        scoreChange: null,
+        templateId: area.templateId ?? null,
+        formId: area.formId ?? null,
+        trackedLinkId: null,
+      })}),
+    })),
+  }
+}
+
+const ACTION_BY_INTENT = { url: 'uri', form: 'uri', text: 'message', template: 'postback', switch: 'richmenuswitch' } as const
+
+/** 画面の中の下書きを、統括のひな形の定義にする。統括で持てない動き・参照は保存の前に断る。 */
+export function hqRichMenuDefinitionFromSeed(seed: HqRichMenuSeed): RichMenuDefinition {
+  const used = new Set<string>()
+  const pageIds = new Map<string, string>()
+  seed.pages.forEach((page, index) => {
+    const id = HQ_ID.test(page.id) && !used.has(page.id) ? page.id : uniqueId('page', used)
+    used.add(id)
+    pageIds.set(page.id, id)
+    void index
+  })
+  const pages = seed.pages.map((page) => {
+    if (!page.imageR2Key) fail(`ページ「${page.name}」の画像を選んでください。`)
+    return {
+      id: pageIds.get(page.id)!,
+      name: page.name.trim() || 'ページ',
+      imageR2Key: page.imageR2Key ?? '',
+      areas: page.areas.map((area, index) => {
+        const name = area.label?.trim() || `面 ${String.fromCharCode(65 + index)}`
+        if (area.trackedLinkId) fail(`「${name}」の計測リンクは店ごとの参照です。配った先で決めてください。`)
+        if (area.scoreChange != null && area.scoreChange !== 0) fail(`「${name}」のスコアは統括のひな形では決められません。`)
+        const intent = area.intent
+        if (!intent || !(HQ_RICH_MENU_INTENTS as readonly string[]).includes(intent)) fail(`「${name}」の動きを決めてください（統括では URL・メッセージ・回答フォーム・テンプレート・メニューの切り替えだけ選べます）。`)
+        const hqIntent = intent as typeof HQ_RICH_MENU_INTENTS[number]
+        const uriData = String((area.actionData as Record<string, unknown> | undefined)?.uri ?? '')
+        const liff = hqIntent === 'url' ? tapActionFromUri(uriData) : null
+        const liffKind = liff && (liff.kind === 'booking' || liff.kind === 'booking_history' || liff.kind === 'visit_stamp') ? liff.kind : null
+        if (area.tagIds?.length && hqIntent !== 'text' && hqIntent !== 'template') fail(`「${name}」でタグを付けられるのは「メッセージを送る」「テンプレートを送る」だけです。`)
+        const data = area.actionData ?? {}
+        const actionData: Record<string, string> = hqIntent === 'url' ? { uri: String(data.uri ?? '') }
+          : hqIntent === 'text' ? { text: String(data.text ?? '') }
+          : hqIntent === 'switch' ? { targetPageId: pageIds.get(String(data.targetPageId ?? '')) ?? String(data.targetPageId ?? '') }
+          : {}
+        const id = HQ_ID.test(area.id) && !used.has(area.id) ? area.id : uniqueId('area', used)
+        used.add(id)
+        if (liffKind) {
+          // 配った先の LIFF に付け替えるので、URL は持たず「種類」と（あれば）参照の ID だけを持つ。
+          return {
+            id,
+            bounds: { x: area.boundsX, y: area.boundsY, width: area.boundsWidth, height: area.boundsHeight },
+            actionType: 'uri' as const,
+            actionData: liffKind === 'booking' && liff?.refId ? { menuId: liff.refId } : liffKind === 'visit_stamp' && liff?.refId ? { cardId: liff.refId } : {},
+            intent: liffKind as never,
+            ...(area.label?.trim() ? { label: area.label.trim() } : {}),
+          }
+        }
+        return {
+          id,
+          bounds: { x: area.boundsX, y: area.boundsY, width: area.boundsWidth, height: area.boundsHeight },
+          actionType: ACTION_BY_INTENT[hqIntent],
+          actionData,
+          intent: hqIntent,
+          ...(area.label?.trim() ? { label: area.label.trim() } : {}),
+          ...(area.tagIds?.length ? { tagIds: [...area.tagIds] } : {}),
+          ...(hqIntent === 'form' && area.formId ? { formId: area.formId } : {}),
+          ...(hqIntent === 'template' && area.templateId ? { templateId: area.templateId } : {}),
+        }
+      }),
+    }
+  })
+  const menuId = seed.id && HQ_ID.test(seed.id) ? seed.id : uniqueId('menu', used)
+  const menu = {
+      id: menuId,
+      name: seed.name.trim(),
+      chatBarText: seed.chatBarText.trim(),
+      size: seed.size,
+      defaultPageId: pageIds.get(seed.defaultPageId) ?? pages[0]?.id ?? '',
+      displayOrder: Math.max(0, Math.round(seed.displayOrder)),
+      displayAudience: seed.displayAudience,
+      ...(seed.displayAudience === 'tag' ? { displayTagName: seed.displayTagName.trim() } : {}),
+      defaultOpen: seed.defaultOpen,
+      pages,
+    }
+  if (seed.displayAudience === 'tag' && !seed.displayTagName.trim()) fail('「タグが付いた人」に出すときは、タグの名前を入れてください。')
+  return { schemaVersion: 1, richMenu: menu as RichMenuDefinition['richMenu'] }
 }

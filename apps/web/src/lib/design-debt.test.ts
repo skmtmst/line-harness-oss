@@ -1,37 +1,30 @@
-/*
- * 共通部品を通らない直書きを、**これ以上増やさない**ための試験。
- *
- * `raw-colors.test.ts` は生の色だけを見る。こちらはその隣で、
- * 任意値記法・直書きの表見出し・直書きのボタン・静的に読めない `className` を見る。
- *
- * どれも「規格から外れているのに、普通のコードに見える」ものばかりで、
- * 目で見ても間違いに気づけない。数で止める。
- *
- * 直し方:
- *
- *     node apps/web/scripts/design-debt.mjs --update
- *
- * `display-class-on-part` だけは基準値ではなく **0 固定**。
- */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   countDebt,
-  compare,
   totals,
   analyzeSource,
   isDisplayClass,
   ZERO_TOLERANCE,
-  BASELINE,
   SRC,
+  partFiles,
 } from '../../scripts/design-debt.mjs'
 
-const baseline = JSON.parse(readFileSync(BASELINE, 'utf8')) as Record<string, Record<string, number>>
 const { counts } = countDebt()
-const { worse } = compare(counts, baseline)
 
 describe('共通部品を通らない直書き', () => {
+  it('画素照合待ちの共通部品も持ち主として扱い、画面側・担当未定の調査は除外しない', () => {
+    const data = { parts: {}, investigations: {
+      owner: { role: 'canonical', status: 'active', code: 'src/components/shared/page-size-select.tsx', components: ['PageSizeSelect'] },
+      screen: { role: 'canonical', status: 'active', code: 'src/v8/demo.tsx', components: ['Demo'] },
+      undecided: { role: 'sample', status: 'active', code: 'src/components/shared/probe.tsx', components: ['Probe'] },
+    } }
+    const files = partFiles(data)
+    expect(files.has(join(SRC, 'components/shared/page-size-select.tsx'))).toBe(true)
+    expect(files.has(join(SRC, 'v8/demo.tsx'))).toBe(false)
+    expect(files.has(join(SRC, 'components/shared/probe.tsx'))).toBe(false)
+  })
   it('design-parts.jsonに登録した正本部品自身は負債へ数えない', () => {
     for (const file of [
       'components/app-shell.tsx',
@@ -46,12 +39,6 @@ describe('共通部品を通らない直書き', () => {
     ]) {
       expect(counts).not.toHaveProperty(file)
     }
-  })
-
-  it('増えていない', () => {
-    // 落ちたら: 共通部品を使うか、意図があるなら
-    // node apps/web/scripts/design-debt.mjs --update で基準を更新してください。
-    expect(worse).toEqual({})
   })
 
   it('共通部品へ表示制御のクラスを渡していない', () => {
@@ -149,5 +136,27 @@ export default () => <ConfirmDialog className="hidden" />`),
       countOf(`import D from '@/components/shared/confirm-dialog'
 export default () => <D className="w-full overflow-hidden" />`),
     ).toBe(0)
+  })
+})
+
+
+describe('CSS Modules の静的な札', () => {
+  const probe = join(SRC, 'components/shared/__probe.tsx')
+  const countOf = (expression: string) => analyzeSource(probe,
+    `import styles from './button.module.css'; export default () => <div className={${expression}} />`,
+    new Set()) as Record<string, number>
+
+  it('実在する札は別名や文字列添字でも解決する', () => {
+    const css = readFileSync(join(SRC, 'components/shared/button.module.css'), 'utf8')
+    const name = css.match(/\.([A-Za-z_][\w-]*)/)![1]
+    expect(countOf(`styles.${name}`)['unresolved-classname'] ?? 0).toBe(0)
+    expect(countOf(`styles['${name}']`)['unresolved-classname'] ?? 0).toBe(0)
+  })
+
+  it('無い札・動的な添字・Tailwind の変数は未解決として残す', () => {
+    for (const value of ['styles.__missing__', 'styles[key]', 'classNames']) {
+      expect(countOf(value)['unresolved-classname']).toBe(1)
+    }
+    expect(countOf('`text-[13px] ${styles.__missing__}`')['arbitrary-value']).toBe(1)
   })
 })

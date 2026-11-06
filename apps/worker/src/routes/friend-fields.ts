@@ -1,9 +1,11 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   getFriendFields,
   getFriendFieldsForScope,
   getFriendFieldByIdForScope,
-  createFriendFieldForScope,
+  createFriendFieldIdempotent,
+  FriendFieldCreateError,
   updateFriendField,
   reorderFriendFields,
   deleteFriendField,
@@ -22,8 +24,8 @@ import {
   executeFieldMigration,
   getFriendFieldsWithValues,
   getFriendById,
-  setFriendFieldValue,
   setFriendFieldValuesBulk,
+  setFriendFieldValuesForFriend,
   jstNow,
   validateFieldKey,
   validateFriendFieldValue,
@@ -34,10 +36,14 @@ import {
   type FriendFieldType,
 } from '@line-crm/db';
 import { recordLoginAudit } from '@line-crm/db';
-import type { Env } from '../index.js';
+import { fail } from '../lib/fail.js';
+
+import type { Env } from '../worker-env.js';
 import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
 import { requireVisibleFriend } from './friends.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { accountAllergyOptions } from '../services/allergy-options.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 const friendFields = new Hono<Env>();
 
@@ -73,6 +79,9 @@ function serialize(row: FriendField & { value?: string | null; updated_by?: stri
     updatedAt: row.updated_at,
     status: row.status ?? 'active',
     version: row.version ?? 1,
+    fixedKey: row.fixed_key ?? null,
+    valueUpdatedAt: row.value_updated_at ?? null,
+    valueSource: row.source_type ? { type: row.source_type, id: row.source_id ?? null, name: row.source_name ?? null } : null,
     canInsertText: row.type !== 'image' && row.type !== 'pdf',
     ...(row.is_inherited !== undefined ? { isInherited: Boolean(row.is_inherited) } : {}),
     ...(row.value !== undefined ? { value: row.value, updatedBy: row.updated_by ?? null } : {}),
@@ -82,7 +91,7 @@ function serialize(row: FriendField & { value?: string | null; updated_by?: stri
 async function friendFieldAccess(c: Context<Env>): Promise<FriendFieldScope | Response> {
   const lineAccountId = c.req.query('lineAccountId');
   if (!lineAccountId) {
-    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+    return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]);
   }
   const staff = c.get('staff');
   if (!staff.tenantId) {
@@ -144,10 +153,7 @@ function parseOptions(raw: unknown, existingRaw?: string | null): { ok: true; va
 }
 
 /*
- * R181: 既定値の検査は個別値（validateFriendFieldValue）と同じ物差しで
- * 行う。以前はここに独自の甘い検査があり、存在しない日付・記号だけの
- * 電話番号が既定値として保存できていた。選択肢はID付きの形で渡し、
- * 個別値側の突き合わせ（ID・表示名の両対応）を使う。
+ * 存在しない日付や不正な電話番号を既定値だけで受け付けないよう、validateFriendFieldValue と同じ検証を使う。選択肢は ID と表示名の両方で照合する。
  */
 function validateDefaultValue(
   raw: unknown,
@@ -168,7 +174,7 @@ async function sha256(value: string): Promise<string> {
 }
 
 /**
- * N-046(#812): 一括更新のIdempotency-Key検査。サーバ状態を持たず、
+ * 一括更新のIdempotency-Key検査。サーバ状態を持たず、
  * key自体へ内容を束縛する。作り方は `ffbulk_<sha256hex>`、正準形は
  * `v1\n<lineAccountId>\n<fieldId>\n<friendIds昇順,区切り>\n<JSON.stringify(value)>`。
  *
@@ -250,8 +256,11 @@ function convertMigrationValue(value: string, targetType: FriendFieldType): Omit
   const trimmed = value.trim();
   if (!trimmed) return { convertedValue: null, status: 'invalid', reason: '空欄です' };
   if (targetType === 'number') {
+    /*
+     * 移行可能件数と保存結果がずれないよう、validateFriendFieldValue と同じ基準で判定する。0x10 や1e5も数値変換だけで許さず、カンマ区切りの処理を一致させる。
+     */
     const normalized = trimmed.replace(/,/g, '');
-    return Number.isFinite(Number(normalized))
+    return /^[-+]?(\d+(\.\d+)?|\.\d+)$/.test(normalized) && Number.isFinite(Number(normalized))
       ? { convertedValue: normalized, status: 'convertible', reason: null }
       : { convertedValue: null, status: 'review', reason: '数値として確認できません' };
   }
@@ -268,6 +277,12 @@ function convertMigrationValue(value: string, targetType: FriendFieldType): Omit
     return !isExactDate
       ? { convertedValue: null, status: 'review', reason: '存在する日付か確認してください' }
       : { convertedValue: result, status: 'convertible', reason: null };
+  }
+  if (targetType === 'time') {
+    const checked = validateFriendFieldValue({ type: 'time', options_json: null }, trimmed);
+    return checked.ok
+      ? { convertedValue: checked.value, status: 'convertible', reason: null }
+      : { convertedValue: null, status: 'review', reason: checked.error };
   }
   if (targetType === 'datetime') {
     const date = new Date(trimmed);
@@ -346,8 +361,7 @@ friendFields.get('/api/friend-fields', async (c) => {
     }
     return c.json({ success: true, data: items.map(serialize) });
   } catch (err) {
-    console.error('GET /api/friend-fields error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -361,8 +375,7 @@ friendFields.get('/api/friend-fields-stats', async (c) => {
     if (scope instanceof Response) return scope;
     return c.json({ success: true, data: await getFriendFieldListSummary(c.env.DB, scope) });
   } catch (err) {
-    console.error('GET /api/friend-fields-stats error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -370,7 +383,7 @@ friendFields.get('/api/friend-fields-stats', async (c) => {
 //
 // 値を1件も変更せず、変換可能・要確認・変換不可を返す。型の違う自由入力を
 // 黙って捨てないため、確認が要る行は友だちIDと理由まで残す。
-friendFields.post('/api/friend-fields/:id/migration-preview', requireRole('owner', 'admin'), async (c) => {
+friendFields.post('/api/friend-fields/:id/migration-preview', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const scope = await friendFieldAccess(c);
     if (scope instanceof Response) return scope;
@@ -384,11 +397,11 @@ friendFields.post('/api/friend-fields/:id/migration-preview', requireRole('owner
       return c.json({ success: false, code: 'TARGET_NOT_FOUND', error: '移行先の項目が見つかりません' }, 404);
     }
     if (target?.id === source.id) {
-      return c.json({ success: false, code: 'SAME_FIELD', error: '移行元と移行先には別の項目を指定してください' }, 422);
+      return inputError(c, { success: false, code: 'SAME_FIELD', error: '移行元と移行先には別の項目を指定してください' }, 422, ["targetFieldId"]);
     }
     const targetType = target?.type ?? String(body.targetType ?? '');
     if (!(FRIEND_FIELD_TYPES as readonly string[]).includes(targetType)) {
-      return c.json({ success: false, error: '移行先の種類が正しくありません' }, 422);
+      return inputError(c, { success: false, error: '移行先の種類が正しくありません' }, 422, ["targetFieldId","targetType"]);
     }
     const values = await getFriendFieldValuesForMigration(c.env.DB, source.id, scope);
     const rows: MigrationPreviewRow[] = values.map((item) => ({
@@ -432,19 +445,18 @@ friendFields.post('/api/friend-fields/:id/migration-preview', requireRole('owner
       previewExpiresAt,
     } });
   } catch (err) {
-    console.error('POST /api/friend-fields/:id/migration-preview error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/friend-fields/:id/migrations
-friendFields.post('/api/friend-fields/:id/migrations', requireRole('owner', 'admin'), async (c) => {
+friendFields.post('/api/friend-fields/:id/migrations', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const scope = await friendFieldAccess(c);
     if (scope instanceof Response) return scope;
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!idempotencyKey || idempotencyKey.length > 128) {
-      return c.json({ success: false, code: 'IDEMPOTENCY_KEY_REQUIRED', error: 'Idempotency-Keyを指定してください' }, 422);
+      return inputError(c, { success: false, code: 'IDEMPOTENCY_KEY_REQUIRED', error: 'Idempotency-Keyを指定してください' }, 422, []);
     }
     const duplicate = await getFieldMigrationRunByIdempotencyKey(c.env.DB, idempotencyKey, scope);
     if (duplicate) return c.json({ success: true, data: { runId: duplicate.id } }, 202);
@@ -452,7 +464,7 @@ friendFields.post('/api/friend-fields/:id/migrations', requireRole('owner', 'adm
     const body = await c.req.json<{ previewToken?: unknown }>();
     const previewToken = typeof body.previewToken === 'string' ? body.previewToken : '';
     if (!previewToken) {
-      return c.json({ success: false, code: 'PREVIEW_TOKEN_REQUIRED', error: '事前確認をやり直してください' }, 422);
+      return inputError(c, { success: false, code: 'PREVIEW_TOKEN_REQUIRED', error: '事前確認をやり直してください' }, 422, ["previewToken"]);
     }
     const run = await getFieldMigrationRunByToken(c.env.DB, await sha256(previewToken), scope);
     if (!run || run.source_field_id !== c.req.param('id')) {
@@ -476,6 +488,17 @@ friendFields.post('/api/friend-fields/:id/migrations', requireRole('owner', 'adm
       return c.json({ success: false, code: 'PREVIEW_STALE', error: '事前確認後に値または使用先が変わりました。やり直してください' }, 409);
     }
     if (!await queueFieldMigration(c.env.DB, run.id, idempotencyKey)) {
+      /*
+       * D036: 前の試しが途中で止まった分は続けられる。実行は「まだの行だけ」を
+       * 拾い直し、件数は表から数え直すため、値を二重に書かない。
+       * 終わった分・止めた分は今までどおり409で断る。
+       */
+      const current = await getFieldMigrationRun(c.env.DB, run.id, scope);
+      if (current && (current.status === 'queued' || current.status === 'running')) {
+        const resume = executeFieldMigration(c.env.DB, run.id, target.type as FriendFieldType, c.get('staff').id);
+        try { c.executionCtx.waitUntil(resume); } catch { await resume; }
+        return c.json({ success: true, data: { runId: run.id } }, 202);
+      }
       return c.json({ success: false, code: 'RUN_STATE_CHANGED', error: '移行状態が変わりました。実行状況を確認してください' }, 409);
     }
     const execution = executeFieldMigration(c.env.DB, run.id, target.type as FriendFieldType, c.get('staff').id);
@@ -485,8 +508,7 @@ friendFields.post('/api/friend-fields/:id/migrations', requireRole('owner', 'adm
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, code: 'IDEMPOTENCY_CONFLICT', error: '同じ操作はすでに受け付けています' }, 409);
     }
-    console.error('POST /api/friend-fields/:id/migrations error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -500,54 +522,62 @@ friendFields.get('/api/field-migrations/:runId', async (c) => {
     const rows = await getFieldMigrationItems(c.env.DB, run.id);
     return c.json({ success: true, data: serializeMigrationRun(run, rows) });
   } catch (err) {
-    console.error('GET /api/field-migrations/:runId error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/friend-fields
-friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), async (c) => {
+friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const scope = await friendFieldAccess(c);
     if (scope instanceof Response) return scope;
+    /*
+     * 応答だけ失った再試行で二重に作らないため、要求キーを必須にする。
+     * 同じキー・同じ内容の再送は保存済みの項目を返し、同じキーに
+     * 異なる内容が来たら作らず409で止める（対応マークと同じ約束）。
+     */
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
+    if (!idempotencyKey || idempotencyKey.length > 128) {
+      return inputError(c, { success: false, error: 'Idempotency-Keyを指定してください' }, 400, []);
+    }
     const body = await c.req.json<Record<string, unknown>>();
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
-    if (!name) return c.json({ success: false, error: '項目名を入力してください' }, 400);
+    if (!name) return inputError(c, { success: false, error: '項目名を入力してください' }, 400, ["name"]);
 
     const keyCheck = validateFieldKey(body.fieldKey);
-    if (!keyCheck.ok) return c.json({ success: false, error: keyCheck.error }, 422);
+    if (!keyCheck.ok) return inputError(c, { success: false, error: keyCheck.error }, 422, ["fieldKey"]);
 
     if (!(FRIEND_FIELD_TYPES as readonly string[]).includes(String(body.type))) {
-      return c.json({ success: false, error: '項目の種類が正しくありません' }, 422);
+      return inputError(c, { success: false, error: '項目の種類が正しくありません' }, 422, ["type"]);
     }
     const type = String(body.type) as FriendFieldType;
     const source = body.source ?? 'manual';
     if (!['manual', 'form', 'ec', 'automation'].includes(String(source))) {
-      return c.json({ success: false, error: '登録元が正しくありません' }, 422);
+      return inputError(c, { success: false, error: '登録元が正しくありません' }, 422, ["source"]);
     }
     const folderId = body.folderId ? String(body.folderId) : null;
     if (folderId) {
       const folder = await getFolderById(c.env.DB, folderId);
       if (!folder || folder.kind !== 'friend_field') {
-        return c.json({ success: false, error: '友だち情報欄のフォルダが見つかりません' }, 422);
+        return inputError(c, { success: false, error: '友だち情報欄のフォルダが見つかりません' }, 422, ["folderId"]);
       }
     }
 
     const options = parseOptions(body.options);
     if (!options.ok) {
-      return c.json({ success: false, error: '選択肢の名前・色・状態を確認してください' }, 422);
+      return inputError(c, { success: false, error: '選択肢の名前・色・状態を確認してください' }, 422, ["options"]);
     }
     if (type !== 'select' && type !== 'multi_select' && options.items.length > 0) {
-      return c.json({ success: false, error: '選択肢は選択式の項目だけに設定できます' }, 422);
+      return inputError(c, { success: false, error: '選択肢は選択式の項目だけに設定できます' }, 422, ["type","options"]);
     }
     if ((type === 'image' || type === 'pdf') && (body.mediaId != null || body.allowTextInsertion === true)) {
-      return c.json({ success: false, error: '画像・PDFは既定値や本文差し込みに使えません' }, 422);
+      return inputError(c, { success: false, error: '画像・PDFは既定値や本文差し込みに使えません' }, 422, ["type","mediaId","allowTextInsertion"]);
     }
     const defaultValue = validateDefaultValue(body.defaultValue, type, options.items);
-    if (!defaultValue.ok) return c.json({ success: false, error: defaultValue.error }, 422);
+    if (!defaultValue.ok) return inputError(c, { success: false, error: defaultValue.error }, 422, ["defaultValue","type","options"]);
 
-    const field = await createFriendFieldForScope(c.env.DB, scope, {
+    const { field, replayed } = await createFriendFieldIdempotent(c.env.DB, scope, {
       name,
       fieldKey: String(body.fieldKey),
       type,
@@ -560,53 +590,51 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), async (c)
       isPersonal: body.isPersonal === true,
       isStarred: body.isStarred === true,
       displayOrder: Number(body.displayOrder ?? 0),
-    });
-    return c.json({ success: true, data: serialize(field) }, 201);
+    }, idempotencyKey);
+    // 再送で保存済みを返したときは200、新しく作ったときは201。
+    return c.json({ success: true, data: serialize(field) }, replayed ? 200 : 201);
   } catch (err) {
+    if (err instanceof FriendFieldCreateError) {
+      return c.json({ success: false, code: err.code, error: err.message }, 409);
+    }
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'その差し込み名は既に使われています' }, 409);
     }
-    console.error('POST /api/friend-fields error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// PATCH /api/friend-fields/:id
-//
-// 種類と差し込み名はここでは変えられない。種類を変えると既に入っている値の
-// 意味が変わり（「犬」が数値項目になる等）、差し込み名を変えると
-// テンプレートの差し込みが黙って空になる。どちらも作り直してもらう。
+// 種類変更は保存値の意味を変え、差し込み名の変更はテンプレートを空にするため、ここでは変更させず作り直す。
 /**
- * PATCH /api/friend-fields/reorder — 並び順をまとめて書く（#1014 ATTR-02/03/04）。
+ * PATCH /api/friend-fields/reorder — 並び順をまとめて書く。
  *
  * /api/friend-fields/:id より前に置く。:id に "reorder" として
  * 食われないようにするため（/api/tags/reorder と同じ並び）。
  * 画面は「動かせる行だけの新しい順」を送り、隠れた行と共通項目の
  * 位置はサーバー側で保つ。
  */
-friendFields.patch('/api/friend-fields/reorder', requireRole('owner', 'admin'), async (c) => {
+friendFields.patch('/api/friend-fields/reorder', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const scope = await friendFieldAccess(c);
     if (scope instanceof Response) return scope;
     const body = await c.req.json<{ ids?: unknown }>();
     if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== 'string')) {
-      return c.json({ success: false, error: 'ids must be an array of field ids' }, 400);
+      return inputError(c, { success: false, error: 'ids must be an array of field ids' }, 400, ["ids"]);
     }
     if (body.ids.length > 500) {
-      return c.json({ success: false, error: 'too many ids' }, 400);
+      return inputError(c, { success: false, error: 'too many ids' }, 400, ["ids"]);
     }
     if (new Set(body.ids).size !== body.ids.length) {
-      return c.json({ success: false, error: 'ids must not contain duplicates' }, 400);
+      return inputError(c, { success: false, error: 'ids must not contain duplicates' }, 400, ["ids"]);
     }
     await reorderFriendFields(c.env.DB, scope, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
-    console.error('PATCH /api/friend-fields/reorder error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), async (c) => {
+friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const scope = await friendFieldAccess(c);
     if (scope instanceof Response) return scope;
@@ -623,37 +651,31 @@ friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), asyn
     const body = await c.req.json<Record<string, unknown>>();
 
     if (body.type !== undefined && body.type !== existing.type) {
-      return c.json(
-        {
+      return inputError(c, {
           success: false,
           error:
             '項目の種類は後から変えられません。すでに入っている値の意味が変わるためです。新しい項目を作ってください。',
-        },
-        422,
-      );
+        }, 422, ["type"]);
     }
     if (body.fieldKey !== undefined && body.fieldKey !== existing.field_key) {
-      return c.json(
-        {
+      return inputError(c, {
           success: false,
           error:
             '差し込み名は後から変えられません。テンプレートの差し込みが空になるためです。新しい項目を作ってください。',
-        },
-        422,
-      );
+        }, 422, ["fieldKey"]);
     }
 
     const patch: Parameters<typeof updateFriendField>[2] = {};
     if (body.version !== undefined) {
       const version = Number(body.version);
       if (!Number.isInteger(version) || version < 1) {
-        return c.json({ success: false, error: 'versionを正しく指定してください' }, 422);
+        return inputError(c, { success: false, error: 'versionを正しく指定してください' }, 422, ["version"]);
       }
       patch.expectedVersion = version;
     }
     if (body.name !== undefined) {
       const name = String(body.name).trim();
-      if (!name) return c.json({ success: false, error: '項目名を入力してください' }, 400);
+      if (!name) return inputError(c, { success: false, error: '項目名を入力してください' }, 400, ["name"]);
       patch.name = name;
     }
     if ('folderId' in body) {
@@ -661,7 +683,7 @@ friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), asyn
       if (folderId) {
         const folder = await getFolderById(c.env.DB, folderId);
         if (!folder || folder.kind !== 'friend_field') {
-          return c.json({ success: false, error: '友だち情報欄のフォルダが見つかりません' }, 422);
+          return inputError(c, { success: false, error: '友だち情報欄のフォルダが見つかりません' }, 422, ["folderId"]);
         }
       }
       patch.folderId = folderId;
@@ -669,10 +691,10 @@ friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), asyn
     if ('options' in body) {
       const options = parseOptions(body.options, existing.options_json);
       if (!options.ok) {
-        return c.json({ success: false, error: '選択肢の名前・色・状態を確認してください' }, 422);
+        return inputError(c, { success: false, error: '選択肢の名前・色・状態を確認してください' }, 422, ["options"]);
       }
       if (existing.type !== 'select' && existing.type !== 'multi_select' && options.items.length > 0) {
-        return c.json({ success: false, error: '選択肢は選択式の項目だけに設定できます' }, 422);
+        return inputError(c, { success: false, error: '選択肢は選択式の項目だけに設定できます' }, 422, ["options"]);
       }
       patch.optionsJson = options.value;
     }
@@ -681,7 +703,7 @@ friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), asyn
         (existing.options_json ? JSON.parse(existing.options_json) : []), existing.options_json);
       const checked = validateDefaultValue(body.defaultValue, existing.type as FriendFieldType,
         parsedOptions.ok ? parsedOptions.items : []);
-      if (!checked.ok) return c.json({ success: false, error: checked.error }, 422);
+      if (!checked.ok) return inputError(c, { success: false, error: checked.error }, 422, ["defaultValue","options"]);
       patch.defaultValue = checked.value;
     }
     if ('ecFieldPath' in body) {
@@ -694,19 +716,27 @@ friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), asyn
 
     const field = await updateFriendField(c.env.DB, id, patch);
     if (!field) {
-      return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの変更が先に保存されました。再読み込みしてください' }, 409);
+      /*
+       * 版が合わない再試行は、最新の内容を付けて409で返す。
+       * 画面は送った内容と比べ、保存済みか他人の変更かを案内する
+       * （対応マークの SUPPORT_MARK_VERSION_CONFLICT と同じ約束）。
+       */
+      const latest = await getFriendFieldByIdForScope(c.env.DB, id, scope);
+      if (!latest) return c.json({ success: false, error: '項目が見つかりません' }, 404);
+      return c.json({
+        success: false,
+        code: 'VERSION_CONFLICT',
+        error: 'ほかの変更が先に保存されました。最新の内容を確認してください',
+        data: { latest: serialize(latest) },
+      }, 409);
     }
     return c.json({ success: true, data: serialize(field!) });
   } catch (err) {
-    console.error('PATCH /api/friend-fields/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// DELETE /api/friend-fields/:id
-//
-// 値が入っていれば人数を返して止める。項目を消すと入っていた値も消えるので、
-// 何人ぶん消えるのかを見てから決めてもらう。
+// 値がある項目は削除件数を示して止め、データ損失を確認してから判断できるようにする。
 friendFields.delete('/api/friend-fields/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const scope = await friendFieldAccess(c);
@@ -733,15 +763,14 @@ friendFields.delete('/api/friend-fields/:id', requireRole('owner', 'admin'), asy
     await deleteFriendField(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/friend-fields/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // GET /api/friends/:id/fields
 //
 // 個人情報の項目は attribute.personal_info.view（またはedit）の個別権限で
-// 絞る（N-045。owner/adminは常に通る）。閲覧できる人が開いたときは記録を残す。
+// 絞る（。owner/adminは常に通る）。閲覧できる人が開いたときは記録を残す。
 friendFields.get(
   '/api/friends/:id/fields',
   requireRole('owner', 'admin', 'staff'),
@@ -756,7 +785,14 @@ friendFields.get(
         && (hasStaffPermission(c, 'attribute.personal_info.view')
           || hasStaffPermission(c, 'attribute.personal_info.edit'));
 
-      const rows = await getFriendFieldsWithValues(c.env.DB, friendId);
+      const friend = await getFriendById(c.env.DB, friendId);
+      const allowed = await getFriendFieldsForScope(c.env.DB, {tenantId:staff?.tenantId ?? DEFAULT_TENANT_ID,lineAccountId:friend?.line_account_id ?? ''});
+      const allowedIds = new Set(allowed.map(field => field.id));
+      const rows = (await getFriendFieldsWithValues(c.env.DB, friendId)).filter(field => (allowedIds.has(field.id) || field.field_key.startsWith('fixed_')) && field.status !== 'archived');
+      if (friend?.line_account_id && rows.some(field=>field.field_key==='fixed_allergy')) {
+        const { options } = await accountAllergyOptions(c.env.DB, friend.line_account_id);
+        for (const field of rows) if (field.field_key === 'fixed_allergy') field.options_json = JSON.stringify(options);
+      }
       const visible = rows.filter((r) => r.is_personal === 0 || canSeePersonal);
       const hiddenCount = rows.length - visible.length;
 
@@ -765,6 +801,7 @@ friendFields.get(
       // 「項目があること」を見ただけでは閲覧にあたらない。
       const audit = recordLoginAudit(c.env.DB, {
         adminUserId: staff?.id ?? null,
+        lineAccountId: friend?.line_account_id ?? null,
         action: 'view_personal',
         screen: `/friends/${friendId}`,
       });
@@ -790,8 +827,7 @@ friendFields.get(
         },
       });
     } catch (err) {
-      console.error('GET /api/friends/:id/fields error:', err);
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   },
 );
@@ -801,10 +837,10 @@ friendFields.get(
 // まとめて更新する。EC を正としている項目は書き換えず、理由を warnings で返す。
 // 黙って無視すると「保存したのに戻る」という形で表に出る。
 //
-// N-045: 個人情報の項目だけ attribute.personal_info.edit を持つ staff に
+// 個人情報の項目だけ attribute.personal_info.edit を持つ staff に
 // 開ける。それ以外の項目は owner/admin のみ。staff が個人情報以外の項目を
 // 送ってきた分は保存せず warnings で返す。
-friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, async (c) => {
+friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, inputJsonBoundary({"values":["object"]}), async (c) => {
   try {
     const friendId = c.req.param('id');
     const staff = c.get('staff');
@@ -817,17 +853,22 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff
     const body = await c.req.json<{ values?: Record<string, unknown> }>();
     const values = body.values ?? {};
 
-    const fields = await getFriendFields(c.env.DB);
+    const friend = await getFriendById(c.env.DB, friendId);
+    const allFields = await getFriendFields(c.env.DB);
+    const scopedFields = await getFriendFieldsForScope(c.env.DB, {tenantId:staff?.tenantId ?? DEFAULT_TENANT_ID,lineAccountId:friend?.line_account_id ?? ''});
+    const allowedIds = new Set(scopedFields.map(field => field.id));
+    const fields = allFields.filter(field => (allowedIds.has(field.id) || field.field_key.startsWith('fixed_')) && field.status !== 'archived');
     const byId = new Map(fields.map((f) => [f.id, f]));
     const warnings: string[] = [];
     const pending: Array<{ fieldId: string; value: string | null; field: FriendField }> = [];
     const errors: Array<{ fieldId: string; name: string; message: string }> = [];
 
-    // N-042: 型に合わない値は1件も保存しない。先に全部を検証し、
+    // 型に合わない値は1件も保存しない。先に全部を検証し、
     // 1つでも通らなければ422で返して書き込まない（部分保存なし）。
     for (const [fieldId, raw] of Object.entries(values)) {
       const field = byId.get(fieldId);
       if (!field) {
+        if (allFields.some(field => field.id === fieldId)) return c.json({success:false,error:'この店で使える情報欄ではありません'},403);
         warnings.push(`知らない項目が含まれていたため無視しました（${fieldId}）`);
         continue;
       }
@@ -847,59 +888,57 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff
       pending.push({ fieldId, value: checked.value, field });
     }
     if (errors.length > 0) {
-      return c.json(
-        { success: false, code: 'FIELD_VALUE_INVALID', error: '項目の値を確認してください', errors },
-        422,
-      );
+      return inputError(c, { success: false, code: 'FIELD_VALUE_INVALID', error: '項目の値を確認してください', errors, fields: Object.fromEntries(errors.map(item => [`values.${item.fieldId}`, item.message])) }, 422, []);
     }
 
-    for (const item of pending) {
-      await setFriendFieldValue(c.env.DB, {
+    /*
+     * 複数項目の保存は同じ取引（1回のbatch）で確定する。
+     * 1件ずつ書くと、途中失敗で500なのに先に書けた分が残る部分保存になる。
+     * batchは原子的で、1文でも失敗したら永続変更は0件になる。
+     * 値は上で validate済みの正規化ずみが pending に入っている。
+     */
+    if (pending.length > 0) {
+      await setFriendFieldValuesForFriend(c.env.DB, {
         friendId,
-        fieldId: item.fieldId,
-        value: item.value,
+        entries: pending.map((item) => ({ fieldId: item.fieldId, value: item.value })),
         updatedBy: staff?.id ?? 'unknown',
-        field: item.field,
+        now: jstNow(),
       });
     }
 
     return c.json({ success: true, data: { updated: pending.length }, warnings });
   } catch (err) {
-    console.error('PUT /api/friends/:id/fields error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/friend-fields/bulk
 //
 // 選んだ友だち全員に同じ値を入れる。人数が多いので、上限を置く。
-// N-045: staff も個人情報の項目だけ、attribute.personal_info.edit を
+// staff も個人情報の項目だけ、attribute.personal_info.edit を
 // 持っていれば実行できる。個人情報以外の項目は従来どおり owner/admin のみ。
-friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staff'), async (c) => {
+friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const staff = c.get('staff');
     const body = await c.req.json<{ friendIds?: unknown; fieldId?: unknown; value?: unknown; lineAccountId?: unknown }>();
     const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+      return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]);
     }
     if (!staff?.tenantId) {
       return c.json({ success: false, error: '所属を確認できません' }, 403);
     }
     const accountScope = await getVisibleLineAccountScope(c.env.DB, staff);
     if (!accountScope.allowedAccountIds.includes(lineAccountId)) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const scope = { tenantId: staff.tenantId, lineAccountId };
     const friendIds = Array.isArray(body.friendIds) ? body.friendIds.map(String) : [];
     if (friendIds.length === 0) {
-      return c.json({ success: false, error: '対象の友だちが選ばれていません' }, 400);
+      return inputError(c, { success: false, error: '対象の友だちが選ばれていません' }, 400, ["friendIds"]);
     }
     if (friendIds.length > 1000) {
-      return c.json(
-        { success: false, error: '一度に変更できるのは1000人までです' },
-        422,
-      );
+      return inputError(c, { success: false, error: '一度に変更できるのは1000人までです' }, 422, ["friendIds"]);
     }
     const field = await getFriendFieldByIdForScope(c.env.DB, String(body.fieldId), scope);
     if (!field) return c.json({ success: false, error: '項目が見つかりません' }, 404);
@@ -918,32 +957,29 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staf
       );
     }
 
-    // N-042: 型に合わない値は誰にも保存しない。所属検査の前に検証し、
+    // 型に合わない値は誰にも保存しない。所属検査の前に検証し、
     // 通らなければ422で返して書き込まない（部分保存なし）。
     const checked = validateFriendFieldValue(field, body.value);
     if (!checked.ok) {
-      return c.json(
-        {
+      return inputError(c, {
           success: false,
           code: 'FIELD_VALUE_INVALID',
           error: checked.error,
           errors: [{ fieldId: field.id, name: field.name, message: checked.error }],
-        },
-        422,
-      );
+        }, 422, ["value"]);
     }
 
-    // N-043: 書込み前に全friendIdsの所属が要求lineAccountIdと完全一致するか検査する。
+    // 書込み前に全friendIdsの所属が要求lineAccountIdと完全一致するか検査する。
     // owner/adminが複数アカウントへアクセスできても、指定外の混在は部分更新せず404で拒否する。
     // 存在の有無・値が分からない汎用404を返す。
     for (const friendId of friendIds) {
       const friend = await getFriendById(c.env.DB, friendId);
       if (!friend || friend.line_account_id !== lineAccountId) {
-        return c.json({ success: false, error: 'Friend not found' }, 404);
+        return fail(c, 404, 'FRIEND_NOT_FOUND');
       }
     }
 
-    // N-046(#812): 冪等keyは内容に束縛する。同じkey＋同じ内容は収束再実行、
+    // 冪等keyは内容に束縛する。同じkey＋同じ内容は収束再実行、
     // 同じkey＋別内容は409、account違いの流用も409。keyなしは従来どおり。
     // keyの正準形はクライアントが送った値そのままで作る（正規化前で一致する）。
     const rawValue = typeof body.value === 'string' ? body.value : null;
@@ -955,7 +991,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staf
     });
     if (idempotencyError) return idempotencyError;
 
-    // N-046(#812): 書き込みは1回のbatchで原子化する。途中で1文でも失敗したら
+    // 書き込みは1回のbatchで原子化する。途中で1文でも失敗したら
     // 永続変更は0件になる。値は事前validateずみの正規化ずみを使う。
     await setFriendFieldValuesBulk(c.env.DB, {
       fieldId: field.id,
@@ -965,8 +1001,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staf
     });
     return c.json({ success: true, data: { updated: friendIds.length } });
   } catch (err) {
-    console.error('POST /api/friend-fields/bulk error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

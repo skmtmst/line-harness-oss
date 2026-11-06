@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .field {
   min-width: 0;
@@ -5,17 +6,12 @@
 
 .label {
   display: block;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-body);
-  font-weight: 500;
 }
 
 /* ラベルと「？」の行。？は label の外に置き、横に並べる。 */
 .labelRow {
   display: flex;
   align-items: center;
-  gap: 2px;
-  margin-bottom: 4px;
 }
 
 /*
@@ -24,6 +20,8 @@
  */
 .required {
   display: inline-flex;
+  flex-shrink: 0;
+  white-space: nowrap;
   margin-left: 6px;
   padding: 2px 6px;
   border-radius: var(--radius-pill);
@@ -34,56 +32,40 @@
   line-height: 1.4;
 }
 
-.control {
-  box-sizing: border-box;
-  width: 100%;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-family: inherit;
-  /* #976 U079: 入力文字は `$size-body`(14px)。text-field.module.css と同じ。 */
-  font-size: var(--text-body);
+/* 「任意」の札（：11px・行17・薄い灰・左に6。丸い地なし）。 */
+.optional {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-left: 6px;
+  font-weight: var(--font-weight-ui);
+  white-space: nowrap;
 }
 
-.control::placeholder {
-  /*
-   * #976 U087: 置き文字は入力済みの値と見分けがつく薄さにする。
-   * 以前は `$ink`（本文色）で、説明文が実際の入力に見えてしまった。
-   * text-field.module.css の `::placeholder` と同じ `$ink-faint`。
-   */
-  color: var(--color-ink-faint);
-  opacity: 1;
-}
+/*
+ * 入力欄そのものの見た目は text-field.module.css（正本）が持つ。
+ * ここの TextInput・TextArea は正本の包みで、互換経路のときだけ元の見た目の差を足す
+ * （互換経路は本番で動いているので変えない）。v8 では正本と同じ物になる。
+ */
 
-.control:focus-visible {
-  outline: 2px solid var(--color-action);
+/* 「？」の中の「くわしく」。本文の中のリンクの色。キーボードで来たときに輪郭を出す。 */
+.helpLink { color: var(--color-link); }
+.helpLink:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
-.control:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+/* 文字数（Field の count）。欄の下の右。上限を超えたら赤。 */
+.count {
+  margin-top: 4px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-variant-numeric: var(--font-numeric);
+  line-height: 1.6;
+  text-align: right;
 }
 
-.control:read-only {
-  background: var(--color-canvas-sunken);
-}
-
-.control[aria-invalid='true'] {
-  border-color: var(--color-danger);
-}
-
-.input {
-  height: 40px;
-  padding: 0 12px;
-}
-
-.textarea {
-  min-height: 120px;
-  padding: 14px;
-  line-height: 1.7;
-  resize: none;
+.countOver {
+  color: var(--color-danger);
 }
 
 .note,
@@ -101,14 +83,127 @@
   color: var(--color-danger);
 }
 
-/* #976 U079/U083: タッチ端末は入力文字16px・1行欄の高さ44px。 */
-@media (pointer: coarse) {
-  .control {
-    font-size: var(--text-lead);
-  }
+/*
+ * ★V8「入力欄・ラジオ」（Ume2U・y4YQSB）：ラベルの色は補助の墨。
+ * 欄そのもの（高さ36・枠 control-border）は text-field.module.css。
+ */
+:root .label {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
 
-  .input {
-    height: 44px;
-  }
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
+:root .field { display: flex; flex-direction: column; gap: 6px; }
+:root .field > :is(.required, .optional) { align-self: flex-start; }
+:root .labelRow { margin-bottom: 0; gap: 6px; }
+:root .label { line-height: 20px; font-family: var(--font-sans); }
+:root .field[data-field-size='compact'] .label { font-size: var(--text-caption); font-weight: 600; line-height: normal; }
+:root .field[data-field-fill] { flex: 1 1 0; }
+
+/* 打ち直している間（Field の data-field-quiet）は、誤りの赤を引っ込めて普段の枠に戻す。 */
+.field[data-field-quiet] [aria-invalid='true'] {
+  border-color: var(--color-hairline);
+}
+
+:root .field[data-field-quiet] [aria-invalid='true'] {
+  outline-color: var(--color-toggle-off);
 }
 }
+
+:root .field[data-label-size='compact'] .label { font-size: var(--text-caption); font-weight: 600; line-height: 17px; }
+
+/* 管理画面 の複数行（TextArea の包み）は元どおり大きさ固定。正本の層の外の resize: vertical より強くするため層の外に置く。 */
+
+:root .field[data-density] { display: flex; flex-direction: column; gap: var(--tpl-rt-payload-gap); }
+:root .field[data-density] .labelRow { margin: 0; }
+:root .field[data-density="compact"] .label { color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; line-height: normal; }
+:root .field[data-density="input"] .label { color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-rt-label-lh); }
+:root .field[data-grow] { flex: 1 1 0; }
+.errorFrame { display: contents; }
+.errorFrame[data-invalid] { display: block; outline: 1px solid var(--color-danger); outline-offset: 2px; border-radius: var(--radius-control); }
+
+:root .field[data-spacing='section'] { gap: var(--tpl-section-gap); }
+:root .field[data-field-size='compact'] .label { font-size: var(--tpl-rest3-ec-small); line-height: var(--tpl-rest3-ec-label-lh); }
+:root .field[data-field-size='compact'] :is(.note, .error) { margin-top: 0; font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }
+
+/* 説明は左・文字数は右の同じ1行。欄との間は6に詰める。 */
+.supportRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+  /* 欄との間は6。欄の並びが持つ8を引いて、合計を6にする。 */
+  margin-top: calc(6px - var(--polish-space-row));
+}
+:root .supportRow .note,
+:root .supportRow .count { margin-top: 0; }
+:root .supportRow .note { flex: 1 1 auto; min-width: 0; }
+/* 説明が無い欄でも文字数は右端へ。 */
+:root .supportRow .count { flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
+
+/* ・仕上げ1：ラベルと欄 */
+:root .field { gap: var(--polish-space-row); }
+:root .labelRow { margin-bottom: 0; }
+
+/* ・仕上げ2 */
+:root .field .label { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
+:root .field:is([data-field-size], [data-label-size], [data-density]) .label { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
+/* ：任意も札で示す。 */
+:root .optional {
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: 1.4;
+}
+
+/* ：欄の上の小見出しは形・密度にかかわらず12/500。 */
+:root .label,
+:root .field[data-field-size] .label,
+:root .field[data-label-size] .label,
+:root .field[data-density] .label {
+  font-size: var(--tpl-field-label-size);
+  font-weight: var(--tpl-field-label-weight);
+}
+
+/* ：ふつうの欄は親の間とラベルの下の余白を二重に足さない。 */
+html:root .field:not([data-density]):not([data-spacing]) { gap: var(--polish-space-row); }
+html:root .field:not([data-density]):not([data-spacing]) > .labelRow { margin-bottom: 0; }
+/*
+ * 題と中身の間（Field の contentGap）。
+ * 共通の間は「題の行の下 8（--polish-space-row）＋段の間 6」で 14。絵の間が
+ * それと違う欄だけ contentGap を渡し、渡した値1つにそろえる（下の 8 は 0 にする）。
+ * 渡さない欄は上の決まりのままなので、他の画面の見え方は変わらない。
+ * @layer の外に置く。中に入れると、同じく外にある `.labelRow` の 8 に負ける。
+ */
+:root .field[data-field-content-gap] {
+  gap: var(--field-content-gap);
+}
+
+:root .field[data-field-content-gap] .labelRow {
+  margin-bottom: 0;
+}
+
+/* 固定絵のラベル行18。の11px札も行の高さを押し広げない。 */
+html:root .field .label { line-height: var(--tpl-field-label-lh); }
+/* input の密度は20のラベル行を持つ。ふつうの18の行で押しつぶさない。 */
+html:root .field[data-density='input'] { gap: var(--polish-space-row); }
+html:root .field[data-density='input'] .label { line-height: var(--tpl-rt-label-lh); }
+html:root :is(.required, .optional) {
+  font-size: var(--polish-text-note);
+  line-height: var(--tpl-field-badge-lh);
+}
+
+/* ：欄の名前は1行で省略し、全文は label の title と読み上げ名に残す。 */
+html:root .labelRow { min-width: 0; }
+html:root .labelRow > .label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html:root .labelRow > :not(.label) { flex-shrink: 0; }
+:root .field [aria-invalid='true']:is(input, textarea, select) { border-color: var(--color-danger); outline: 1px solid var(--color-danger); }
+
+/* 認証の欄は取り込み前の間を保持する。指定なしのinput密度は変えない。 */
+html:root .field[data-density='input'][data-field-content-gap] { gap: var(--field-content-gap); }

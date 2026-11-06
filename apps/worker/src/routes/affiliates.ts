@@ -1,4 +1,7 @@
-import { Hono, type Context, type MiddlewareHandler } from 'hono';
+import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { serializeAffiliate } from './affiliate-serialization.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { FolderAssignmentError } from '@line-crm/db';
 import {
   getAffiliates,
   getAffiliateById,
@@ -22,11 +25,15 @@ import {
   listAffiliateLinks,
   listAffiliateOffers,
   type AffiliateScope,
+  type UpdateAffiliateInput,
 } from '@line-crm/db';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
+import { fail } from '../lib/fail.js';
+
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -53,7 +60,7 @@ function accountVisible(
 }
 
 /**
- * 紹介者の成績・動線の参照に付ける権限検査（#554 点検#505中9）。
+ * 紹介者の成績・動線の参照に付ける権限検査（ 点検中9）。
  *
  * 成果地点側の `conversionPermission('view')` と同じ考えで、見るだけの人にも
  * 鍵（`affiliate.report.view`、精算口と共通）で開ける。owner・admin は素通し。
@@ -69,7 +76,7 @@ function affiliateReportPermission(): MiddlewareHandler<Env> {
 }
 
 /**
- * 報酬率の範囲検査（#554 点検#505中2）。
+ * 報酬率の範囲検査（ 点検中2）。
  *
  * 100超をそのまま保存すると報酬計算（revenue*rate/100）が膨らむ。
  * 省略時はDB既定（0）を使うので undefined は通す。
@@ -80,38 +87,6 @@ function commissionRateError(value: unknown): string | null {
     return '報酬率は0から100の間で入力してください';
   }
   return null;
-}
-
-function serializeAffiliate(row: {
-  id: string;
-  tenant_id?: string;
-  line_account_id?: string | null;
-  name: string;
-  code: string;
-  commission_rate: number;
-  is_active: number;
-  created_at: string;
-  friend_id?: string | null;
-  email?: string | null;
-  hold_days?: number | null;
-  payout_cycle?: string | null;
-  notify_on_conversion?: number;
-}) {
-  return {
-    id: row.id,
-    tenantId: row.tenant_id ?? null,
-    lineAccountId: row.line_account_id ?? null,
-    name: row.name,
-    code: row.code,
-    commissionRate: row.commission_rate,
-    isActive: Boolean(row.is_active),
-    createdAt: row.created_at,
-    friendId: row.friend_id ?? null,
-    email: row.email ?? null,
-    holdDays: row.hold_days ?? null,
-    payoutCycle: row.payout_cycle ?? null,
-    notifyOnConversion: Boolean(row.notify_on_conversion),
-  };
 }
 
 /**
@@ -168,12 +143,20 @@ function readAffiliateSettlement(
 // GET /api/affiliates - list all
 affiliates.get('/api/affiliates', async (c) => {
   try {
-    const { scope } = await getAffiliateScope(c);
-    const items = await getAffiliates(c.env.DB, scope);
+    const accountId = c.req.query('accountId') ?? c.req.query('lineAccountId');
+    if (!accountId || (c.req.query('lineAccountId') && c.req.query('lineAccountId') !== accountId)) {
+      return inputError(c, { success: false, error: 'LINE公式アカウントを1つ選んでください', code: 'ACCOUNT_REQUIRED' }, 400, ['accountId']);
+    }
+    const { visible, scope } = await getAffiliateScope(c);
+    if (!visible.allowedAccountIds.includes(accountId)) {
+      return c.json({ success: false, error: 'このアカウントを閲覧する権限がありません' }, 403);
+    }
+    const items = await getAffiliates(c.env.DB, {
+      ...scope, allowedLineAccountIds: [accountId], includeUnassigned: false,
+    });
     return c.json({ success: true, data: items.map(serializeAffiliate) });
   } catch (err) {
-    console.error('GET /api/affiliates error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -201,8 +184,7 @@ affiliates.get('/api/affiliate-payments', requireRole('owner', 'admin'), async (
       },
     });
   } catch (err) {
-    console.error('GET /api/affiliate-payments error:', err);
-    return c.json({ success: false, error: '支払い情報を取得できませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -222,13 +204,12 @@ affiliates.get('/api/affiliates/:id/archive-impact', requireRole('owner', 'admin
     if (!impact) return c.json({ success: false, error: '紹介者が見つかりません' }, 404);
     return c.json({ success: true, data: impact });
   } catch (err) {
-    console.error('GET /api/affiliates/:id/archive-impact error:', err);
-    return c.json({ success: false, error: '影響を確認できませんでした' }, 500);
+    throw err;
   }
 });
 
 // POST /api/affiliates/:id/archive - 記録を残したまま紹介を止める
-affiliates.post('/api/affiliates/:id/archive', requireRole('owner', 'admin'), async (c) => {
+affiliates.post('/api/affiliates/:id/archive', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   auditLog(c, 'affiliate.archive', { kind: 'affiliate', id: c.req.param('id') });
   try {
     const { scope } = await getAffiliateScope(c);
@@ -241,10 +222,10 @@ affiliates.post('/api/affiliates/:id/archive', requireRole('owner', 'admin'), as
       confirmationName?: unknown;
     }>();
     if (body.mode !== 'pause' && body.mode !== 'archive') {
-      return c.json({ success: false, error: '停止方法を選んでください' }, 400);
+      return inputError(c, { success: false, error: '停止方法を選んでください' }, 400, ["mode"]);
     }
     if (body.mode === 'archive' && body.confirmationName !== affiliate.name) {
-      return c.json({ success: false, error: '確認用の名前が一致しません' }, 400);
+      return inputError(c, { success: false, error: '確認用の名前が一致しません' }, 400, ["mode","confirmationName"]);
     }
     const updated = await updateAffiliateLifecycle(c.env.DB, {
       tenantId: scope.tenantId,
@@ -262,8 +243,7 @@ affiliates.post('/api/affiliates/:id/archive', requireRole('owner', 'admin'), as
       },
     });
   } catch (err) {
-    console.error('POST /api/affiliates/:id/archive error:', err);
-    return c.json({ success: false, error: '紹介を止められませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -291,13 +271,12 @@ affiliates.get('/api/affiliate-payments/:id/preview', requireRole('owner', 'admi
     const { entries: _entries, ...data } = preview;
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/affiliate-payments/:id/preview error:', err);
-    return c.json({ success: false, error: '確定内容を確認できませんでした' }, 500);
+    throw err;
   }
 });
 
 // POST /api/affiliate-payments/:id/confirm - 承認済み報酬を追記台帳へ固定する
-affiliates.post('/api/affiliate-payments/:id/confirm', requireRole('owner', 'admin'), async (c) => {
+affiliates.post('/api/affiliate-payments/:id/confirm', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   auditLog(c, 'affiliate.settlement.close', { kind: 'affiliate', id: c.req.param('id') });
   try {
     const body = await c.req.json<{
@@ -306,13 +285,13 @@ affiliates.post('/api/affiliate-payments/:id/confirm', requireRole('owner', 'adm
       idempotencyKey?: unknown;
     }>();
     if (typeof body.lineAccountId !== 'string' || !body.lineAccountId) {
-      return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+      return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["lineAccountId"]);
     }
     if (!Number.isInteger(body.expectedAmount) || Number(body.expectedAmount) < 0) {
-      return c.json({ success: false, error: '確定額が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '確定額が正しくありません' }, 400, ["expectedAmount"]);
     }
     if (typeof body.idempotencyKey !== 'string' || body.idempotencyKey.length < 8 || body.idempotencyKey.length > 200) {
-      return c.json({ success: false, error: 'もう一度、確定内容を開き直してください' }, 400);
+      return inputError(c, { success: false, error: 'もう一度、確定内容を開き直してください' }, 400, []);
     }
     const { visible, scope } = await getAffiliateScope(c);
     if (!visible.allowedAccountIds.includes(body.lineAccountId)) {
@@ -349,8 +328,7 @@ affiliates.post('/api/affiliate-payments/:id/confirm', requireRole('owner', 'adm
     if (/UNIQUE constraint failed/i.test(message)) {
       return c.json({ success: false, code: 'SETTLEMENT_CHANGED', error: '別の操作で確定済みです。内容を読み直してください' }, 409);
     }
-    console.error('POST /api/affiliate-payments/:id/confirm error:', err);
-    return c.json({ success: false, error: '支払いを確定できませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -360,39 +338,32 @@ affiliates.get('/api/affiliates/:id', async (c) => {
     const { scope } = await getAffiliateScope(c);
     const item = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
     if (!item) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeAffiliate(item) });
   } catch (err) {
-    console.error('GET /api/affiliates/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// POST /api/affiliates - create (admin-side)
-//
-// Three call shapes, all backward compatible:
-//   1. Random-code create:  { name?, commissionRate?, friendId?, issueInitialLink? }
-//        - `code` is auto-generated (unguessable base62 slug). No manual entry.
-//        - `friendId` binds the affiliate 1:1 to a LINE friend (migration 046
-//          partial UNIQUE index enforces one affiliate per friend).
-//        - When friendId is given, `name` defaults to the friend's display_name
-//          and an initial link is issued by default (issueInitialLink=true).
-//   2. Legacy explicit create: { name, code, commissionRate? }
-//        - OSS back-compat. `code` must be >= 4 chars, alphanumeric only.
+// 友だち指定の作成は推測しにくいコードを生成し、DB の部分 UNIQUE で1対1を守る。名前は友だちの表示名、初期リンク発行は既定 true とする。OSS の互換用の明示コードは4文字以上の英数字を受け付ける。
 const CODE_RE = /^[A-Za-z0-9]{4,}$/;
 
-affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
+affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBoundary({"folderId":["string","null"],"name":["string"],"code":["string"],"rewardMode":["string"],"friendId":["string"],"issueInitialLink":["boolean"],"lineAccountId":["string"],"operationId":["string"],"isActive":["boolean"]}), async (c) => {
   auditLog(c, 'affiliate.create', { kind: 'affiliate' });
   try {
     const body = await c.req.json<{
       name?: string;
+      folderId?: string | null;
       code?: string;
       commissionRate?: number;
+      rewardMode?: 'none' | 'fixed' | 'rate';
       friendId?: string;
       issueInitialLink?: boolean;
       lineAccountId?: string;
       operationId?: string;
+      // 「すぐに計測を始める」オフで登録したら最初の行から停止で作る。
+      isActive?: boolean;
     }>();
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -401,33 +372,29 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
     const requestedLineAccountId = typeof body.lineAccountId === 'string'
       ? body.lineAccountId.trim()
       : '';
-    // 安定した操作UUID（#686）。commit後に応答だけ失われて再送されても、
+    // 安定した操作UUID。commit後に応答だけ失われて再送されても、
     // packages/db 側が同じIDで既存行を回収するため二重登録にならない。
     const operationId = typeof body.operationId === 'string' ? body.operationId.trim() : '';
     if (operationId && (operationId.length < 8 || operationId.length > 200)) {
-      return c.json({ success: false, error: 'もう一度、最初からやり直してください' }, 400);
+      return inputError(c, { success: false, error: 'もう一度、最初からやり直してください' }, 400, ["operationId"]);
     }
     const { visible, scope } = await getAffiliateScope(c);
 
-    // Require at least one of name / code / friendId to identify the affiliate.
+    // 参加者を識別できるよう、name/code/friendId のいずれかを必須にする。
     if (!name && !code && !friendId) {
-      return c.json(
-        { success: false, error: 'name, code, or friendId is required' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'name, code, or friendId is required' }, 400, ["name","code","friendId"]);
     }
 
-    // Resolve the friend (if binding) up front: 404 on unknown friend, and use
-    // its display_name when the caller did not supply a name.
+    // 先に友だちを解決し、不存在なら404、名前の指定がなければ表示名を使う。
     let resolvedName = name;
     let lineAccountId = requestedLineAccountId;
     if (friendId) {
       const friend = await getFriendById(c.env.DB, friendId);
       if (!friend || !accountVisible(friend.line_account_id, visible) || !friend.line_account_id) {
-        return c.json({ success: false, error: 'Friend not found' }, 404);
+        return fail(c, 404, 'FRIEND_NOT_FOUND');
       }
       if (lineAccountId && lineAccountId !== friend.line_account_id) {
-        return c.json({ success: false, error: 'Friend not found' }, 404);
+        return fail(c, 404, 'FRIEND_NOT_FOUND');
       }
       lineAccountId = friend.line_account_id;
       if (!resolvedName) {
@@ -438,39 +405,42 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
       [lineAccountId] = visible.allowedAccountIds;
     }
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
     }
     if (!visible.allowedAccountIds.includes(lineAccountId)) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
+    }
+    if (body.rewardMode !== undefined && !['none', 'fixed', 'rate'].includes(body.rewardMode)) {
+      return inputError(c, { success: false, error: 'rewardMode must be none, fixed or rate' }, 400, ["rewardMode"]);
     }
     const rateError = commissionRateError(body.commissionRate);
     if (rateError) {
-      return c.json({ success: false, error: rateError }, 400);
+      return inputError(c, { success: false, error: rateError }, 400, ["commissionRate"]);
     }
 
-    // ── Legacy explicit-code path (OSS back-compat) ─────────────────────────
-    // Only taken when a code was supplied AND no friend binding is requested.
+    // OSS 互換の明示コードは、友だちとの結び付けを要求しない場合だけに適用する。
     if (code && !friendId) {
       if (!CODE_RE.test(code)) {
-        return c.json(
-          {
+        return inputError(c, {
             success: false,
             error: 'code must be at least 4 alphanumeric characters',
-          },
-          400,
-        );
+          }, 400, ["code"]);
       }
       if (!resolvedName) {
-        return c.json({ success: false, error: 'name is required' }, 400);
+        return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
       }
       try {
         const item = await createAffiliate(c.env.DB, {
           tenantId: scope.tenantId,
+          folderId: body.folderId,
           lineAccountId,
           name: resolvedName,
           code,
           commissionRate: body.commissionRate,
+        rewardMode: body.rewardMode,
           operationId: operationId || undefined,
+          // 追加情報の保存が失敗しても稼働で残さない。
+          isActive: body.isActive,
         });
         return c.json({ success: true, data: serializeAffiliate(item) }, 201);
       } catch (err) {
@@ -494,15 +464,18 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
     try {
       item = await createAffiliateWithRandomCode(c.env.DB, {
         tenantId: scope.tenantId,
+        folderId: body.folderId,
         lineAccountId,
         name: resolvedName,
         commissionRate: body.commissionRate,
+        rewardMode: body.rewardMode,
         friendId: friendId || null,
         operationId: operationId || undefined,
+        // 追加情報の保存が失敗しても稼働で残さない。
+        isActive: body.isActive,
       });
     } catch (err) {
-      // The friend_id partial UNIQUE index throws when the friend already has an
-      // affiliate. Confirm and return 409 with a friendly message.
+      // 友だちの部分 UNIQUE による既存登録との競合を確認し、運用者向けの理由で409を返す。
       const msg = err instanceof Error ? err.message : String(err);
       if (friendId && /UNIQUE constraint failed/i.test(msg)) {
         const existing = await getAffiliateByFriendId(c.env.DB, friendId, lineAccountId);
@@ -516,14 +489,14 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
       throw err;
     }
 
-    // Issue an initial link. Defaults to true when a friend is bound.
+    // 友だちに結び付ける場合は、初期リンクの発行を既定とする。
     const shouldIssueLink =
       body.issueInitialLink !== undefined
         ? body.issueInitialLink
         : Boolean(friendId);
 
     // 応答だけ失われた再送は、上の operationId で同じ `item` を回収する。
-    // リンク発行も同じ操作UUIDを渡し、DB側の部分UNIQUEで1本に収める（#686）。
+    // リンク発行も同じ操作UUIDを渡し、DB側の部分UNIQUEで1本に収める。
     // ここを「一覧を読んで無ければ作る」で書くと、同時2実行で両方が
     // 「まだ無い」と読んでそれぞれ発行し、リンクが2本できる。
     let link: { refCode: string; url: string } | undefined;
@@ -542,42 +515,80 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
       201,
     );
   } catch (err) {
-    console.error('POST /api/affiliates error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
+    throw err;
   }
 });
 
 // PUT /api/affiliates/:id - update
-affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) => {
+affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), inputJsonBoundary({"folderId":["string","null"],"name":["string"],"rewardMode":["string"],"isActive":["boolean"]}), async (c) => {
   auditLog(c, 'affiliate.update', { kind: 'affiliate', id: c.req.param('id') });
   try {
     const id = c.req.param('id');
     const { scope } = await getAffiliateScope(c);
     const body = await c.req.json<{
       name?: string;
+      folderId?: string | null;
       commissionRate?: number;
+      rewardMode?: 'none' | 'fixed' | 'rate';
       isActive?: boolean;
     } & Record<string, unknown>>();
 
     const settlement = readAffiliateSettlement(body);
-    if (!settlement.ok) return c.json({ success: false, error: settlement.error }, 400);
+    if (!settlement.ok) return inputError(c, { success: false, error: settlement.error }, 400, ["email","holdDays","payoutCycle","notifyOnConversion"]);
+    if (body.rewardMode !== undefined && !['none', 'fixed', 'rate'].includes(body.rewardMode)) {
+      return inputError(c, { success: false, error: 'rewardMode must be none, fixed or rate' }, 400, ["rewardMode"]);
+    }
     const rateError = commissionRateError(body.commissionRate);
-    if (rateError) return c.json({ success: false, error: rateError }, 400);
+    if (rateError) return inputError(c, { success: false, error: rateError }, 400, ["commissionRate"]);
+
+    let expected: UpdateAffiliateInput | undefined;
+    if (body.expected !== undefined) {
+      const source = body.expected as Record<string, unknown> | null;
+      if (!source || typeof source !== 'object' || Array.isArray(source)
+        || typeof source.name !== 'string'
+        || typeof source.commissionRate !== 'number' || commissionRateError(source.commissionRate)
+        || typeof source.rewardMode !== 'string' || !['none', 'fixed', 'rate'].includes(source.rewardMode)
+        || typeof source.isActive !== 'boolean' || typeof source.notifyOnConversion !== 'boolean'
+        || !(source.email === null || typeof source.email === 'string')
+        || !(source.holdDays === null || (typeof source.holdDays === 'number' && Number.isInteger(source.holdDays)))
+        || !(source.payoutCycle === null || typeof source.payoutCycle === 'string')) {
+        return inputError(c, { success: false, error: '比較する保存内容が不正です。最新を読み直してください。' }, 400, ['expected']);
+      }
+      expected = {
+        name: source.name,
+        commission_rate: source.commissionRate,
+        reward_mode: source.rewardMode as 'none' | 'fixed' | 'rate',
+        is_active: source.isActive ? 1 : 0,
+        email: source.email as string | null,
+        hold_days: source.holdDays as number | null,
+        payout_cycle: source.payoutCycle as string | null,
+        notify_on_conversion: source.notifyOnConversion ? 1 : 0,
+      };
+    }
 
     const updated = await updateAffiliate(c.env.DB, id, {
       name: body.name,
+      folder_id: body.folderId,
       commission_rate: body.commissionRate,
+      reward_mode: body.rewardMode,
       is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
       ...settlement.value,
-    }, scope);
+    }, scope, expected);
 
     if (!updated) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeAffiliate(updated) });
   } catch (err) {
-    console.error('PUT /api/affiliates/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    if (err instanceof Error && err.message === 'AFFILIATE_VERSION_CONFLICT') {
+      return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に変えました。最新を読み直してください。' }, 409);
+    }
+    if (err instanceof Error && err.message === 'APPROVED_REWARD_SNAPSHOT_MISSING') {
+      return c.json({ success: false, code: err.message, error: '過去の承認額を確かめられないため、報酬方式を変更できません。過去の記録を照合してください。' }, 409);
+    }
+    if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
+    throw err;
   }
 });
 
@@ -586,7 +597,7 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) =
 affiliates.delete('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) => {
   const { scope } = await getAffiliateScope(c);
   const item = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
-  if (!item) return c.json({ success: false, error: 'Affiliate not found' }, 404);
+  if (!item) return fail(c, 404, 'AFFILIATE_NOT_FOUND');
   return c.json(
     {
       success: false,
@@ -597,15 +608,13 @@ affiliates.delete('/api/affiliates/:id', requireRole('owner', 'admin'), async (c
   );
 });
 
-// GET /api/affiliates/:id/report - affiliate performance report (v2)
-// Extends the legacy report with ref_tracking-based clicks, add-time friendAdds,
-// conversionsByPoint, estimatedCommission and identity-key duplicateFlags.
+
 affiliates.get('/api/affiliates/:id/report', affiliateReportPermission(), async (c) => {
   try {
     const { scope } = await getAffiliateScope(c);
     const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
     if (!affiliate) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     const report = await getAffiliateReportV2(c.env.DB, c.req.param('id'), {
       startDate: c.req.query('startDate'),
@@ -615,44 +624,42 @@ affiliates.get('/api/affiliates/:id/report', affiliateReportPermission(), async 
     });
 
     if (!report) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     return c.json({ success: true, data: report });
   } catch (err) {
-    console.error('GET /api/affiliates/:id/report error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// GET /api/affiliates/:id/journeys - attributed-friend journey summaries
-// Cursor-paginated on (addedAt, friendId), same scheme as GET /api/chats.
+// 追加日時と友だち ID の組をカーソルにし、同日時の行も取り落とさない。
 affiliates.get('/api/affiliates/:id/journeys', affiliateReportPermission(), async (c) => {
   try {
     const { scope } = await getAffiliateScope(c);
     const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
     if (!affiliate) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
-    const limitParam = Number.parseInt(c.req.query('limit') ?? '', 10);
+    const limitParam = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
     const page = await getAffiliateJourneys(c.env.DB, c.req.param('id'), {
       limit: Number.isFinite(limitParam) ? limitParam : undefined,
       beforeAt: c.req.query('beforeAt') || undefined,
       beforeId: c.req.query('beforeId') || undefined,
     });
-    return c.json({ success: true, data: page.items, nextCursor: page.nextCursor });
+    const responseItems = page.items;
+    return c.json(buildCursorListResponse({ success: true, data: responseItems, nextCursor: page.nextCursor, items: responseItems, paging: { limit: Math.min(200, Math.max(1, Number.isFinite(limitParam) ? limitParam : 50)) }, sort: [{ field: 'addedAt', direction: 'desc' }, { field: 'friendId', direction: 'desc' }] }));
   } catch (err) {
-    console.error('GET /api/affiliates/:id/journeys error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// GET /api/affiliates/:id/links - list all ref_code links for an affiliate
+
 affiliates.get('/api/affiliates/:id/links', affiliateReportPermission(), async (c) => {
   try {
     const { scope } = await getAffiliateScope(c);
     const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
     if (!affiliate) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     const links = await listAffiliateLinks(c.env.DB, c.req.param('id'), {
       lineAccountId: affiliate.line_account_id,
@@ -671,29 +678,27 @@ affiliates.get('/api/affiliates/:id/links', affiliateReportPermission(), async (
     }));
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/affiliates/:id/links error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// GET /api/friends/:id/journey - time-ordered event journey for one friend
+
 affiliates.get('/api/friends/:id/journey', async (c) => {
   try {
     const { visible } = await getAffiliateScope(c);
     const friend = await getFriendById(c.env.DB, c.req.param('id'));
     if (!friend || !accountVisible(friend.line_account_id, visible)) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const events = await getFriendJourney(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: { events } });
   } catch (err) {
-    console.error('GET /api/friends/:id/journey error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/affiliates/click - record click (public endpoint tracked by ref param)
-affiliates.post('/api/affiliates/click', async (c) => {
+affiliates.post('/api/affiliates/click', inputJsonBoundary({"code":["string"],"url":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       code: string;
@@ -701,20 +706,19 @@ affiliates.post('/api/affiliates/click', async (c) => {
     }>();
 
     if (!body.code) {
-      return c.json({ success: false, error: 'code is required' }, 400);
+      return inputError(c, { success: false, error: 'code is required' }, 400, ["code"]);
     }
 
     const affiliate = await getAffiliateByCode(c.env.DB, body.code);
     if (!affiliate || affiliate.is_active !== 1) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
 
     const ipAddress = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? null;
     await recordAffiliateClick(c.env.DB, affiliate.id, body.url, ipAddress);
     return c.json({ success: true, data: null }, 201);
   } catch (err) {
-    console.error('POST /api/affiliates/click error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -729,8 +733,7 @@ affiliates.get('/api/affiliates-report', requireRole('owner', 'admin'), async (c
     });
     return c.json({ success: true, data: report });
   } catch (err) {
-    console.error('GET /api/affiliates-report error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

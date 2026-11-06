@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   overflow-y: auto;
-  background: #11182755;
+  background: var(--color-scrim);
   padding: 16px;
 }
 
@@ -18,9 +18,9 @@
   gap: 18px;
   overflow: hidden;
   border: 1px solid var(--color-hairline);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: 0 18px 50px rgb(15 23 42 / 18%);
+  box-shadow: var(--shadow-overlay);
   padding: 28px;
   color: var(--color-ink);
 }
@@ -35,10 +35,6 @@
   固定 height + overflow:hidden だと、390px幅など中身が収まらないときに
   キャンセル/次へボタンごと切れて、どうやっても押せなくなる（ATTR-18）。
 */
-.selectPanel {
-  max-height: min(455px, calc(100vh - 32px));
-}
-
 .successPanel {
   max-height: min(245px, calc(100vh - 32px));
 }
@@ -59,7 +55,7 @@
   min-height: 0;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   overflow-y: auto;
 }
 
@@ -74,7 +70,7 @@
 .title {
   margin: 0;
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
 }
 
@@ -86,15 +82,6 @@
   line-height: 1.6;
 }
 
-.steps {
-  margin: 0;
-  border-radius: var(--radius-card);
-  background: var(--color-canvas-sunken);
-  padding: 14px 18px 14px 36px;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  line-height: 1.8;
-}
 
 .fileField {
   display: flex;
@@ -121,10 +108,10 @@
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
-  padding: 7px 12px;
+  padding: 6px 12px;
   color: var(--color-ink);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .fileField:focus-within .fileButton {
@@ -144,103 +131,18 @@
   flex-shrink: 0;
 }
 
-.note {
-  display: flex;
-  gap: 9px;
-  border: 1px solid var(--color-status-info-soft);
-  border-radius: var(--radius-card);
-  background: var(--color-status-info-soft);
-  padding: 12px 14px;
-  color: var(--color-status-info);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.error {
-  border: 1px solid var(--color-status-danger-soft);
-  border-radius: var(--radius-control);
-  background: var(--color-status-danger-soft);
-  padding: 10px 12px;
-  color: var(--color-danger);
-  font-size: 13px;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-}
 
 .exportButton {
   width: auto;
   min-width: 230px;
 }
 
-.summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  overflow: hidden;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  flex-shrink: 0;
-}
-
-.summaryItem {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-  border-right: 1px solid var(--color-hairline);
-  padding: 12px 16px;
-}
-
-.summaryItem:last-child {
-  border-right: 0;
-}
-
-.summaryLabel {
-  color: var(--color-ink-faint);
-  font-size: 11px;
-}
-
-.summaryValue {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-/* 設計 `sfTEW`：通る数は緑、直す数は赤。数の意味を色でも先に伝える。 */
-.summaryReady {
-  color: var(--color-accent-deep);
-}
-
-.summaryInvalid {
-  color: var(--color-danger);
-}
-
-.summaryDetail {
-  color: var(--color-ink-faint);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
 /* 設計 `sfTEW` の注意帯。押す前に、押したらどうなるかを書く。 */
-.warnBar {
-  display: flex;
-  gap: 9px;
-  border: 1px solid var(--color-status-warn-soft);
-  border-radius: var(--radius-card);
-  background: var(--color-status-warn-soft);
-  padding: 12px 14px;
-  color: var(--color-status-warn-deep);
-  flex-shrink: 0;
-}
 
 .warnTitle {
   margin: 0;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.6;
 }
 
@@ -267,6 +169,14 @@
   border-radius: var(--radius-card);
 }
 
+/* 確認の表の続き（100 行ごと）。表の枠の中、表の下に置く。 */
+.moreRows {
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+  border-top: 1px solid var(--color-hairline);
+}
+
 .table {
   width: 100%;
   table-layout: fixed;
@@ -280,7 +190,7 @@
   z-index: 1;
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .table th,
@@ -305,10 +215,10 @@
   display: inline-flex;
   min-height: 24px;
   align-items: center;
-  border-radius: 999px;
-  padding: 3px 9px;
-  font-size: 11px;
-  font-weight: 700;
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  font-size: var(--text-micro);
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -317,38 +227,12 @@
 .invalid,
 .failed { background: var(--color-status-danger-soft); color: var(--color-danger); }
 
-.footerRow {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
-  flex-shrink: 0;
-}
 
-.footerRow .muted {
-  min-width: 0;
-  flex: 1;
-}
-
-.resultBanner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-radius: var(--radius-control);
-  background: var(--color-accent-soft);
-  padding: 14px 16px;
-  color: var(--color-accent-deep);
-}
-
-.warningBanner {
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
-}
 
 .resultTitle {
   margin: 0;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
 }
 
@@ -373,9 +257,4 @@
 
 @media (max-width: 700px) {
   .panel { padding: 20px; }
-  .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .summaryItem:nth-child(2) { border-right: 0; }
-  .summaryItem:nth-child(-n+2) { border-bottom: 1px solid var(--color-hairline); }
-  .footerRow { align-items: stretch; flex-direction: column; }
-  .actions { width: 100%; }
 }

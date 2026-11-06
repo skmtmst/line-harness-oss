@@ -1,0 +1,38 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/*
+ * 増減の札（Pencil ★V8 `C6DGX`・`OEQxt`・`r9qfM2`）。
+ *
+ *   余白 2/7・アイコン 12・文字 12/600・角丸 mini
+ *   良い＝success 系・悪い＝danger 系・要確認＝warn 系
+ *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない
+ */
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+:root .root {
+  flex-shrink: 0;
+  justify-content: flex-start;
+  border-radius: var(--polish-radius-small);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-variant-numeric: var(--font-numeric);
+  font-size: 12px;
+  line-height: 18px;
+}
+:root .attentionIcon { display: none; }
+/* 幅に余裕のある数のマスだけ、色が表す良し悪しも言葉で添える。 */
+:root .word { display: none; margin-inline-start: 4px; }
+@container kpi-card (width >= 260px) { :root .word { display: inline; } }
+:root .up { background: var(--color-success-bg); color: var(--color-success); }
+:root .down { background: var(--color-status-danger-soft); color: var(--color-danger); }
+:root .attention { background: var(--color-status-warn-soft); color: var(--color-warning); }
+:root .root svg { flex-shrink: 0; }
+
+}

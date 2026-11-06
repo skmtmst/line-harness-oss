@@ -1,0 +1,66 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.panel { display: flex; flex-direction: column; gap: var(--tpl-fdt-summary-gap); min-width: 0; padding: var(--tpl-inbox-info-card-pad); border: 1px solid var(--card-edge); border-radius: var(--radius-card); box-shadow: var(--card-shadow); }
+.section { display: flex; flex-direction: column; gap: var(--tpl-fdt-group-gap); min-width: 0; }
+.section + .section { padding-top: var(--tpl-fdt-summary-gap); border-top: 1px solid var(--color-hairline); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-fdt-group-gap); }
+.head h3 { margin: 0; font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-fdt-small-lh); color: var(--color-ink-faint); }
+.action { color: var(--color-action); font-size: var(--text-caption); white-space: nowrap; }
+.action:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+.rows { display: flex; flex-direction: column; gap: var(--tpl-fdt-group-gap); margin: 0; }
+.row { display: grid; grid-template-columns: var(--tpl-customer-label) minmax(0, 1fr); gap: var(--tpl-fdt-group-gap); font-size: var(--polish-text-body); line-height: var(--tpl-inbox-row-preview-lh); }
+.row dt { color: var(--color-ink-secondary); white-space: nowrap; }
+.row dd { display: flex; align-items: center; gap: var(--space-8); margin: 0; min-width: 0; }
+.value { display: block; min-width: 0; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--polish-text-body); }
+.row small { display: block; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--text-micro--line-height); overflow-wrap: anywhere; }
+.note { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
+.content, .more { min-width: 0; overflow-wrap: anywhere; }
+.options { display: flex; flex-direction: column; gap: var(--tpl-fdt-summary-gap); }
+
+.option { display: flex; align-items: center; gap: var(--tpl-fdt-group-gap); }
+.allergies { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-fdt-group-gap); min-width: 0; }
+.row dd > .allergies { flex: 1; min-width: 0; }
+/* 編集中のアレルギーは題の下に全幅で札を横に並べ、下に「選んで足す」。細い右の列だと札が1つずつ縦に積まれた。 */
+.row[data-layout='stack'] { grid-template-columns: minmax(0, 1fr); }
+.allergyAdd { width: 100%; justify-content: space-between; }
+.other { display: flex; gap: var(--tpl-fdt-group-gap); align-items: center; min-width: 0; }
+.editActions { display: flex; gap: var(--tpl-fdt-group-gap); justify-content: flex-end; }
+}
+
+/* ：欄の内側は16以上。基本の値と出どころの印を横に並べる。 */
+.panel { padding: var(--polish-space-section); border: 0; border-radius: var(--radius-flat); box-shadow: none; }
+.profile { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+.profileName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; }
+.profileDate { flex: none; color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
+.head h3 { display: flex; align-items: center; gap: var(--space-8); }
+.head :is(a, button) { color: var(--color-action); white-space: nowrap; font-size: var(--text-caption); }
+.content :is(dl > div) { display: grid; grid-template-columns: var(--tpl-customer-label) minmax(0, 1fr); gap: var(--space-8); }
+.content :is(dl > div) dd { min-width: 0; margin: 0; }
+
+.rail { display: flex; flex: none; min-width: 0; }
+.railCompact { display: flex; align-self: flex-start; flex: none; padding: var(--space-16); }
+.profileName { flex: 1; }
+.profileDate { margin-left: auto; }
+
+/* ：追加した連絡欄も72の見出し幅で1行。 */
+.content dl dt { font-size: var(--polish-text-body); white-space: nowrap; }
+
+/* /: 段は16、段内は8。節の線・上下の余白を重ねない。 */
+.panel { gap: var(--space-16); }
+.section + .section { padding-top: 0; border-top: 0; }
+
+/* 絵 ：節の中身が文字だけ（メモ・リッチメニュー名）のときも、行の値と同じ本文の大きさ。 */
+.content { color: var(--color-ink); font-size: var(--polish-text-body); line-height: var(--tpl-inbox-row-preview-lh); }
+.viewport { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable both-edges; }
+
+/* 列幅は実際の項目名で決め、値と出どころの操作を右端まで使う。 */
+:root .rows { display: grid; grid-template-columns: max-content minmax(0, 1fr); row-gap: var(--space-4); column-gap: var(--space-8); }
+:root .rows > .row { grid-column: 1 / -1; grid-template-columns: subgrid; min-height: var(--space-24); align-items: center; }
+:root .rows > .row[data-layout='stack'] { grid-template-columns: minmax(0, 1fr); }
+:root .row dd > :first-child { flex: 1; min-width: 0; }
+:root .row dd > :nth-child(2) { flex: none; margin-inline-start: auto; opacity: 0.45; }
+:root .row:is(:hover, :focus-within) dd > :nth-child(2) { opacity: 1; }
+/* タッチの端末では乗せられないので、補足の操作を常に出す。 */
+@media (hover: none) { :root .row dd > :nth-child(2) { opacity: 1; } }
+/* 受信箱の外側が左右24を持つので、内側で同じ余白を重ねない。 */
+:root .panel[data-label-width='wide'] { --tpl-customer-label: max-content; padding: 0; }

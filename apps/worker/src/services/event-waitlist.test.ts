@@ -7,10 +7,14 @@ import {
   createEventWaitlistOfferSender,
   enqueueEventWaitlistPromotion,
   getEventOccurrenceApplicants,
+  getEventWaitlistOffer,
+  getMyEventWaitlist,
+  cancelMyEventWaitlist,
   processEventWaitlistPromotionJobs,
   promoteEventWaitlist,
+  reorderEventWaitlist,
 } from './event-waitlist.js';
-import type { EventWaitlistOfferSender } from './event-waitlist.js';
+import type { EventWaitlistOfferSender } from './event-waitlist-sender.js';
 
 function asD1(sqlite: Database.Database, beforeRun?: (query: string) => Promise<void>): D1Database {
   function prepare(query: string): D1PreparedStatement {
@@ -42,7 +46,7 @@ function asD1(sqlite: Database.Database, beforeRun?: (query: string) => Promise<
   } as unknown as D1Database;
 }
 
-describe('V6 event waitlist and applicants', () => {
+describe('event waitlist and applicants', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -167,8 +171,8 @@ describe('V6 event waitlist and applicants', () => {
 
   test('IDEA-29: 席数別の集計・終了した待ち履歴・当日受付を人数で返す', async () => {
     // 確定2人・承認待ち1人・待機1人・案内中2人・繰上げ済み1人・期限切れ1人・参加済1人。
-    seedBooking(); // booking-a: confirmed party_size=2
-    seedWaitlist(); // wait-a: waiting party_size=1
+    seedBooking(); // booking-a は確定済みで2人分。
+    seedWaitlist(); // wait-a は待機中で1人分。
     sqlite.exec(`
       INSERT INTO event_bookings (
         id, line_account_id, event_id, slot_id, friend_id, status, requested_at,
@@ -246,6 +250,8 @@ describe('V6 event waitlist and applicants', () => {
     });
     expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM event_bookings`).get())
       .toEqual({ count: 1 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM workflow_steps WHERE process_kind='booking_line_delivery'
+      AND subject_id='event-waitlist-accept:event-waitlist:wait-a'`).get()).toEqual({count:1});
   });
 
   test('移行済み待機者はイベントと枠の編集後に繰り上げても旧snapshotで案内・予約する', async () => {
@@ -307,6 +313,119 @@ describe('V6 event waitlist and applicants', () => {
       event_name: '移行時のイベント名',
       slot_starts_at: '2099-06-01T01:00:00.000Z',
     });
+  });
+
+  test('案内の詳細は本人だけに日時・確保席・残り秒を返し、読み取りでは状態を変えない', async () => {
+    const token = 'detail-offer-token-12345678901234567890123456789';
+    await seedOffered(token);
+    const before = sqlite.prepare(`SELECT * FROM event_waitlist`).all();
+    expect(await getEventWaitlistOffer(db, {
+      token, callerLineUserId: 'Ub', now: new Date('2099-06-01T23:59:00.000Z'),
+    })).toMatchObject({
+      waitlistId: 'wait-a', slotId: 'slot-a', eventName: 'しつけ教室',
+      startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T03:00:00.000Z',
+      partySize: 1, remainingSeconds: 60, canAccept: true,
+    });
+    expect(await getEventWaitlistOffer(db, { token, callerLineUserId: 'Ua' })).toBeNull();
+    expect(await getEventWaitlistOffer(db, { token: '短い鍵', callerLineUserId: 'Ub' })).toBeNull();
+    expect(sqlite.prepare(`SELECT * FROM event_waitlist`).all()).toEqual(before);
+  });
+
+  test('案内期限のちょうど時刻と期限後は残り0秒で確定不可', async () => {
+    const token = 'expired-detail-token-12345678901234567890123456789';
+    await seedOffered(token);
+    for (const now of ['2099-06-02T00:00:00.000Z', '2099-06-03T00:00:00.000Z']) {
+      expect(await getEventWaitlistOffer(db, { token, callerLineUserId: 'Ub', now: new Date(now) }))
+        .toMatchObject({ remainingSeconds: 0, canAccept: false });
+    }
+    sqlite.exec(`UPDATE event_waitlist SET status = 'cancelled'`);
+    expect(await getEventWaitlistOffer(db, {
+      token, callerLineUserId: 'Ub', now: new Date('2099-06-01T00:00:00.000Z'),
+    })).toMatchObject({ status: 'cancelled', canAccept: false });
+  });
+
+  test('案内詳細は申込時のsnapshotを使い、削除済み開催回は返さない', async () => {
+    const token = 'snapshot-detail-token-12345678901234567890123456789';
+    await seedOffered(token);
+    sqlite.prepare(`UPDATE event_waitlist SET event_snapshot_json = ?`).run(JSON.stringify({
+      eventName: '申込時の名前', slotStartsAt: '2099-05-01T01:00:00.000Z',
+      slotEndsAt: '2099-05-01T03:00:00.000Z', venueName: '申込時の会場',
+    }));
+    expect(await getEventWaitlistOffer(db, { token, callerLineUserId: 'Ub' }))
+      .toMatchObject({ eventName: '申込時の名前', startsAt: '2099-05-01T01:00:00.000Z' });
+    sqlite.exec(`UPDATE event_slots SET deleted_at = '2026-10-07' WHERE id = 'slot-a'`);
+    expect(await getEventWaitlistOffer(db, { token, callerLineUserId: 'Ub' })).toBeNull();
+  });
+
+  test('本人の待ちの順番は並べ替え・同時刻のID順に従い、案内済みを数えない', async () => {
+    seedWaitlist();
+    sqlite.exec(`INSERT INTO event_waitlist
+      (id, line_account_id, event_id, slot_id, friend_id, identity_key, status, sort_order, created_at, updated_at)
+      VALUES ('ahead', 'account-a', 'event-a', 'slot-a', 'friend-c', 'friend-c', 'waiting', -1, '2026-09-02', '2026-09-02'),
+             ('offered', 'account-a', 'event-a', 'slot-a', 'friend-a', 'friend-a', 'offered', -2, '2026-09-01', '2026-09-01');`);
+    expect(await getMyEventWaitlist(db, { lineAccountId: 'account-a', callerLineUserId: 'Ub' }))
+      .toMatchObject([{ id: 'wait-a', queue_position: 2, source: 'waitlist', venue_url: null }]);
+    sqlite.exec(`UPDATE event_waitlist SET sort_order = 1 WHERE id = 'ahead'`);
+    expect(await getMyEventWaitlist(db, { lineAccountId: 'account-a', callerLineUserId: 'Ub' }))
+      .toMatchObject([{ queue_position: 1 }]);
+    sqlite.exec(`UPDATE event_waitlist SET sort_order = 0, created_at = '2026-09-01T01:00:00.000Z' WHERE id = 'ahead'`);
+    expect(await getMyEventWaitlist(db, { lineAccountId: 'account-a', callerLineUserId: 'Ub' }))
+      .toMatchObject([{ queue_position: 2 }]);
+    expect(await getMyEventWaitlist(db, { lineAccountId: 'account-b', callerLineUserId: 'Ub' })).toEqual([]);
+  });
+
+  test.each(['waiting', 'offered'])('%sの本人取り下げは席と順番を解放し、再送でも一度だけjobを作る', async status => {
+    seedWaitlist();
+    sqlite.prepare(`UPDATE event_waitlist SET status = ?`).run(status);
+    const params = { lineAccountId: 'account-a', callerLineUserId: 'Ub', waitlistId: 'wait-a' };
+    expect(await cancelMyEventWaitlist(db, params)).toBe('cancelled');
+    expect(await cancelMyEventWaitlist(db, params)).toBe('cancelled');
+    expect(sqlite.prepare(`SELECT status, version FROM event_waitlist`).get()).toEqual({ status: 'cancelled', version: 2 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM event_waitlist_promotion_jobs`).get()).toEqual({ count: 1 });
+    expect(sqlite.prepare(`SELECT version FROM event_slots WHERE id = 'slot-a'`).get()).toEqual({ version: 2 });
+    expect(await getMyEventWaitlist(db, params)).toMatchObject([{ queue_position: null }]);
+  });
+
+  test('別人・別店は取り下げできず、受諾中や予約化後は409に相当する', async () => {
+    seedWaitlist();
+    const params = { lineAccountId: 'account-a', callerLineUserId: 'Ub', waitlistId: 'wait-a' };
+    expect(await cancelMyEventWaitlist(db, { ...params, callerLineUserId: 'Ua' })).toBe('not_found');
+    expect(await cancelMyEventWaitlist(db, { ...params, lineAccountId: 'account-b' })).toBe('not_found');
+    for (const status of ['accepted', 'converted', 'expired']) {
+      sqlite.prepare(`UPDATE event_waitlist SET status = ?`).run(status);
+      expect(await cancelMyEventWaitlist(db, params)).toBe('conflict');
+    }
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM event_waitlist_promotion_jobs`).get()).toEqual({ count: 0 });
+  });
+
+  test('受諾が読み取り後に先に進んだ場合は取り下げが負け、席解放jobを作らない', async () => {
+    seedWaitlist();
+    db = asD1(sqlite, async query => {
+      if (/SET status = 'cancelled'/.test(query)) {
+        sqlite.exec(`UPDATE event_waitlist SET status = 'accepted', version = version + 1`);
+      }
+    });
+    expect(await cancelMyEventWaitlist(db, {
+      lineAccountId: 'account-a', callerLineUserId: 'Ub', waitlistId: 'wait-a',
+    })).toBe('conflict');
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM event_waitlist_promotion_jobs`).get()).toEqual({ count: 0 });
+    expect(sqlite.prepare(`SELECT version FROM event_slots WHERE id = 'slot-a'`).get()).toEqual({ version: 1 });
+  });
+
+  test('同時取り下げが同じ時刻でも、敗者は枠の版を二度進めない', async () => {
+    seedWaitlist();
+    const params = { lineAccountId: 'account-a', callerLineUserId: 'Ub', waitlistId: 'wait-a', now: new Date('2026-10-07T00:00:00.000Z') };
+    const plain = asD1(sqlite);
+    let winner: string | undefined;
+    db = asD1(sqlite, async query => {
+      if (winner === undefined && /SET status = 'cancelled'/.test(query)) {
+        winner = await cancelMyEventWaitlist(plain, params);
+      }
+    });
+    expect(await cancelMyEventWaitlist(db, params)).toBe('conflict');
+    expect(winner).toBe('cancelled');
+    expect(sqlite.prepare(`SELECT version FROM event_slots WHERE id = 'slot-a'`).get()).toEqual({ version: 2 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM event_waitlist_promotion_jobs`).get()).toEqual({ count: 1 });
   });
 
   test('繰上げURLが漏れても、別のLINEユーザーは承諾できない', async () => {
@@ -428,7 +547,7 @@ describe('V6 event waitlist and applicants', () => {
       .toEqual({ status: 'waiting' });
   });
 
-  test('通知失敗は成立扱いにせず待機へ戻す', async () => {
+  test('通知の応答不明は案内中を保ち、台帳で確認待ちにする', async () => {
     seedBooking();
     seedWaitlist();
     await expect(promoteEventWaitlist(db, {
@@ -438,7 +557,9 @@ describe('V6 event waitlist and applicants', () => {
     })).rejects.toThrow('LINE temporary error');
     expect(sqlite.prepare(
       `SELECT status, offered_at, offer_expires_at, offer_token_hash FROM event_waitlist WHERE id = 'wait-a'`,
-    ).get()).toEqual({ status: 'waiting', offered_at: null, offer_expires_at: null, offer_token_hash: null });
+    ).get()).toEqual({ status: 'offered', offered_at: '2026-09-07T00:00:00.000Z', offer_expires_at: '2026-09-08T00:00:00.000Z', offer_token_hash: expect.any(String) });
+    expect(sqlite.prepare(`SELECT status,retryable,error_code FROM notification_deliveries`).get())
+      .toEqual({status:'failed',retryable:0,error_code:'delivery_unknown'});
   });
 
   test.each(['accepted', 'offered'])('空席確認後に増えた%sの保留人数も確保のSQLで数える', async status => {
@@ -501,7 +622,30 @@ describe('V6 event waitlist and applicants', () => {
     })).rejects.not.toThrow('waitlist_notification_destination_missing');
   });
 
-  test('Cron: 席解放jobを一度だけ処理し、一時失敗は再試行可能に残す', async () => {
+  test('EV-C01: offered保存後・送信前で落ちても次の回に一度だけ案内する', async () => {
+    seedWaitlist();
+    const now = new Date('2026-09-07T00:00:00.000Z');
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    let crash = true;
+    const interrupted = asD1(sqlite, async query => {
+      if (crash && ((query.includes('UPDATE notification_deliveries') && query.includes('attempts'))
+        || (query.includes('UPDATE event_slots') && !query.includes('offer_token_hash')))) {
+        crash = false;
+        throw new Error('injected before send');
+      }
+    });
+    await expect(promoteEventWaitlist(interrupted, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a', now, sender,
+    })).rejects.toThrow('injected before send');
+    expect(sender).not.toHaveBeenCalled();
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    expect(sender).toHaveBeenCalledTimes(1);
+    expect(sqlite.prepare("SELECT notified_at FROM event_waitlist WHERE id='wait-a'").get()).toEqual({ notified_at: now.toISOString() });
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    expect(sender).toHaveBeenCalledTimes(1);
+  });
+
+  test('Cron: 送信の結果不明は台帳に残し、jobが再開しても二度送らない', async () => {
     seedBooking();
     seedWaitlist();
     sqlite.prepare(`UPDATE event_bookings SET status = 'cancelled' WHERE id = 'booking-a'`).run();
@@ -524,12 +668,62 @@ describe('V6 event waitlist and applicants', () => {
     ).get()).toEqual({ status: 'retryable_failed', attempts: 1, last_error: 'temporary' });
 
     const retryAt = new Date(now.getTime() + 2 * 60_000);
+    const retrySender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
     const second = await processEventWaitlistPromotionJobs(db, {
-      now: retryAt, sender: async () => undefined,
+      now: retryAt, sender: retrySender,
     });
-    expect(second).toEqual({ processed: 1, promoted: 1, retried: 0 });
+    expect(second).toEqual({ processed: 1, promoted: 0, retried: 0 });
+    expect(retrySender).not.toHaveBeenCalled();
+    expect(sqlite.prepare(`SELECT status, retryable, error_code FROM notification_deliveries`).get())
+      .toEqual({ status: 'failed', retryable: 0, error_code: 'delivery_unknown' });
     expect(sqlite.prepare(`SELECT status FROM event_waitlist_promotion_jobs`).get())
       .toEqual({ status: 'completed' });
+  });
+
+  test('EV-C01: 受理後・成功保存前の中断は確認待ちに残し再送しない', async () => {
+    seedWaitlist();
+    const now = new Date('2026-09-07T00:00:00.000Z');
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    const interrupted = asD1(sqlite, async query => {
+      if (query.includes('UPDATE notification_deliveries') && query.includes("status = 'provider_accepted'")) throw new Error('injected accepted ack crash');
+    });
+    await expect(promoteEventWaitlist(interrupted, { occurrenceId: 'slot-a', lineAccountId: 'account-a', now, sender })).rejects.toThrow('injected accepted ack crash');
+    expect(sender).toHaveBeenCalledTimes(1);
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    expect(sender).toHaveBeenCalledTimes(1);
+    expect(sqlite.prepare('SELECT status,retryable,error_code FROM notification_deliveries').get())
+      .toEqual({ status:'failed',retryable:0,error_code:'delivery_unknown' });
+  });
+
+  test('EV-C01: 旧版の送信開始不明な案内は自動で送らず運用者に見せる', async () => {
+    await seedOffered('legacy-unknown-token');
+    sqlite.exec("UPDATE event_waitlist SET notified_at=NULL WHERE id='wait-a'");
+    const now = new Date('2026-09-07T00:00:00.000Z');
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    expect(sender).not.toHaveBeenCalled();
+    expect(sqlite.prepare('SELECT status,retryable,error_code FROM notification_deliveries').all())
+      .toEqual([{ status:'failed',retryable:0,error_code:'delivery_unknown' }]);
+  });
+
+  test('EV-C02: expired保存後・次job登録前で落ちても次の回に次の人へ案内する', async () => {
+    await seedOffered('expiry-crash-token', '2026-09-06T00:00:00.000Z');
+    sqlite.exec(`INSERT INTO event_waitlist
+      (id,line_account_id,event_id,slot_id,friend_id,identity_key,status,created_at,updated_at)
+      VALUES ('wait-next','account-a','event-a','slot-a','friend-c','friend-c','waiting','2026-09-02','2026-09-02')`);
+    const now = new Date('2026-09-07T00:00:00.000Z');
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    const interrupted = asD1(sqlite, async query => {
+      if (query.includes('INSERT OR IGNORE INTO event_waitlist_promotion_jobs')) throw new Error('injected enqueue crash');
+    });
+    await expect(processEventWaitlistPromotionJobs(interrupted, { now, sender })).rejects.toThrow('injected enqueue crash');
+    expect(sender).not.toHaveBeenCalled();
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    expect(sender).toHaveBeenCalledTimes(1);
+    expect(sqlite.prepare("SELECT status FROM event_waitlist WHERE id='wait-next'").get()).toEqual({status:'offered'});
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    expect(sender).toHaveBeenCalledTimes(1);
   });
 
   test('開催後は自動繰り上げしない', async () => {
@@ -582,5 +776,41 @@ describe('V6 event waitlist and applicants', () => {
     ]);
     expect(sqlite.prepare(`SELECT version FROM event_slots WHERE id = 'slot-a'`).get())
       .toEqual({ version: 3 });
+  });
+
+  test('同じ期待版の並べ替えが並走したら一件だけ確定し、敗者は競合になる', async () => {
+    seedWaitlist();
+    sqlite.exec(`
+      INSERT INTO event_waitlist (
+        id, line_account_id, event_id, slot_id, friend_id, identity_key, status,
+        created_at, updated_at
+      ) VALUES
+        ('wait-b', 'account-a', 'event-a', 'slot-a', 'friend-c', 'friend-c', 'waiting',
+          '2026-09-02T00:00:00.000Z', '2026-09-02T00:00:00.000Z'),
+        ('wait-c', 'account-a', 'event-a', 'slot-a', 'friend-a', 'friend-a', 'waiting',
+          '2026-09-03T00:00:00.000Z', '2026-09-03T00:00:00.000Z');
+    `);
+    const plainDb = asD1(sqlite);
+    let winner: Awaited<ReturnType<typeof reorderEventWaitlist>> | undefined;
+    db = asD1(sqlite, async (query) => {
+      // Aのbatchが始まる直前でBを最後まで通し、Aを後から再開させる。
+      if (winner === undefined && /UPDATE event_waitlist/.test(query)) {
+        winner = await reorderEventWaitlist(plainDb, {
+          occurrenceId: 'slot-a', lineAccountId: 'account-a',
+          orderedIds: ['wait-c', 'wait-a', 'wait-b'], expectedVersion: 1,
+        });
+      }
+    });
+    const loser = await reorderEventWaitlist(db, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a',
+      orderedIds: ['wait-b', 'wait-c', 'wait-a'], expectedVersion: 1,
+    });
+    expect(winner).toMatchObject({ kind: 'reordered', occurrenceVersion: 2 });
+    expect(loser).toEqual({ kind: 'conflict', currentVersion: 2 });
+    // 勝者の順番だけが残り、版は1つだけ進む。
+    expect(sqlite.prepare(`SELECT id FROM event_waitlist ORDER BY sort_order, created_at`).all())
+      .toEqual([{ id: 'wait-c' }, { id: 'wait-a' }, { id: 'wait-b' }]);
+    expect(sqlite.prepare(`SELECT version FROM event_slots WHERE id = 'slot-a'`).get())
+      .toEqual({ version: 2 });
   });
 });

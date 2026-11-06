@@ -1,7 +1,7 @@
 import { jstNow } from './utils.js';
 
 /**
- * LINEアカウントの乗り換え（引き継ぎ）。設計 ★V6 33-4（`nx3XW`）。台帳 #133。
+ * LINEアカウントの乗り換え（引き継ぎ）。設計 ★33-4（`nx3XW`）。
  *
  * **`account_migrations` とは別物。** あちらは友だちを別のアカウントへ移す表。
  * こちらは「2つのアカウントをコードでつなぎ、突合してから本実行する」5段の流れ。
@@ -120,7 +120,7 @@ export async function issueHandoverCode(
   const existing = await db
     .prepare(
       `SELECT * FROM account_handovers
-        WHERE from_account_id = ? AND status = 'code_issued' AND code_expires_at > ?
+        WHERE from_account_id = ? AND status = 'code_issued' AND julianday(code_expires_at) > julianday(?)
         ORDER BY created_at DESC LIMIT 1`,
     )
     .bind(input.fromAccountId, jstNow())
@@ -160,19 +160,22 @@ export async function linkHandover(
   const handover = await getHandoverByCode(db, input.code);
   if (!handover) return { ok: false, error: 'そのコードはありません' };
   if (handover.status !== 'code_issued') return { ok: false, error: 'そのコードはもう使われています' };
-  if (handover.code_expires_at <= jstNow()) return { ok: false, error: 'そのコードは期限が切れています' };
+  if (!Number.isFinite(Date.parse(handover.code_expires_at)) || Date.parse(handover.code_expires_at) <= Date.parse(jstNow())) return { ok: false, error: 'そのコードは期限が切れています' };
   if (handover.from_account_id === input.toAccountId) {
     return { ok: false, error: '同じアカウントへは引き継げません' };
   }
   const now = jstNow();
-  await db
+  const result = await db
     .prepare(
       `UPDATE account_handovers
           SET to_account_id = ?, provider_match = ?, status = 'linked', linked_at = ?
-        WHERE id = ?`,
+        WHERE id = ? AND status = 'code_issued' AND julianday(code_expires_at) > julianday(?)`,
     )
-    .bind(input.toAccountId, input.providerMatch, now, handover.id)
+    .bind(input.toAccountId, input.providerMatch, now, handover.id, now)
     .run();
+  if (Number(result.meta?.changes ?? 0) !== 1) {
+    return { ok: false, error: 'そのコードは期限切れ、または既に使われています' };
+  }
   return { ok: true, handover: (await getHandoverById(db, handover.id))! };
 }
 
@@ -214,7 +217,7 @@ export async function savePreview(
   return { ok: true };
 }
 
-/** 切り戻しできるのは本実行から7日間だけ（v6-33 §12-2、X の確定値）。 */
+/** 切り戻しできるのは本実行から7日間だけ（-33 §12-2、X の確定値）。 */
 export const HANDOVER_ROLLBACK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function rollbackDeadlineOf(handover: HandoverRow): string | null {

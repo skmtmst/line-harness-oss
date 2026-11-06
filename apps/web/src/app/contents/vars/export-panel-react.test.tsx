@@ -16,6 +16,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
+  download: vi.fn(),
   listExports: vi.fn(),
   createExport: vi.fn(),
   exportDetail: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return {
     ...actual,
+    downloadApiFile: api.download,
     api: {
       ...actual.api,
       commonVars: {
@@ -39,7 +41,12 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-import VarsExportPanel from './export-panel'
+import { useVarsExportPanel } from '@/v8/common-vars/export-panel'
+
+function VarsExportPanel(props: Parameters<typeof useVarsExportPanel>[0]) {
+  const panel = useVarsExportPanel(props)
+  return <><header>{panel.action}</header><main>{panel.status}</main></>
+}
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -81,6 +88,7 @@ async function clickButton(label: string) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  api.download.mockResolvedValue({ totalCount: 12, returnedCount: 12, truncated: false })
   api.listExports.mockResolvedValue({ success: true, data: [] })
   api.createExport.mockResolvedValue({ success: true, data: job() })
   api.exportDetail.mockResolvedValue({ success: true, data: job() })
@@ -104,9 +112,9 @@ describe('共通情報CSVの監査付き出力パネル', () => {
       accountId: 'account-1', folderId: 'folder-9', ungrouped: undefined,
     })
     expect(text()).toContain('完了')
-    expect(text()).toContain('12件')
-    const link = host.querySelector('a[href$="/api/common-vars/exports/job-1/download"]')
-    expect(link).not.toBeNull()
+    expect(text()).toContain('12 件')
+    await clickButton('CSVをダウンロード')
+    expect(api.download).toHaveBeenCalledWith('/api/common-vars/exports/job-1/download', 'common-vars-job-1.csv', undefined)
   })
 
   it('未分類の絞り込みは ungrouped として送る', async () => {
@@ -148,9 +156,63 @@ describe('共通情報CSVの監査付き出力パネル', () => {
     })
     await render()
     expect(text()).toContain('期限切れ')
-    expect(host.querySelector('a[href$="/download"]')).toBeNull()
+    expect(Array.from(host.querySelectorAll('button')).some(button => button.textContent?.trim() === 'CSVをダウンロード')).toBe(false)
     await clickButton('もう一度書き出す')
     expect(api.regenerateExport).toHaveBeenCalledWith('job-1')
+  })
+
+  it('期限切れの案内は閉じられ、表示を閉じても一覧の状態は残る', async () => {
+    api.listExports.mockResolvedValue({
+      success: true,
+      data: [job({ status: 'expired', downloadUrl: null })],
+    })
+    await render()
+    expect(host.querySelector('[data-testid="vars-export-status"]')).not.toBeNull()
+    const close = host.querySelector('button[aria-label="通知を閉じる"]') as HTMLButtonElement
+    await act(async () => { close.click() })
+    expect(host.querySelector('[data-testid="vars-export-status"]')).toBeNull()
+    expect(text()).toContain('CSVで書き出す')
+  })
+
+  it('期限切れの共通通知は操作と同じ行の閉じ口を持ち、見出しの外に出る', async () => {
+    api.listExports.mockResolvedValue({ success: true, data: [job({ status: 'expired', downloadUrl: null })] })
+    await render()
+    const status = host.querySelector('[role="status"]')!
+    expect(status.getAttribute('data-design-part')).toBe('notice')
+    expect(status.querySelector('[data-notice-dot]')).not.toBeNull()
+    expect(status.closest('header')).toBeNull()
+    expect(status.querySelector('button[aria-label="通知を閉じる"]')).not.toBeNull()
+    expect(host.querySelector('header')?.textContent).toBe('CSVで書き出す')
+  })
+
+  it('最近の履歴を残し、通知を閉じても完了のDLと期限切れの再生成を使える', async () => {
+    api.listExports.mockResolvedValue({ success: true, data: [job({ status: 'expired', downloadUrl: null }), job({ id: 'older', downloadUrl: '/api/common-vars/exports/older/download' })] })
+    await render()
+    await act(async () => { (host.querySelector('[role="status"] button[aria-label="通知を閉じる"]') as HTMLButtonElement).click() })
+    expect(host.querySelector('[role="status"]')).toBeNull()
+    expect(text()).toContain('最近の書き出し（2 件）')
+    await clickButton('ダウンロード')
+    expect(api.download).toHaveBeenCalledWith('/api/common-vars/exports/older/download', 'common-vars-older.csv', undefined)
+    await clickButton('再生成')
+    expect(api.regenerateExport).toHaveBeenCalledWith('job-1')
+  })
+
+  it('別アカウントへ切り替えた後に届いた履歴と依頼結果を表示しない', async () => {
+    let finishHistory!: (value: unknown) => void
+    let finishRequest!: (value: unknown) => void
+    api.listExports.mockImplementationOnce(() => new Promise(resolve => { finishHistory = resolve }))
+    api.createExport.mockImplementationOnce(() => new Promise(resolve => { finishRequest = resolve }))
+    await render()
+    await clickButton('CSVで書き出す')
+    await render({ accountId: 'account-2' })
+    await act(async () => {
+      finishHistory({ success: true, data: [job({ failureReason: '別店舗の理由', status: 'failed' })] })
+      finishRequest({ success: true, data: job({ status: 'completed', rowCount: 999 }) })
+    })
+    expect(text()).not.toContain('別店舗の理由')
+    expect(text()).not.toContain('999')
+    expect(host.querySelector('[role="status"]')).toBeNull()
+    expect(api.listExports).toHaveBeenLastCalledWith('account-2')
   })
 
   it('アカウント未選択では依頼できない', async () => {
@@ -166,6 +228,6 @@ describe('共通情報CSVの監査付き出力パネル', () => {
     api.createExport.mockRejectedValue(new Error('network'))
     await render()
     await clickButton('CSVで書き出す')
-    expect(text()).toContain('書き出しを依頼できませんでした')
+    expect(text()).toContain('書き出しに失敗しました')
   })
 })

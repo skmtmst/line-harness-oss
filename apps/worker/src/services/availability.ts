@@ -1,13 +1,13 @@
-// Booking availability calculation.
-// `computeSlots` is a pure function over Interval[]; `getAvailability`
-// is the high-level entry point that fetches working hours, busy intervals,
-// and applies lead-time / virtual-staff rules.
+import { logger } from '@line-crm/shared/server';
+import {toMin,fromMin,overlaps,intInRange,isHhmm} from './availability-time-values.js';
+import { sqlIdSet } from '@line-crm/db/id-queries';
+// computeSlots は区間だけを受ける純粋関数とし、勤務・埋まりの取得や締切・仮担当者の条件は getAvailability で接続する。
 
-import type { AvailabilityByStaff } from './booking-types.js';
-import { SLOT_GRANULARITY_CHOICES, SLOT_GRANULARITY_MINUTES } from './booking-types.js';
-import { getStaffGoogleBusy } from './booking-calendar-sync.js';
+import type { AvailabilityByStaff } from '../features/booking/booking-types/index.js';
+import { SLOT_GRANULARITY_CHOICES, SLOT_GRANULARITY_MINUTES } from '../features/booking/booking-types/index.js';
+import { getStaffGoogleBusy } from '../features/booking/booking-calendar-sync/index.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
-import { storeSeatsForSlot, type StoreCapacityWindow } from './booking-store-capacity.js';
+import { storeSeatsForSlot, type StoreCapacityWindow } from '../features/booking/booking-store-capacity/index.js';
 
 export interface Interval {
   start: string; // HH:MM
@@ -39,34 +39,10 @@ export interface ComputeSlotsInput {
   capacity?: number;
 }
 
-function toMin(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number);
-  return h * 60 + m;
-}
 
-function fromMin(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
 
-function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
-  return aStart < bEnd && bStart < aEnd;
-}
 
-/**
- * R92: 店舗共通ルールの値を範囲検査して読む。手編集で壊れた値・
- * 型違いは「未設定」と同じ扱いにし、メニュー値だけを見る。
- */
-function intInRange(value: unknown, min: number, max: number): number | null {
-  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
-    ? value
-    : null;
-}
 
-function isHhmm(value: string): boolean {
-  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
-}
 
 /** 重なる稼働区間をまとめる。例外日が複数ある日の union 用。 */
 function mergeIntervals(intervals: Interval[]): Interval[] {
@@ -83,7 +59,7 @@ function mergeIntervals(intervals: Interval[]): Interval[] {
   return merged.map((m) => ({ start: fromMin(m.s), end: fromMin(m.e) }));
 }
 
-/** 稼働区間から休憩などの除外区間を差し引く（R164）。 */
+/** 稼働区間から休憩などの除外区間を差し引く。 */
 function subtractIntervals(working: Interval[], excluded: Interval[]): Interval[] {
   let out = mergeIntervals(working);
   const cuts = mergeIntervals(excluded);
@@ -120,12 +96,8 @@ function intersectIntervals(a: Interval[], b: Interval[]): Interval[] {
 }
 
 /**
- * 勤務時間から、予約を入れられる開始時刻を並べる。
- *
- * 候補の枠を1つずつ見て、埋まっている時間帯と重なるかを判定する。
- * 以前は「勤務時間から埋まりを引き算する」形だったが、同時受付数を
- * 数えるには「何件重なっているか」が要るので、枠ごとの判定に変えた。
- * 定員1・全て別メニュー扱い、という従来の条件では結果は変わらない。
+ * 同時受付数を判定するため、候補の開始時刻ごとに重なる予約件数を数える。
+ * 勤務時間から埋まりを引くだけでは重複件数が分からないため、枠ごとの判定を使う。
  */
 export function computeSlots(input: ComputeSlotsInput): Interval[] {
   const occupy = input.menu.duration_minutes + input.menu.buffer_after_minutes;
@@ -166,8 +138,7 @@ export function computeSlots(input: ComputeSlotsInput): Interval[] {
   return out;
 }
 
-// ----------------------------------------------------------------
-// DB layer
+
 
 const FALLBACK_TIME_ZONE = 'Asia/Tokyo';
 
@@ -178,7 +149,7 @@ export function normalizeTimeZone(raw: unknown): string {
     new Intl.DateTimeFormat('en-US', { timeZone: candidate });
     return candidate;
   } catch {
-    console.error('booking availability: invalid timezone, falling back to Asia/Tokyo');
+    logger.error("booking_availability.validate_timezone_failed");
     return FALLBACK_TIME_ZONE;
   }
 }
@@ -277,10 +248,11 @@ function eachDate(from: string, to: string): string[] {
 }
 
 export interface GetAvailabilityParams {
+  additionalDurationMinutes?:number;
   lineAccountId: string;
   menuId: string;
   staffId?: string;
-  from: string; // YYYY-MM-DD JST
+  from: string; // 日本時間の YYYY-MM-DD。
   to: string;
   now: Date;
   minLeadTimeMinutes: number;
@@ -291,12 +263,16 @@ export interface GetAvailabilityParams {
    */
   applyStoreRules?: boolean;
   googleCredentials?: GoogleServiceAccountCredentials;
+  forceCalendarRefresh?: boolean;
   /**
    * 予約内容の変更で、変更対象そのものを空き枠計算から外す。
    * 自予約の古い枠が重なり判定に残ると、同じ担当のまま少しずらす
    * 変更が「自分自身と競合」で通らなくなる。
    */
   excludeBookingId?: string;
+  excludeWaitlistId?: string;
+  /** 本人確認済みの案内は通常の受付締切を越えて確定できる。 */
+  waitlistOffer?: boolean;
 }
 
 export interface CalendarSyncState {
@@ -307,7 +283,7 @@ export interface CalendarSyncState {
 }
 
 /**
- * 予約できない理由の分類（IDEA-28 予約設定の「この日時はなぜ取れないか」）。
+ * 予約できない理由の分類（ 予約設定の「この日時はなぜ取れないか」）。
  * 画面はこのコードを運用者向けの文へ翻訳する。顧客名・外部予定の内容など
  * 詳細は返さず、「どの条件で塞がっているか」だけを表す。
  */
@@ -439,7 +415,7 @@ interface LoadedAvailability {
   minLeadAt: Date;
   windowLastDate: string | null;
   /**
-   * R314: 予約枠の間隔（分）。店舗設定の保存値を使う。行が無い・壊れた
+   * 予約枠の間隔（分）。店舗設定の保存値を使う。行が無い・壊れた
    * 値のときだけ従来の既定（30）に寄せる。
    */
   slotGranularity: number;
@@ -490,12 +466,7 @@ export interface StoreCapacitySnapshot {
   settingsVersion: number;
 }
 
-/**
- * Capacity applies only to business-hour intervals touched by this occupancy.
- * Settings and hours are read by one LEFT JOIN so the returned version describes
- * exactly the rows used to build the capacity windows, including a configured
- * all-closed week that has no child rows.
- */
+/** 対象の営業区間だけへ定員を適用する。設定と営業時間を1つの LEFT JOIN で読み、子行のない全休週も含め、返す版と計算に使う状態を一致させる。 */
 export async function getStoreCapacitySnapshot(
   db: D1Database,
   accountId: string,
@@ -644,7 +615,7 @@ async function loadAvailabilityData(
   if (!staffRows.results.length) return { kind: 'no_staff' };
 
   const staffIds = staffRows.results.map((s) => s.id);
-  const placeholders = staffIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(staffIds).sql;
 
   const [businessHours, menuResources, exceptionsResult, settingsRow] = await Promise.all([
     db.prepare(`SELECT bh.weekday, bh.start_time, bh.end_time, bh.capacity
@@ -681,7 +652,7 @@ async function loadAvailabilityData(
   ]);
   // 店舗のタイムゾーンで日付・時刻を読む。未設定・壊れた値は Asia/Tokyo。
   const timeZone = normalizeTimeZone(settingsRow?.timezone ?? FALLBACK_TIME_ZONE);
-  // R314: 枠生成・可否説明で使う刻み幅は店舗設定の保存値。候補外・欠損は既定へ。
+  // 枠生成・可否説明で使う刻み幅は店舗設定の保存値。候補外・欠損は既定へ。
   const storedGranularity = Number(settingsRow?.slot_granularity_minutes);
   const slotGranularity = (SLOT_GRANULARITY_CHOICES as readonly number[]).includes(storedGranularity)
     ? storedGranularity
@@ -714,7 +685,7 @@ async function loadAvailabilityData(
         WHERE staff_id IN (${placeholders})
           AND work_date BETWEEN ? AND ?`,
     )
-    .bind(...staffIds, params.from, params.to)
+    .bind(...(staffIds.length ? sqlIdSet(staffIds).binds : []), params.from, params.to)
     .all<{ staff_id: string; work_date: string; start_time: string; end_time: string }>();
 
   const rules = await db
@@ -723,10 +694,10 @@ async function loadAvailabilityData(
          FROM staff_availability_rules
         WHERE staff_id IN (${placeholders}) AND is_active = 1`,
     )
-    .bind(...staffIds)
+    .bind(...(staffIds.length ? sqlIdSet(staffIds).binds : []))
     .all<{ staff_id: string; weekday: number; start_time: string; end_time: string }>();
 
-  // R164: 曜日指定・日付指定の休憩。勤務区間から差し引くため、
+  // 曜日指定・日付指定の休憩。勤務区間から差し引くため、
   // 空きの列挙と確定前判定の両方で同じく読む。
   const [weeklyBreaks, datedBreaks] = await Promise.all([
     db.prepare(
@@ -734,7 +705,7 @@ async function loadAvailabilityData(
          FROM staff_breaks
         WHERE staff_id IN (${placeholders})`,
     )
-      .bind(...staffIds)
+      .bind(...(staffIds.length ? sqlIdSet(staffIds).binds : []))
       .all<BreakRow>(),
     db.prepare(
       `SELECT staff_id, work_date, start_time, end_time
@@ -742,7 +713,7 @@ async function loadAvailabilityData(
         WHERE staff_id IN (${placeholders})
           AND work_date BETWEEN ? AND ?`,
       )
-      .bind(...staffIds, params.from, params.to)
+      .bind(...(staffIds.length ? sqlIdSet(staffIds).binds : []), params.from, params.to)
       .all<BreakDateRow>(),
   ]);
   const breaks = weeklyBreaks.results ?? [];
@@ -762,12 +733,11 @@ async function loadAvailabilityData(
   const bookings = await db
     .prepare(
       `SELECT staff_id, menu_id, starts_at, block_ends_at
-         FROM bookings
+         FROM booking_slot_allocations
         WHERE line_account_id = ?
-          AND status IN ('requested','confirmed')
           AND julianday(starts_at) < julianday(?)
           AND julianday(block_ends_at) > julianday(?)
-          AND (? IS NULL OR id != ?)`,
+          AND (? IS NULL OR id != ?) AND (? IS NULL OR COALESCE(waitlist_id,'') != ?)`,
     )
     .bind(
       params.lineAccountId,
@@ -775,6 +745,8 @@ async function loadAvailabilityData(
       rangeStart.toISOString(),
       params.excludeBookingId ?? null,
       params.excludeBookingId ?? null,
+      params.excludeWaitlistId ?? null,
+      params.excludeWaitlistId ?? null,
     )
     .all<{ staff_id: string; menu_id: string; starts_at: string; block_ends_at: string }>();
 
@@ -783,39 +755,25 @@ async function loadAvailabilityData(
   const resourceBookings = requiredResources.length === 0
     ? { results: [] as Array<{ resource_id: string; quantity: number; starts_at: string; block_ends_at: string }> }
     : await db.prepare(
-      `SELECT brc.resource_id, brc.quantity, b.starts_at, b.block_ends_at
-         FROM booking_resource_consumptions brc
-         INNER JOIN bookings b ON b.id = brc.booking_id
-         INNER JOIN booking_menu_resources current_requirement
-           ON current_requirement.resource_id = brc.resource_id
-          AND current_requirement.menu_id = ?
-        WHERE brc.line_account_id = ?
-          AND b.status IN ('requested', 'confirmed')
-          AND julianday(b.starts_at) < julianday(?)
-          AND julianday(b.block_ends_at) > julianday(?)
-          AND (? IS NULL OR b.id != ?)`,
-    ).bind(
-      params.menuId,
-      params.lineAccountId,
-      rangeEnd.toISOString(),
-      rangeStart.toISOString(),
-      params.excludeBookingId ?? null,
-      params.excludeBookingId ?? null,
-    ).all<{ resource_id: string; quantity: number; starts_at: string; block_ends_at: string }>();
+      `SELECT a.resource_id,a.quantity,a.starts_at,a.block_ends_at FROM booking_slot_resources a
+        JOIN booking_menu_resources mr ON mr.resource_id=a.resource_id AND mr.menu_id=?
+        WHERE a.line_account_id=? AND julianday(a.starts_at)<julianday(?) AND julianday(a.block_ends_at)>julianday(?)
+        AND (? IS NULL OR a.id<>?) AND (? IS NULL OR COALESCE(a.waitlist_id,'')<>?)`,
+    ).bind(params.menuId,params.lineAccountId,rangeEnd.toISOString(),rangeStart.toISOString(),params.excludeBookingId??null,params.excludeBookingId??null,params.excludeWaitlistId??null,params.excludeWaitlistId??null).all<{ resource_id: string; quantity: number; starts_at: string; block_ends_at: string }>();
 
   const menuForCalc = {
-    duration_minutes: menu.override_duration ?? menu.duration_minutes,
+    duration_minutes: (menu.override_duration ?? menu.duration_minutes)+(params.additionalDurationMinutes??0),
     buffer_after_minutes: menu.buffer_after_minutes,
   };
   // 受付の締め切り。全体の最短リード時間とメニューごとの締め切りの、
   // 遅い方を採る。片方だけを見ると、どちらかの設定が黙って無視される。
   // R92: メニューの個別指定が無いとき、お客さま向け (applyStoreRules) は
-  // 店舗共通ルールを既定値として使う。要件 v6-28 §受付期間・締切:
+  // 店舗共通ルールを既定値として使う。要件 -28 §受付期間・締切:
   // 「店舗既定値を持ち、メニューは必要な項目だけ上書きする」。
   // 手編集で壊れた店舗値は無視し、メニュー値だけを見る（従来どおり）。
   const storeCutoffMinutes = intInRange(settingsRow?.cutoff_minutes_before, 0, 43_200);
   const menuCutoffMinutes = menu.cutoff_hours_before == null ? null : menu.cutoff_hours_before * 60;
-  const cutoffMinutes = Math.max(
+  const cutoffMinutes = params.waitlistOffer ? 0 : Math.max(
     params.minLeadTimeMinutes,
     params.applyStoreRules
       ? (menuCutoffMinutes ?? storeCutoffMinutes ?? 0)
@@ -843,15 +801,15 @@ async function loadAvailabilityData(
       const busy = await getStaffGoogleBusy(db, params.googleCredentials ?? {}, {
         lineAccountId: params.lineAccountId,
         staffId: staff.id,
+        fresh: params.forceCalendarRefresh,
         timeMin: new Date(zonedTimeToUtcMs(timeZone, params.from, '00:00')).toISOString(),
         timeMax: new Date(zonedTimeToUtcMs(timeZone, addDays(params.to, 1), '00:00')).toISOString(),
       });
       googleBusyByStaff.set(staff.id, busy);
       calendarSync.push({ staff_id: staff.id, configured: busy !== null, ok: true });
     } catch (error) {
-      // Configured calendar must fail closed. Showing slots while Google is
-      // unreachable can create double bookings.
-      console.error(`Google Calendar availability failed for staff=${staff.id}`, error);
+      // Google の予定が取れないと二重予約になるため、接続設定済みで取得不能なら空き枠を見せず安全側に止める。
+      logger.error("booking_availability.load_failed");
       googleBusyByStaff.set(staff.id, []);
       calendarSync.push({ staff_id: staff.id, configured: true, ok: false, error: 'unavailable' });
     }
@@ -1004,7 +962,7 @@ function computeDayWorking(
       ? [{ start: base.start_time, end: base.end_time }]
       : [];
   /*
-   * 店舗の営業時間（週次）で、通常の勤務を切り詰める（#748 / N-403）。
+   * 店舗の営業時間（週次）で、通常の勤務を切り詰める。
    *
    * これまで `booking_business_hours` は定員の計算にしか使われておらず、
    * 枠の開閉には効いていなかった。営業 10:00-17:00・勤務 09:00-18:00 の
@@ -1045,7 +1003,7 @@ function computeDayWorking(
     workingList = intersectIntervals(workingList, mergeIntervals(hours));
     if (workingList.length === 0) break;
   }
-  // R164: 休憩を勤務区間から差し引く。その日だけの休憩と、その曜日の
+  // 休憩を勤務区間から差し引く。その日だけの休憩と、その曜日の
   // いつもの休憩の両方を見る。壊れた行は保存口で弾くため、ここでは
   // 時刻の形が正しいものだけを差し引く。
   if (workingList.length > 0) {
@@ -1315,7 +1273,7 @@ export async function getAvailability(
     };
   }
   const d = loaded.data;
-  // Staff/menu concurrency is distinct from the store-wide seat budget.
+  // 担当者・メニューの同時受付と、店舗全体の席数を別々に検査する。
   const staffCapacity = Math.max(1, d.concurrentCapacity);
   const by_staff: AvailabilityByStaff[] = [];
   // LIFF カレンダーの「休」の印用。担当ごとに閉まっている日を集め、
@@ -1376,7 +1334,7 @@ export async function getAvailability(
 }
 
 // ----------------------------------------------------------------
-// IDEA-28 予約設定: 「この日時はなぜ予約できないか」の説明
+//  予約設定: 「この日時はなぜ予約できないか」の説明
 // ----------------------------------------------------------------
 
 export interface ExplainSlotParams {
@@ -1391,6 +1349,7 @@ export interface ExplainSlotParams {
   minLeadTimeMinutes: number;
   /** R92: お客さま向けの説明では店舗共通ルールを既定値として使う。 */
   applyStoreRules?: boolean;
+  waitlistOffer?: boolean;
   googleCredentials?: GoogleServiceAccountCredentials;
 }
 
@@ -1415,7 +1374,7 @@ export interface SlotCheckResult {
   reasons: SlotBlockReason[];
   per_staff: SlotCheckStaff[];
   /**
-   * R314: 判定に実際に使った枠間隔（分）。理由文が適用値を表示するために使う。
+   * 判定に実際に使った枠間隔（分）。理由文が適用値を表示するために使う。
    * 追加の項目なので、読まない呼び出し側の動きは変わらない。
    */
   slotGranularityMinutes?: number;
@@ -1439,6 +1398,7 @@ export async function explainBookingSlot(
     now: params.now,
     minLeadTimeMinutes: params.minLeadTimeMinutes,
     applyStoreRules: params.applyStoreRules,
+    waitlistOffer:params.waitlistOffer,
     googleCredentials: params.googleCredentials,
   });
   const d0 = loaded.kind === 'ok' ? loaded.data : null;
@@ -1449,7 +1409,7 @@ export async function explainBookingSlot(
     bookable: false,
     reasons: [],
     per_staff: [],
-    // R314: 刻み幅が要る理由文のため、読めたときは適用値を添える。
+    // 刻み幅が要る理由文のため、読めたときは適用値を添える。
     ...(d0 ? { slotGranularityMinutes: d0.slotGranularity } : null),
     ...partial,
   });

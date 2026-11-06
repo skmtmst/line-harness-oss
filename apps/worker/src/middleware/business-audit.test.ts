@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const recordAuditEvent = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@line-crm/db', () => ({

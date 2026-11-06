@@ -34,7 +34,7 @@ function dialog(src: string, index: number): string {
 
 describe('予約スタッフの削除 (#1058)', () => {
   it('削除に失敗したら未処理拒否にせず、窓の中に理由を出す', () => {
-    const body = fnBody(PAGE, 'async function remove(id: string)')
+    const body = fnBody(PAGE, 'async function remove(id: string, targetScope: typeof scope.current)')
     expect(body, '失敗を受けていない').toContain('} catch {')
     expect(body, '失敗を窓に出していない').toContain(
       "setRemoveError('このスタッフを削除できませんでした。状態を読み直してから、もう一度お試しください。')",
@@ -45,10 +45,10 @@ describe('予約スタッフの削除 (#1058)', () => {
   })
 
   it('失敗のあとに確認窓が消えない（成功したときだけ閉じる）', () => {
-    const body = fnBody(PAGE, 'async function remove(id: string)')
+    const body = fnBody(PAGE, 'async function remove(id: string, targetScope: typeof scope.current)')
     // setRemoveTarget(null) は削除成功の通路上にだけあること
     expect(body.indexOf('setRemoveTarget(null)')).toBeLessThan(body.indexOf('catch'))
-    expect(body).toContain('await bookingApi.deleteStaff(selectedAccountId, id)')
+    expect(body).toContain('await bookingApi.deleteStaff(targetScope.accountId, id)')
   })
 
   it('確認窓は失敗文を受け取り、処理中は閉じられない', () => {
@@ -60,6 +60,6 @@ describe('予約スタッフの削除 (#1058)', () => {
   })
 
   it('窓を開き直したとき前の失敗文が残らない', () => {
-    expect(PAGE).toContain("setRemoveError(''); setRemoveTarget(s)")
+    expect(PAGE).toContain("setRemoveError(''); setRemoveTarget({ staff: s, scope: renderedScope })")
   })
 })

@@ -5,7 +5,6 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
-import { conversionsTabTitle } from './conversions/conversions-tab-title'
 import { MENU_SECTIONS } from '@/lib/menu'
 import PageHeaderH2 from '@/components/layout/page-header-h2'
 
@@ -52,20 +51,19 @@ describe('Issue #637 h1は1画面に1つ', () => {
   })
 
   it('本文見出しをh1に戻さない（重複が直った画面はh2版を使う）', () => {
-    for (const rel of ['app/nen-campaigns/nen-overview.tsx', 'app/ec-commerce/page.tsx']) {
-      const src = read(rel)
-      expect(src, rel + ' が共有PageHeader（h1）へ戻っている').toContain(
-        "@/components/layout/page-header-h2",
-      )
-      expect(src, rel + ' が共有PageHeader（h1）へ戻っている').not.toContain(
-        "@/components/shared/page-header",
-      )
-    }
+    // 画面の題（h1）が1つだけなのは、描いて数える試験が守る：
+    // NEN配信の一覧は v8/nen-campaigns/list.test.tsx、EC連携は app/ec-commerce/ec-connector-v8.test.tsx。
+    // 上の帯のパンくずは見出しにしない。画面の題（h1）は本文の頭が持つ。
+    expect(read('components/shared/top-bar.tsx').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')).not.toMatch(/<h1[\s>]/)
+    expect(read('v8/settings/ec-commerce/screen.tsx'), '共有PageHeader（h1）へ戻っている').not.toContain(
+      "@/components/shared/page-header",
+    )
   })
 
   it('/nen-members の深い画面（掲載管理・1枚表示）もh1を置かない', () => {
     // トップバーの「投稿」（h1）と並ぶと1画面に h1 が2つになるため h2 へ。
-    for (const rel of ['app/nen-members/photo-publications.tsx', 'app/nen-members/photo-review-detail.tsx']) {
+    // 掲載管理の古い photo-publications.tsx はどこからも描かれないので 2026-10-07 に消した。
+    for (const rel of ['v8/nen-posts/detail.tsx']) {
       const src = read(rel)
         .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
         .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -80,32 +78,19 @@ describe('Issue #637 h1は1画面に1つ', () => {
  * 画面に出る名前を一致させる。
  *
  * - /nen-members … 監査は「h1:投稿」を不一致と記録したが、現行ナビも
- *   「投稿」。V6-22 は写真審査（投稿）画面であり、監査時点の
+ *   「投稿」。管理画面-22 は写真審査（投稿）画面であり、監査時点の
  *   「会員」想定は旧定義。現行ナビ名を正として固定する。
- * - /affiliates … 旧URL。実体は /conversions?tab=affiliates。
- *   ナビ「成果とアフィリエイト」に合わせ、タブ側の画面名を渡す。
+ * - /affiliates … V8では独立した「成果とアフィリエイト」の画面。
+ *   旧 /conversions?tab=affiliates から移動しても画面名を一致させる。
  */
 describe('Issue #637 画面名とナビ名の一致', () => {
   it('ナビ項目名が監査対象ルートに対して正しい', () => {
-    expect(menuLabel('/conversions?tab=affiliates')).toBe('成果とアフィリエイト')
-    expect(menuLabel('/conversions')).toBe('コンバージョン')
+    expect(menuLabel('/affiliates?tab=affiliates')).toBe('成果とアフィリエイト')
+    expect(menuLabel('/affiliates?tab=points')).toBe('コンバージョン')
     expect(menuLabel('/nen-members')).toBe('投稿')
     expect(menuLabel('/nen-campaigns')).toBe('NEN配信')
     expect(menuLabel('/ec-commerce')).toBe('EC連携')
-  })
-
-  it('/conversions は開いているタブの名前を上部バーへ渡す', () => {
-    // アフィリエイト系タブ（旧 /affiliates の実体）
-    expect(conversionsTabTitle('affiliates')).toBe('成果とアフィリエイト')
-    expect(conversionsTabTitle('offers')).toBe('成果とアフィリエイト')
-    expect(conversionsTabTitle('approvals')).toBe('成果とアフィリエイト')
-    expect(conversionsTabTitle('payment')).toBe('成果とアフィリエイト')
-    // コンバージョン系タブと既定
-    expect(conversionsTabTitle('points')).toBe('コンバージョン')
-    expect(conversionsTabTitle('report')).toBe('コンバージョン')
-    expect(conversionsTabTitle('unknown')).toBe('コンバージョン')
-
-    const src = read('app/conversions/page.tsx')
-    expect(src).toContain('usePageTitle(conversionsTabTitle(tab))')
+    // 入口が上の帯へこの名前を渡すことは、描いて確かめる：コンバージョンは
+    // conversions/conversion-points-rowmenu-react.test.tsx、成果とアフィリエイトは v8/affiliates/entry-behavior.test.tsx。
   })
 })

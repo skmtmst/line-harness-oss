@@ -1,6 +1,7 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * パンくず。Pencil V6 の `R098Z`「共通 パンくず」。
+ * パンくず。Pencil 管理画面 の `R098Z`「共通 パンくず」。
  *
  * 途中の階層はリンク（`$status-info`）、いま開いている場所は
  * リンクではない（`$ink`）。区切りは `chevron-right` 13px。
@@ -18,7 +19,7 @@
 .link {
   flex: none;
   white-space: nowrap;
-  color: var(--color-status-info); /* fill: $status-info */
+  color: var(--color-action); /* fill: $status-info */
 }
 
 .link:hover {
@@ -42,7 +43,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-ink); /* fill: $ink */
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .separator {
@@ -51,4 +52,8 @@
   color: var(--color-ink-faint); /* fill: $ink-faint */
   flex: none;
 }
+
+/* 統括バナーの板だけ：緑の行き先と文字の区切り。既定のパンくずは保つ。 */
+.list[data-appearance='banner'] .link { color: var(--color-accent-deep); }
+.list[data-appearance='banner'] .separator { width: auto; height: auto; }
 }

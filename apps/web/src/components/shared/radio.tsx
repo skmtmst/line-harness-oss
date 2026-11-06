@@ -1,0 +1,42 @@
+'use client'
+
+import type { InputHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
+import styles from './radio.module.css'
+
+/** V8 の行内ラジオ（y4YQSB / gzxYf）。カード形式は RadioCardGroup を使う。 */
+export default function Radio({
+  children,
+  invalid = false,
+  className,
+  size = 'medium',
+  fill = false,
+  ...props
+  /*
+   * `size` は入力欄そのものの属性（数字）としても使えるが、この部品では
+   * 文字の大きさを選ぶ名前として使うので、元の属性は外しておく。
+   * 外さないと数字と名前が重なって型が合わなくなる。
+   */
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'children' | 'size'> & {
+  invalid?: boolean
+  children: ReactNode
+  /**
+   * 文字の大きさ。既定 'medium' は行内ラジオ（y4YQSB／gzxYf：文 13/20）。
+   * 'small' は脇のパネル内（★BG-B `z14gEG` 人物2択：文 12/17）。
+   * 丸の 18 と間隔 8 はどちらも同じ。v8 だけで効く。
+   */
+  size?: 'medium' | 'small'
+  /** 一覧行の名前を省略できるよう、ラベルを残りの幅に収める。 */
+  fill?: boolean
+}) {
+  return (
+    <label className={[styles.root, className].filter(Boolean).join(' ')} data-size={size} data-fill={fill || undefined}>
+      <input type="radio" className={styles.input} {...props} style={invalid ? { ...props.style, outline: '1px solid var(--color-danger)' } : props.style} />
+      <span className={styles.label}>{children}</span>
+    </label>
+  )
+}
+
+/** 行内ラジオを1つの読み上げられる選択群にする。配置は呼び出し側から渡す。 */
+export function RadioGroup({ label, children, ...props }: HTMLAttributes<HTMLDivElement> & { label: string; children: ReactNode }) {
+  return <div {...props} role="radiogroup" aria-label={label}>{children}</div>
+}

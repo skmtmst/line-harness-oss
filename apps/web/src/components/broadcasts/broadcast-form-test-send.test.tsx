@@ -10,6 +10,7 @@
  *      2成功0失敗=成功で、文言と色が分かれる。
  *   4. テスト送信もLINE公式アカウントの送信枠を使うと説明する。
  */
+import { setTextControlValue } from '@/test-utils/text-control'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const sendApi = vi.hoisted(() => vi.fn())
 const createApi = vi.hoisted(() => vi.fn())
 const recipientsApi = vi.hoisted(() => vi.fn())
+const account = vi.hoisted(() => ({ id: 'acc-1' }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -62,7 +64,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, loading: false }),
 }))
 
 import BroadcastForm from './broadcast-form'
@@ -97,18 +99,13 @@ function unmount() {
 }
 
 function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
-    'value',
-  )?.set
-  setter?.call(element, value)
-  element.dispatchEvent(new Event('input', { bubbles: true }))
+  setTextControlValue(element, value)
 }
 
 async function fillMinimum() {
   const title = container.querySelector('input[placeholder="例：8月キャンペーンのお知らせ"]') as HTMLInputElement | null
   expect(title).not.toBeNull()
-  const body = container.querySelector('textarea[placeholder="テキストを入力"]') as HTMLTextAreaElement | null
+  const body = container.querySelector('[role="textbox"][placeholder="テキストを入力"]') as HTMLTextAreaElement | null
   expect(body).not.toBeNull()
   await act(async () => {
     setNativeValue(title!, '検証配信用の題')
@@ -126,7 +123,7 @@ function dialog(): HTMLElement {
 async function openTestDialog() {
   await renderForm()
   await fillMinimum()
-  const button = [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'テスト送信')
+  const button = [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'テストを送る')
   expect(button).toBeDefined()
   await act(async () => {
     button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -135,7 +132,7 @@ async function openTestDialog() {
 }
 
 async function confirmTestSend() {
-  const button = [...dialog().querySelectorAll('button')].find((b) => b.textContent?.trim() === 'テスト送信する')
+  const button = [...dialog().querySelectorAll('button')].find((b) => b.textContent?.trim() === 'テストを送る')
   expect(button).toBeDefined()
   await act(async () => {
     button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -144,14 +141,15 @@ async function confirmTestSend() {
 }
 
 function resultBanner(): HTMLElement {
-  const el = [...dialog().querySelectorAll('p')].find((p) =>
-    p.className.includes('bg-success-bg') || p.className.includes('bg-warning-bg') || p.className.includes('bg-danger-bg'),
+  const el = [...dialog().querySelectorAll('[data-design-part="notice"]')].find((p) =>
+    /テスト送信(?:できませんでした|済み|に失敗)|一部を送信できませんでした/.test(p.textContent ?? ''),
   )
   expect(el, '結果の表示がない').toBeDefined()
   return el as HTMLElement
 }
 
 beforeEach(() => {
+  account.id = 'acc-1'
   vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network is blocked in this test') }))
   createApi.mockResolvedValue({ success: true, data: { id: 'fake-draft', version: 1 } })
   recipientsApi.mockResolvedValue({
@@ -168,6 +166,23 @@ afterEach(() => {
 })
 
 describe('一斉配信のテスト送信（#986）', () => {
+  it('テスト送信の確認にLINEアカウントと環境を出す', async () => {
+    await openTestDialog()
+    expect(dialog().textContent).toContain('LINEアカウント')
+    expect(dialog().textContent).toContain('環境')
+  })
+  it('下書き保存中にアカウントが変わったらテスト送信へ進まない', async () => {
+    let finish!: (value: unknown) => void
+    createApi.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    await openTestDialog()
+    const button = [...dialog().querySelectorAll('button')].find(b => b.textContent?.trim() === 'テストを送る')!
+    await act(async () => { button.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(createApi).toHaveBeenCalled()
+    account.id = 'acc-2'
+    await act(async () => { root.render(<BroadcastForm tags={[]} onSuccess={() => {}} onCancel={() => {}} />) })
+    await act(async () => { finish({ success: true, data: { id: 'fake-draft', version: 1 } }); await Promise.resolve() })
+    expect(sendApi).not.toHaveBeenCalled()
+  })
   it('送信先を読み込んだだけでは実行履歴は0件で、固定の成功・日時を出さない', async () => {
     await openTestDialog()
     expect(sendApi).not.toHaveBeenCalled()
@@ -194,14 +209,13 @@ describe('一斉配信のテスト送信（#986）', () => {
     expect(el.querySelectorAll('.bg-accent-soft, .border-accent')).toHaveLength(0)
   })
 
-  it('0成功2失敗はエラーとして赤で出し、成功扱いにしない', async () => {
+  it('0成功2失敗はエラーとして知らせ、成功扱いにしない', async () => {
     sendApi.mockResolvedValue({ success: true, sent: 0, failed: 2 })
     await openTestDialog()
     await confirmTestSend()
     expect(sendApi).toHaveBeenCalledWith('fake-draft')
     const banner = resultBanner()
-    expect(banner.className).toContain('bg-danger-bg')
-    expect(banner.className).not.toContain('bg-success-bg')
+    expect(banner.getAttribute('role')).toBe('alert')
     expect(banner.textContent).toContain('2名')
     expect(dialog().textContent).not.toContain('テスト送信しました（0件）')
     expect(dialog().textContent).not.toContain('成功')
@@ -212,17 +226,18 @@ describe('一斉配信のテスト送信（#986）', () => {
     await openTestDialog()
     await confirmTestSend()
     const banner = resultBanner()
-    expect(banner.className).toContain('bg-warning-bg')
+    expect(banner.textContent).toContain('一部を送信できませんでした')
     expect(banner.textContent).toContain('1名成功')
     expect(banner.textContent).toContain('1名失敗')
   })
 
-  it('2成功0失敗だけ成功として緑で出す', async () => {
+  it('2成功0失敗だけ成功として知らせる', async () => {
     sendApi.mockResolvedValue({ success: true, sent: 2, failed: 0 })
     await openTestDialog()
     await confirmTestSend()
     const banner = resultBanner()
-    expect(banner.className).toContain('bg-success-bg')
+    expect(banner.textContent).toContain('テスト送信済み')
+    expect(banner.textContent).not.toContain('失敗')
     expect(banner.textContent).toContain('2名成功')
   })
 
@@ -232,6 +247,12 @@ describe('一斉配信のテスト送信（#986）', () => {
       .mockResolvedValueOnce({ success: true, sent: 2, failed: 0 })
     await openTestDialog()
     await confirmTestSend()
+    // The acknowledged send is complete. Close its result and explicitly start the next test.
+    const close = dialog().querySelector('button[aria-label="閉じる"]')!
+    await act(async () => { close.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    const send = [...container.querySelectorAll('button')].find(button => button.textContent?.trim() === 'テストを送る')!
+    await act(async () => { send.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await flush()
     await confirmTestSend()
     expect(sendApi).toHaveBeenCalledTimes(2)
     const el = dialog()

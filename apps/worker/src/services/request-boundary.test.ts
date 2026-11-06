@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { resolveRequestBoundaries, resolveRequestBoundary } from './request-boundary.js';
 
-// board #800: 権限・tenant・LINEアカウント境界の共通土台。
+// board : 権限・tenant・LINEアカウント境界の共通土台。
 // 実SQLiteで確かめる。SQLそのものが仕様のため、手書きモックでは意味がない。
 
 const TENANT_B = 'tenant-B';

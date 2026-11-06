@@ -1,3 +1,4 @@
+import { createD1Timing, timedD1 } from '../lib/d1-timing.js';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { _resetCacheForTest, computeUsersGrouped } from './users-grouped.js';
 
@@ -486,7 +487,7 @@ describe('computeUsersGrouped', () => {
   });
 
   /*
-   * FRIEND-09: uid 絞り込みは「表示中の1ページ」ではなく全件へかけてから
+   * uid 絞り込みは「表示中の1ページ」ではなく全件へかけてから
    * ページを切る。絞った集まりの2ページ目へも辿れ、total は絞った後の数。
    */
   test('uid 絞り込みはページネーションより先に全件へかかる（FRIEND-09）', async () => {
@@ -601,12 +602,17 @@ describe('computeUsersGrouped', () => {
       },
     } as unknown as D1Database;
 
-    await computeUsersGrouped(db);
-    await computeUsersGrouped(db);
+    const initial = createD1Timing();
+    const repeated = createD1Timing();
+    await computeUsersGrouped(timedD1(db, initial));
+    await computeUsersGrouped(timedD1(db, repeated));
     expect(identCalls).toBe(1);
+    expect(initial.count).toBe(2);
+    expect(repeated.count).toBe(0);
 
-    await computeUsersGrouped(db, { forceRefresh: true });
+    await computeUsersGrouped(timedD1(db, repeated), { forceRefresh: true });
     expect(identCalls).toBe(2);
+    expect(repeated.count).toBe(2);
   });
 
   test('空結果はキャッシュされない（誤検知マスクを避ける）', async () => {

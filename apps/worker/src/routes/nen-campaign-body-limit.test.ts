@@ -88,7 +88,7 @@ describe('NEN本文の保存上限（#659）', () => {
   });
 
   test('絵文字はUTF-16 code unitで数える（🌿4500個はUTF-16で9000になり保存できない）', async () => {
-    // #659差し戻し3点目: 旧実装はコードポイントで数えており、この本文が
+    // 複数バイトの本文でも、コードポイント数でなく送信時の上限で検査する。
     // 誤って保存できてしまっていた（UTF-16では9000で、LINEの実際の
     // 数え方では大幅な上限超過）。
     const response = await putSetting('🌿'.repeat(NEN_CAMPAIGN_BODY_MAX_LENGTH));

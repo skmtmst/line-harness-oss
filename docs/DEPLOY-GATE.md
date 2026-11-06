@@ -1,3 +1,5 @@
+> 文書：デプロイ安全ゲートと排他運用｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # デプロイ安全ゲートと排他運用
 
 2026-08-14 に masato / kenta で合意した、2人以上で並行開発するときの運用ルールです。
@@ -38,11 +40,27 @@ LINEのテスト通知も混ざります。だから排他制御が要ります�
 本番を `codex/development` から出すと未検証の変更が本番へ入り、
 検証を `main` から出すと検証そのものが成立しません。preflight は両方を拒否します。
 
+### 2026-11-04 の隔離リリース
+
+この更新では、オーナーが対象外とした PR #2075 が検証ブランチへ先に統合されました。
+対象外の変更を本番へ混ぜないため、`codex/masato-production-release-20261104` を
+基点 `941616d7a41390199ee6cfef7569cfd43b2d8497` から作る一度限りの経路を使います。
+この枝の検証配備は手動実行だけで、対象外マージ
+`7e7f4f704ed237f88b2bee20c4e5b50a73c8bf45` を含まないことを検査します。
+通常と同じ検証環境ロック、dry-run、Worker・管理画面の公開SHA照合を必須とします。
+本番昇格時は、同じSHAの配備実行が公開SHAを照合して成功した記録を確認します。
+その後の通常の検証配備で公開版が進んでも、この記録は有効です。
+本番昇格PRも同じ基点と検証配備記録を照合し、全検査とオーナーの最終承認後だけ
+`main` へ統合します。例外はこの正確な枝名に限り、以後の通常配備は
+`codex/development` から行います。
+このPRの新規画面契約と共通パターンの検査も同じ基点からの追加分を検査します。
+通常のPRは引き続きPRの比較元を使用します。
+
 - `codex/development` への直接 push は禁止。PR経由のみ。
 - `codex/development` は、条件を確認できた開発者が自分でマージしてよい。
 - `main` への反映は masato の承認が必要。
-- `LINE_HARNESS_CLOUDFLARE_DEPLOY` は当面未設定のまま。安全なリリース手順が
-  確立するまで自動本番デプロイは有効化しない。
+- `LINE_HARNESS_CLOUDFLARE_DEPLOY` は本番配備準備で有効化済み。
+  本番配備は自動では始まらず、オーナー本人による手動実行と本節の検査を必須とする。
 
 ## 設定（PC・環境ごとに違う値）
 
@@ -65,6 +83,11 @@ export LINE_HARNESS_DEPLOY_REMOTE=origin
 ```
 
 ## 検証デプロイの手順
+
+**この節は手元から `pnpm deploy:staging` で配るときの手順です。**
+GitHub Actions の `deploy-cloudflare-staging.yml` を使うときは
+ロックを自分で取らないでください（workflow が自分で取ります）。
+→「[GitHub Actions のロック](#github-actions-のロック2026-10-13-修正)」
 
 ### 1. ロックを取得する（＝使用宣言）
 
@@ -125,6 +148,44 @@ SHAが変わっていた場合は削除せず、現在の保持者を確認す�
 **古いロック**は `status` で「放置の可能性あり」と表示されますが（90分）、
 **時間経過での自動解放はしません**。デプロイ継続中か中断かは人が判断すべきだからです。
 
+### GitHub Actions のロック（2026-10-13 修正）
+
+`deploy-cloudflare-staging.yml` は `DELIVERY_MODE=apply` のときだけロックを取得し、
+run が終わる段で解放します。この解放の段は
+**`always() && steps.staging_lock.outcome == 'success'`** です。
+
+- 途中の段が失敗・中断しても解放します。ロックは「いま配備中」の宣言であり、
+  run が終わった時点で配備している人はいないためです。
+  途中まで反映された事実は run の失敗と `Summarize` の出力が示します。
+- 取得していない run（`outcome != success`）は解放しません。
+  他担当のロックに触れないためです。
+
+**workflow を使うなら、手元で先にロックを取らないでください。**
+ロックは「空いているrefへのpush」で取るので、自分が先に取っていても
+workflow 側の取得は `lock-held-by-other` 相当で失敗します。
+自分のロックだから通るということはありません。
+**手元の `pnpm deploy:staging` と、workflow の `DELIVERY_MODE=apply` は、
+ロックの取り方が違う別経路です。混ぜて使えません。**
+
+| 配り方 | ロックを取るのは | 解放するのは |
+| --- | --- | --- |
+| 手元 `pnpm deploy:staging -- --apply` | **自分**（上の手順1） | **自分**（手順3） |
+| Actions `deploy-cloudflare-staging.yml` | **workflow**（`Acquire the shared staging lock`） | **workflow**（run終了時） |
+
+run [38894823582](https://github.com/skmtmst/line-harness-oss/actions/runs/38894823582) が
+これで落ちました。手元のロックを取った状態で workflow を起動したため、
+**コードの公開処理に入る前**に取得の段で停止しています（配備は未実施）。
+
+以前はここが `success()` だったため、**取得後に1段でも失敗すると解放が飛ばされ、
+誰も配備していないのにロックが残り続けました**。
+run [38250060610](https://github.com/skmtmst/line-harness-oss/actions/runs/38250060610) で
+Worker の配備は成功、管理画面が Cloudflare 側の `Unknown internal error occurred` で失敗し、
+staging のロックが242分残留してその間の配備が全部止まりました。
+`scripts/deploy/staging-actions-workflow.test.ts` が `success()` への差し戻しを拒否します。
+
+残ってしまったロックの扱いは人の判断です。保持者に解放してもらうか、
+**保持者と状況を確認した上で** `pnpm deploy:lock release staging --force` を使います。
+
 ## 事前確認（preflight）が見ているもの
 
 `scripts/deploy/preflight.ts` は次を確認し、違反を全件まとめて表示します。
@@ -152,6 +213,19 @@ SHAが変わっていた場合は削除せず、現在の保持者を確認す�
 ## 本番デプロイ
 
 原則として masato 専任です。
+
+### musubo Cloudflare の Actions 承認（非公開リポジトリ・GitHub Free）
+
+GitHub Free の非公開リポジトリでは、Environment の required reviewers を本番ゲートに使えません。
+Cloudflare 本番 Workflow は `main` の `workflow_dispatch` を **skmtmst 本人が開始**した場合だけ動きます。
+再実行も本人に限ります。Workflow の入口と、DB 更新・Worker・管理画面の各公開直前に、
+GitHub が記録した `actor` / `triggering_actor`、run ID、リポジトリ、`main` の SHA を API で再照合します。
+入力欄の承認者名だけでは通しません。
+
+この技術的な制限は承認記録の代わりではありません。実行前に、対象 SHA、検証 run、
+マイグレーション一覧・ハッシュ、影響と切り戻しを Masato が確認し、明示的に承認します。
+代理実行や自動再実行はしません。`LINE_HARNESS_CLOUDFLARE_DEPLOY` は、
+本番反映の準備と承認が整うまで未設定のまま維持します。
 
 Cloudflare の本番アクセス権限があること自体は、本番変更の承認ではありません。
 kenta は調査・差分確認・dry-run・手順準備まで進められますが、
@@ -268,107 +342,10 @@ root へ追加すると、`packageManager` の pin より新しい pnpm で生�
 - `docs/NEN-LINE-STAGING.md` — 検証環境の構成と接続情報
 - `docs/admin-ui-design-guidelines.md` — 管理画面のデザイン基準
 
-## 並行で作業するときに踏んだこと（2026-08-20）
+## 並行で作業するとき
 
-一晩に4つのセッションが同じリポジトリで動いた記録です。**規則として読むより、
-「自分がいまこの位置にいないか」を確かめるために読んでください。**
-どれも「そのときは正しくやった。続かなかっただけ」でした。
-
-### 別々の作業フォルダにする
-
-同じフォルダを複数のセッションで開くと、**同じファイルの別の場所を同時に書きます。**
-`apps/web/src/lib/api.ts` に3セッションぶんの変更が混ざりました。ブランチも1つしか
-出せないので、片方がコミットすると相手の変更が載ります。
-
-```bash
-git worktree add ../line-harness-<機能名> -b codex/kenta-<機能名> codex/development
-```
-
-新しい worktree には `node_modules` がありません。`pnpm install --frozen-lockfile` が要ります。
-
-### `packages/shared` は、マージのたびにビルドし直す
-
-```bash
-git merge origin/codex/development
-cd packages/shared && npx tsc -p tsconfig.build.json
-```
-
-`@line-crm/shared` は `dist` を見に行きます。**新しい `export` が足されると、dist を
-持っている人でも古ければ落ちます。** 自分が足していなくても踏みます。
-
-**落ちるのはビルドの最後です。** 型検査も試験も全部通ってから落ちるので、ソースを
-いくら読んでも原因が見つかりません。
-
-```
-"validateAnswers" is not exported by "packages/shared/dist/index.js"
-```
-
-`line-sdk` と `update-engine` も同じです（こちらは「dist が無い」で落ちます）。
-
-**「新しい export を足したときだけ」では見落とします。** 自分が足していなくても踏むためです。
-
-なお `apps/worker` と `apps/web` の `typecheck` / `test` / `build` は、**走る前に
-自動でビルドし直します**（`pretypecheck` などに入れてあります）。手で流す必要が
-あるのは、それ以外の入口（`vitest` を直接呼ぶ、エディタの型検査など）だけです。
-
-このやり方に変えたのは、**書き残した直後の私自身が、また同じところで落ちた**ためです。
-手順として書くだけでは足りませんでした。
-
-### `git diff --check` は、コミットする前に流す
-
-```bash
-git add -A
-git diff --cached --check   # ← ここ
-git commit
-```
-
-**コミットしたあとに流すと、必ず何も出ません。** 作業ツリーと HEAD が同じになるためです。
-
-実際に、突き合わせの目印（`<<<<<<< HEAD`）が入ったまま押されました。押した本人は
-コミット後に `git diff --check` を流して「何も出ない」ので通しています。
-**そのあと、それを教えた側（このリポジトリの取りまとめ）も同じ順序で同じ失敗をしました。**
-間違った手順が2人のあいだを往復しました。
-
-### `git checkout` が失敗していても、気づかないことがある
-
-未コミットの変更があると切り替わりません。**そのとき、同じ突き合わせの目印が両方の
-ブランチに入っていたので、画面に出た中身が正しく見えました。**
-
-偶然が重なると、間違いが正しく見えます。切り替えたつもりのときは
-`git branch --show-current` を見てください。
-
-### 追いつきは `gh pr update-branch`
-
-```bash
-gh pr update-branch <番号>
-```
-
-このリポジトリは「取り込み先に追いついていないと入れられない」設定です。手で
-`git merge` して push すると、その間に別のPRが入って、また追いつき直しになります。
-一晩で何周かしました。**衝突が無ければこのコマンドで足ります。**（衝突があると弾かれます。
-そのときは中身を知っている人が解いてください。）
-
-### 反映履歴は、PRごとの1ファイルに書く
-
-```
-docs/release-log/unreleased/<PR番号>-<担当>-<何の話か>.md
-```
-
-`unreleased.md` に全員が書き足す形だと、**全員が同じ場所（`## 追加` の直後）に行を
-差し込むので、PRのたびに必ずぶつかります。** 一晩で9本のPRが全部ここで止まりました。
-
-### マイグレーションの番号は、取る前に取りまとめへ聞く
-
-担当ごとの番号帯（147〜149 はあなた、150〜152 は私、のような割り方）は**使いません。**
-将来の upstream 採番とぶつかるためです。穴を空けずに詰めて取ります。
-
-一晩で2回、番号がぶつかりました。**どちらも「使ったあとに宣言した」ためです。**
-書き始める前に聞いてください。
-
-### 試験が走っているか、一度は確かめる
-
-`packages/shared` に試験が74件あるのに、**`test` スクリプトも vitest の設定も無く、
-CI も呼んでいませんでした。** 書いた人が手元で1回流して終わりでした。
-
-日付・時刻を扱うものは、**`TZ` を変えても通ることを CI で見てください。** 日本時間で
-走らせている限り、時計に引きずられる書き方には気づけません。
+- 作業ごとに専用のworktreeとブランチを使い、依存を `pnpm install --frozen-lockfile` で導入する。
+- 共有パッケージを先にビルドし、古いdistや別の作業場所の出力を合格の証拠に使わない。
+- 反映履歴・マイグレーションの採番・同時統合の扱いは `AGENTS.md` の現行手順に従う。過去の衝突記録から別の規則を作らない。
+- 開始・コミット前後・DB更新前・配備前後にクリーン状態とSHAを確認する。DB更新・配備・ロックは上の独立した関門を保つ。
+- 試験の実行終了と失敗件数を確かめ、日時の処理は異なるTZでも確認する。旧作業の失敗例と件数は[外部保管](document-archives.md#s05)へ分離した。

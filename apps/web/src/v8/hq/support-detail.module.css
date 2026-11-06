@@ -1,0 +1,181 @@
+/*
+ * ★V8 お問い合わせのやり取り（Pencil ）。頭・左の列は型（ListPage）。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
+ */
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-body-gap);
+  flex: 1;
+  min-width: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-form-gap);
+  width: var(--tpl-hq-side-w);
+  flex-shrink: 0;
+}
+
+.faint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
+.buttonIcon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
+.smallIcon { width: var(--tpl-hq-check); height: var(--tpl-hq-check); }
+.notice { margin: 0; color: var(--color-accent-deep); font-size: var(--text-label); }
+
+.warn { color: var(--color-status-warn-deep); }
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-plan-head-gap);
+}
+
+.statusNote {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+}
+
+/* やり取り（枠のカード・余白16・間14） */
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-body-gap);
+  margin: 0;
+  padding: var(--tpl-hq-thread-pad);
+  list-style: none;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: var(--card-shadow);
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-hq-card-gap);
+}
+
+.messageMine { align-items: flex-end; }
+
+.author {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+}
+
+.bubble {
+  width: var(--tpl-hq-bubble-w);
+  max-width: 100%;
+  margin: 0;
+  padding: var(--tpl-hq-bubble-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-table-head);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-lead-lh);
+  white-space: pre-wrap;
+}
+
+.bubbleMine { background: var(--color-accent-soft); }
+
+.files { display: flex; flex-wrap: wrap; gap: var(--tpl-hq-plan-head-gap); }
+.file {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-hq-card-gap);
+  color: var(--color-action);
+  font-size: var(--text-micro);
+  text-decoration: none;
+}
+.file:hover { text-decoration: underline; }
+
+/* 続きを送る（枠のカード・余白16・間8） */
+.compose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-plan-head-gap);
+  padding: var(--tpl-hq-thread-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: var(--card-shadow);
+}
+
+.composeTitle {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-hq-nav-item-lh-20);
+}
+
+.textarea {
+  width: 100%;
+  height: var(--tpl-hq-compose-h);
+  min-height: var(--tpl-hq-compose-h);
+  padding: var(--tpl-hq-compose-pad);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-lead-lh);
+  resize: vertical;
+}
+
+.composeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-plan-head-gap);
+}
+
+.spacer { flex: 1; }
+
+.sendNote {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+  white-space: nowrap;
+}
+
+.thumbs { display: flex; flex-wrap: wrap; gap: var(--tpl-hq-plan-head-gap); margin: 0; padding: 0; list-style: none; }
+.thumb { position: relative; overflow: hidden; border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); }
+.thumbImage { display: block; width: var(--tpl-hq-thumb-w); height: var(--tpl-hq-thumb-h); object-fit: cover; }
+.thumbRemove {
+  position: absolute;
+  top: var(--tpl-hq-thumb-inset);
+  right: var(--tpl-hq-thumb-inset);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+/* 右：送信者（灰の地） */
+.sender {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-plan-head-gap);
+  padding: var(--tpl-hq-thread-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-table-head);
+}
+
+.senderTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-hq-nav-item-lh);
+}
+
+.senderLines {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-nav-item-lh-20);
+}
+
+/* 画像を添える所（MediaSlot・Z7vd2 の小さい形）。 */
+.attachSlot { width: var(--tpl-slot-w-compact); }

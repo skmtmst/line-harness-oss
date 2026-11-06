@@ -1,19 +1,23 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useContext, useEffect, useLayoutEffect, useState } from 'react'
 import type { MergedPersonDeliveryPriority } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import {
   canSaveDeliveryPriorities,
   groupByPurpose,
   purposeText,
 } from './merged-person-view'
-import styles from './merged-person-detail.module.css'
+import styles from './merged-delivery-dialog.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 /**
- * 配信元の優先順を変える窓（設計 `w8W4Eh`「優先順位を変更」）。
+ * 配信元の優先順を変える窓（設計 「優先順位を変更」）。
  *
  * **全部を「使わない」にすると、この人へはどこからも送れなくなる。**
  * 契約では空配列がそのまま「全部解除」になるので、押し間違いで送られないよう、
@@ -30,6 +34,7 @@ export default function MergedDeliveryDialog({
   error,
   onCancel,
   onSave,
+  onDirtyChange,
 }: {
   open: boolean
   priorities: MergedPersonDeliveryPriority[]
@@ -39,9 +44,16 @@ export default function MergedDeliveryDialog({
   error?: string
   onCancel: () => void
   onSave: (rows: MergedPersonDeliveryPriority[]) => void
+  onDirtyChange?: (dirty: boolean) => void
 }) {
   const [rows, setRows] = useState<MergedPersonDeliveryPriority[]>(priorities)
   const [confirmedClearAll, setConfirmedClearAll] = useState(false)
+  const dirty = JSON.stringify(rows) !== JSON.stringify(priorities)
+  const depth = useContext(OverlayDepthContext)
+  useLayoutEffect(() => { if (!open) return; onDirtyChange?.(dirty || busy); return () => onDirtyChange?.(false) }, [open, dirty, busy, onDirtyChange])
+  const guard = useUnsavedGuard({ dirty: open && (dirty || busy), busy: open && busy, onDiscard: () => { onDirtyChange?.(false); onCancel() } })
+  const close = () => guard.guarded(() => { if (!dirty) onCancel() })
+  useEffect(() => { if (!open) guard.cancelLeave() }, [open, guard.cancelLeave])
 
   // 別の人を開いたら、前の人の編集を持ち越さない。
   useEffect(() => {
@@ -79,24 +91,24 @@ export default function MergedDeliveryDialog({
       )
     })
 
-  return (
+  return (<>
     <Dialog
       open={open}
       title="配信元の優先順を変える"
       description="同じ人へ2通目以降を送らないよう、用途ごとに上から1件だけ選びます。"
       busy={busy}
       error={error}
-      onCancel={onCancel}
-      designNode="w8W4Eh"
+      dirty={false}
+      onCancel={close}
+      designNode="Hn9eE"
       footer={
-        <div className={styles.actions}>
-          <Button type="button" onClick={onCancel} disabled={busy}>
-            やめる
+        <DialogActions>
+          <Button type="button" onClick={close} disabled={busy}>
+            キャンセル
           </Button>
-          <Button type="button" variant="primary" onClick={() => onSave(rows)} disabled={!ready}>
-            {busy ? '処理中…' : '保存する'}
+          <Button type="button" variant="primary" onClick={() => onSave(rows)} disabled={!ready} busy={busy} busyLabel="処理中…">保存する
           </Button>
-        </div>
+        </DialogActions>
       }
     >
       <div className={styles.dialogBody}>
@@ -142,12 +154,13 @@ export default function MergedDeliveryDialog({
         ))}
 
         {clearingAll ? (
-          <Checkbox
+          <SaveErrorField names={["confirmedClearAll","confirmed_clear_all"]}><Checkbox
             checked={confirmedClearAll}
             onCheckedChange={setConfirmedClearAll}
-          >全部を「使わない」にすると、この人へはどこからも送れなくなります。承知のうえで保存します。</Checkbox>
+          >全部を「使わない」にすると、この人へはどこからも送れなくなります。承知のうえで保存します。</Checkbox></SaveErrorField>
         ) : null}
       </div>
     </Dialog>
-  )
+    <OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={open && guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} /></OverlayDepthContext.Provider>
+  </>)
 }

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const SRC = path.join(__dirname, '..')
 
-/** コメントを外す。注意書きの中の `confirm()` に当てないため。 */
+/** コメントを外す。注意書きの中の `confirm` に当てないため。 */
 function code(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 }
@@ -20,14 +20,14 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 /**
- * **ブラウザの `confirm()` `alert()` `prompt()` を使わない。**
+ * **ブラウザの `confirm` `alert` `prompt` を使わない。**
  *
  * 見た目がブラウザ任せで、設計の確認窓（`J6x4Q` / `H2S1T4`）と違う。
  * 何が消えるのか・戻せるのかを本文で読ませられず、押し間違いを止められない。
  * さらに**画像比較に写らない**ので、確認と失敗の絵をそもそも撮れない
  * （`Y0Sn3` の失敗状態が撮れなかったのはこれが理由だった）。
  *
- * `alert()` はもう1つ悪いところがある。**押した瞬間しか読めない。**
+ * `alert` はもう1つ悪いところがある。**押した瞬間しか読めない。**
  * 消えると理由を確かめ直せないので、原因を追えない。実際
  * `update failed: …` `rollback not implemented in MVP — use CLI`
  * `areas は最大 20 個` のように、**内部語がそのまま出ていた**。
@@ -85,7 +85,7 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
   })
 
   /**
-   * `prompt()` は**まだ残っている。減る一方の表で数える。**
+   * `prompt` は**まだ残っている。減る一方の表で数える。**
    *
    * 多くは「コピーできなかったとき、URLを選べる形で出す」代わりに使って
    * いる（`navigator.clipboard` が使えない環境の逃げ道）。逃げ道そのものは
@@ -93,18 +93,16 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
    *
    * `app/form-submissions/edit` の「ページの名前」は、そもそも入力欄を持つ窓に
    * するのが正しい。
-   * 手本は `app/rich-menus/edit/page.tsx`——`ConfirmDialog` の `children` に
+   * 手本は `v8/rich-menus/new/create.tsx`——`Dialog` の `children` に
    * 入力欄を置いている。
    *
    * **増やせない。0 になったら行ごと消す**（消し忘れるとここで落ちる）。
    */
-  // 2026-09-14 点検#520の軽15(#739)で components/events/event-form.tsx の
+  // 2026-09-14 点検#520の軽15(#739)で v8/events/edit-form.tsx の
   // window.prompt 2箇所を隣の読取専用欄へ寄せたので、一覧から外した。
   // 2026-09-23 V6R-S3-f で予約管理・流入経路の詳細のコピー失敗を画面内の欄と一言へ寄せたので、
   // 一覧から外した。
-  const PROMPT_NOT_YET = [
-    'app/form-submissions/edit/page.tsx',
-  ]
+  const PROMPT_NOT_YET: string[] = []
 
   it('prompt を使うファイルを増やさない', () => {
     expect(offenders(BROWSER_PROMPT), 'ConfirmDialog の children に入力欄を置く').toEqual(
@@ -112,19 +110,23 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
     )
   })
 
-  it('リマインダの一括削除が共通の確認窓を使う', () => {
-    const src = fs.readFileSync(path.join(SRC, 'app', 'reminders', 'page.tsx'), 'utf8')
-    expect(src).toContain('ConfirmDialog')
-    expect(src).toContain('confirmLabel="削除する"')
+  it('リマインダの削除が共通の確認窓を使う', () => {
+    /* 完全切り替え：管理画面 page は捨て、V8 の list-v8 を見る。 */
+    const src = fs.readFileSync(new URL('../v8/reminders/list.tsx', import.meta.url), 'utf8')
+    /*
+     * 2026-10-06：V8 の削除の窓（絵 ：幅600・危ない操作は左端・「代わりに一時停止」）は
+     * 共通の ConfirmDialog の形に無いため、src/v8/reminders/sheet-dialog（useOverlayFocus の面）で組む。
+     * どちらでも「ブラウザの confirm に戻らない・危ない操作として出す」ことを見る。
+     */
+    expect(src).toMatch(/<SheetDialog[\s\S]*designNode="VsSyu"|<ConfirmDialog[\s\S]*confirmLabel="削除する"/)
+    expect(src).toMatch(/destructive=\{\(\s*<Button variant="danger"[\s\S]*?削除する|confirmLabel="削除する"/)
     expect(src).toContain('destructive')
     expect(code(src), 'ブラウザのconfirmへ戻っている').not.toMatch(BROWSER_CONFIRM)
     // 押している間に二度押しできない
-    expect(src).toContain('selected.size === 0 || deleting')
-    // 失敗を握りつぶさず、成功済みを再試行しない。
-    // 一部成功後に全件を選んだままにすると、成功済みの404で残りへ進めなくなる。
-    const body = src.slice(src.indexOf('const handleDeleteSelected'), src.indexOf('const filtered'))
-    expect(body, '削除の返事を確かめていない').toContain('return res.success')
-    expect(body, '失敗したものだけを選び直していない').toContain('setSelected(new Set(failed))')
-    expect(body, '一部失敗を運用者へ知らせていない').toContain('削除できなかったものだけを残しています')
+    expect(src).toContain('deleting || !deleteStillListed')
+    // 失敗を握りつぶさない。戻りの success を見て、失敗時は窓を閉じない。
+    const body = src.slice(src.indexOf('const runDelete'), src.indexOf('/* ===== 複製'))
+    expect(body, '削除の返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
+    expect(body, '成功時に窓を閉じていない').toContain('setDeleteTarget(null)')
   })
 })

@@ -1,14 +1,18 @@
 'use client'
 
+import { PageHeading } from '@/components/templates/page-frame'
+
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError, type Recipe } from '@/lib/api'
+import { useResponseGate } from '@/lib/use-response-gate'
 import { useAccount } from '@/contexts/account-context'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import TargetMissing from '@/components/shared/target-missing'
-import Select from '@/components/shared/select'
+
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
@@ -24,8 +28,9 @@ import {
   prefixedName,
 } from '../recipe-catalog'
 import styles from './clone.module.css'
+import { formatNumber } from '@/lib/format'
 
-/** 設計 ★V6 34-3「レシピを複製する」（`D5UaX`）。 */
+/** 設計 ★管理画面 34-3「レシピを複製する」（`D5UaX`）。 */
 function RecipeClone() {
   /*
     **`[recipeId]` は使えない。** 静的書き出し（`output: 'export'`）なので
@@ -41,29 +46,55 @@ function RecipeClone() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
+  /*
+   * M044: 捕まえた取得失敗は共通部品へ渡す。403 は権限の案内になり、
+   * 押しても直らない再試行は出ない。429 は待ち秒数を添えた案内になる。
+   */
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [prefix, setPrefix] = useState('')
   const [cloneState, setCloneState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   /** 同じ作成意図の再送で使い回すキー（監査 R126）。 */
   const cloneKeyRef = useRef<{ intent: string; key: string } | null>(null)
 
   usePageTitle(recipe ? `${recipe.name}を作る` : null)
+  /* パンくずは上の帯だけ（板の中の2つ目のパンくずは置かない）。 */
+  usePageCrumbs([{ label: 'レシピ', href: '/recipes' }])
 
-  const reload = useCallback(async (): Promise<'ok' | 'missing' | 'error'> => {
+  /*
+   * WEB321：レシピ・アカウントを変えたら、前の遅い応答（読み込み・作成の結果）を
+   * 今の画面へ書かない。作成の再送キーと版（R126）はそのまま使う。
+   */
+  const gate = useResponseGate()
+  const targetRef = useRef('')
+  targetRef.current = `${id}|${selectedAccountId ?? ''}`
+  useEffect(() => { setCloneState('idle') }, [id, selectedAccountId])
+
+  const reload = useCallback(async (): Promise<'ok' | 'missing' | 'error' | 'stale'> => {
+    const token = gate.begin()
     try {
       const res = await api.recipes.get(id, selectedAccountId ?? undefined)
-      if (!res.success || !res.data) return 'error'
+      if (!gate.current(token)) return 'stale'
+      if (!res.success || !res.data) {
+        setLoadError(null)
+        return 'error'
+      }
       setRecipe(res.data)
+      setLoadError(null)
       return 'ok'
     } catch (caught: unknown) {
+      if (!gate.current(token)) return 'stale'
       if (caught instanceof ApiError && caught.status === 404) return 'missing'
+      setLoadError(caught)
       return 'error'
     }
-  }, [id, selectedAccountId])
+  }, [id, selectedAccountId, gate])
 
   const refresh = useCallback(() => {
     setStatus('loading')
     setMissing(false)
+    setLoadError(null)
     void reload().then((outcome) => {
+      if (outcome === 'stale') return
       if (outcome === 'missing') {
         setMissing(true)
         setStatus('ready')
@@ -106,12 +137,19 @@ function RecipeClone() {
     )
   }
 
+  /*
+   * M044: 403・429だけ共通文へ切り替える（権限・混雑の案内。再試行の
+   * 有無は `loadFailureCopy` が決める）。それ以外は画面の文のまま。
+   */
+  const cloneFailure = loadError ? loadFailureCopy(loadError, 'レシピ') : null
+  const useCommonCopy = loadError ? isForbiddenOrRateLimited(loadError) : false
   if (status === 'error') {
     return (
       <TargetMissing
         kind="error"
-        title="レシピを読み込めませんでした"
-        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        title={useCommonCopy && cloneFailure ? cloneFailure.title : 'レシピを読み込めませんでした'}
+        description={useCommonCopy && cloneFailure ? cloneFailure.description : '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
+        error={loadError ?? undefined}
         onRetry={() => refresh()}
       />
     )
@@ -136,25 +174,24 @@ function RecipeClone() {
     if (cloneKeyRef.current?.intent !== intent) {
       cloneKeyRef.current = { intent, key: crypto.randomUUID() }
     }
+    const target = targetRef.current
     try {
       const result = await api.recipes.clone(
         recipe.id,
         { accountId: selectedAccountId, namePrefix: prefix || null, expectedVersion: recipe.version },
         cloneKeyRef.current.key,
       )
+      if (targetRef.current !== target) return
       setCloneState(result.success ? 'success' : 'error')
     } catch {
+      if (targetRef.current !== target) return
       setCloneState('error')
     }
   }
 
   return (
     <div className={styles.page}>
-      <nav className={styles.breadcrumb} aria-label="パンくず">
-        <Link href="/recipes">レシピ</Link>
-        <span aria-hidden>›</span>
-        <span>{recipe.name}</span>
-      </nav>
+      <div><PageHeading title="レシピを複製する" /></div>
 
       <>
           <div className={styles.columns}>
@@ -176,18 +213,7 @@ function RecipeClone() {
                 <label className={styles.accountLabel} htmlFor="recipe-clone-account">
                   どのLINEアカウントに作るか<RequiredBadge />
                 </label>
-                <Select
-                  aria-label="どのLINEアカウントに作るか"
-                  id="recipe-clone-account"
-                  size="full"
-                  value={selectedAccountId ?? ''}
-                  disabled={!selectedAccountId}
-                  onChange={() => undefined}
-                  options={[{
-                    value: selectedAccountId ?? '',
-                    label: selectedAccount?.name ?? 'アカウントが選ばれていません',
-                  }]}
-                />
+                <p id="recipe-clone-account">{selectedAccount?.name ?? 'アカウントが選ばれていません'}</p>
                 <p className={styles.hint}>
                   作る先はいま選んでいるアカウントです。変えるときは上のLINEアカウントから選び直します。
                 </p>
@@ -195,7 +221,7 @@ function RecipeClone() {
 
               <section className={styles.block}>
                 <h2 className={styles.blockTitle}>
-                  作られるもの{recipe.itemCount != null ? ` ${recipe.itemCount}件` : ''}
+                  作られるもの{recipe.itemCount != null ? ` ${formatNumber(recipe.itemCount)}件` : ''}
                 </h2>
                 <p className={styles.hint}>
                   すべて下書きで作られます。動きはじめるのは、ひとつずつ公開してからです。

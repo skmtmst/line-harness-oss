@@ -40,6 +40,20 @@ describe('broadcast template conversion', () => {
     expect(bubble.content).toMatchObject({ assetId: 'asset-1', assetName: '夏クーポン' })
   })
 
+  it('pins research choices and tap extras to the published version, including when a draft exists', () => {
+    const published = [{ format: 'single', required: true, text: '質問', choices: ['公開済み'], choiceTapExtras: [{ scoreChange: 10 }] }]
+    const bubble = contentTemplateToBubble({
+      id: 'survey', lineAccountId: 'store', kind: 'research', name: 'アンケート', publishedVersion: 2,
+      publishedPayload: { questions: published },
+      payload: { questions: [{ format: 'single', required: true, text: '下書き', choices: ['未公開'], choiceTapExtras: [{ scoreChange: 100 }] }] },
+      createdAt: '', updatedAt: '',
+    })
+    expect(bubble.content).toMatchObject({ assetId: 'survey', assetVersion: 2, questions: published })
+    const card = JSON.parse(bubbleLegacyMessage(bubble).messageContent)
+    expect(card.footer.contents[0].action).toEqual({ type: 'uri', label: '回答する', uri: 'https://liff.line.me/{{liff_id}}/?page=research&researchId=survey' })
+    expect(JSON.stringify(card)).not.toContain('research:survey:2:0:0')
+  })
+
   it('uses raw Flex JSON as the legacy message content', () => {
     expect(bubbleLegacyMessage({
       id: 'bubble-id',
@@ -70,7 +84,7 @@ describe('保存に渡す吹き出し', () => {
   const bubble = (text: string) => ({ id: text, type: 'text' as const, content: { text } })
 
   it('1つだけなら渡さない', () => {
-    expect(bubblesForSave([bubble('a')])).toBeUndefined()
+    expect(bubblesForSave([bubble('a')])).toEqual([bubble('a')])
   })
 
   it('2つ以上なら渡す', () => {
@@ -167,33 +181,33 @@ describe('素材の引用を LINE の種別に直す', () => {
     expect(out.messageContent).not.toContain('assetId')
   })
 
-  it('リッチメッセージは Flex に直す', () => {
+  it('リッチメッセージはタップ範囲を持つイメージマップに直す', () => {
     const out = bubbleLegacyMessage({
       id: 'b', type: 'rich_message',
-      content: { assetId: 'a', assetName: '便り', imageUrl: 'https://example.com/a.png', description: '新米です', actionUrl: 'https://example.com/lp' },
+      content: { assetId: 'a', assetName: '便り',baseUrl:'https://example.com/images/map',baseSize:{width:1040,height:520},tapAreas:[{x:0,y:0,width:100,height:100,actionType:'uri',uri:'https://example.com/lp'}], imageUrl: 'https://example.com/a.png', description: '新米です', actionUrl: 'https://example.com/lp' },
     })
-    expect(out.messageType).toBe('flex')
-    expect(JSON.parse(out.messageContent)).toMatchObject({ type: 'bubble' })
+    expect(out.messageType).toBe('imagemap')
+    expect(JSON.parse(out.messageContent)).toMatchObject({baseSize:{width:1040,height:520}})
     expect(out.messageContent).not.toContain('assetId')
   })
 
-  it('クーポンは読める文に直す（JSON を本文にしない）', () => {
+  it('クーポンは使用ボタンつきカードに直す', () => {
     const out = bubbleLegacyMessage({
       id: 'b', type: 'coupon',
-      content: { assetId: 'a', assetName: '夏クーポン', description: '500円引き', actionUrl: 'https://example.com/c' },
+      content: { assetId: 'a', assetName: '夏クーポン',startsAt:'2026-01-01T00:00',endsAt:'2027-01-01T00:00',description: '500円引き', actionUrl: 'https://example.com/c' },
     })
-    expect(out.messageType).toBe('text')
-    expect(out.messageContent).toBe('500円引き\nhttps://example.com/c')
+    expect(out.messageType).toBe('flex')
+    expect(out.messageContent).toContain('coupon_use:a')
   })
 
-  it('リサーチは読める文に直す', () => {
+  it('リサーチはLIFFで回答するボタンに直す', () => {
     const out = bubbleLegacyMessage({
       id: 'b', type: 'research',
-      content: { assetId: 'a', assetName: '調査', description: '答えてください', actionUrl: 'https://example.com/f' },
+      content: { assetId: 'a', assetName: '調査', description: '答えてください', questions: [{ text: '質問', format: 'free', required: true }] },
     })
-    expect(out.messageType).toBe('text')
+    expect(out.messageType).toBe('flex')
     expect(out.messageContent).toContain('答えてください')
-    expect(out.messageContent).not.toContain('assetId')
+    expect(out.messageContent).toContain('page=research&researchId=a')
   })
 
   it('選んでいない素材は選び直しを求める', () => {
@@ -257,5 +271,45 @@ describe('ボタンの入力不備', () => {
     expect(messageButtonsError([button(), button(), button(), button(), button()])).toBe(
       'ボタンは4つまでです',
     )
+  })
+})
+
+
+describe('イメージマップのAPIと編集用データの往復',()=>{
+  it('LINEの範囲をピクセルのまま保ち、既存のリッチメッセージとして読み込む',()=>{
+    const payload={baseUrl:'https://example.com/images/map',baseSize:{width:1040,height:520},altText:'予約案内',actions:[{type:'message',text:'予約',area:{x:520,y:0,width:520,height:520}}]}
+    const loaded=messageTemplateToBubble({id:'template',name:'予約案内',messageType:'imagemap',messageContent:JSON.stringify(payload)})!
+    expect(loaded.type).toBe('rich_message')
+    expect(loaded.content.coordinateUnit).toBe('px')
+    expect(bubblesForSave([loaded])).toHaveLength(1)
+    expect(JSON.parse(bubbleLegacyMessage(loaded).messageContent)).toMatchObject(payload)
+  })
+})
+
+describe('composer でテンプレートを読み戻す', () => {
+  it('カルーセルのボタンの動きを落とさない', () => {
+    const actions = { '0': { '0': [{ type: 'tag_add', config: { tagId: 'tag' } }] } }
+    const columns = [{ title: 'お知らせ', text: '本文', actions: [{ type: 'postback', label: '選ぶ', data: 'ctpl=t&c=0&a=0' }] }]
+    const selected = messageTemplateToBubble({ id: 't', name: 'お知らせ', category: 'general', messageType: 'carousel', messageContent: JSON.stringify(columns), carouselActions: actions })!
+    expect(selected.type).toBe('carousel'); expect(selected.content.carouselActions).toEqual(actions)
+    expect(JSON.parse(bubbleLegacyMessage(selected).messageContent)).toEqual(columns)
+  })
+  it('音声のミリ秒を編集用の秒へ戻し、保存時に元の長さへ戻す', () => {
+    const content = { originalContentUrl: 'https://example.com/a.m4a', duration: 42000 }
+    const selected = messageTemplateToBubble({ id: 'a', name: '音声', category: 'general', messageType: 'audio', messageContent: JSON.stringify(content) })!
+    expect(JSON.parse(bubbleLegacyMessage(selected).messageContent)).toEqual(content)
+  })
+})
+
+describe('一斉配信のボタンの押したら（YPzmo）：LIFF のページ', () => {
+  const liff = (query: string) => ({ label: '予約', type: 'url' as const, value: `https://liff.line.me/{{liff_id}}/?${query}` })
+  it('LIFF の無いアカウントでは予約などを送らない', () => {
+    expect(messageButtonsError([liff('page=salon-book')], { hasLiff: false })).toBe('ボタン1：このアカウントに LIFF が設定されていないため、「予約」は開けません')
+    expect(messageButtonsError([liff('page=salon-book')], { hasLiff: true })).toBe('')
+    expect(messageButtonsError([{ label: '外', type: 'url', value: 'https://example.com' }], { hasLiff: false })).toBe('')
+  })
+  it('回答フォームは選ぶまで送らない', () => {
+    expect(messageButtonsError([liff('page=form&id=')], { hasLiff: true })).toBe('ボタン1の回答フォームを選んでください')
+    expect(messageButtonsError([liff('page=form&id=f1')], { hasLiff: true })).toBe('')
   })
 })

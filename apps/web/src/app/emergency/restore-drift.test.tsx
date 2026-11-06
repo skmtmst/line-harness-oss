@@ -1,3 +1,4 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 // @vitest-environment happy-dom
 
 /*
@@ -9,11 +10,15 @@
  *   - 409 OPERATION_RESTORE_BLOCKED は理由一覧を表示して止める
  *   - 差分の読み取りに失敗しても復旧自体は止まらない（口側が同じ検査をする）
  */
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { OperationCapability, OperationControl, OperationImpactPreview, OperationRestoreDrift, OperationRestoreReport } from '@/lib/api'
-import EmergencyPage from './page'
+import EmergencyPageInner from './page'
+
+vi.mock('@/contexts/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner', useStaffIdentity: () => ({ role: 'owner', readOnly: false }) }))
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -162,7 +167,6 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-const { EmergencyPageInner } = EmergencyPage.__test
 
 async function flush() {
   await act(async () => {
@@ -172,23 +176,17 @@ async function flush() {
   })
 }
 
-function input(id: string): HTMLInputElement {
-  const node = document.getElementById(id)
-  if (!(node instanceof HTMLInputElement)) throw new Error(`#${id} がありません`)
-  return node
-}
 
 async function runRestoreFlow() {
   fireEvent.click(screen.getByRole('button', { name: '復旧する' }))
   await flush()
-  fireEvent.change(input('emergency-confirm-word'), { target: { value: '復旧' } })
+  fireEvent.change(screen.getByRole('textbox', { name: '確認の言葉' }), { target: { value: '復旧' } })
   await flush()
   fireEvent.click(screen.getByRole('button', { name: '復旧を実行する' }))
   await flush()
-  fireEvent.change(input('emergency-step-up-code'), { target: { value: '123456' } })
-  await flush()
-  fireEvent.click(screen.getByRole('button', { name: '本人確認して復旧' }))
-  await flush()
+  await screen.findByRole('dialog', { name: '認証アプリで本人確認' })
+  fireEvent.paste(screen.getByRole('textbox', { name: '1桁目' }), { clipboardData: { getData: () => '123456' } })
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 }
 
 afterEach(() => {
@@ -279,16 +277,18 @@ describe('停止中の変更を理由つきで見せて安全に復旧する(N-4
     await flush()
     expect(document.body.textContent ?? '').not.toContain('停止しているあいだに変わったものがあります')
 
-    fireEvent.change(input('emergency-confirm-word'), { target: { value: '復旧' } })
+    fireEvent.change(screen.getByRole('textbox', { name: '確認の言葉' }), { target: { value: '復旧' } })
     await flush()
     fireEvent.click(screen.getByRole('button', { name: '復旧を実行する' }))
     await flush()
-    fireEvent.change(input('emergency-step-up-code'), { target: { value: '123456' } })
-    await flush()
-    fireEvent.click(screen.getByRole('button', { name: '本人確認して復旧' }))
-    await flush()
+    await screen.findByRole('dialog', { name: '認証アプリで本人確認' })
+    fireEvent.paste(screen.getByRole('textbox', { name: '1桁目' }), { clipboardData: { getData: () => '123456' } })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
     expect(calls.restore).toHaveLength(1)
     expect(document.body.textContent ?? '').toContain('サーバー共通の停止状態を復旧しました')
   })
 })
+
+beforeEach(() => { verifiedStaffRole('owner') })
+afterEach(() => { verifiedStaffRole(null) })

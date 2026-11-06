@@ -1,0 +1,270 @@
+'use client'
+
+import { requiredText } from '@/lib/form-requirement'
+const FIELD_REQUIREMENTS = {
+  editing_title: requiredText("称号を入れてください。"),
+}
+
+import { notifySaved } from '@/components/shared/toast'
+import { useEffect, useRef, useState } from 'react'
+import { Check } from 'lucide-react'
+import Card from '@/components/shared/card'
+import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import ListState from '@/components/shared/list-state'
+import Toggle from '@/components/shared/toggle'
+import { RowActions } from '@/components/shared/row-actions'
+import { TextField } from '@/components/shared/text-field'
+import { FieldError, Field } from '@/components/shared/form-controls'
+import { useFieldValidation } from '@/lib/use-field-validation'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { formatNumber } from '@/lib/format'
+import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
+import { parseYen, yen, type LoadStatus, type SavedHandler } from './parts'
+import styles from './members.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
+
+/*
+ * ★V8-B 会員 › ライフタイム。
+ *
+ * 1枚のカードに「節目（ライフタイム）」の説明と右に合計、下に節目の表
+ * （節目（累計）・称号・特典・到達した人・到達時の LINE 通知・行の「…」）。
+ * 行の中身は「…」の「編集する」で開く窓で直し、下の中央の「保存して EC へ同期する」でまとめて保存する。
+ */
+
+type MilestoneDraft = { id: string | null; threshold: number; title: string; benefit: string | null; notify: boolean; reachedCount: number }
+
+const MAX_MILESTONES = 12
+
+const fromSettings = (next: NenRankSettingsData): MilestoneDraft[] =>
+  next.milestones.map((m) => ({ id: m.id, threshold: m.thresholdYen, title: m.title, benefit: m.benefitNote, notify: m.notifyOnReach, reachedCount: m.reachedCount }))
+
+export default function LifetimeV8({
+  accountId,
+  status,
+  settings,
+  onSaved,
+  onRetry,
+  readonly,
+}: {
+  accountId: string
+  status: LoadStatus
+  settings: NenRankSettingsData | null
+  onSaved: SavedHandler
+  onRetry: () => void
+  readonly: boolean
+}) {
+  const saveErrors = useSaveFormErrors()
+  const [drafts, setDrafts] = useState<MilestoneDraft[]>([])
+  const [dirty, setDirty] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  /** 編集の窓。index は直す行（新しい行は drafts.length）。 */
+  const [editing, setEditing] = useState<{ index: number; threshold: string; title: string; notify: boolean } | null>(null)
+  const [draftAccountId, setDraftAccountId] = useState(accountId)
+  const activeAccount = useRef({ id: accountId })
+  if (activeAccount.current.id !== accountId) activeAccount.current = { id: accountId }
+  const fields = useFieldValidation(editing ? [
+    ...(!Number.isFinite(parseYen(editing.threshold)) || parseYen(editing.threshold) <= 0
+      ? [{ id: 'milestone-threshold', message: '節目の金額は1円以上で入れてください。' }] : []),
+    ...((FIELD_REQUIREMENTS.editing_title.check(editing.title) !== null) ? [{ id: 'milestone-title', message: '称号を入れてください。' }] : []),
+  ] : [])
+
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
+
+  if (draftAccountId !== accountId) {
+    const hadUnsaved = dirty || editing !== null
+    setDraftAccountId(accountId)
+    setDrafts([])
+    setDirty(false)
+    setBusy(false)
+    setError('')
+    setEditing(null)
+    cancelLeave()
+    setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
+  }
+
+  useEffect(() => {
+    if (!settings || dirty) return
+    setDrafts(fromSettings(settings))
+  }, [settings, dirty])
+
+  const openEdit = (index: number) => {
+    const row = drafts[index]
+    fields.reset()
+    setEditing(row
+      ? { index, threshold: String(row.threshold), title: row.title, notify: row.notify }
+      : { index, threshold: '', title: '', notify: false })
+  }
+
+  const applyEdit = () => {
+    if (!editing) return
+    const threshold = parseYen(editing.threshold)
+    if (!fields.submit()) return
+    setDrafts((current) => {
+      const next = [...current]
+      const before = next[editing.index]
+      const row: MilestoneDraft = before
+        ? { ...before, threshold, title: editing.title.trim(), notify: editing.notify }
+        : { id: null, threshold, title: editing.title.trim(), benefit: null, notify: editing.notify, reachedCount: 0 }
+      next[editing.index] = row
+      return next.sort((a, b) => a.threshold - b.threshold)
+    })
+    setDirty(true)
+    setNotice('')
+    setEditing(null)
+  }
+
+  const remove = (index: number) => {
+    setDrafts((current) => current.filter((_, i) => i !== index))
+    setDirty(true)
+    setNotice('')
+  }
+
+  const save = async () => {
+    const target = activeAccount.current
+    if (draftAccountId !== accountId) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const res = await nenRanksApi.saveMilestones(accountId, drafts.map((row) => ({
+        id: row.id, thresholdYen: row.threshold, title: row.title.trim(), notifyOnReach: row.notify,
+      })))
+      if (activeAccount.current !== target) return
+      if (!res.success) throw new Error(res.error)
+      setDirty(false)
+      onSaved(accountId, res.data)
+      notifySaved(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。')
+      if (res.data.sync?.status !== 'synced') setError(res.data.ranks.length === 0
+        ? 'ランクが未設定のため、ECへ同期できません。ランク設定から初期ランクを作成してください。'
+        : 'ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
+    } catch (caught) {
+      if (activeAccount.current !== target) return
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
+      setError(describeApiFailure(caught, '節目の保存', {
+        scope: 'store',
+      })) }
+    } finally {
+      if (activeAccount.current === target) setBusy(false)
+    }
+  }
+
+  if (status === 'loading' && !settings) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="ライフタイムを読み込んでいます" /></SaveErrorScope>
+  if (status === 'forbidden') return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden" /></SaveErrorScope>
+  if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="ライフタイムを読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} /></SaveErrorScope>
+  if (!settings) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="ライフタイムを読み込んでいます" /></SaveErrorScope>
+
+  const topThreshold = drafts.reduce((max, row) => Math.max(max, row.threshold), 0)
+
+  return (
+    <SaveErrorScope errors={saveErrors}><div className={styles.rankBody}>
+      {notice || error ? (
+        <div className={styles.messages}>
+          {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
+          {error ? <Notice tone="danger" >{error}</Notice> : null}
+        </div>
+      ) : null}
+
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-lifetime-title">
+        <div className={styles.lifetimeHead}>
+          <div className={styles.cardHead}>
+            <h2 id="nen-lifetime-title" className={styles.cardTitle}>節目（ライフタイム）</h2>
+            <p className={styles.cardDesc}>ライフタイムはこれまでの購入額の累計で、減りません。LINE 連携済みの会員の累計です</p>
+          </div>
+          <div className={styles.lifetimeTotal}>
+            <span className={styles.lifetimeTotalLabel}>ライフタイム 合計</span>
+            <span className={styles.lifetimeTotalValue}>{yen(settings.kpis.lifetimeTotalYen)}</span>
+          </div>
+        </div>
+
+        <div className={styles.lifeTable} role="table" aria-label="節目">
+          <div className={styles.lifeHeadRow} role="row">
+            <span className={styles.lifeColThreshold} role="columnheader">節目（累計）</span>
+            <span className={styles.lifeColTitle} role="columnheader">称号</span>
+            <span className={styles.lifeColBenefit} role="columnheader">特典</span>
+            <span className={styles.lifeColReached} role="columnheader">到達した人</span>
+            <span className={styles.lifeColNotify} role="columnheader">到達時の LINE 通知</span>
+            <span className={styles.lifeColAction} role="columnheader"><span className="sr-only">操作</span></span>
+          </div>
+          {drafts.length === 0 ? (
+            <div className={styles.lifeEmpty} role="row">
+              <span role="cell">まだ節目がありません。{readonly ? '' : '下の「節目を足す」から作れます。'}</span>
+            </div>
+          ) : drafts.map((row, index) => (
+            <div key={row.id ?? `new-${index}`} className={styles.lifeRow} role="row">
+              <span className={styles.lifeColThreshold} role="cell">{yen(row.threshold)}</span>
+              <span className={styles.lifeColTitle} role="cell">
+                <span className={row.threshold === topThreshold ? styles.lifeTitleTop : styles.lifeTitle} title={row.title}>{row.title}</span>
+                {row.threshold === topThreshold && drafts.length > 1 ? <span className={styles.lifeTitleSub}>最上位</span> : null}
+              </span>
+              <span className={styles.lifeColBenefit} role="cell" title={row.benefit ?? ''}>{row.benefit ?? emptyValue('unconfigured')}</span>
+              <span className={styles.lifeColReached} role="cell">{formatNumber(row.reachedCount)} 人</span>
+              <span className={styles.lifeColNotify} role="cell">{row.notify ? '通知する' : '通知しない'}</span>
+              <span className={styles.lifeColAction} role="cell">
+                {readonly ? null : (
+                  <RowActions
+                    subjectName={`節目「${row.title || yen(row.threshold)}」`}
+                    menuItems={[{ id: 'edit', label: '編集する', onSelect: () => openEdit(index) }]}
+                    destructiveItem={{ id: 'delete', label: '削除する', onSelect: () => remove(index) }}
+                  />
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {readonly ? null : (
+          <div className={styles.lifeAdd}>
+            <button type="button" className={styles.textAction} disabled={drafts.length >= MAX_MILESTONES} title={drafts.length >= MAX_MILESTONES ? '節目は12個までです' : undefined} onClick={() => openEdit(drafts.length)}>
+              ＋ 節目を足す
+            </button>
+          </div>
+        )}
+      </Card>
+
+      {readonly ? null : (
+        <div className={styles.saveRow}>
+          <Button variant="secondary" onClick={() => { setDirty(false); setError(''); if (settings) setDrafts(fromSettings(settings)) }} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? '変更がありません' : undefined}>キャンセル</Button>
+          <Button variant="primary" onClick={() => save()} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? '節目を変更すると保存できます' : undefined} busy={Boolean(busy)} busyLabel="処理中…">
+            <Check size={16} aria-hidden="true" />保存して EC へ同期する
+          </Button>
+        </div>
+      )}
+
+      <Dialog
+        open={editing !== null}
+        designWidth={520}
+        title={editing && drafts[editing.index] ? '節目を直す' : '節目を足す'}
+        description="金額は、これまでの購入額の累計です。保存は下の「保存して EC へ同期する」でまとめて行います。"
+        confirmLabel="決める"
+        cancelLabel="キャンセル"
+        onConfirm={applyEdit}
+        onCancel={() => setEditing(null)}
+      >
+        {editing ? (
+          <div className={styles.editBody}>
+            <Field label="節目（累計の金額）"><SaveErrorField names={["threshold","editing.threshold"]}><NumberInput numericText {...fields.bind('milestone-threshold')} inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} /></SaveErrorField>
+<FieldError id="milestone-threshold-error">{fields.error('milestone-threshold')}</FieldError></Field>
+            <Field label="称号" requirement={FIELD_REQUIREMENTS.editing_title}><SaveErrorField names={["title","editing.title"]}><TextField {...fields.bind('milestone-title')} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} /></SaveErrorField>
+<FieldError id="milestone-title-error">{fields.error('milestone-title')}</FieldError></Field>
+            <div className={styles.editToggle}>
+              <SaveErrorField names={["notify","editing.notify"]}><Toggle id="milestone-notify" checked={editing.notify} onChange={(checked) => setEditing({ ...editing, notify: checked })} label={editing.notify ? '到達したら LINE で通知する' : '到達しても通知しない'} /></SaveErrorField><label htmlFor="milestone-notify">{editing.notify ? '到達したら LINE で通知する' : '到達しても通知しない'}</label>
+            </div>
+          </div>
+        ) : null}
+      </Dialog>
+
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="節目への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    </div></SaveErrorScope>
+  )
+}

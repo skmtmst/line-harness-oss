@@ -1,0 +1,101 @@
+// @vitest-environment happy-dom
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { StrictMode } from 'react'
+import { afterEach, expect, it, vi } from 'vitest'
+import Pagination from './pagination'
+
+afterEach(cleanup)
+
+const reason = (button: HTMLElement) => {
+  const id = button.getAttribute('aria-describedby')
+  return id ? document.getElementById(id)?.textContent : null
+}
+
+it('ページ境界と一時停止の理由を示し、移動できる操作から理由を外す', () => {
+  const change = vi.fn()
+  const { rerender } = render(<Pagination page={1} pageCount={2} onPageChange={change} />)
+  expect(reason(screen.getByLabelText('前のページ'))).toBe('最初のページです。')
+  expect(screen.getByRole('button', { name: '前のページ', description: '最初のページです。' })).toBeTruthy()
+  expect(document.getElementById(screen.getByLabelText('前のページ').getAttribute('aria-describedby')!)?.hidden).toBe(true)
+  expect(screen.getByLabelText('前のページ').getAttribute('title')).toBe('最初のページです。')
+  expect(reason(screen.getByLabelText('次のページ'))).toBeNull()
+  rerender(<Pagination page={2} pageCount={2} onPageChange={change} />)
+  expect(reason(screen.getByLabelText('前のページ'))).toBeNull()
+  expect(reason(screen.getByLabelText('次のページ'))).toBe('最後のページです。')
+  rerender(<Pagination page={1} pageCount={2} disabled onPageChange={change} />)
+  for (const button of screen.getAllByRole('button')) {
+    expect(reason(button)).toBe('現在、ページを移動できません。')
+    fireEvent.click(button)
+  }
+  expect(change).not.toHaveBeenCalled()
+})
+
+it.each([
+  [1, 1, { total: 7, first: 1, last: 7 }, '7件中 1〜7件'],
+  [2, 3, { total: 48, first: 21, last: 40 }, '48件中 21〜40件'],
+  [1, 1, { total: 6, first: 1, last: 6, unit: '人' }, '6人中 1〜6人'],
+  [1, 1, { total: 0, first: 0, last: 0 }, '0件'],
+  [1, 1, { total: null, first: 1, last: 3 }, '—件中 1〜3件'],
+  [1, 80, { total: 1234, first: 1, last: 20 }, '1,234件中 1〜20件'],
+] as const)('総数と範囲だけから同じ件数文を描く', (page, pageCount, range, text) => {
+  const change = vi.fn()
+  render(<Pagination page={page} pageCount={pageCount} range={range} onPageChange={change} />)
+  expect(screen.getByText(text)).toBeTruthy()
+  expect(document.querySelectorAll('[data-pagination-summary]')).toHaveLength(1)
+  const next = screen.queryByLabelText('次のページ')
+  if (pageCount === 1) expect(next).toBeNull()
+  if (next) fireEvent.click(next)
+  if (page < pageCount) expect(change).toHaveBeenCalledWith(page + 1)
+  else expect(change).not.toHaveBeenCalled()
+  if (pageCount <= 1) expect(screen.queryByRole('button')).toBeNull()
+})
+
+it.each([0, 1, -1, NaN, Infinity])('ページ数%sでは渡された件数文だけを残す', (pageCount) => {
+  const change = vi.fn()
+  render(<Pagination page={1} pageCount={pageCount} summary={<span>件数を確認しています</span>} onPageChange={change} />)
+  expect(screen.getByText('件数を確認しています')).toBeTruthy()
+  expect(screen.queryByRole('navigation')).toBeNull()
+  expect(screen.queryByRole('button')).toBeNull()
+  expect(screen.queryByLabelText('1ページ目へ')).toBeNull()
+  expect(change).not.toHaveBeenCalled()
+})
+
+it('1ページで件数文がなければ空のナビゲーションを作らない', () => {
+  const { container } = render(<Pagination page={1} pageCount={1} onPageChange={vi.fn()} />)
+  expect(container.childElementCount).toBe(0)
+})
+
+it('印がある時に範囲の外なら最後のページへ戻す知らせを1回出す', () => {
+  const change = vi.fn()
+  render(<Pagination page={3} pageCount={1} onPageChange={change} correctOutOfRange />)
+  expect(change).toHaveBeenCalledTimes(1)
+  expect(change).toHaveBeenCalledWith(1)
+})
+
+it('印がなければ範囲の外でも知らせを出さない', () => {
+  const change = vi.fn()
+  render(<Pagination page={3} pageCount={1} onPageChange={change} />)
+  expect(change).not.toHaveBeenCalled()
+})
+
+it('印があっても読み込み中は知らせを出さない', () => {
+  const change = vi.fn()
+  render(<Pagination page={3} pageCount={1} onPageChange={change} correctOutOfRange disabled />)
+  expect(change).not.toHaveBeenCalled()
+})
+
+it('二重実行でも同じ行き先への知らせは1回だけ', () => {
+  const change = vi.fn()
+  render(<StrictMode><Pagination page={3} pageCount={1} onPageChange={change} correctOutOfRange /></StrictMode>)
+  expect(change).toHaveBeenCalledTimes(1)
+  expect(change).toHaveBeenCalledWith(1)
+})
+
+it('読み込み中は知らせが出ず、読み終わって範囲の外なら出る', () => {
+  const change = vi.fn()
+  const { rerender } = render(<Pagination page={3} pageCount={1} onPageChange={change} correctOutOfRange={false} />)
+  expect(change).not.toHaveBeenCalled()
+  rerender(<Pagination page={3} pageCount={1} onPageChange={change} correctOutOfRange />)
+  expect(change).toHaveBeenCalledTimes(1)
+  expect(change).toHaveBeenCalledWith(1)
+})

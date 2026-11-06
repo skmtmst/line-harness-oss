@@ -1,7 +1,7 @@
 import { jstNow } from './utils.js';
 
 /**
- * 公開APIトークンの台帳（#939 N-380）。
+ * 公開APIトークンの台帳。
  *
  * 外部システムが `/api/public/v1/*` を呼ぶための合言葉。
  * 管理画面の認証(staffのapi_keyやenv API_KEY)とは別の台帳で、
@@ -83,10 +83,11 @@ export async function resolveIntegrationApiToken(
 export async function listIntegrationApiTokens(
   db: D1Database,
   lineAccountId: string,
+  opts?: { includeRevoked?: boolean },
 ): Promise<IntegrationApiTokenRow[]> {
   const result = await db.prepare(
     `SELECT * FROM integration_api_tokens
-      WHERE line_account_id = ? AND revoked_at IS NULL
+      WHERE line_account_id = ?${opts?.includeRevoked ? '' : ' AND revoked_at IS NULL'}
       ORDER BY created_at DESC`,
   ).bind(lineAccountId).all<IntegrationApiTokenRow>();
   return result.results ?? [];
@@ -155,25 +156,63 @@ export async function revokeIntegrationApiToken(
 }
 
 /**
+ * 止めた鍵を動かし直す。
+ *
+ * 止めている行だけが対象。平文は保存していないが hash は残っているので、
+ * 止める前の合言葉がそのまま使えるようになる（新しい発行はしない）。
+ * 止めた人（revoked_by）は履歴として残し、動かし直し自体は監査記録へ残す。
+ */
+export async function reactivateIntegrationApiToken(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<boolean> {
+  const now = jstNow();
+  const result = await db.prepare(
+    `UPDATE integration_api_tokens
+        SET revoked_at = NULL, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND revoked_at IS NOT NULL`,
+  ).bind(now, id, lineAccountId).run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+export type RotateIntegrationApiTokenResult =
+  /** 再発行できた。row が新しい行、token はこの応答にだけ乗る平文。 */
+  | { status: 'ok'; row: IntegrationApiTokenRow; token: string }
+  /** 旧行が無い・読んだ時点で既に失効済み。 */
+  | { status: 'not_found' }
+  /**
+   * 旧行は読めたが、失効させる番が回ってきたときには誰かが先に
+   * 失効・再発行を確定させていた。新トークンは作らない。
+   */
+  | { status: 'conflict' };
+
+/**
  * 再発行。旧トークンは即座に失効させ、同じ名前・範囲の新しいトークンを返す。
- * 旧行が無い・既に失効済みなら null。
+ *
+ * 同時再発行の当たり判定は、条件付きの失効 UPDATE（revoked_at IS NULL）が
+ * 実際に1行へ効いたかどうかだけを見る。2本が同時に旧行を読んでも、
+ * 失効に勝った1本だけが後継を作る。負けた側・古い読み取りのまま来た側は
+ * 新トークンを作らず conflict を返す。逐次の再発行と本人確認の扱いは変えない。
  */
 export async function rotateIntegrationApiToken(
   db: D1Database,
   id: string,
   lineAccountId: string,
   rotatedBy?: string,
-): Promise<{ row: IntegrationApiTokenRow; token: string } | null> {
+): Promise<RotateIntegrationApiTokenResult> {
   const old = await getIntegrationApiTokenById(db, id, lineAccountId);
-  if (!old || old.revoked_at !== null) return null;
+  if (!old || old.revoked_at !== null) return { status: 'not_found' };
   // 先に失効させる。逆順で新しい方だけ失敗すると、失効したはずの
   // 旧トークンが生き残る。先に止めれば失敗時は「どちらも使えない」に倒れる。
-  await revokeIntegrationApiToken(db, id, lineAccountId, rotatedBy);
-  return createIntegrationApiToken(db, {
+  const revoked = await revokeIntegrationApiToken(db, id, lineAccountId, rotatedBy);
+  if (!revoked) return { status: 'conflict' };
+  const { row, token } = await createIntegrationApiToken(db, {
     lineAccountId,
     name: old.name,
     scopes: parseScopes(old.scopes),
     createdBy: rotatedBy,
     rotatedFromId: old.id,
   });
+  return { status: 'ok', row, token };
 }

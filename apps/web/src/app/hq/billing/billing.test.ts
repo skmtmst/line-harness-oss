@@ -1,15 +1,24 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BillingPlanView, BillingSummary } from '@/lib/hq-billing'
 import HqBillingPage from './page'
 
 const calls = vi.hoisted(() => ({ summary: vi.fn(), invoices: vi.fn(), checkout: vi.fn(), portal: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { hqBilling: calls }, ApiError: class extends Error {} }))
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+const navigation = vi.hoisted(() => ({ checkout: '' }))
+const metrics = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api/helpers/hq-billing', () => ({ fetchHqBillingMetrics: metrics }))
+vi.mock('@/lib/api', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  const mocked = await (() => ({ api: { hqBilling: calls }, ApiError: class extends Error {} }))()
+  return { ...actual, ...mocked }
+})
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams({ checkout: navigation.checkout }), usePathname: () => '/hq/billing', useRouter: () => ({push: vi.fn()}) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
+
+vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole: () => 'owner'}))
 
 const plans: BillingPlanView[] = [
   { key: 'light', name: 'ライト', monthlyYen: 9800, yearlyYen: 99000 },
@@ -25,6 +34,7 @@ const summary: BillingSummary = {
 }
 beforeEach(() => {
   vi.clearAllMocks()
+  navigation.checkout = ''
   /*
    * この環境の happy-dom は localStorage を用意しない（document と window は
    * 入る）。ほかの画面試験と同じく、Map 仕掛けの最小の器を当てる。
@@ -42,6 +52,12 @@ beforeEach(() => {
   localStorage.setItem('lh_staff_role', 'owner')
   calls.summary.mockResolvedValue({ success: true, data: summary })
   calls.invoices.mockResolvedValue({ success: true, data: [] })
+  metrics.mockResolvedValue({ success: true, data: {
+    period: { from: '2026-10-01', until: '2026-11-01' }, unavailable: {},
+    thisMonthBilledYen: null, contractCount: 0, contractUnit: 'organization', activeAccountCount: 0,
+    contractAccountCount: null, trialCount: 1, unpaidInvoiceCount: null, paymentFailureCount: null,
+    nextBillingAt: null, source: 'stored_invoices', observedInvoiceCount: 0, lastSyncedAt: null,
+  } })
   // 外部へ移動せず、送信した周期と申込みエラーからの復帰を確認する。
   calls.checkout.mockResolvedValue({ success: false, error: 'テスト用の申込み停止' })
 })
@@ -49,107 +65,146 @@ afterEach(cleanup)
 
 async function openPage() {
   render(createElement(HqBillingPage))
-  return screen.findByRole('switch', { name: '年払い' })
+  return screen.findByRole('button', { name: /年払い/ })
 }
 
+async function openInterval() {
+  render(createElement(HqBillingPage))
+  const year = await screen.findByRole('button', { name: /年払い/ })
+  const month = await screen.findByRole('button', { name: '月払い' })
+  return { year, month }
+}
+
+/*
+ * 並び・申込・ポータル・失敗の案内は billing-flow-react、いまのプランと「利用中」は v8/hq/billing.test.tsx、
+ * 左下のメニューの「請求」は components/hq/sidebar-account-menu-react、上限の帯からの誘導は
+ * components/hq/banners/limit-state-react が描いて見る。ここは戻してはいけない形の禁止の見張りだけを文字で残す。
+ */
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8')
-const page = read('./page.tsx')
-const menu = read('../../../components/hq/account-menu.tsx')
-const limit = read('../../../components/hq/banners/limit-state.tsx')
+const page = read('../../../v8/hq/billing.tsx')
 
-/** ★V6 36-2 / 36-2-A 課金プランの構造と実際の切り替え。 */
+/** ★管理画面 36-2 / 36-2-A 課金プランの構造と実際の切り替え。 */
 describe('課金プラン（36-2）', () => {
-  it('帯 → プラン3枚 → 注記 → 支払い履歴の順で、画面名はトップバーだけ', () => {
-    const order = ['data-design="Status"', 'data-design="Interval"', 'data-design="Plans"', 'data-design="Note"', 'data-design="History"']
-    const positions = order.map((n) => page.indexOf(n))
-    expect(positions.every((p) => p >= 0)).toBe(true)
-    expect([...positions].sort((a, b) => a - b)).toEqual(positions)
-    expect(page).toContain("usePageTitle('課金プラン')")
-    expect(page).not.toContain('<h1')
-  })
-
-  it('申込は Stripe Checkout、支払い方法と解約は Stripe のポータルへ任せる', () => {
-    expect(page).toContain('api.hqBilling.checkout(plan.key, selectedInterval)')
-    expect(page).toContain('api.hqBilling.portal()')
-    expect(page).toContain('window.location.href = res.data.url')
+  it('カード番号を画面で受け取らず、「相談する」の行き止まりに戻さない', () => {
     expect(page).not.toMatch(/card_number|cardNumber|cvc/i)
-  })
-
-  it('金額の取得元を持ち、設計の価格単位を保つ', () => {
-    expect(page).toContain("data-price-source={price.fromStripe ? 'stripe' : 'fallback'}")
-    expect(page).toContain('税込')
-  })
-
-  it('プロもCheckoutへ、契約中のプランは「変更する」でポータルへ', () => {
     expect(page).not.toContain('相談する')
-    expect(page).toContain('変更する')
-    expect(page).toContain('利用中')
   })
 
-  it('Checkout から戻ったら Webhook を待って読み直す', () => {
-    expect(page).toContain("params.get('checkout')")
-    expect(page).toContain('setTimeout(() => void load(), 4000)')
-  })
-
-  it('左下のアカウントメニューにプランの札と「課金プラン」が出る', () => {
-    expect(menu).toContain('api.hqBilling.summary()')
-    expect(menu).toContain('billingChip(billing)')
-    expect(menu).toContain('href="/hq/billing"')
-  })
-
-  it('35-4 の上限・停止の状態から課金プランへ行ける', () => {
-    expect(limit).toContain('href="/hq/billing"')
-    expect(limit).toContain('課金プランを見る')
+  it('Checkout から戻ったら4秒待ち、保存済みの表示を使わずに読み直す', async () => {
+    vi.useFakeTimers()
+    navigation.checkout = 'success'
+    try {
+      render(createElement(HqBillingPage))
+      await act(async () => {})
+      expect(calls.summary).toHaveBeenCalledTimes(1)
+      await act(async () => { await vi.advanceTimersByTimeAsync(3999) })
+      expect(calls.summary).toHaveBeenCalledTimes(1)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+      expect(calls.summary).toHaveBeenCalledTimes(2)
+      expect(calls.summary).toHaveBeenLastCalledWith({ cache: 'reload' })
+    } finally { vi.useRealTimers() }
   })
 
   it('既定は月払い。年払いで3つの札・月あたり・年額に切り替わり、戻すと月額になる', async () => {
-    const toggle = await openPage()
-    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    const { year, month } = await openInterval()
+    expect(year.getAttribute('aria-pressed')).toBe('false')
     for (const amount of ['¥9,800', '¥29,800', '¥59,800']) expect(screen.getByText(amount)).toBeTruthy()
     expect(screen.queryAllByText('約15% OFF')).toHaveLength(0)
-    fireEvent.click(toggle)
-    expect(toggle.getAttribute('aria-checked')).toBe('true')
-    expect(screen.getAllByText('約15% OFF')).toHaveLength(3)
+    fireEvent.click(year)
+    expect(year.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryAllByText('約15% OFF')).toHaveLength(3)
     for (const amount of ['¥8,250', '¥25,250', '¥50,750']) expect(screen.getByText(amount)).toBeTruthy()
     for (const amount of ['¥99,000', '¥303,000', '¥609,000']) expect(screen.getByText(`年額 ${amount}（税込）`)).toBeTruthy()
-    fireEvent.click(toggle)
+    fireEvent.click(month)
     expect(screen.getByText('¥9,800')).toBeTruthy()
     expect(screen.queryByText('年額 ¥99,000（税込）')).toBeNull()
-    fireEvent.click(toggle)
+    fireEvent.click(year)
     cleanup()
-    expect((await openPage()).getAttribute('aria-checked')).toBe('false')
+    expect((await openPage()).getAttribute('aria-pressed')).toBe('false')
   })
 
   it.each([['light', 0], ['standard', 1], ['pro', 2]] as const)('%s の年払いボタンはyearで申込み、月払いに戻すとmonthで申し込む', async (key, index) => {
-    const toggle = await openPage()
-    fireEvent.click(toggle)
+    const { year, month } = await openInterval()
+    fireEvent.click(year)
     fireEvent.click(screen.getAllByRole('button', { name: 'このプランにする' })[index])
     await waitFor(() => expect(calls.checkout).toHaveBeenLastCalledWith(key, 'year'))
     await screen.findByRole('alert')
-    fireEvent.click(toggle)
+    fireEvent.click(month)
     fireEvent.click(screen.getAllByRole('button', { name: 'このプランにする' })[index])
     await waitFor(() => expect(calls.checkout).toHaveBeenLastCalledWith(key, 'month'))
   })
 
   it('年のPrice未設定は該当ボタンだけ無効にし、月払いは止めない', async () => {
     calls.summary.mockResolvedValue({ success: true, data: { ...summary, plans: plans.map((p) => ({ ...p, yearlyAvailable: p.key !== 'light' })) } })
-    const toggle = await openPage()
-    fireEvent.click(toggle)
+    const { year, month } = await openInterval()
+    fireEvent.click(year)
     const buttons = screen.getAllByRole('button', { name: 'このプランにする' }) as HTMLButtonElement[]
     expect(buttons.map((b) => b.disabled)).toEqual([true, false, false])
     expect(screen.getByText('価格がまだ設定されていません')).toBeTruthy()
     fireEvent.click(buttons[0])
     expect(calls.checkout).not.toHaveBeenCalled()
-    fireEvent.click(toggle)
+    fireEvent.click(month)
     expect(buttons[0].disabled).toBe(false)
   })
 
   it('Stripe由来の年額を12で割り、端数を切り捨てる', async () => {
     calls.summary.mockResolvedValue({ success: true, data: { ...summary, plans: [{ ...plans[0], yearlyYen: 100001, yearlyPriceFromStripe: true }] } })
-    fireEvent.click(await openPage())
+    const { year } = await openInterval()
+    fireEvent.click(year)
     expect(screen.getByText('¥8,333')).toBeTruthy()
     expect(screen.getByText('年額 ¥100,001（税込）')).toBeTruthy()
     expect(document.querySelector('[data-price-source="stripe"]')).toBeTruthy()
+  })
+})
+
+/** R607: Stripe取得済み価格と代替価格の案内を分ける。金額とプラン内容の確定度も分ける。 */
+describe('Stripe価格の出所と仮表示の区別（R607）', () => {
+  const plansWith = (flags: { month: boolean; year: boolean }) =>
+    plans.map((p) => ({ ...p, priceFromStripe: flags.month, yearlyPriceFromStripe: flags.year }))
+  const summaryWith = (list: BillingPlanView[]) => ({ ...summary, plans: list })
+
+  it('月3プランともStripe取得済みなら「料金と内容は仮置き」と一律に出さない', async () => {
+    calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: true, year: true })) })
+    await openPage()
+    expect(screen.queryByText(/料金と内容は仮置きです/)).toBeNull()
+    expect(document.querySelectorAll('[data-price-source="stripe"]')).toHaveLength(3)
+    expect(screen.queryByText('仮の料金です')).toBeNull()
+  })
+
+  it('代替価格だけに「仮の料金です」と出し、注記も仮置きにする', async () => {
+    calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: false, year: false })) })
+    await openPage()
+    expect(screen.getAllByText('仮の料金です')).toHaveLength(3)
+    expect(document.querySelectorAll('[data-price-source="fallback"]')).toHaveLength(3)
+  })
+
+  it('プランごとに出所が違う場合は一律注記にせず、代替の分だけ仮表示する', async () => {
+    const mixed = plansWith({ month: true, year: true })
+    mixed[1] = { ...mixed[1], priceFromStripe: false }
+    calls.summary.mockResolvedValue({ success: true, data: summaryWith(mixed) })
+    await openPage()
+    expect(screen.getAllByText('仮の料金です')).toHaveLength(1)
+    expect(screen.queryByText(/料金と内容は仮置きです/)).toBeNull()
+    expect(document.querySelectorAll('[data-price-source="fallback"]')).toHaveLength(1)
+  })
+
+  it('注記は選んだ周期に追随する（月はStripe取得・年は代替）', async () => {
+    calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: true, year: false })) })
+    const { year } = await openInterval()
+    expect(screen.queryByText('仮の料金です')).toBeNull()
+    expect(document.querySelectorAll('[data-price-source="stripe"]')).toHaveLength(3)
+    fireEvent.click(year)
+    expect(screen.getAllByText('仮の料金です')).toHaveLength(3)
+    expect(document.querySelectorAll('[data-price-source="fallback"]')).toHaveLength(3)
+  })
+
+  it('注記は選んだ周期に追随する（月は代替・年はStripe取得）', async () => {
+    calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: false, year: true })) })
+    const { year } = await openInterval()
+    expect(screen.getAllByText('仮の料金です')).toHaveLength(3)
+    fireEvent.click(year)
+    expect(screen.queryByText('仮の料金です')).toBeNull()
+    expect(document.querySelectorAll('[data-price-source="stripe"]')).toHaveLength(3)
   })
 })
 
@@ -176,7 +231,8 @@ describe('請求履歴の取得失敗（R118）', () => {
     await openPage()
     expect(screen.getByText('支払い履歴を読み込めませんでした')).toBeTruthy()
     calls.invoices.mockResolvedValue({ success: true, data: [] })
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    const history = screen.getByRole('heading', { name: '支払い履歴' }).closest('section')!
+    fireEvent.click(within(history).getByRole('button', { name: 'もう一度読み込む' }))
     await screen.findByText(/まだ支払いはありません/)
     expect(screen.queryByText('支払い履歴を読み込めませんでした')).toBeNull()
   })

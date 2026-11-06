@@ -11,6 +11,7 @@ export const EC_EVENT_TYPES = [
   'ec.subscription.card_updated',
   'ec.subscription.cancelled',
   'ec.customer.profile_updated',
+  'ec.site.publication_viewed',
 ] as const;
 
 /** WebとWorkerで同じ表示名を使うための正本。 */
@@ -26,6 +27,7 @@ export const EC_EVENT_LABELS = {
   'ec.subscription.card_updated': 'カード変更・再決済結果',
   'ec.subscription.cancelled': '定期便の解約',
   'ec.customer.profile_updated': 'ペット情報更新',
+  'ec.site.publication_viewed': '掲載の閲覧数',
   // 既存の画面履歴にだけ現れる値。受信許可はせず、表示名だけを維持する。
   'ec.subscription.started': '定期便がはじまりました',
 } as const;

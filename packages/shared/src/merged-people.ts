@@ -1,4 +1,4 @@
-/** V6 3-3-A 統合ユーザー詳細の読み取り・更新契約。 */
+/** 3-3-A 統合ユーザー詳細の読み取り・更新契約。 */
 export type MergedPersonStatus = "active" | "review" | "archived";
 
 export type MergedPersonProfileSource =
@@ -44,7 +44,7 @@ export interface MergedPersonLinkedFriend {
   linkMethod: string;
   /** null は移行前の既存リンクなど、確信度を記録していない状態。 */
   confidence: number | null;
-  /** #598 の候補画面へ戻すための操作用ID。本文へは表示しない。 */
+  /** 統合候補の画面へ戻すための操作用ID。本文へは表示しない。 */
   candidateId: string | null;
   candidateVersion: number | null;
 }

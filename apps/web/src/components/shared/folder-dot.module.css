@@ -1,0 +1,50 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/* ★V8 フォルダの色の丸（絵の ほか一覧の行）。大きさ 8・名前との間 8。 */
+.dot {
+  display: inline-block;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: var(--tpl-folder-dot-size);
+  height: var(--tpl-folder-dot-size);
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-faint);
+}
+
+/* 未分類は灰色の丸。色の「灰」のフォルダと見分けられる薄い灰。 */
+.unfiled {
+  background: var(--color-ink-disabled);
+}
+
+.line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-folder-dot-gap);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+}
+
+.line { width: 100%; white-space: nowrap; }
+.name { flex: 1; }
+.name :is(a, button) { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-action); }
+
+:root [data-list-name] .name :is(a, button) { color: var(--color-action); }
+
+/* ：名前は通常・乗せた・押した状態で黒の太字。 */
+html:root [data-list-name] .name,
+html:root [data-list-name] .name :is(a, button) { color: var(--color-ink); font-weight: 700; }
+
+.line[data-has-annotation] { width: max-content; }
+.line[data-has-annotation] > :last-child { flex: none; }
+
+/* セルでは名前を行の塊として置き、選択の箱もセルの中央にそろえる。 */
+:global(td) > .line,
+:global([role='cell']) > .line { display: flex; }

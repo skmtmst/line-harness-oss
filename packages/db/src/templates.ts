@@ -1,54 +1,10 @@
+import type { TemplateRow } from './template-row-types.js';
+export type { TemplateRow } from './template-row-types.js';
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
-import { applyMediaUsageMutation } from './media.js';
-// テンプレート管理クエリヘルパー
-
-export interface TemplateRow {
-  id: string;
-  name: string;
-  category: string;
-  message_type: string;
-  message_content: string;
-  /** テンプレートの置き場（099 で追加）。未分類は null。 */
-  folder_id: string | null;
-  /** 162: カルーセルの選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
-  carousel_actions_json: string | null;
-  /** 162: 選択肢の押せる回数。'none'（制限なし）／'once'（全体で1回） */
-  carousel_tap_limit_mode: string;
-  /** 162: 制限を超えたときに返すテキスト。空なら何も返さない。 */
-  carousel_tap_limit_text: string | null;
-  /** 質問テンプレート。scenario_steps.question_json と同じ形。 */
-  question_json: string | null;
-  question_status: 'draft' | 'published';
-  created_at: string;
-  updated_at: string;
-  line_account_id: string | null;
-  /**
-   * 347: 公開版の版番号。公開操作でだけ +1 する。
-   * 送信側が読む live 列(message_type / message_content / carousel_* /
-   * question_*)は公開版そのものなので、版番号と live 列は常に一致する。
-   */
-  published_version: number;
-  /** 347: 最後に公開した日時。既存行は移行時に updated_at を入れる。 */
-  published_at: string | null;
-  /**
-   * 347: 編集中の下書き。PUT はここへだけ書く。
-   * どれか1つでも入っていれば「公開待ちの下書きあり」。
-   */
-  draft_message_type: string | null;
-  draft_message_content: string | null;
-  draft_carousel_actions_json: string | null;
-  draft_carousel_tap_limit_mode: string | null;
-  draft_carousel_tap_limit_text: string | null;
-  draft_question_json: string | null;
-  draft_question_status: 'draft' | 'published' | null;
-  /**
-   * 347(差し戻し対応): 下書きの版。保存のたびに +1 し、公開で 0 に戻す。
-   * 公開口はこの番号も確認し、検査後に書き換わった下書きを出さない。
-   */
-  draft_revision: number;
-  /** 347: 公開の再試行を見分ける確認キー。auto_reply_versions と同じ使い方。 */
-  publish_idempotency_key: string | null;
-}
+import { applyMediaUsageMutation } from './media/index.js';
+import { publishedVersionStatement } from './template-publish-statement.js';
+export { publishedVersionStatement } from './template-publish-statement.js';
 
 /** 下書きがあるかどうか。どれか1列でも入っていれば true。 */
 export function hasTemplateDraft(row: Pick<TemplateRow,
@@ -71,20 +27,20 @@ export function hasTemplateDraft(row: Pick<TemplateRow,
 
 export async function getTemplates(db: D1Database, category?: string): Promise<TemplateRow[]> {
   if (category) {
-    const result = await db.prepare(`SELECT * FROM templates WHERE category = ? ORDER BY created_at DESC`)
+    const result = await db.prepare(`SELECT * FROM templates WHERE deleted_at IS NULL AND category = ? ORDER BY created_at DESC`)
       .bind(category).all<TemplateRow>();
     return result.results;
   }
-  const result = await db.prepare(`SELECT * FROM templates ORDER BY created_at DESC`).all<TemplateRow>();
+  const result = await db.prepare(`SELECT * FROM templates WHERE deleted_at IS NULL ORDER BY created_at DESC`).all<TemplateRow>();
   return result.results;
 }
 
 export async function getTemplateById(db: D1Database, id: string): Promise<TemplateRow | null> {
-  return db.prepare(`SELECT * FROM templates WHERE id = ?`).bind(id).first<TemplateRow>();
+  return db.prepare(`SELECT * FROM templates WHERE id = ? AND deleted_at IS NULL`).bind(id).first<TemplateRow>();
 }
 
 /**
- * 独立審査対応(P1): 下書き全文の指紋(SHA-256 hex)。同じ内容なら同じ値に
+ * 下書き全文の指紋(SHA-256 hex)。同じ内容なら同じ値に
  * なり、1文字でも違えば(削除も含めて)変わる。同キー再試行が別操作か
  * どうかの見分けに使う(成功時の控えと比べる)。32bit 非暗号ハッシュは不可。
  */
@@ -93,7 +49,7 @@ export async function templateDraftFingerprint(
     'draft_message_type' | 'draft_message_content' |
     'draft_carousel_actions_json' | 'draft_carousel_tap_limit_mode' |
     'draft_carousel_tap_limit_text' | 'draft_question_json' |
-    'draft_question_status'>,
+    'draft_question_status' | 'draft_message_bubbles_json'>,
 ): Promise<string> {
   const canonical = JSON.stringify([
     draft.draft_message_type ?? null,
@@ -103,22 +59,23 @@ export async function templateDraftFingerprint(
     draft.draft_carousel_tap_limit_text ?? null,
     draft.draft_question_json ?? null,
     draft.draft_question_status ?? null,
+    draft.draft_message_bubbles_json ?? null,
   ]);
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /**
- * 独立審査P2相当(指摘3): いま送ってよいテンプレートかどうか。
+ * いま送ってよいテンプレートかどうか。
  * 公開版があること(版1以上)に加え、送る側と持ち主の両方が分かり、
  * 完全一致すること。どちらかが null の wildcard 照合はしない(fail-close)。
  * 未公開・別アカウント・持ち主不明は送らない。
  */
 export function isTemplateSendable(
-  row: Pick<TemplateRow, 'published_version' | 'line_account_id'> | null | undefined,
+  row: Pick<TemplateRow, 'published_version' | 'line_account_id' | 'message_bubbles_json'> | null | undefined,
   lineAccountId?: string | null,
 ): boolean {
-  if (!row) return false;
+  if (!row || row.message_bubbles_json) return false;
   if (Number(row.published_version ?? 0) < 1) return false;
   if (lineAccountId == null || row.line_account_id == null) return false;
   return row.line_account_id === lineAccountId;
@@ -135,16 +92,16 @@ export async function getSendableTemplate(
 }
 
 /**
- * 独立審査P2相当(指摘3): 結びつけてよいテンプレートかどうか。
+ * 結びつけてよいテンプレートかどうか。
  * 公開版があり、結びつける側と完全一致すること。持ち主不明は通さない
  * (fail-close)。持ち主未定のシナリオに結ぶと、送る側で別アカウントの
  * 公開版が混ざる。送信時と同じ条件にする。
  */
 export function isTemplateAssociable(
-  row: Pick<TemplateRow, 'published_version' | 'line_account_id'> | null | undefined,
+  row: Pick<TemplateRow, 'published_version' | 'line_account_id' | 'message_bubbles_json'> | null | undefined,
   lineAccountId?: string | null,
 ): boolean {
-  if (!row) return false;
+  if (!row || row.message_bubbles_json) return false;
   if (Number(row.published_version ?? 0) < 1) return false;
   if (lineAccountId == null || row.line_account_id == null) return false;
   return row.line_account_id === lineAccountId;
@@ -190,7 +147,7 @@ export async function createTemplate(
   const id = crypto.randomUUID();
   const now = jstNow();
   /*
-   * 347(差し戻し対応・要件4): 新規作成は未公開の下書きで始める。
+   * 新規作成は未公開の下書きで始める。
    * live 列には初期内容を入れる(NOT NULL のため)が、版は 0・公開日時は空にし、
    * 初回の明示 publish でだけ公開版 1 になる。作った直後は送信候補に出さない。
    */
@@ -320,12 +277,38 @@ export async function updateTemplate(
 
 export async function deleteTemplate(db: D1Database, id: string): Promise<void> {
   await db.batch([
-    db.prepare(`DELETE FROM templates WHERE id = ?`).bind(id),
+    db.prepare(`UPDATE templates SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`).bind(jstNow(), jstNow(), id),
     db.prepare(`DELETE FROM media_usages WHERE ref_kind = 'template' AND ref_id = ?`).bind(id),
   ]);
 }
 
+/** 自動作成した未公開の下書きだけ、読み取った版のままなら消す。 */
+export async function deleteCreatedTemplateDraft(db: D1Database, id: string, revision: number): Promise<boolean> {
+  const now = jstNow();
+  try {
+    await db.batch([
+      db.prepare(`SELECT json('__TEMPLATE_DRAFT_CHANGED__') WHERE NOT EXISTS (
+        SELECT 1 FROM templates WHERE id = ? AND deleted_at IS NULL
+          AND COALESCE(published_version, 0) = 0 AND COALESCE(draft_revision, 0) = ?
+      )`).bind(id, revision),
+      db.prepare(`UPDATE templates SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`).bind(now, now, id),
+      db.prepare(`DELETE FROM media_usages WHERE ref_kind = 'template' AND ref_id = ?`).bind(id),
+    ]);
+    return true;
+  } catch (error) {
+    if (error instanceof Error && /malformed JSON/i.test(error.message)) return false;
+    throw error;
+  }
+}
+
 export interface TemplateDraftUpdates {
+  /** 編集画面を読み込んだ時点の版。保存直前の読み直しで置き換えない。 */
+  expectedVersion?: number;
+  expectedDraftRevision?: number;
+  name?: string;
+  category?: string;
+  folderId?: string | null;
+  messageBubblesJson?: string | null;
   messageType?: string;
   messageContent?: string;
   /** 162: 選択肢を押したときの動き。`null` は動きの削除。 */
@@ -352,8 +335,17 @@ export async function saveTemplateDraft(
 ): Promise<TemplateRow> {
   const current = await getTemplateById(db, id);
   if (!current) throw new Error('TEMPLATE_NOT_FOUND');
+  const expectedVersion = updates.expectedVersion ?? Number(current.published_version ?? 0);
+  const expectedDraftRevision = updates.expectedDraftRevision ?? Number(current.draft_revision ?? 0);
+  if (expectedVersion !== Number(current.published_version ?? 0)
+    || expectedDraftRevision !== Number(current.draft_revision ?? 0)) throw new Error('TEMPLATE_DRAFT_CONFLICT');
+  const metadata: string[] = [];
+  const metadataValues: unknown[] = [];
+  for (const [column, value] of [['name', updates.name], ['category', updates.category], ['folder_id', updates.folderId]] as const) {
+    if (value !== undefined) { metadata.push(`${column} = ?`); metadataValues.push(value); }
+  }
   /*
-   * 差し戻し対応(要件2): 下書きがある行の draft 列 NULL は「削除した」。
+   * 下書きがある行の draft 列 NULL は「削除した」。
    * 下書きがない行の NULL は「下書きなし」。`??` で一列ずつ落とすと、
    * 削除したはずの値が公開版から復活して新しい下書きへ混入する。
    * 下書きは全文スナップショットなので、行単位でどちらかを見る。
@@ -376,23 +368,24 @@ export async function saveTemplateDraft(
   const draftQuestionStatus = updates.questionStatus
     ?? current.draft_question_status
     ?? current.question_status;
-  const expectedVersion = Number(current.published_version ?? 0);
-  const expectedDraftRevision = Number(current.draft_revision ?? 0);
   const nextDraftRevision = expectedDraftRevision + 1;
+  const savedAt = jstNow();
   const mutation = db.prepare(
     `UPDATE templates
-        SET draft_message_type = ?,
+        SET ${metadata.length ? metadata.join(', ') + ',' : ''} draft_message_type = ?,
             draft_message_content = ?,
             draft_carousel_actions_json = ?,
             draft_carousel_tap_limit_mode = ?,
             draft_carousel_tap_limit_text = ?,
             draft_question_json = ?,
             draft_question_status = ?,
+            draft_message_bubbles_json = ?,
             draft_revision = draft_revision + 1,
             updated_at = ?
       WHERE id = ? AND published_version = ? AND draft_revision = ?
         AND message_content IS ?`,
   ).bind(
+    ...metadataValues,
     draftMessageType,
     draftMessageContent,
     draftCarouselActionsJson,
@@ -400,7 +393,8 @@ export async function saveTemplateDraft(
     draftCarouselTapLimitText,
     draftQuestionJson,
     draftQuestionStatus,
-    jstNow(),
+    updates.messageBubblesJson === undefined ? (snapshot ? current.draft_message_bubbles_json ?? null : current.message_bubbles_json ?? null) : updates.messageBubblesJson,
+    savedAt,
     id,
     expectedVersion,
     expectedDraftRevision,
@@ -424,7 +418,24 @@ export async function saveTemplateDraft(
     },
   });
   if ((updated?.meta?.changes ?? 0) === 0) throw new Error('TEMPLATE_DRAFT_CONFLICT');
-  return (await getTemplateById(db, id))!;
+  // Return this write's version, even if another editor saves before our reply.
+  return {
+    ...current,
+    name: updates.name ?? current.name,
+    category: updates.category ?? current.category,
+    folder_id: updates.folderId === undefined ? current.folder_id : updates.folderId,
+    draft_message_type: draftMessageType,
+    draft_message_content: draftMessageContent,
+    draft_carousel_actions_json: draftCarouselActionsJson,
+    draft_carousel_tap_limit_mode: draftCarouselTapLimitMode,
+    draft_carousel_tap_limit_text: draftCarouselTapLimitText,
+    draft_question_json: draftQuestionJson,
+    draft_question_status: draftQuestionStatus,
+    draft_message_bubbles_json: updates.messageBubblesJson === undefined
+      ? (snapshot ? current.draft_message_bubbles_json ?? null : current.message_bubbles_json ?? null) : updates.messageBubblesJson,
+    draft_revision: nextDraftRevision,
+    updated_at: savedAt,
+  };
 }
 
 export interface TemplatePublishResult {
@@ -442,63 +453,6 @@ interface TemplatePublishKeyRecord {
   draft_fingerprint: string | null;
   message_type: string | null;
   message_content: string | null;
-}
-
-/**
- * 347: 下書きを公開版(live 列)へ写す。送信側は live 列だけを読むので、
- * この関数を通らない編集が実送信文へ混入することはない。
- *
- * 差し戻し対応(#645 6要件 + 再審査5点 + 独立審査P1):
- * - 下書きは全文スナップショットなので、下書き列をそのまま写す。
- *   `COALESCE(下書き, 公開版)` にしない。NULL は「削除した」であり、
- *   削除したはずの古い公開値が復活してはいけない(要件2)。
- * - `expectedDraftRevision` がいまの下書き版と違えば
- *   'TEMPLATE_DRAFT_CONFLICT'。検査後に別人が書き換えた内容を、
- *   確認なしに公開しない(要件3)。事前確認だけでなく UPDATE 文の条件にも
- *   版を入れ、確認と書き込みの間に挟まった保存から守る(再審査1)。
- * - `expectedVersion` がいまの公開版と違えば 'TEMPLATE_VERSION_CONFLICT'。
- *   同時更新は版番号付きの UPDATE 1文で直列化し、負けた側は落とす。
- * - 同じ `idempotencyKey` の再試行は、成功時の記録と下書き指紋(SHA-256)を
- *   比べる。指紋が違えば別操作の使い回しとして
- *   'TEMPLATE_PUBLISH_KEY_CONFLICT'。同じ内容なら記録時の版・本文を
- *   そのまま返す(固定応答)(再審査5)。
- *   下書きなしの成功も記録し、古い複数の成功キーも残る(要件5)。
- * - 公開版の更新とキー記録は `db.batch` の単一原子操作で行う。
- *   途中障害・並行要求で版だけ進むことはない(独立審査P1)。
- */
-/**
- * 466: 公開が決まった内容を版履歴へ1行足す。前の版は変えない。
- * 公開の原子操作のあとに足す。ここで落ちたら公開ごと500にし、
- * 版だけ進んだ公開を残さない（黙って履歴欠けにしない）。
- */
-async function recordPublishedVersion(
-  db: D1Database,
-  row: TemplateRow,
-  versionNumber: number,
-  options: { effectiveFrom?: string; createdByStaffId?: string | null },
-  now: string,
-): Promise<void> {
-  await db.prepare(
-    `INSERT INTO template_versions
-       (id, template_id, version_number, message_type, message_content,
-        carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
-        question_json, question_status, effective_from, created_by_staff_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(
-    crypto.randomUUID(),
-    row.id,
-    versionNumber,
-    row.message_type,
-    row.message_content,
-    row.carousel_actions_json,
-    row.carousel_tap_limit_mode,
-    row.carousel_tap_limit_text,
-    row.question_json,
-    row.question_status,
-    options.effectiveFrom ?? now,
-    options.createdByStaffId ?? null,
-    now,
-  ).run();
 }
 
 export async function publishTemplate(
@@ -546,6 +500,13 @@ export async function publishTemplate(
         draft_question_status: null,
         draft_revision: 0,
       };
+      const history = await db.prepare(`SELECT id FROM template_versions WHERE template_id=? AND version_number=?`)
+        .bind(id,Number(prior.published_version)).first();
+      if (!history && Number(prior.published_version) > 0) {
+        // 過去の欠落版の付属設定・利用開始日・操作者は成功キーだけでは
+        // 復元できない。現在の設定から推測せず、人の復旧判断へ返す。
+        throw new Error('TEMPLATE_VERSION_HISTORY_MISSING');
+      }
       return { row: fixed, published: false, replayed: true };
     }
   }
@@ -576,7 +537,7 @@ export async function publishTemplate(
   const publishedFingerprint = await templateDraftFingerprint(current);
   const nextVersion = Number(current.published_version) + 1;
   /*
-   * 独立審査P1: 公開版の更新とキー記録は単一の原子操作にする。
+   * 公開版の更新とキー記録は単一の原子操作にする。
    * 記録に載せる版・本文は、下書き(成功すれば消える)から先に決める。
    * 2文の間で落ちても版だけ進むことはない。
    */
@@ -585,6 +546,8 @@ export async function publishTemplate(
       `UPDATE templates
           SET message_type = draft_message_type,
               message_content = draft_message_content,
+              message_bubbles_json = draft_message_bubbles_json,
+              draft_message_bubbles_json = NULL,
               carousel_actions_json = draft_carousel_actions_json,
               carousel_tap_limit_mode = draft_carousel_tap_limit_mode,
               carousel_tap_limit_text = draft_carousel_tap_limit_text,
@@ -611,11 +574,12 @@ export async function publishTemplate(
       current.published_version,
       current.draft_revision ?? 0,
     ),
+    publishedVersionStatement(db, id, nextVersion, options, now),
   ];
   if (options.idempotencyKey) {
     /*
-     * 同じ原子操作の中で、UPDATE が1行に当たったときだけ記録する。
-     * `changes()` は直前文の更新行数。無条件 INSERT にすると、
+     * 同じ原子操作の中で、公開UPDATEと直後の版履歴INSERTが
+     * それぞれ1行に当たったときだけ記録する。無条件 INSERT にすると、
      * 同時負けの側まで記録が残り、再試行の見分けが壊れる。
      */
     publishBatch.push(
@@ -675,8 +639,6 @@ export async function publishTemplate(
   if (!next || Number(next.published_version) !== nextVersion) {
     throw new Error('TEMPLATE_VERSION_CONFLICT');
   }
-  // 466: 公開のたびに版を1行足す。前の版は変えない。
-  await recordPublishedVersion(db, next, nextVersion, options, now);
   return { row: next, published: true, replayed: false };
 }
 
@@ -697,6 +659,7 @@ export interface TemplateUsage {
     scenarioName: string;
     stepId: string;
     stepOrder: number;
+    displayOrder: number;
   }>;
   reminderSteps: Array<{
     reminderId: string;
@@ -725,7 +688,7 @@ export interface TemplateUsage {
  * templateAccountId を渡すと、使用先もテンプレートと同じアカウント
  * （またはアカウント未設定）のものだけに絞る。別アカウントの設定は
  * 名前・遷移先ともに見せられず、そこへ直しに行けないまま削除だけが
- * 止まるので、ここで除外する（#891 N-135/142/143）。
+ * 止まるので、ここで除外する。
  */
 export async function getTemplateUsage(
   db: D1Database,
@@ -774,14 +737,15 @@ export async function getTemplateUsage(
 
   const scenarioRes = await db
     .prepare(
-      `SELECT ss.id AS step_id, ss.step_order, ss.scenario_id, s.name AS scenario_name
+      `SELECT ss.id AS step_id, ss.step_order, ss.scenario_id, s.name AS scenario_name,
+              (SELECT COUNT(*) FROM scenario_steps preceding WHERE preceding.scenario_id = ss.scenario_id AND preceding.step_order <= ss.step_order) AS display_order
        FROM scenario_steps ss
        JOIN scenarios s ON s.id = ss.scenario_id
        WHERE ss.template_id = ?${scope('s.line_account_id')}
        ORDER BY s.name, ss.step_order`,
     )
     .bind(...scopeBinds([templateId]))
-    .all<{ step_id: string; step_order: number; scenario_id: string; scenario_name: string }>();
+    .all<{ step_id: string; step_order: number; display_order: number; scenario_id: string; scenario_name: string }>();
 
   const reminderRes = await db
     .prepare(
@@ -835,6 +799,7 @@ export async function getTemplateUsage(
       scenarioName: r.scenario_name,
       stepId: r.step_id,
       stepOrder: r.step_order,
+      displayOrder: r.display_order,
     })),
     reminderSteps: (reminderRes.results ?? []).map((r) => ({
       reminderId: r.reminder_id,
@@ -877,7 +842,6 @@ export async function getTemplateSendCounts(
 ): Promise<Map<string, TemplateSendCounts>> {
   if (templateIds.length === 0) return new Map();
   const month = nowJst.slice(0, 7);
-  const placeholders = templateIds.map(() => '?').join(',');
   const result = await db.prepare(
     `SELECT template_id_at_send AS template_id,
             COUNT(*) AS total_count,
@@ -885,9 +849,9 @@ export async function getTemplateSendCounts(
       FROM messages_log
       WHERE direction = 'outgoing'
         AND COALESCE(delivery_type, '') != 'test'
-        AND template_id_at_send IN (${placeholders})
+        AND template_id_at_send IN (SELECT value FROM json_each(?))
       GROUP BY template_id_at_send`,
-  ).bind(month, ...templateIds).all<{
+  ).bind(month, JSON.stringify(templateIds)).all<{
     template_id: string;
     total_count: number;
     month_count: number;
@@ -899,7 +863,7 @@ export async function getTemplateSendCounts(
   ]));
 }
 
-/** PERF-12: テンプレート選択の絞り込み。ページに切る前に適用する。 */
+/** テンプレート選択の絞り込み。ページに切る前に適用する。 */
 export type TemplateListFilter = {
   /** 名前・本文の部分一致（大文字小文字は LIKE の ASCII 規則に従う）。 */
   q?: string;
@@ -907,9 +871,13 @@ export type TemplateListFilter = {
   folderIds?: string[] | 'none';
   /** 文字テンプレートだけに絞るなど。 */
   messageType?: string;
+  /** 入力欄へ入れられる文字本文だけ。質問付きの文字は含めない。 */
+  textOnly?: boolean;
   /** 選択画面の分類。reservation/ec は名称・本文の文字一致、frequent は送信実績順。 */
   quick?: 'reservation' | 'ec' | 'frequent';
 };
+
+const plainTextTemplateWhere = "message_type = 'text' AND (question_json IS NULL OR TRIM(question_json) IN ('', 'null'))";
 
 const QUICK_KEYWORDS: Record<'reservation' | 'ec', string[]> = {
   // 選択画面がこれまでクライアント側で使っていた正規表現と同じ語。
@@ -922,7 +890,7 @@ function likeEscape(text: string): string {
 }
 
 function quickClause(keywords: string[]): string {
-  // instr() は大文字小文字を区別するので、従来の正規表現と同じ一致方になる。
+  // instr は大文字小文字を区別するので、従来の正規表現と同じ一致方になる。
   return `(${keywords.map(() => '(instr(name, ?) > 0 OR instr(message_content, ?) > 0)').join(' OR ')})`;
 }
 
@@ -940,7 +908,7 @@ export async function getTemplatesWithUsageCount(
   filter?: TemplateListFilter,
 ): Promise<{ items: TemplateRowWithUsage[]; total: number }> {
   // 1. templates 本体
-  const filters: string[] = [];
+  const filters: string[] = ['deleted_at IS NULL'];
   const values: unknown[] = [];
   if (category) {
     filters.push('category = ?');
@@ -950,6 +918,7 @@ export async function getTemplatesWithUsageCount(
     filters.push('message_type = ?');
     values.push(filter.messageType);
   }
+  if (filter?.textOnly) filters.push(plainTextTemplateWhere);
   if (filter?.q && filter.q.trim() !== '') {
     const like = `%${likeEscape(filter.q.trim())}%`;
     filters.push(`(name LIKE ? ESCAPE '\\' OR message_content LIKE ? ESCAPE '\\')`);
@@ -961,8 +930,8 @@ export async function getTemplatesWithUsageCount(
     if (filter.folderIds.length === 0) {
       filters.push('1 = 0');
     } else {
-      filters.push(`folder_id IN (${filter.folderIds.map(() => '?').join(',')})`);
-      values.push(...filter.folderIds);
+      filters.push(`folder_id IN (${sqlIdSet(filter.folderIds).sql})`);
+      values.push(...(filter.folderIds.length ? sqlIdSet(filter.folderIds).binds : []));
     }
   }
   if (filter?.quick === 'reservation' || filter?.quick === 'ec') {
@@ -973,9 +942,9 @@ export async function getTemplatesWithUsageCount(
   if (scope) {
     if (scope.accountIds.length > 0) {
       filters.push(
-        `(line_account_id IN (${scope.accountIds.map(() => '?').join(',')})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
+        `(line_account_id IN (${sqlIdSet(scope.accountIds).sql})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
       );
-      values.push(...scope.accountIds);
+      values.push(...(scope.accountIds.length ? sqlIdSet(scope.accountIds).binds : []));
     } else {
       filters.push(scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
     }
@@ -989,8 +958,7 @@ export async function getTemplatesWithUsageCount(
   // 2. 列で参照している設定を1回の問い合わせでまとめて取る。
   // 使用先のアカウントも一緒に返し、テンプレートと同じアカウント
   // （または未設定）の使用先だけを数える。詳細の getTemplateUsage と
-  // 同じ粒度・同じ境界にしないと「一覧の数」と「詳細の件数」がずれる
-  // （#891 N-135/142/143）。
+  // 同じ粒度・同じ境界にしないと「一覧の数」と「詳細の件数」がずれる。
   // D1 の compound SELECT 上限(5項)を超えないよう2本に分けて問い合わせる。
   const relationalResA = await db.prepare(
     `SELECT template_id, acct FROM (
@@ -1062,7 +1030,7 @@ export async function getTemplatesWithUsageCount(
 
   // テンプレートがアカウント所属なら、使用先は同じアカウント or
   // 未設定のものだけ。別アカウントの設定は名前も遷移先も見せられず、
-  // 数だけ残ると削除が永久に止まる（#891）。
+  // 数だけ残ると削除が永久に止まる。
   const countVisible = (template: { id: string; line_account_id: string | null }): number => {
     const refs = usageRefs.get(template.id) ?? [];
     const account = template.line_account_id;
@@ -1073,7 +1041,7 @@ export async function getTemplatesWithUsageCount(
   let templates: TemplateRow[];
   if (filter?.quick === 'frequent') {
     /*
-      PERF-12 「よく使う」: 送信実績順は行を切る前に決める必要がある。
+      「よく使う」: 送信実績順は行を切る前に決める必要がある。
       絞り込んだ全件の id だけを取り、スコア順に切ってからその区画の
       行だけ SELECT * で読む。画面側の従来順（月間→累計→使用箇所数の
       多い順）と同じスコアにする。
@@ -1102,8 +1070,8 @@ export async function getTemplatesWithUsageCount(
       templates = [];
     } else {
       const rows = await db.prepare(
-        `SELECT * FROM templates WHERE id IN (${pageIds.map(() => '?').join(',')})`,
-      ).bind(...pageIds).all<TemplateRow>();
+        `SELECT * FROM templates WHERE id IN (SELECT value FROM json_each(?))`,
+      ).bind(JSON.stringify(pageIds)).all<TemplateRow>();
       const order = new Map(pageIds.map((id, index) => [id, index]));
       templates = (rows.results ?? [])
         .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
@@ -1125,27 +1093,49 @@ export async function getTemplatesWithUsageCount(
   };
 }
 
+/** タブの種類で数えるための行。一覧と同じく削除済みを除き、種類の判定に使う列だけ読む。 */
+export interface TemplateSectionRow {
+  folder_id: string | null;
+  message_type: string;
+  message_content: string;
+  draft_message_content: string | null;
+  question_json: string | null;
+}
+
+export async function getTemplateSectionRows(db: D1Database, scope: TemplateListScope): Promise<TemplateSectionRow[]> {
+  const accountSql = scope.accountIds.length > 0
+    ? `(line_account_id IN (${sqlIdSet(scope.accountIds).sql})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+    : scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0';
+  const binds = scope.accountIds.length > 0 ? sqlIdSet(scope.accountIds).binds : [];
+  const statement = db.prepare(`SELECT folder_id, message_type, message_content, draft_message_content, question_json
+    FROM templates WHERE deleted_at IS NULL AND ${accountSql}`);
+  const rows = await (binds.length > 0 ? statement.bind(...binds) : statement).all<TemplateSectionRow>();
+  return rows.results ?? [];
+}
+
 /**
- * PERF-12: フォルダごとの件数。選択画面のフォルダ欄は件数を出すが、
+ * フォルダごとの件数。選択画面のフォルダ欄は件数を出すが、
  * 一覧を全件読まなくても分かるように、スコープ内で GROUP BY だけする。
  */
 export async function getTemplateFolderCounts(
   db: D1Database,
   scope?: TemplateListScope,
   messageType?: string,
+  textOnly = false,
 ): Promise<Map<string, number>> {
-  const filters: string[] = [];
+  const filters: string[] = ['deleted_at IS NULL'];
   const values: unknown[] = [];
   if (messageType) {
     filters.push('message_type = ?');
     values.push(messageType);
   }
+  if (textOnly) filters.push(plainTextTemplateWhere);
   if (scope) {
     if (scope.accountIds.length > 0) {
       filters.push(
-        `(line_account_id IN (${scope.accountIds.map(() => '?').join(',')})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
+        `(line_account_id IN (${sqlIdSet(scope.accountIds).sql})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
       );
-      values.push(...scope.accountIds);
+      values.push(...(scope.accountIds.length ? sqlIdSet(scope.accountIds).binds : []));
     } else {
       filters.push(scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
     }

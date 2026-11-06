@@ -1,0 +1,24 @@
+/*
+ * ★V8 オートメーションの外枠（・・・・）。
+ * 枠・見出し・タブの段・帯の並びは型（ListPage）が持つ。ここはタブの高さと閲覧のみの帯だけ。
+ */
+
+/* 閲覧のみの帯（：タブの下に上下12・左右24の段、薄い青の帯）。 */
+.viewerRow {
+  padding: var(--tpl-am-ro-row-pad);
+}
+
+/* タブ（絵：高さ28・文字の下10・文字 13/18）。共通のタブの V8 の値より詰める。 */
+:global(:root) .tabs [role='tab'] {
+  box-sizing: border-box;
+  height: var(--tpl-am-tab-h);
+  min-height: 0;
+  align-items: flex-start;
+  padding-bottom: 0;
+  line-height: var(--tpl-tabs-text-lh);
+}
+
+/* 数の帯の境目は共通の型と帯に任せる。画面側で線・影を重ねない。 */
+
+/* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
+.viewerBand { }

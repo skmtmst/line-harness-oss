@@ -1,5 +1,5 @@
 /*
- * 1対1トークの差し込み解決(N-026)のルート対照。
+ * 1対1トークの差し込み解決のルート対照。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物の chats ルートを当て、
  * LINE clientだけを止める。
@@ -11,12 +11,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const pushMessage = vi.fn().mockResolvedValue({ sentMessages: [{}] });
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({ pushMessage })),
+  LineClient: vi.fn().mockImplementation(function () { return ({ pushMessage }); }),
 }));
 
 const { chats } = await import('./chats.js');

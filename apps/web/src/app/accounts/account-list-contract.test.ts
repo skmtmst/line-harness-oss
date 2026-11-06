@@ -9,11 +9,11 @@ import {
   matchesQuery,
   parentName,
   webhookLabel,
-} from './account-list-view'
+} from '@/v8/settings/accounts/view'
 import type { LineAccount } from '@line-crm/shared'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(HERE, '../../v8/settings/accounts/accounts.tsx'), 'utf8')
 
 const account = (over: Partial<LineAccount> = {}): LineAccount => ({
   id: 'a1', channelId: '2007123456', name: '然-NEN- TEST',
@@ -25,48 +25,48 @@ const account = (over: Partial<LineAccount> = {}): LineAccount => ({
 })
 
 /**
- * LINEアカウントの一覧（設計 ★V6 33-1 `QT91v`）。
+ * LINEアカウントの一覧（設計板 ）。
  *
- * **これまでここは `/hq` への転送だった。** 統括の店舗管理と、LINE公式
- * アカウントの設定は別のもの（要件 §5-3）。
+ * 板の言葉が正本。接続は「正常／確認停止中／アーカイブ」、
+ * Webhook は「正常／未確認」の2択で出す。
  */
-describe('V6 33-1 LINEアカウント一覧', () => {
-  it('転送をやめて画面にする', () => {
-    expect(PAGE).not.toContain("redirect('/hq')")
-    expect(PAGE).toContain('data-design-node="QT91v"')
+describe('V7vn3 LINEアカウント一覧', () => {
+  it('古い板 QT91v の骨組みへ戻さない', () => {
+    // 板 V7vn3 の枠・数の4枚・表・行の操作は accounts-row-actions-react.test.tsx が描いて確かめる。
+    expect(PAGE).not.toContain('data-design-node="QT91v"')
   })
 
   it('接続状態を、色だけでなく文字で言う', () => {
-    expect(connectionLabel(account({ isActive: true })).label).toBe('稼働中')
+    expect(connectionLabel(account({ isActive: true, connection: { status: 'ok' } })).label).toBe('正常')
     expect(connectionLabel(account({ isActive: false })).label).toBe('停止中')
+    expect(connectionLabel(account({ archivedAt: '2026-09-01T00:00:00Z' })).label).toBe('アーカイブ')
   })
 
-  it('「確認していません」と「合っていません」を言い分ける', () => {
+  it('Webhook は「正常／未確認」の2択にする', () => {
     /*
-      どちらも「届かないかもしれない」だが、運用者のやることが違う——
-      前者は確かめる、後者は直す。同じ言葉にすると、直す手が分からない。
+      板  の Webhook 欄は2択。合っていない・登録が無い・
+      まだ確かめていないは、どれも「未確認」にまとめる。
+      直し方は詳しい画面で言い分ける。
     */
     const w = (status: NonNullable<LineAccount['webhook']>['status']) =>
       webhookLabel(account({ webhook: { expectedUrl: '', actualUrl: null, active: null, status } })).label
-    expect(w('matched')).toBe('一致・利用中')
-    expect(w('mismatched')).toBe('URLが違います')
-    expect(w('unconfigured')).toBe('登録されていません')
-    expect(w('unknown')).toBe('確認していません')
-    // `webhook` そのものが付いてこないときも「確認していません」。
-    expect(webhookLabel(account()).label).toBe('確認していません')
+    expect(w('matched')).toBe('正常')
+    expect(w('mismatched')).toBe('未確認')
+    expect(w('unconfigured')).toBe('未確認')
+    expect(w('unknown')).toBe('未確認')
+    // `webhook` そのものが付いてこないときも「未確認」。
+    expect(webhookLabel(account()).label).toBe('未確認')
   })
 
-  it('接続に問題があるのは、合っていないか登録が無いとき', () => {
-    const w = (status: NonNullable<LineAccount['webhook']>['status']) =>
-      account({ webhook: { expectedUrl: '', actualUrl: null, active: null, status } })
-    expect(hasConnectionProblem(w('mismatched'))).toBe(true)
-    expect(hasConnectionProblem(w('unconfigured'))).toBe(true)
-    // **確かめていないだけのものを「問題あり」に数えない。**
-    expect(hasConnectionProblem(w('unknown'))).toBe(false)
-    expect(hasConnectionProblem(w('matched'))).toBe(false)
+  it('保存した接続の問題だけを数え、未確認・停止・保管を分ける', () => {
+    expect(connectionLabel(account()).label).toBe('未確認')
+    expect(hasConnectionProblem(account({ connection: { status: 'warn' } }))).toBe(true)
+    expect(hasConnectionProblem(account({ connection: { status: 'unknown' } }))).toBe(false)
+    expect(hasConnectionProblem(account({ isActive: false, connection: { status: 'warn' } }))).toBe(false)
+    expect(hasConnectionProblem(account({ archivedAt: '2026-10-01', connection: { status: 'warn' } }))).toBe(false)
   })
 
-  it('絞り込みは設計のタブと同じ', () => {
+  it('絞り込みは板と同じ並び', () => {
     expect(matchesFilter(account({ isActive: true }), 'active')).toBe(true)
     expect(matchesFilter(account({ isActive: true }), 'inactive')).toBe(false)
     expect(matchesFilter(account({ isActive: false }), 'inactive')).toBe(true)
@@ -90,22 +90,7 @@ describe('V6 33-1 LINEアカウント一覧', () => {
     expect(parentName(account(), [])).toBe('—')
   })
 
-  it('APIで取れるアーカイブ件数・友だち数・既定を表示する', () => {
-    /*
-      一覧APIの `stats` とライフサイクル値を使う。値が無い固定データでは
-      `—` のままにし、未取得を 0 と誤表示しない。
-    */
-    expect(PAGE).toContain('title="アーカイブ" value={archivedCount}')
-    expect(PAGE).toContain('account.stats.friendCount')
-    expect(PAGE).toContain('account.isDefault')
-  })
-
-  it('並び順と親子の操作を、保存できる既存部品へつなぐ', () => {
-    expect(PAGE).toContain("import AccountOrdering from '@/components/accounts/account-ordering'")
-    expect(PAGE).toContain('{orderingOpen && <AccountOrdering />}')
-  })
-
-  it('失敗したときに、運用者ができることを置く', () => {
-    expect(PAGE).toContain('再読み込み')
+  it('一覧に「ここで見えること」の説明の塊を置かない', () => {
+    expect(PAGE).not.toContain('ここで見えること')
   })
 })

@@ -7,7 +7,8 @@ import {
   routeClassification,
 } from './middleware/feature-enforcement.js';
 
-const INFRASTRUCTURE_PATTERNS = new Set(['/*', '/api/*']);
+// app.use の認証・権限 middleware は endpoint ではない。
+const INFRASTRUCTURE_PATTERNS = new Set(['/*', '/api/*', '/api/hq/*']);
 
 function mountedRoutes(): Array<{ method: string; path: string }> {
   const unique = new Map<string, { method: string; path: string }>();

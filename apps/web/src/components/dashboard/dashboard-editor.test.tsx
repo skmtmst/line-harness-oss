@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import DashboardEditor, {
+import DashboardEditor from '@/v8/dashboard/dashboard-editor'
+import {
   defaultDashboardPreferences,
   moveDashboardItem,
 } from './dashboard-editor'

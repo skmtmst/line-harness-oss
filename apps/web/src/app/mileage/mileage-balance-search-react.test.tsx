@@ -17,9 +17,9 @@ import { AccountProvider } from '@/contexts/account-context'
 import MileagePage from './page'
 
 vi.mock('next/link', () => ({ default: () => null }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams('tab=balances'),
   usePathname: () => '/mileage',
 }))
 
@@ -52,7 +52,12 @@ function memberFixture() {
   }
 }
 
+/*
+ * D022: 見本は実APIの形に合わせる（実APIは nextExpiringAt・measuredAt を
+ * 必ず返す）。欠けた見本は応答検査で弾かれ、検索欄まで届かない。
+ */
 const friendsOverview = {
+  balanceSource: 'musubo',
   items: [memberFixture()],
   summary: {
     totalMembers: 1,
@@ -62,8 +67,10 @@ const friendsOverview = {
     monthChange: 0,
     rankCounts: [],
     expiringMiles30d: null,
+    nextExpiringAt: null,
   },
   pagination: { total: 1, limit: 20, offset: 0 },
+  measuredAt: '2026-09-10T00:00:00.000Z',
 }
 
 /*
@@ -167,6 +174,7 @@ async function renderPage() {
 }
 
 async function settle(ticks = 6) {
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   for (let i = 0; i < ticks; i += 1) {
     await act(async () => { await Promise.resolve() })
   }
@@ -175,7 +183,7 @@ async function settle(ticks = 6) {
 async function waitForSearchInput(): Promise<HTMLInputElement> {
   for (let i = 0; i < 40; i += 1) {
     await act(async () => { await Promise.resolve() })
-    const input = container.querySelector('input[placeholder="友だちの名前で検索"]')
+    const input = container.querySelector('input[placeholder="友だちの名前で探す"]')
     if (input) return input as HTMLInputElement
   }
   throw new Error('検索欄が出ませんでした')
@@ -196,14 +204,13 @@ function pressEnter(input: HTMLInputElement) {
 }
 
 describe('友だちの残高タブの検索(本物のReact)', () => {
-  it('検索欄でEnterを押すと条件が即時確定して一覧を取り直す', async () => {
+  it('検索語を入れて300ms待つと自動で一覧を取り直す', async () => {
     const net = stubFetch()
     await renderPage()
     const input = await waitForSearchInput()
 
     typeInto(input, '田中')
-    // デバウンスの300msを待たず、Enterだけで確定・取り直しが走る。
-    pressEnter(input)
+    // Enterなしでも検索を確定する。
     await settle()
 
     const searched = net.friendsCalls().filter((call) => net.searchOf(call) === '田中')

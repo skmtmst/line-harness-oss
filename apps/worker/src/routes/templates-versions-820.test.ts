@@ -6,11 +6,11 @@ import {
   getBroadcastById,
   updateBroadcast,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /**
- * #820: テンプレートの版履歴と参照表。
+ * テンプレートの版履歴と参照表。
  * 公開のたびに版を足す（前の版は変えない）。戻すは新しい版を作る。
  * 予約済み・送信中の配信で使うものは消せない。送った配信は送った時の版のまま。
  */
@@ -33,7 +33,12 @@ function app() {
   return hono;
 }
 
-function json(method: string, path: string, body?: unknown, key?: string, db = store.db) {
+async function json(method: string, path: string, body?: unknown, key?: string, db = store.db) {
+  // 読みたての編集画面から保存する経路を試す。古い版を試す場合は、本文に明示した版を優先する。
+  if (method === 'PUT' && path.startsWith('/api/templates/')) {
+    const row = store.raw.prepare('SELECT published_version, draft_revision FROM templates WHERE id=?').get(path.split('/').at(-1)) as {published_version:number;draft_revision:number} | undefined;
+    if (row) body = { expectedVersion: row.published_version, expectedDraftRevision: row.draft_revision, ...body as Record<string, unknown> };
+  }
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (key) headers['Idempotency-Key'] = key;
   return app().request(path, {
@@ -94,6 +99,9 @@ async function versionsOnApi(id: string) {
       status: string;
       messageContent: string;
       effectiveFrom: string | null;
+      createdByStaffId: string | null;
+      creatorName: string | null;
+      creatorNameSource: 'current_staff_profile' | null;
     }>;
   };
 }
@@ -282,6 +290,18 @@ describe('参照表と削除の止め', () => {
     expect(againBody.data.scenarioSteps[0].templateVersion).toBe(1);
   });
 
+  it('シナリオの使用先は保存番号と別に画面の通数を返す', async () => {
+    const id = await createTemplateOnApi('本文');
+    await publishOnApi(id, '', 'testkey-v1');
+    store.raw.prepare(`INSERT INTO scenarios (id, name, trigger_type, line_account_id) VALUES ('sc-gap', '間のあるシナリオ', 'manual', 'account-1')`).run();
+    for (const order of [1, 3, 5]) await createScenarioStep(store.db, {
+      scenarioId: 'sc-gap', stepOrder: order, messageType: 'text', messageContent: '控え', ...(order === 3 ? { templateId: id } : {}),
+    });
+    const response = await json('GET', `/api/templates/${id}/usages`, {});
+    const body = await response.json() as { data: { scenarioSteps: Array<{ stepOrder: number; displayOrder: number }> } };
+    expect(body.data.scenarioSteps).toEqual([expect.objectContaining({ stepOrder: 3, displayOrder: 2 })]);
+  });
+
   it('一斉配信の参照は送った時の版で残る', async () => {
     const id = await createTemplateOnApi('最初の本文');
     await publishOnApi(id, '', 'testkey-v1');
@@ -295,4 +315,58 @@ describe('参照表と削除の止め', () => {
     expect(body.data.broadcasts[0].title).toBe('秋の会員向け案内');
     expect(body.data.broadcasts[0].templateVersionNumber).toBe(1);
   });
+});
+
+
+describe(': 版を作った人', () => {
+  it('公開時の担当者IDから同じ組織の名前を返す。再公開と名簿の変更も区別する', async () => {
+    store.raw.exec(`INSERT INTO tenants(id,name) VALUES('tenant-api5','組5');
+      INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id)
+        VALUES('account-1','店','api5','fixture','fixture','tenant-api5');
+      INSERT INTO staff_members(id,name,role,api_key,tenant_id)
+        VALUES('owner-1','作成者','owner','fixture','tenant-api5')`);
+    const id = await createTemplateOnApi();
+    await publishOnApi(id, '版1', 'author-1');
+    await publishOnApi(id, '版2', 'author-2');
+    const original = (await versionsOnApi(id)).data;
+    expect(original.map(v => [v.versionNumber, v.createdByStaffId, v.creatorName, v.creatorNameSource]))
+      .toEqual([[2,'owner-1','作成者','current_staff_profile'],[1,'owner-1','作成者','current_staff_profile']]);
+    store.raw.exec("UPDATE staff_members SET name='変更後',is_active=0 WHERE id='owner-1'");
+    expect((await versionsOnApi(id)).data.map(v => v.creatorName)).toEqual(['変更後','変更後']);
+    expect(store.raw.prepare('SELECT COUNT(*) n FROM template_versions').get()).toEqual({ n: 2 });
+  });
+
+  it('旧版・不明な担当者・別組織・アカウント未設定の名前を補わず、担当外は404', async () => {
+    store.raw.exec(`INSERT INTO tenants(id,name) VALUES('tenant-api5','組5'),('tenant-other','別組織');
+      INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id)
+        VALUES('account-1','店','api5','fixture','fixture','tenant-api5');
+      INSERT INTO staff_members(id,name,role,api_key,tenant_id)
+        VALUES('owner-1','別組織の秘密名','owner','fixture','tenant-other')`);
+    const id = await createTemplateOnApi();
+    await publishOnApi(id, '公開版', 'unknown-author');
+    expect((await versionsOnApi(id)).data[0]).toMatchObject({ createdByStaffId: 'owner-1', creatorName: null, creatorNameSource: null });
+    for (const author of [null, 'missing']) {
+      store.raw.prepare('UPDATE template_versions SET created_by_staff_id=? WHERE template_id=?').run(author,id);
+      expect((await versionsOnApi(id)).data[0]).toMatchObject({ creatorName: null, creatorNameSource: null });
+    }
+    store.raw.prepare('UPDATE templates SET line_account_id=NULL WHERE id=?').run(id);
+    expect((await versionsOnApi(id)).data[0].creatorName).toBeNull();
+    accountAccess.canAccessAllLineAccounts.mockResolvedValue(false);
+    expect((await json('GET', `/api/templates/${id}/versions`)).status).toBe(404);
+  });
+});
+
+
+it('一覧は公開版と編集途中の複数通を分けて返す', async () => {
+  const id = await createTemplateOnApi();
+  await publishOnApi(id, '', 'testkey-multiple-list');
+  const published = [{id:'p',type:'text',content:{text:'公開'}}];
+  const draft = [{id:'d1',type:'text',content:{text:'一通目'}},{id:'d2',type:'text',content:{text:'二通目'}}];
+  store.raw.prepare('UPDATE templates SET message_bubbles_json=?, draft_message_bubbles_json=?, draft_message_content=?, draft_revision=1 WHERE id=?').run(JSON.stringify(published),JSON.stringify(draft),'編集途中',id);
+  const response = await json('GET', '/api/templates?account_id=account-1');
+  expect(response.status).toBe(200);
+  const result = await response.json() as {data:Array<{id:string;messageBubbles:unknown;draftMessageBubbles:unknown}>};
+  const row = result.data.find(item => item.id === id)!;
+  expect(row.messageBubbles).toEqual(published);
+  expect(row.draftMessageBubbles).toEqual(draft);
 });

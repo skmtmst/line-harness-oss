@@ -18,7 +18,7 @@ export const ROUTES = [
   // D 受信箱（3カラム全画面）
   { name: 'chats', path: '/chats', type: 'D' },
   // 設定系
-  { name: 'settings-features', path: '/settings/features', type: 'L' },
+  { name: 'settings-features', path: '/settings', type: 'L' },
   { name: 'staff', path: '/staff', type: 'L' },
   // S ダッシュボード（カードを並べる画面）
   /*
@@ -32,6 +32,7 @@ export const ROUTES = [
   // 残りの一覧
   { name: 'broadcasts', path: '/broadcasts', type: 'L' },
   { name: 'rich-menus', path: '/rich-menus', type: 'L' },
+  { name: 'initial-rich-menu', path: '/getting-started/rich-menu', type: 'C', widths: [1152, 1440, 1920] },
   { name: 'automations', path: '/automations', type: 'L' },
 ]
 
@@ -93,5 +94,5 @@ export const TAG_STATES = [
   },
 ]
 
-/** 画像を撮る幅。V6の設計は1920だが、1440でも横スクロールが出てはいけない。 */
+/** 画像を撮る幅。PCのどの幅でも横スクロールが出てはいけない。 */
 export const WIDTHS = [1440, 1920]

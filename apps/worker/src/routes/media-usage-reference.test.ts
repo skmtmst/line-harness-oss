@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { tenantScopeMiddleware } from '../middleware/tenant-scope.js';
 import { businessAuditMiddleware } from '../middleware/business-audit.js';
@@ -15,7 +15,7 @@ vi.mock('../services/file-scan.js', () => ({
 }));
 
 /**
- * N-202 (#832): 使用先ごとの版固定参照・ライブ参照切替。
+ *  使用先ごとの版固定参照・ライブ参照切替。
  *
  * 本番と同じ順序 auth → tenantScope → businessAudit → feature →
  * images → contents で、実D1・実認証・実走査のまま確かめる。
@@ -149,6 +149,7 @@ function environment(): Env['Bindings'] {
     [V1_KEY]: 'PNG-V1',
     [V2_KEY]: 'PNG-V2',
     [V3_KEY]: 'PNG-V3',
+    'form-uploads/form/friend/private.jpg': 'SYNTHETIC-PRIVATE',
   };
   return {
     DB: enforceD1BindLimit ? ({
@@ -182,6 +183,7 @@ async function request(path: string, init?: { method?: string; apiKey?: string; 
     headers: {
       ...(init?.apiKey ? { Authorization: `Bearer ${init.apiKey}` } : {}),
       ...(init?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(init?.method === 'PATCH' ? { 'If-Match': '1' } : {}),
     },
     body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
   }, environment());
@@ -210,7 +212,7 @@ function mediaMetadata(id = 'md-1'): { filename: string; folder_id: string | nul
 
 beforeEach(() => {
   warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
   enforceD1BindLimit = false;
   insertAccount('acc-1', DEFAULT_TENANT_ID);
   insertAccount('acc-2', 'tenant-B');
@@ -226,6 +228,15 @@ beforeEach(() => {
 });
 
 describe('ライブ参照の公開配信', () => {
+  it('S11 blocks private form objects through the public live-media alias', async () => {
+    testDb.raw.prepare("UPDATE media SET r2_key='form-uploads/form/friend/private.jpg' WHERE id='md-1'").run();
+    expect((await request('/media/md-1/content')).status).toBe(404);
+  });
+  it('S11 blocks webinar originals through both public media routes', async () => {
+    testDb.raw.prepare("INSERT INTO webinars(id,title,slug,duration_seconds,video_prefix,created_at,updated_at) VALUES ('synthetic-webinar','Synthetic','synthetic',60,?,'2026-10-13T00:00:00','2026-10-13T00:00:00')").run(V1_KEY);
+    expect((await request('/media/md-1/content')).status).toBe(404);
+    expect((await request(`/images/${V1_KEY}`)).status).toBe(404);
+  });
   it('認証なしで最新版へ解決され、immutableでは返さない', async () => {
     const res = await request('/media/md-1/content');
     expect(res.status).toBe(200);
@@ -507,10 +518,10 @@ describe('認証と権限', () => {
     expect(templateContent('t-pinned')).toContain(V1_KEY);
   });
 
-  it('staffは役割不足で403', async () => {
+  it('素材の編集権限を持つstaffは参照を切り替えられる', async () => {
     const res = await patchUsageReference(CONTENTS_KEY, switchBody);
-    expect(res.status).toBe(403);
-    expect(templateContent('t-pinned')).toContain(V1_KEY);
+    expect(res.status).toBe(200);
+    expect(templateContent('t-pinned')).toContain(LIVE_URL);
   });
 
   it('権限のないstaffは境界で403', async () => {

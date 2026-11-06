@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   getBroadcastStats,
+  getFriendStats,
   getDashboardOverview,
   dashboardFreshness,
   recordFriendSnapshot,
@@ -85,12 +86,14 @@ describe('期間の解釈', () => {
     expect(periodDays('today')).toBe(1);
     expect(periodDays('last7')).toBe(7);
     expect(periodDays('last28')).toBe(28);
+    expect(periodDays('last30')).toBe(30);
   });
 
   test('期間の始まりは、その日数ぶん遡った日', () => {
     expect(periodStart('today')).toBe(jstDate(0));
     expect(periodStart('last7')).toBe(jstDate(-6));
     expect(periodStart('last28')).toBe(jstDate(-27));
+    expect(periodStart('last30')).toBe(jstDate(-29));
   });
 });
 
@@ -156,6 +159,19 @@ describe('友だちの内訳', () => {
   });
 });
 
+describe('30日の集計境界', () => {
+  test('29日前を含み、30日前を含めない。旧28日とは結果が異なる', async () => {
+    insertFriend('included', { createdAt: `${jstDate(-29)}T12:00:00.000+09:00` });
+    insertFriend('excluded', { createdAt: `${jstDate(-30)}T12:00:00.000+09:00` });
+    const thirty = await getDashboardOverview(db, 'last30', { allTenants: true });
+    const legacy = await getDashboardOverview(db, 'last28', { allTenants: true });
+    expect(thirty.period).toBe('last30');
+    expect(thirty.sections.conversions.period).toBe('last30');
+    expect(thirty.operations.inflowTop.reduce((sum, row) => sum + row.count, 0)).toBe(1);
+    expect(legacy.operations.inflowTop).toEqual([]);
+  });
+});
+
 describe('友だち数の推移', () => {
   test('日次記録があればそれを使い、推定にしない', async () => {
     insertFriend('a');
@@ -170,7 +186,7 @@ describe('友だち数の推移', () => {
   test('上の期間切り替えに関わらず、いつも7日ぶん出る', async () => {
     // 推移は「直近どう動いたか」を見るもので、上の切り替えは KPI の集計期間。
     // 連動させていた頃は「今日」を選ぶと1行だけになり、増減が読めなかった。
-    for (const period of ['today', 'last7', 'last28'] as const) {
+    for (const period of ['today', 'last7', 'last28', 'last30'] as const) {
       const { trend } = await getDashboardOverview(db, period, { allTenants: true });
       expect(trend).toHaveLength(7);
       expect(trend[trend.length - 1].date).toBe(jstDate(0));
@@ -305,6 +321,24 @@ describe('友だち数の推移', () => {
     expect(today.sections.trend.asOf).not.toBe(today.generatedAt);
     expect(today.sections.trend.status).toBe('stale');
     expect(today.sections.trend.freshness).toBe('stale');
+  });
+
+  test('多数の店舗も一定の問い合わせ数で空店舗を含めて記録する', async () => {
+    for (let i = 0; i < 350; i++) insertAccount(`store-${i}`);
+    insertFriend('unassigned');
+    let queries = 0;
+    const budgetDb = {
+      prepare(sql: string) {
+        queries++;
+        if (queries > 3) throw new Error('snapshot query budget exceeded');
+        return db.prepare(sql);
+      },
+    } as D1Database;
+    await recordFriendSnapshot(budgetDb, null, jstDate(0));
+    expect(queries).toBeLessThanOrEqual(3);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM friend_daily_snapshots').get()).toEqual({ n: 351 });
+    expect(sqlite.prepare("SELECT total, active FROM friend_daily_snapshots WHERE line_account_id = 'store-349'").get()).toEqual({ total: 0, active: 0 });
+    expect(sqlite.prepare("SELECT total FROM friend_daily_snapshots WHERE line_account_id = '__unassigned__'").get()).toEqual({ total: 1 });
   });
 
   test('日次記録は1回の上限まで進め、未記録の残りを次回に続ける', async () => {
@@ -610,7 +644,7 @@ describe('今月の配信(#666 N-003)', () => {
   test('期間を切り替えても「今月の配信」の範囲は変わらず、区画の期間表示は this-month', async () => {
     const { countedBroadcasts } = seedDelivery();
     const scope = { allowedAccountIds: ['account-a'], includeUnassigned: false } as const;
-    for (const period of ['today', 'last7', 'last28'] as const) {
+    for (const period of ['today', 'last7', 'last28', 'last30'] as const) {
       const overview = await getDashboardOverview(db, period, scope);
       expect(overview.delivery.sent).toBe(3);
       expect(overview.delivery.broadcasts).toBe(countedBroadcasts.length);
@@ -637,5 +671,30 @@ describe('今月の配信(#666 N-003)', () => {
     expect(stats.thisMonth).toBe(countedBroadcasts.length);
     expect(countedBroadcasts).toEqual(['b-today', 'b-edge', 'b-made-last-month', 'b-legacy']);
     expect(stats.scheduled).toBe(1);
+  });
+});
+
+describe('友だち一覧と同じ母集団の対応状態', () => {
+  test('会話なしも対応済みに含め、別アカウントと未所属を混ぜない', async () => {
+    insertAccount('a'); insertAccount('b');
+    for (const id of ['no-chat', 'resolved', 'unread', 'progress', 'hold']) insertFriend(id, { lineAccountId: 'a' });
+    insertFriend('other', { lineAccountId: 'b' });
+    insertFriend('unassigned');
+    for (const [id, status] of [['resolved', 'resolved'], ['unread', 'unread'], ['progress', 'in_progress'], ['hold', 'on_hold'], ['other', 'unread']]) {
+      sqlite.prepare('INSERT INTO chats (id,friend_id,status,created_at,updated_at,last_message_at) VALUES (?,?,?,?,?,?)').run('chat-'+id, id, status, jstDate(0), jstDate(0), jstDate(0));
+    }
+    const stats = await getFriendStats(db, { allowedAccountIds: ['a'], includeUnassigned: false });
+    expect(stats).toMatchObject({ total: 5, unanswered: 1, resolved: 2 });
+    // 一覧の行が使う現在状態の既定値も同じ。
+    const rows = sqlite.prepare("SELECT COALESCE(c.status, 'resolved') AS status FROM friends f LEFT JOIN chats c ON c.friend_id=f.id WHERE f.line_account_id='a'").all() as {status:string}[];
+    expect(stats.unanswered).toBe(rows.filter(row => row.status === 'unread').length);
+    expect(stats.resolved).toBe(rows.filter(row => row.status === 'resolved').length);
+    const withUnassigned = await getFriendStats(db, { allowedAccountIds: ['a'], includeUnassigned: true });
+    expect(withUnassigned).toMatchObject({ total: 6, unanswered: 1, resolved: 3 });
+  });
+  test('閲覧範囲が空なら未対応も対応済みも0', async () => {
+    insertFriend('unassigned');
+    const stats = await getFriendStats(db, { allowedAccountIds: [], includeUnassigned: false });
+    expect(stats).toMatchObject({ total: 0, unanswered: 0, resolved: 0 });
   });
 });

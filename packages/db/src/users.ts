@@ -274,13 +274,13 @@ export interface RelinkActor {
 }
 
 /*
- * R385 + R392/R394: 友だちを本人へ結ぶときは、結び直しの競合対策と
+ * 友だちを本人へ結ぶときは、結び直しの競合対策と
  * マイルの移管の両方を行う。
- * R394: 古い候補の有効な結び付き行も外す（friendsだけ付け替えると古い取消が
+ * 古い候補の有効な結び付き行も外す（friendsだけ付け替えると古い取消が
  * 新しい結び付きを消す）。外した行は理由付きで残す。
- * R385: 結ぶ前に友だち宛てへ付いた台帳・ロット・財布を本人キーへ移す
+ * 結ぶ前に友だち宛てへ付いた台帳・ロット・財布を本人キーへ移す
  * （行は消さず、再実行しても重複しない）。
- * R392: 両本人の版を付け替え成功時だけ進め、競合時はfalseで409にする。
+ * 両本人の版を付け替え成功時だけ進め、競合時はfalseで409にする。
  */
 export async function linkFriendToUser(
   db: D1Database,
@@ -288,6 +288,20 @@ export async function linkFriendToUser(
   userId: string,
   actor: RelinkActor | null = null,
 ): Promise<boolean> {
+  // Identity and wallet operations must share a tenant even for legacy NULL users.
+  const boundary = await db.prepare(`SELECT f.id FROM friends f
+    LEFT JOIN line_accounts a ON a.id=f.line_account_id
+    JOIN users u ON u.id=?
+    WHERE f.id=? AND COALESCE(u.status,'active') <> 'archived'
+      AND COALESCE(u.tenant_id, COALESCE(a.tenant_id, ?)) = COALESCE(a.tenant_id, ?)
+      AND NOT EXISTS (SELECT 1 FROM friends other
+        LEFT JOIN line_accounts oa ON oa.id=other.line_account_id
+        WHERE other.user_id=u.id AND COALESCE(oa.tenant_id, ?) <> COALESCE(a.tenant_id, ?))
+      AND (u.tenant_id IS NOT NULL OR COALESCE(a.tenant_id, ?)=?
+        OR EXISTS (SELECT 1 FROM friends own JOIN line_accounts own_a ON own_a.id=own.line_account_id
+          WHERE own.user_id=u.id AND COALESCE(own_a.tenant_id,?)=COALESCE(a.tenant_id,?)))
+  `).bind(userId,friendId,...Array(8).fill(DEFAULT_TENANT_ID)).first();
+  if (!boundary) return false;
   const now = jstNow();
   const userKey = `user:${userId}`;
   const friendKey = `friend:${friendId}`;
@@ -357,7 +371,7 @@ export async function linkFriendToUser(
     ).bind(now, userId, friendId, userId),
   ]);
   /*
-   * R392: 結び付きが変わるので両本人の版を進める。後に開いた保存は409になる。
+   * 結び付きが変わるので両本人の版を進める。後に開いた保存は409になる。
    * friends の付け替えが0件＝別の人が先に動かした＝結び付き行も触っていない
    *（同じ条件のため）ので false で知らせる。マイル移管は成功時だけ行う。
    */

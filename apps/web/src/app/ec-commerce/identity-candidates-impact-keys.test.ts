@@ -40,7 +40,7 @@ describe('EC計量キーの共有(#517 軽4)', () => {
   })
 
   it('K2: 表示側に手書きのキー一覧が無い', () => {
-    const page = readFileSync(join(import.meta.dirname, 'identity-candidates', 'page.tsx'), 'utf8')
+    const page = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/identity.tsx'), 'utf8')
     expect(page).toContain('ORDER_IMPACT_KEYS')
     expect(page).toContain('REVENUE_IMPACT_KEYS')
     expect(page).not.toContain("'order_count'")

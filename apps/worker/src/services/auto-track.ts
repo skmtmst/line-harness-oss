@@ -1,7 +1,10 @@
-import { getOrCreateAutoTrackedLink } from '@line-crm/db';
+import { issueTrackedLinkIdentity } from './tracked-link-identity.js';
+import { convertBroadcastAsset, isBroadcastAssetKind } from '@line-crm/shared';
+import { decorateTapExtras } from './tap-extra-links.js';
+import { getOrCreateAutoTrackedLink, getTrackedLinkByIdOrShortCode } from '@line-crm/db';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 
-// Domains where Universal Links / App Links should be used
+// Universal Link / App Link で開くドメイン。
 const APP_LINK_DOMAINS = new Set([
   'x.com',
   'twitter.com',
@@ -17,8 +20,7 @@ function isAppLinkDomain(url: string): boolean {
   try {
     const hostname = new URL(url).hostname.replace(/^www\./, '');
     if (APP_LINK_DOMAINS.has(hostname)) return true;
-    // common share / mobile / regional subdomains: vm.tiktok.com, m.youtube.com,
-    // mobile.x.com 等。`.<root-domain>` で末尾一致させる。
+    // モバイルや地域別のサブドメインも、.ルートドメインの末尾一致で扱う。
     for (const root of APP_LINK_DOMAINS) {
       if (hostname.endsWith(`.${root}`)) return true;
     }
@@ -44,7 +46,7 @@ function appendOpenExternalBrowser(url: string): string {
 
 const URL_REGEX = /https?:\/\/[^\s"'<>\])}]+/g;
 
-// URLs that should NOT be wrapped (internal/system URLs)
+// 内部・システムの URL は計測リンクで包まない。
 const SKIP_PATTERNS = [
   /\/t\/[0-9a-f-]{36}/,       // already a tracking link (legacy UUID form)
   /liff\.line\.me/,            // LIFF URLs
@@ -54,12 +56,11 @@ const SKIP_PATTERNS = [
 
 function shouldSkip(url: string, skipPrefixes: string[]): boolean {
   if (SKIP_PATTERNS.some((p) => p.test(url))) return true;
-  // Short-code tracking links (/t/Ab3xY9k) don't match the UUID pattern, so
-  // skip anything under our own worker or the configured short domain.
+  // 短縮コードは UUID の式に当たらないため、自分の Worker と独自短縮ドメインも除外し、再短縮を防ぐ。
   return skipPrefixes.some((prefix) => prefix && url.startsWith(`${prefix}/t/`));
 }
 
-/** Extract trackable URLs from content string */
+
 function extractUrls(content: string, skipPrefixes: string[]): Set<string> {
   const urls = new Set<string>();
   for (const match of content.matchAll(URL_REGEX)) {
@@ -69,7 +70,7 @@ function extractUrls(content: string, skipPrefixes: string[]): Set<string> {
   return urls;
 }
 
-/** Create tracking links and return a map of original → tracking URL */
+
 async function createTrackingMap(
   db: D1Database,
   urls: Set<string>,
@@ -78,21 +79,17 @@ async function createTrackingMap(
   templateId?: string | null,
   broadcastId?: string | null,
 ): Promise<Map<string, { trackingUrl: string; originalUrl: string; label: string }>> {
-  // Lookups are independent per URL, so run them concurrently — a carousel
-  // can hold 10+ URIs and sequential D1 round-trips add up inside per-friend
-  // delivery loops.
+  // カルーセルの多数 URL で D1 往復が積み重ならないよう、独立した解決を並列に行う。
   const entries = await Promise.all(
     [...urls].map(async (url) => {
-      // Reuses the one auto link per (url, account) — per-friend delivery
-      // loops must not mint a fresh tracked_links row on every send.
+      // 宛先ごとの配信でリンク行が増殖しないよう、同じ URL・アカウントの自動リンクを再利用する。
       const link = await getOrCreateAutoTrackedLink(db, {
         originalUrl: url,
         lineAccountId: lineAccountId ?? null,
         templateId: templateId ?? null,
         dedupScope: broadcastId ? `broadcast:${broadcastId}` : null,
       });
-      // /t/ URL — Worker handles LINE app detection and LIFF redirect server-side.
-      // Prefer the short code (linkBase may be a branded short domain).
+      // Worker が LINE 判別と LIFF 移動を行う /t/ を使い、独自ドメインでも短縮コードを優先する。
       const trackingUrl = `${linkBase}/t/${link.short_code ?? link.id}`;
       const hostname = new URL(url).hostname.replace('www.', '');
       const label = hostname.length > 20 ? hostname.slice(0, 20) + '…' : hostname;
@@ -109,17 +106,17 @@ async function createTrackingMap(
   return new Map(entries);
 }
 
-/** Build a Flex bubble from text + tracked URLs */
+
 function textToFlex(
   text: string,
   links: { trackingUrl: string; originalUrl: string; label: string }[],
 ): string {
-  // Remove URLs from the text body
+
   let cleanText = text;
   for (const link of links) {
     cleanText = cleanText.split(link.originalUrl).join('').trim();
   }
-  // Clean up leftover whitespace/punctuation
+
   cleanText = cleanText.replace(/\s{2,}/g, ' ').replace(/[👉🔗➡️]\s*$/g, '').trim();
 
   const bodyContents: unknown[] = [];
@@ -134,7 +131,7 @@ function textToFlex(
   }
 
   const buttons = links.map((link) => {
-    // Append openExternalBrowser=1 for app-link domains (opens Safari/Chrome instead of LINE browser)
+    // LINE 内でなく Safari/Chrome へ渡すため、アプリリンクに openExternalBrowser=1 を付ける。
     const uri = isAppLinkDomain(link.originalUrl)
       ? `${link.trackingUrl}${link.trackingUrl.includes('?') ? '&' : '?'}openExternalBrowser=1`
       : link.trackingUrl;
@@ -176,30 +173,16 @@ export interface AutoTrackResult {
 }
 
 export interface AutoTrackOptions {
-  /**
-   * LINE account that owns the created tracked links. /t/:linkId uses this to
-   * redirect LINE in-app clicks to the owning account's LIFF (instead of the
-   * global env.LIFF_URL) so friends of that account never see another
-   * account's consent screen.
-   */
+  /** 別アカウントの同意画面を出さないよう、作成した計測リンクの所属を使い、クリックはそのアカウントの LIFF へ戻す。 */
   lineAccountId?: string | null;
   /** この本文が属するテンプレート（110）。クリックをテンプレート単位で数えるため。 */
   templateId?: string | null;
   /** 配信別に短縮URLとクリック数を分ける。 */
   broadcastId?: string | null;
+  sourceContent?: string;
 }
 
-/**
- * Append `f=<friendId>` to every /t/ tracked-link URL in per-friend message
- * content. With f= present, /t skips the LIFF identification hop entirely
- * (no consent screen, no extra tap) and still attributes the click — the
- * friend is already known because the message was pushed 1:1.
- *
- * Only valid for per-friend sends (scenario step delivery, manual DM,
- * OAuth immediate push). NEVER use for multicast/broadcast content: the same
- * body goes to many users, so a baked f= would attribute everyone's clicks
- * to one friend.
- */
+/** 個別送信のリンクへ期限付きの本人資格を付ける。複数人へ同じ本文を送る配信では使わない。 */
 export async function appendFriendToTrackedLinks(
   db: D1Database,
   content: string,
@@ -207,38 +190,36 @@ export async function appendFriendToTrackedLinks(
   friendId: string | null | undefined,
 ): Promise<string> {
   if (!friendId) return content;
-  // Tracked links are always built as `${base}/t/${code}` (worker base, short
-  // domain, and legacy UUID form alike), so content without the literal
-  // '/t/' cannot contain one. Skip the settings read — this runs in front of
-  // reply-token sends where pre-send latency matters, and URL-free content
-  // is the common case.
+  // 計測リンクは必ず /t/ を含むため、ない本文は設定読取を省く。短時間で送る replyToken の前処理を軽くする。
   if (!content.includes('/t/')) return content;
   const workerBase = workerUrl.replace(/\/$/, '');
   const linkBase = await resolveTrackedLinkBaseUrl(db, workerUrl);
   const bases = [...new Set([workerBase, linkBase])];
-  return content.replace(URL_REGEX, (match) => {
-    // URL_REGEX greedily captures trailing sentence punctuation and even
-    // full-width Japanese text glued to the URL (「…/t/abc。続き」等)。
-    // URL は ASCII のみなので、まず ASCII 境界で切り、さらに extractUrls と
-    // 同じ末尾記号を URL の外として扱う。f= はその手前に挿す。
+  const replacements = await Promise.all([...content.matchAll(URL_REGEX)].map(async ([match]) => {
     const ascii = match.match(/^[\x21-\x7E]+/)?.[0] ?? '';
     const punct = ascii.match(/[.,;:!?)]+$/)?.[0] ?? '';
     const url = punct ? ascii.slice(0, -punct.length) : ascii;
     const trailing = match.slice(url.length);
-    const isTrackedLink = bases.some((b) => url.startsWith(`${b}/t/`));
-    if (!isTrackedLink) return match;
-    if (/[?&]f=/.test(url)) return match;
-    // /t links never carry fragments, so appending at the end is safe.
-    const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}f=${encodeURIComponent(friendId)}${trailing}`;
-  });
+    if (!bases.some((base) => url.startsWith(`${base}/t/`))) return [match, match] as const;
+    let parsed: URL;
+    let identifier: string;
+    try {
+      parsed = new URL(url);
+      identifier = decodeURIComponent(parsed.pathname.slice(3));
+    } catch { return [match, match] as const; }
+    const link = await getTrackedLinkByIdOrShortCode(db, identifier);
+    const token = link ? await issueTrackedLinkIdentity(db, link, friendId) : null;
+    parsed.searchParams.delete('f');
+    parsed.searchParams.delete('lu');
+    parsed.searchParams.delete('identity');
+    if (token) parsed.searchParams.set('identity', token);
+    return [match, `${parsed.toString()}${trailing}`] as const;
+  }));
+  const byMatch = new Map(replacements);
+  return content.replace(URL_REGEX, (match) => byMatch.get(match) ?? match);
 }
 
-/**
- * Auto-wrap URLs in message content with tracking links.
- * Text and flex messages both get their URLs replaced inline with tracked
- * links; the message type is preserved.
- */
+/** メッセージ種別を変えず、text と Flex の URL だけを計測リンクへ置き換える。 */
 export async function autoTrackContent(
   db: D1Database,
   messageType: string,
@@ -247,15 +228,26 @@ export async function autoTrackContent(
   options?: AutoTrackOptions,
 ): Promise<AutoTrackResult> {
   if (messageType === 'image') return { messageType, content };
-
-  // Extract first so URL-free messages (the common case in per-friend
-  // delivery loops) skip the settings lookup entirely.
   const workerBase = workerUrl.replace(/\/$/, '');
-  let urls = extractUrls(content, [workerBase]);
+  const authored = options?.sourceContent === undefined ? null : extractUrls(options.sourceContent, [workerBase]);
+  const isAuthored = (url: string) => !authored || authored.has(url) && !/[{}]/.test(url);
+  if (messageType !== 'text' && content.includes('\"tapExtras\"')) {
+    let tree = JSON.parse(content);
+    if (isBroadcastAssetKind(messageType)) {
+      const converted = convertBroadcastAsset(messageType, tree.assetName ?? '', tree);
+      if (!converted.ok) throw new Error(converted.error);
+      messageType = converted.message.messageType;
+      tree = JSON.parse(converted.message.messageContent);
+    }
+    content = JSON.stringify(await decorateTapExtras(db, tree, workerUrl, options?.lineAccountId ?? null, options?.templateId, options?.broadcastId, isAuthored));
+  }
+
+  // 宛先ごとのループで不要な設定読取を増やさないよう、先に URL を抽出し、ない本文は省く。
+
+  let urls = new Set([...extractUrls(content, [workerBase])].filter(isAuthored));
   if (urls.size === 0) return { messageType, content };
 
-  // Branded short domain (tracked_link_base_url) when configured, else workerUrl.
-  // Re-filter: short-domain /t links are already tracked — never re-wrap them.
+  // 独自短縮ドメインを優先し、既に計測済みの /t/ は再び包まない。
   const linkBase = await resolveTrackedLinkBaseUrl(db, workerUrl);
   if (linkBase !== workerBase) {
     urls = new Set([...urls].filter((u) => !u.startsWith(`${linkBase}/t/`)));
@@ -290,26 +282,20 @@ export async function autoTrackContent(
     return { messageType: 'text', content: result };
   }
 
-  // Flex messages → rewrite ONLY uri actions (action / defaultAction / altUri.desktop).
-  // Never rewrite the `url` field of image/video/icon components: LINE's media
-  // loader fetches that URL directly, and /t returns an HTML interstitial (not
-  // an image), which renders hero/body images as blank space.
+  // Flex は uri アクションだけを変換する。画像・動画・アイコンの url は LINE が直接読むため、HTML を返す /t/ へ置換して表示を壊さない。
   let tree: unknown;
   try {
     tree = JSON.parse(content);
   } catch {
-    // Not valid JSON — leave untouched rather than risk corrupting the payload
+    // JSON が不正なら、変換でさらに壊さないよう元のまま返す。
     return { messageType, content };
   }
   const skipPrefixes = linkBase !== workerBase ? [workerBase, linkBase] : [workerBase];
   const actionUris = new Set<string>();
   collectActionUris(tree, actionUris);
-  // Only valid http(s) URIs are trackable (uri actions also allow tel:,
-  // line://, etc., and hand-written JSON can hold malformed URLs like a bare
-  // "https://" — createTrackingMap calls `new URL()`, so an invalid URI here
-  // would throw and fail the whole delivery instead of one link).
+  // tel:/line: や壊れた URL で配信全体が失敗しないよう、有効な HTTP(S) の URI だけを計測対象にする。
   const trackableUris = new Set(
-    [...actionUris].filter((u) => isTrackableHttpUrl(u) && !shouldSkip(u, skipPrefixes)),
+    [...actionUris].filter((u) => isTrackableHttpUrl(u) && !shouldSkip(u, skipPrefixes) && isAuthored(u)),
   );
   if (trackableUris.size === 0) return { messageType, content };
   const uriMap = await createTrackingMap(db, trackableUris, linkBase, options?.lineAccountId, options?.templateId, options?.broadcastId);
@@ -323,7 +309,7 @@ export async function autoTrackContent(
   return { messageType, content: JSON.stringify(tree) };
 }
 
-/** Valid, parseable http(s) URL — safe to hand to `new URL()` downstream */
+/** 後続の new URL へ安全に渡せる、解析済みの HTTP(S) だけを許す。 */
 function isTrackableHttpUrl(u: string): boolean {
   try {
     const parsed = new URL(u);
@@ -333,7 +319,7 @@ function isTrackableHttpUrl(u: string): boolean {
   }
 }
 
-/** Walk a Flex JSON tree and visit every action/defaultAction uri (+ altUri.desktop) */
+
 function visitActionUris(node: unknown, visit: (holder: Record<string, unknown>, key: string) => void): void {
   if (!node || typeof node !== 'object') return;
   if (Array.isArray(node)) {
@@ -345,7 +331,7 @@ function visitActionUris(node: unknown, visit: (holder: Record<string, unknown>,
     const a = obj[key] as Record<string, unknown> | undefined;
     if (a && a.type === 'uri') {
       if (typeof a.uri === 'string') visit(a, 'uri');
-      // Desktop LINE uses altUri.desktop instead of uri — track it the same way
+      // PC の LINE は altUri.desktop を使うため、通常の uri と同じく計測する。
       const alt = a.altUri as Record<string, unknown> | undefined;
       if (alt && typeof alt.desktop === 'string') visit(alt, 'desktop');
     }
@@ -363,32 +349,18 @@ function rewriteActionUris(node: unknown, fn: (u: string) => string): void {
   });
 }
 
-/**
- * Full per-friend outgoing decoration pipeline: wrap raw URLs into tracked
- * links (autoTrackContent), then bake f=<friendId> into /t links
- * (appendFriendToTrackedLinks) so clicks attribute without the LIFF
- * identification hop.
- *
- * Single implementation shared by the cron step delivery
- * (step-delivery.ts) and the instant first-step push
- * (immediate-first-step.ts) so the two pipelines cannot drift — whichever
- * side wins the delivery claim, the friend receives identically decorated
- * content.
- *
- * Per-friend sends only — never use for multicast/broadcast content (see
- * appendFriendToTrackedLinks). Returns the input unchanged when workerUrl
- * is not configured.
- */
+/** 宛先別の通常配信と即時初回文で差が出ないよう、URL の計測化と署名付き本人情報の追加を共通化する。本人情報付きなので multicast/broadcast には使わず、Worker URL がなければ入力を保つ。 */
 export async function decorateForFriendPush(
   db: D1Database,
   messageType: string,
   content: string,
   workerUrl: string | undefined,
-  opts: { lineAccountId: string | null; friendId: string },
+  opts: { lineAccountId: string | null; friendId: string; sourceContent?: string },
 ): Promise<AutoTrackResult> {
   if (!workerUrl) return { messageType, content };
   const tracked = await autoTrackContent(db, messageType, content, workerUrl, {
     lineAccountId: opts.lineAccountId,
+    sourceContent: opts.sourceContent ?? '',
   });
   const decorated = await appendFriendToTrackedLinks(db, tracked.content, workerUrl, opts.friendId);
   return { messageType: tracked.messageType, content: decorated };

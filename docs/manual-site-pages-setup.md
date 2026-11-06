@@ -1,3 +1,5 @@
+> 文書：musubo マニュアルサイトのCloudflare Pages初回設定｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # musubo マニュアルサイトのCloudflare Pages初回設定
 
 ## この手順の対象

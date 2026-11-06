@@ -1,0 +1,91 @@
+// @vitest-environment happy-dom
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setImmediate } from 'node:timers'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import TemplateConsole from '@/test-utils/hq-template-console'
+import type { TemplateDefinition } from '@/lib/hq-templates-api'
+
+const calls = vi.hoisted(() => ({ uploadImage: vi.fn(), deleteImage: vi.fn(), context: vi.fn(), list: vi.fn(), accounts: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), preflight: vi.fn(), distribute: vi.fn(), result: vi.fn() }))
+vi.mock('@/lib/hq-templates-api', async (original) => ({ ...await original<typeof import('@/lib/hq-templates-api')>(), TEMPLATE_TYPES: ['tag', 'template', 'rich_menu', 'form'], hqTemplatesApi: { listStats: async () => ({ thisMonthSentCount: 0, outdatedTemplateCount: 0 }), listByKind: () => calls.list('template'), kindCounts: async () => ({}), versions: async () => [], receivedVersions: async () => [], messageReferences: async () => [], folders: { list: async () => [] }, ...calls } }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(window.location.search),  usePathname: () => '/hq/templates', useRouter: () => ({ push: vi.fn() }) }))
+
+const png = (filename: string, r2Key: string) => ({ id: `id-${filename}`, kind: 'image' as const, filename, mimeType: 'image/png', sizeBytes: 32, width: 2500, height: 1686, durationMs: null, r2Key, publicUrl: `https://worker.test/images/${r2Key}`, versionId: `id-${filename}`, versionNo: 1, contentHash: 'a'.repeat(64) })
+const KEY_A = 'hq-templates/tenant-a/uploads/aaaa', KEY_B = 'hq-templates/tenant-a/uploads/bbbb', KEY_M = 'hq-templates/tenant-a/uploads/mmmm'
+
+beforeEach(() => {
+  vi.resetAllMocks(); window.sessionStorage.clear(); window.history.replaceState(null, '', '/hq/templates?type=rich_menu')
+  calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
+  calls.list.mockResolvedValue([]); calls.accounts.mockResolvedValue([])
+  calls.deleteImage.mockResolvedValue(undefined)
+  calls.create.mockImplementation(async (input: { definition: TemplateDefinition }) => ({ template: { id: 't1', name: 'x', template_type: 'rich_menu', revision: 1, updated_at: '2026-09-29T00:00:00Z' }, definition: input.definition }))
+})
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+
+async function startCreate(label: 'リッチメニュー画像を選ぶ' | 'メッセージ画像を選ぶ') {
+  render(<TemplateConsole type={label === 'メッセージ画像を選ぶ' ? 'template' : 'rich_menu'} />)
+  if (label === 'メッセージ画像を選ぶ') fireEvent.click(await screen.findByRole('tab', { name: /カルーセル/ }))
+  fireEvent.click((await screen.findAllByRole('button', { name: label === 'メッセージ画像を選ぶ' ? 'テンプレートを作る' : 'メニューを作る' }))[0])
+  await screen.findByLabelText(label === 'メッセージ画像を選ぶ' ? '画像を追加（ファイル）' : label)
+}
+
+async function cancelUploadedCreate(confirmDiscard = false) {
+  // 受信・採用・busy解除まで待つ。API呼び出しだけを待つと無効なボタンを押してしまう。
+  const cancel = await waitFor(() => {
+    const button = screen.getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+    expect(button.matches(':disabled')).toBe(false)
+    expect(button.closest('fieldset[disabled]')).toBeNull()
+    return button
+  })
+  // busy解除後の離脱guardのeffectも更新してから利用者の操作を行う。
+  await act(async () => { await new Promise<void>(resolve => setImmediate(resolve)) })
+  fireEvent.click(cancel)
+  if (confirmDiscard) fireEvent.click(await screen.findByRole('button', { name: /^(破棄する|保存せずに移る)$/ }))
+}
+
+describe('R568 cancelled or replaced uploads are reclaimed', () => {
+  it('cancelling a rich menu create deletes the uploaded-but-unsaved image', async () => {
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: 2500, height: 1686, close: vi.fn() })))
+    let finishUpload!: (media: ReturnType<typeof png>) => void
+    calls.uploadImage.mockReturnValue(new Promise(resolve => { finishUpload = resolve }))
+    await startCreate('リッチメニュー画像を選ぶ')
+    fireEvent.change(screen.getByLabelText('リッチメニュー画像を選ぶ'), { target: { files: [new File(['a'], 'a.png', { type: 'image/png' })] } })
+    await waitFor(() => expect(calls.uploadImage).toHaveBeenCalled())
+    // API開始だけでは操作できない。遅いアップロードを確実に再現する。
+    expect((screen.getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(true)
+    await act(async () => { finishUpload(png('a.png', KEY_A)) })
+    await cancelUploadedCreate(true)
+    await waitFor(() => expect(calls.deleteImage).toHaveBeenCalledWith(KEY_A))
+  })
+  it('cancelling a shared message template create deletes its uploaded image', async () => {
+    calls.uploadImage.mockResolvedValue(png('m.png', KEY_M))
+    await startCreate('メッセージ画像を選ぶ')
+    fireEvent.change(screen.getByLabelText('画像を追加（ファイル）'), { target: { files: [new File(['m'], 'm.png', { type: 'image/png' })] } })
+    await waitFor(() => expect(calls.uploadImage).toHaveBeenCalled())
+    await cancelUploadedCreate()
+    await waitFor(() => expect(calls.deleteImage).toHaveBeenCalledWith(KEY_M))
+  })
+  it('saving deletes only the replaced image and keeps the adopted one', async () => {
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: 2500, height: 1686, close: vi.fn() })))
+    calls.uploadImage.mockResolvedValueOnce(png('a.png', KEY_A)).mockResolvedValueOnce(png('b.png', KEY_B))
+    await startCreate('リッチメニュー画像を選ぶ')
+    const input = screen.getByLabelText('リッチメニュー画像を選ぶ')
+    fireEvent.change(input, { target: { files: [new File(['a'], 'a.png', { type: 'image/png' })] } })
+    await waitFor(() => expect(calls.uploadImage).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect((input as HTMLInputElement).disabled).toBe(false))
+    fireEvent.change(input, { target: { files: [new File(['b'], 'b.png', { type: 'image/png' })] } })
+    await waitFor(() => expect(calls.uploadImage).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect((input as HTMLInputElement).disabled).toBe(false))
+    fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '案内' } })
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    await waitFor(() => expect(calls.create).toHaveBeenCalled())
+    await waitFor(() => expect(calls.deleteImage).toHaveBeenCalledWith(KEY_A))
+    expect(calls.deleteImage).not.toHaveBeenCalledWith(KEY_B)
+  })
+})
+
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], selectedAccountId: null, selectedAccount: null, setSelectedAccountId: vi.fn(), loading: false }) }))
+
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
+
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))

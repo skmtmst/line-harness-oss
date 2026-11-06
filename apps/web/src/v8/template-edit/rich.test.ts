@@ -1,0 +1,88 @@
+import { describe, expect, test } from 'vitest'
+import { RICH_SHAPES, areaPlace, buildRichPayload, emptyAreaDraft } from './rich'
+
+/*
+ * ★V8 リッチメッセージを作るの保存値と面の呼び名。
+ * 保存値は今の画面（template-asset-editor.tsx）と同じ形：選んだ形の面だけを座標と動きつきで送る。
+ */
+const shape = (value: string) => RICH_SHAPES.find((s) => s.value === value)!
+
+describe('面の呼び名', () => {
+  test('形ごとに「上・下」「左・右」「左上…」で呼ぶ', () => {
+    const names = (value: string) => shape(value).areas.map((a) => `${a.label} ${areaPlace(a, shape(value).areas)}`)
+    expect(names('1')).toEqual(['A 全体'])
+    expect(names('2v')).toEqual(['A 上', 'B 下'])
+    expect(names('2h')).toEqual(['A 左', 'B 右'])
+    expect(names('3')).toEqual(['A 上', 'B 左下', 'C 右下'])
+    expect(names('4')).toEqual(['A 左上', 'B 右上', 'C 左下', 'D 右下'])
+    expect(names('6')).toEqual(['A 左上', 'B 中上', 'C 右上', 'D 左下', 'E 中下', 'F 右下'])
+  })
+})
+
+describe('保存値', () => {
+  test('URLとテキストの両方でタグ・合計点を保存する', () => {
+    const input = { imageUrl: 'https://x.example/a.png', pickedMedia: null, shape: shape('1') }
+    const tapExtras = { tagIds: ['tag'], scoreChange: 10 }
+    const built = buildRichPayload({ ...input, areas: { A: { ...emptyAreaDraft(), kind: 'uri', uri: 'https://x.example', tapExtras } } })
+    if (!('payload' in built)) throw new Error(built.error)
+    expect(built.payload.tapAreas).toMatchObject([{ tapExtras }])
+    const message = buildRichPayload({ ...input, areas: { A: { ...emptyAreaDraft(), kind: 'message', text: '返信', tapExtras } } })
+    if (!('payload' in message)) throw new Error(message.error)
+    expect(message.payload.tapAreas).toMatchObject([{ actionType: 'message', text: '返信', tapExtras }])
+  })
+
+  test('画像が無ければ送らない・URL を選んで空なら送らない', () => {
+    expect(buildRichPayload({ imageUrl: ' ', pickedMedia: null, shape: shape('2v'), areas: {} })).toEqual({ error: '画像を設定してください。' })
+    expect(buildRichPayload({ imageUrl: 'https://x.example/a.png', pickedMedia: null, shape: shape('2v'), areas: { B: { ...emptyAreaDraft(), kind: 'uri' } } }))
+      .toEqual({ error: '面 B のURLを入力してください。' })
+  })
+
+  test('選んだ形の面だけを、座標と動きつきで送る', () => {
+    const built = buildRichPayload({
+      imageUrl: ' https://x.example/a.png ',
+      pickedMedia: null,
+      shape: shape('2v'),
+      areas: { A: { kind: 'uri', uri: ' https://nen.example/summer ', text: '', refId: '' }, C: { kind: 'uri', uri: 'https://other', text: '', refId: '' } },
+    })
+    expect('payload' in built).toBe(true)
+    if (!('payload' in built)) return
+    expect(built.payload.imageUrl).toBe('https://x.example/a.png')
+    expect(built.payload.shape).toBe('2v')
+    expect(built.payload.tapAreas).toEqual([
+      { label: 'A', x: 0, y: 0, width: 100, height: 50, actionType: 'uri', uri: 'https://nen.example/summer' },
+      { label: 'B', x: 0, y: 50, width: 100, height: 50, actionType: 'none' },
+    ])
+  })
+
+  test('テキストはメッセージ、予約・回答フォームなどはアカウントの LIFF の URL で送る（postback は送らない）', () => {
+    const built = buildRichPayload({
+      imageUrl: 'https://x.example/a.png',
+      pickedMedia: null,
+      shape: shape('4'),
+      areas: {
+        A: { kind: 'message', uri: '', text: ' 予約の空き ', refId: '' },
+        B: { kind: 'booking', uri: '', text: '', refId: 'm1' },
+        C: { kind: 'form', uri: '', text: '', refId: 'f1' },
+        D: { kind: 'visit_stamp', uri: '', text: '', refId: '' },
+      },
+      liffId: 'L-1',
+    })
+    if (!('payload' in built)) throw new Error(built.error)
+    const taps = built.payload.tapAreas as Array<Record<string, unknown>>
+    expect(taps.map(({ actionType, uri, text }) => ({ actionType, uri, text }))).toEqual([
+      { actionType: 'message', uri: undefined, text: '予約の空き' },
+      { actionType: 'uri', uri: 'https://liff.line.me/L-1/?page=salon-book&menu_id=m1', text: undefined },
+      { actionType: 'uri', uri: 'https://liff.line.me/L-1/?page=form&id=f1', text: undefined },
+      { actionType: 'uri', uri: 'https://liff.line.me/L-1/?page=visit-stamps', text: undefined },
+    ])
+    expect(taps.some((tap) => tap.actionType === 'postback')).toBe(false)
+  })
+
+  test('LIFF が無い・回答フォームを選んでいない・文が長すぎるときは送らない', () => {
+    const one = (draft: Parameters<typeof buildRichPayload>[0]['areas'][string], liffId: string | null = 'L-1') =>
+      buildRichPayload({ imageUrl: 'https://x.example/a.png', pickedMedia: null, shape: shape('1'), areas: { A: draft }, liffId })
+    expect(one({ kind: 'booking_history', uri: '', text: '', refId: '' }, null)).toEqual({ error: expect.stringContaining('LIFF') })
+    expect(one({ kind: 'form', uri: '', text: '', refId: '' })).toEqual({ error: '面 A の回答フォームを選んでください。' })
+    expect(one({ kind: 'message', uri: '', text: 'あ'.repeat(401), refId: '' })).toEqual({ error: '面 A の送る文は400文字までです。' })
+  })
+})

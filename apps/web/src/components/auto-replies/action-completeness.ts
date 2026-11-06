@@ -27,6 +27,8 @@ export function actionIncompleteReason(
   }
   const c = config as Record<string, unknown>
   switch (actionType) {
+    case 'notify_staff':
+      return typeof c.notificationRuleId === 'string' && c.notificationRuleId && Number.isSafeInteger(c.notificationRuleVersion) && typeof c.message === 'string' && c.message.trim() ? null : '通知先と本文が選ばれていません'
     case 'tag': {
       const picked =
         (Array.isArray(c.tagIds) && c.tagIds.length > 0) ||

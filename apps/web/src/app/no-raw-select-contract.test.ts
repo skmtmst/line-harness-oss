@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { describe,expect,it } from 'vitest'
 
 const SRC = path.join(__dirname, '..')
 
@@ -38,8 +38,7 @@ const count = (s: string) => (s.match(/<select[\s>]/g) ?? []).length
 /**
  * **まだ素で書いている画面。減る一方の表。**
  *
- * 寄せるのは画面ごとの作業で、担当は S1〜S3（`docs/v6-parallel-plan.md`
- * §4「守ること」で S0 は機能の画面を触らない）。ここは**増やせないこと**
+ * 寄せるのは画面ごとの作業（共通部品の作業では機能の画面を触らない）。ここは**増やせないこと**
  * だけを見張る。0 になったら行ごと消す——消し忘れるとこの試験が落ちる。
  *
  * 2026-09-04 に 41 画面・83 か所すべてを共通部品へ寄せ終えた。
@@ -49,7 +48,7 @@ const NOT_YET: Record<string, number> = {}
 
 describe('素の <select> を画面に書かない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(189)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。同日に付与ルールの下書き編集画面を追加（R296）。
+    expect(PAGES.length).toBe(216)  // 2026-10-29 に友だち引継ぎの再開（/accounts/new/handover）と運営の申込（/ops/applications・/ops/applications/detail）の3画面を追加。2026-10-16 に AI の操作の記録（/webhooks/ai-log）を追加。2026-10-12 に設定のデリバリー連携（/settings/delivery、承認案 DL-1 `dF4Ov`）を追加。2026-10-11 に開発枝のお客様の見え方（/settings/customer-look）を取り込み。2026-10-10 に開発枝の編集画面3枚（/conversions/edit・/inflow-links/edit・/staff/edit）を取り込み。2026-10-09 に飲食店向けテストのデリバリー受注（/restaurant-test/delivery）を追加。2026-10-08 に V2〜管理画面 の見本 6 画面（visual-qa/friend-attributes・-v2・-v3・管理画面-combobox・管理画面-progress-filedrop・管理画面-target-missing）を撤去。2026-10-07 に提案 E-7 の来店スタンプ（/visit-stamps）、提案 E-4 予約サイト・グルメ媒体（/settings/booking-media）と E-9 統括の一括配信（/hq/broadcasts・new・detail）を追加。同日に提案 E の枠を閉じる知らせ（/restaurant-test/close-tasks）と SNS 連携（/settings/sns）を追加。情報欄の編集画面と運営専用ナレッジ（37-11）、★管理画面見本（管理画面-progress-filedrop・管理画面-combobox・管理画面-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。同日に付与ルールの下書き編集画面を追加（R296）。2026-10-01 に ★V8 新部品の見本画面（visual-qa/v8-parts）を追加。2026-10-03 に /scenarios/new の転送画面を追加。2026-10-04 に予約からの売上（/booking/sales）を追加。
   })
 
   it('表に無い画面は素の <select> を持たない', () => {
@@ -95,15 +94,10 @@ describe('素の <select> を画面に書かない', () => {
   })
 
   it('共通部品は素の <select> を持たない', () => {
-    // 例外は1つだけ。「ブラウザ標準を使う」ことに理由がある。
     const shared = fs.readdirSync(path.join(SRC, 'components', 'shared'))
       .filter((n) => n.endsWith('.tsx') && !n.includes('.test.'))
     const withRaw = shared.filter((n) =>
       count(fs.readFileSync(path.join(SRC, 'components', 'shared', n), 'utf8')) > 0)
-    expect(withRaw.sort(), '共通部品に素の <select> が入った').toEqual([
-      // アカウントの札。印を `select` の中に置けないので札へ重ね、
-      // `select` は透明にして上に敷く。開いた中身はブラウザ任せのまま。
-      'top-bar.tsx',
-    ])
+    expect(withRaw.sort(), '共通部品に素の <select> が入った').toEqual([])
   })
 })

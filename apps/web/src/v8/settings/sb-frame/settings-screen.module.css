@@ -1,0 +1,3 @@
+/* SettingsPage.layout が寸法を持つ。 */
+.screen { display: contents; }
+.back { font-size: var(--tpl-sb-band-text); white-space: nowrap; }

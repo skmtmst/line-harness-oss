@@ -1,4 +1,5 @@
 import type { OpsKnowledgeArticle, OpsKnowledgeArticleKind } from '@/lib/api'
+import { formatDay, formatTime } from '@/lib/format'
 
 export const KNOWLEDGE_KINDS = [
   { value: 'usage', label: '使い方について' }, { value: 'bug', label: '不具合' },
@@ -22,14 +23,10 @@ export function knowledgeState(article: OpsKnowledgeArticle) {
 }
 export function knowledgeDate(value: string) {
   const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : new Intl.DateTimeFormat('ja-JP', {
-    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo',
-  }).format(date)
+  return Number.isNaN(date.valueOf()) ? '—' : formatDay(date)
 }
 
 export function knowledgeTime(value: string) {
   const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : new Intl.DateTimeFormat('ja-JP', {
-    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
-  }).format(date)
+  return Number.isNaN(date.valueOf()) ? '—' : formatTime(date)
 }

@@ -21,7 +21,7 @@ class MemoryStorage implements Storage {
 }
 
 /**
- * #1058: 2要素認証の確認。
+ * #1058: 二段階認証の確認。
  * `fetchApi` は 4xx/5xx を例外で投げる。`await api.staff.confirmTwoFactorSetup` を
  * そのまま書くと例外で `setBusy(false)` が走らず「確認しています…」のまま
  * ボタンが固まるので、`opsCall` で受けてエラーを画面へ出す契約。
@@ -85,28 +85,28 @@ async function renderReady() {
   })
 }
 
+/* 6桁目が入った瞬間に送られる（動きの点検・6）。ここでは返事を待つだけ。 */
 async function submit() {
-  await act(async () => {
-    host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-    await Promise.resolve()
-  })
   await flush()
 }
 
 const submitButton = () =>
-  Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('登録を完了') || b.textContent?.includes('確認しています'))
+  Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('登録する') || b.textContent?.includes('登録しています'))
 
-describe('2要素認証の確認エラー', () => {
-  it('400 が返ってもボタンを戻し、サーバーの文言をそのまま出す', async () => {
+describe('二段階認証の確認エラー', () => {
+  it('400 が返ってもボタンを戻し、違うコードは人の言葉で出す', async () => {
     await renderReady()
     await submit()
 
     const alert = host.querySelector('[role="alert"]')
-    expect(alert?.textContent).toContain('認証コードが正しくありません')
+    expect(alert?.textContent).toContain('コードが違います。もう一度入れてください')
     // 「確認しています…」のまま固まらず、もう一度押せる。
     const button = submitButton()
-    expect(button?.textContent).toContain('確認して登録を完了する')
-    expect(button?.disabled).toBe(false)
+    expect(button?.textContent).toContain('登録する')
+    // 違ったら6桁を消して1マス目から入れ直せる（6桁そろうと、また自動で送る）。
+    const first = host.querySelector('#ops-totp-code') as HTMLInputElement
+    expect(first.disabled).toBe(false)
+    expect(first.value).toBe('')
   })
 
   it('5xx が返ってもボタンを戻し、状態コードから言い換えた案内を出す', async () => {
@@ -118,8 +118,11 @@ describe('2要素認証の確認エラー', () => {
     const alert = host.querySelector('[role="alert"]')
     expect(alert?.textContent).toContain('サーバーでエラーが起きました')
     const button = submitButton()
-    expect(button?.textContent).toContain('確認して登録を完了する')
-    expect(button?.disabled).toBe(false)
+    expect(button?.textContent).toContain('登録する')
+    // 違ったら6桁を消して1マス目から入れ直せる（6桁そろうと、また自動で送る）。
+    const first = host.querySelector('#ops-totp-code') as HTMLInputElement
+    expect(first.disabled).toBe(false)
+    expect(first.value).toBe('')
   })
 
   it('200 でも success:false なら従来どおり文言を出す', async () => {
@@ -128,8 +131,8 @@ describe('2要素認証の確認エラー', () => {
     await renderReady()
     await submit()
 
-    expect(host.querySelector('[role="alert"]')?.textContent).toContain('コードの有効期限が切れています')
-    expect(submitButton()?.disabled).toBe(false)
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('コードの時間が切れました')
+    expect((host.querySelector('#ops-totp-code') as HTMLInputElement).disabled).toBe(false)
   })
 
   it('確認が通ると完了の案内へ進む', async () => {
@@ -138,6 +141,36 @@ describe('2要素認証の確認エラー', () => {
     await renderReady()
     await submit()
 
-    expect(host.textContent).toContain('2要素認証を登録しました')
+    expect(host.textContent).toContain('二段階認証を登録しました')
+  })
+})
+
+describe('R615 QR準備の失敗はログイン切れにしない', () => {
+  it('setup が 500 でもログインへ送らず、理由と取り直しを出す', async () => {
+    const seen: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      seen.push(url)
+      if (url.includes('/api/auth/session')) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: { id: 's1', name: '運営 太郎', platformAdmin: true },
+          csrfToken: 'csrf-token',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ error: 'setup failed' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      })
+    }))
+    await act(async () => { root.render(<OpsTwoFactorPage />) })
+    await flush()
+
+    // 準備の口を叩いたうえで、ログイン中のまま失敗を出す。
+    expect(seen.some((url) => url.includes('/two-factor/setup'))).toBe(true)
+    expect(host.textContent).toContain('QRコードを用意できませんでした')
+    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
+    expect(retry).toBeTruthy()
+    // ログイン画面への送りは起きない（送られていたら失敗文は出ない）。
+    expect(window.location.pathname).not.toContain('/ops/login')
   })
 })

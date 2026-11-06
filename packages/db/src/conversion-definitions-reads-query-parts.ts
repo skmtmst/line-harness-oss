@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { accountWhere, assertUsageRefExists, cancellationMetrics, CONVERSION_DEFINITION_USAGE_KINDS, ConversionDefinitionError, definitionWhere, deriveDefinitionState, INVALID_CONFIG_SQL, metricsCte, orderBy, reversalMetrics, selectDefinitionsSql, serializeDefinition, serializeUsage, SOURCE_STOPPED_SQL, stateFilterSql, UNUSED_SQL, USAGE_REF_CHECKS, usageName } from './conversion-definitions/reads-query-parts.js';

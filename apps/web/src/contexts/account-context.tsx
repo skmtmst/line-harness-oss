@@ -1,8 +1,13 @@
 'use client'
 
+import { ListNavigationAccount, ListReturnAccountGuard } from '@/components/shared/list-navigation'
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { loadLineAccounts } from '@/lib/line-accounts-cache'
+import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
+import { clearApiReadCache } from '@/lib/api/transport/read-cache'
+import { api } from '@/lib/api'
 
 const STORAGE_KEY = 'lh_selected_account'
 
@@ -15,6 +20,8 @@ export interface AccountWithStats {
   pictureUrl?: string | null
   basicId?: string | null
   isActive: boolean
+  /** 既存のメール受信箱をこのアカウントで表示できるか。新規アカウントは未接続。 */
+  emailInboxEnabled?: boolean
   country: string | null
   role: string | null
   displayOrder: number
@@ -44,10 +51,12 @@ export interface AccountWithStats {
     messagesThisMonth: number
     staffCount: number
   }
-  connection?: {
-    status: 'ok' | 'warn' | 'unknown'
-    checkedAt: string | null
-  }
+  /** 板 ：付けたタグ（`GET /api/line-accounts` の `tags`）。 */
+  tags?: import("@line-crm/shared").LineAccountTagSummary[]
+  /** 板 ：アーカイブ日時。あるときはアーカイブ済み。 */
+  archivedAt?: string | null
+  tokenExpiry?: import('@line-crm/shared').LineTokenExpiry
+  connection?: import('@line-crm/shared').LineConnection
 }
 
 interface AccountContextValue {
@@ -82,36 +91,44 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const [refreshing, setRefreshing] = useState(false)
 
   const setSelectedAccountId = useCallback((id: string) => {
-    setSelectedAccountIdState(id)
-    try {
-      localStorage.setItem(STORAGE_KEY, id)
-    } catch {
-      // localStorage unavailable
-    }
+    requestUnsavedAction(() => {
+      clearApiReadCache()
+      setSelectedAccountIdState(id)
+      try {
+        localStorage.setItem(STORAGE_KEY, id)
+      } catch {
+        // localStorage unavailable
+      }
+    })
   }, [])
 
   const clearSelectedAccountId = useCallback(() => {
-    setSelectedAccountIdState(null)
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-    } catch {
-      // localStorage unavailable
-    }
+    requestUnsavedAction(() => {
+      clearApiReadCache()
+      setSelectedAccountIdState(null)
+      try {
+        localStorage.removeItem(STORAGE_KEY)
+      } catch {
+        // localStorage unavailable
+      }
+    })
   }, [])
 
-  const refreshAccounts = useCallback(async () => {
+  const loadAccounts = useCallback(async (reload: boolean) => {
     setRefreshing(true)
     try {
-      // 取り直しの口なので、使い回しの答えは捨てて必ず取り直す。
-      const res = await loadLineAccounts({ reload: true })
+      // 初回は AuthGuard の先読みを使う。変更後の取り直しだけ古い答えを捨てる。
+      const res = await loadLineAccounts({ reload })
       if (!res.success) {
         // 失敗時は手元の一覧を消さない。古い一覧でも「アカウントなし」の
         // 空画面より役に立つし、初回失敗ではもともと空なので差し支えない。
         setError(res.error || 'アカウント一覧を読み込めませんでした')
         return
       }
-      if (res.data.length > 0) {
-        const list = res.data as AccountWithStats[]
+      // アーカイブ済みは管理画面で復元できるが、店舗の選択肢には出さない。
+      // PC・モバイル・初期着地点で同じ一覧を使うため、ここで揃える。
+      const list = (res.data as AccountWithStats[]).filter((account) => !account.archivedAt)
+      if (list.length > 0) {
         setAccounts(list)
 
         // 無効になった選択だけを解除する。未選択のときに先頭へ勝手に
@@ -126,11 +143,23 @@ export function AccountProvider({ children }: { children: ReactNode }) {
             // localStorage unavailable
           }
           const valid = stored && list.some((a) => a.id === stored)
+          if (!valid && stored) {
+            try {
+              localStorage.removeItem(STORAGE_KEY)
+            } catch {
+              // localStorage unavailable
+            }
+          }
           return valid ? stored : null
         })
       } else {
         setAccounts([])
         setSelectedAccountIdState(null)
+        try {
+          localStorage.removeItem(STORAGE_KEY)
+        } catch {
+          // localStorage unavailable
+        }
       }
       setError(null)
     } catch {
@@ -141,19 +170,64 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const refreshAccounts = useCallback(() => loadAccounts(true), [loadAccounts])
+
   useEffect(() => {
-    refreshAccounts()
-  }, [refreshAccounts])
+    void loadAccounts(false)
+  }, [loadAccounts])
+
+  useEffect(() => {
+    if (loading || error || accounts.length === 0) return
+    let cancelled = false
+    let inFlight = false
+    let lastAttempt = 0
+    const refreshPictures = async () => {
+      if (inFlight || document.visibilityState === 'hidden' || Date.now() - lastAttempt < 30_000) return
+      inFlight = true
+      lastAttempt = Date.now()
+      try {
+        const response = await api.lineAccounts.profilePictures()
+        if (cancelled || !response.success) return
+        const byId = new Map(response.data.map((item) => [item.id, item.pictureUrl]))
+        setAccounts((current) => current.map((account) => {
+          if (!byId.has(account.id)) return account
+          const pictureUrl = byId.get(account.id) ?? null
+          return account.pictureUrl === pictureUrl ? account : { ...account, pictureUrl }
+        }))
+      } catch {
+        // アイコン更新だけの失敗で、アカウント一覧を消さない。
+      } finally {
+        inFlight = false
+      }
+    }
+    const onVisible = () => { void refreshPictures() }
+    void refreshPictures()
+    window.addEventListener('focus', onVisible)
+    document.addEventListener('visibilitychange', onVisible)
+    const timer = window.setInterval(onVisible, 5 * 60_000)
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', onVisible)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.clearInterval(timer)
+    }
+  }, [loading, error, accounts.length])
 
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? null
 
   return (
-    <AccountContext.Provider
+    <ListNavigationAccount.Provider value={selectedAccountId}><AccountContext.Provider
       value={{ accounts, selectedAccountId, selectedAccount, setSelectedAccountId, clearSelectedAccountId, refreshAccounts, loading, error, refreshing }}
     >
-      {children}
-    </AccountContext.Provider>
+      <ListReturnAccountGuard accountId={selectedAccountId} />
+      <KpiValueMotionProvider scope={loading ? null : selectedAccountId ?? 'hq'} updates={false}>{children}</KpiValueMotionProvider>
+    </AccountContext.Provider></ListNavigationAccount.Provider>
   )
+}
+
+/** 外枠の外（ログイン・試験の単体描画など）では null。外枠の共通部品が使う。 */
+export function useOptionalAccount(): AccountContextValue | null {
+  return useContext(AccountContext)
 }
 
 export function useAccount(): AccountContextValue {

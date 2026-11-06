@@ -62,7 +62,7 @@ describe('プール管理の発行前ゲート（#703）', () => {
       expect(view.getByText('この機能は設定でオフになっています')).toBeTruthy()
     })
     expect(view.queryByText('新規プール')).toBeNull()
-    expect(view.queryByText('読み込み中...')).toBeNull()
+    expect(view.queryByText('読み込み中…')).toBeNull()
     expect(seenPaths).not.toContain('/api/traffic-pools')
   })
 
@@ -72,7 +72,12 @@ describe('プール管理の発行前ゲート（#703）', () => {
     const view = render(<PoolsPage />)
 
     await waitFor(() => expect(view.getByText('メインプール')).toBeTruthy())
-    expect(view.getAllByText(/プールをつくる/)[0]).toBeTruthy()
+    expect(view.getAllByText(/新規プール/)[0]).toBeTruthy()
     expect(seenPaths).toContain('/api/traffic-pools')
   })
 })
+
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())

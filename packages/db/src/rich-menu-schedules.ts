@@ -1,6 +1,6 @@
 import { boundedListLimit, jstNow } from './utils.js';
 
-// E-08 (#621): 公開予約の実行状態を DB で持つための最小ヘルパー。
+// 公開予約の実行状態を DB で持つための最小ヘルパー。
 // 342 で足した attempt_count / next_retry_at、344 の journal、355 の lease を使う。
 // 上限回数はコード定数で持つ (列は増やさない)。
 

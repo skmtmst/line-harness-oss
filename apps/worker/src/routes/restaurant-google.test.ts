@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -30,7 +31,8 @@ const authMocks = vi.hoisted(() => {
   }
   return {
     sessions,
-    getStaffByApiKey: vi.fn(async (): Promise<unknown> => null),
+    getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
+  getStaffByApiKey: vi.fn(async (): Promise<unknown> => null),
     getStaffByAdminSession: vi.fn(async (_db: unknown, tokenHash: string): Promise<unknown> => {
       for (const [token, staff] of sessions) if ((await sha256Hex(token)) === tokenHash) return staff;
       return null;
@@ -63,6 +65,11 @@ vi.mock('@line-crm/db', async () => {
 
 const { authMiddleware, ADMIN_SESSION_BEARER_PREFIX } = await import('../middleware/auth.js');
 const { restaurantGoogle } = await import('./restaurant-google.js');
+const { restaurantTest } = await import('./restaurant-test.js');
+const { restaurantDelivery } = await import('./restaurant-delivery.js');
+const { restaurantGoogleProfile } = await import('./restaurant-google-profile.js');
+const { restaurantGooglePosts } = await import('./restaurant-google-posts.js');
+const { restaurantGooglePerformance } = await import('./restaurant-google-performance.js');
 const { decryptCredential, encryptCredential } = await import('@line-crm/db');
 type Env = import('../index.js').Env;
 
@@ -111,7 +118,12 @@ async function seedConnection(overrides: Partial<{ status: string; location_name
 function app() {
   const instance = new Hono<Env>();
   instance.use('*', authMiddleware);
+  instance.route('/', restaurantTest);
   instance.route('/', restaurantGoogle);
+  instance.route('/', restaurantGoogleProfile);
+  instance.route('/', restaurantGooglePosts);
+  instance.route('/', restaurantGooglePerformance);
+  instance.route('/', restaurantDelivery);
   return instance;
 }
 
@@ -166,7 +178,10 @@ beforeEach(() => {
     { id: 'account-2', name: '渋谷店', is_active: 1, channel_access_token: 'token-2' },
     { id: 'account-9', name: '他社', is_active: 1, channel_access_token: 'token-9' },
   ];
-  testDb = createTestD1();
+  testDb = createTestD1({ loginPolicy: 'off' });
+  // 統括ゲート（飲食店機能パック）。このAPI群自体を検証するファイルなので
+  // 既定の統括には常にパックを付けておく。
+  testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`).run(TENANT);
   googleCalls = [];
   googleHandler = () => jsonResponse({}, 404);
   vi.stubGlobal(
@@ -182,7 +197,7 @@ beforeEach(() => {
     IMAGES: {} as R2Bucket,
     RAW_MAIL: {} as R2Bucket,
     ASSETS: {} as Fetcher,
-    RESTAURANT_TEST_ENABLED: 'true',
+    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true', GOOGLE_BUSINESS_ENABLED: 'true',
     LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',
     LIFF_URL: 'https://example.test', LINE_CHANNEL_ID: 'unused',
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
@@ -200,7 +215,7 @@ beforeEach(() => {
  * Google Business Profileプロジェクトを間接的に使える経路を残さない。
  *
  * Google Business Profile APIのポリシー
- * （https://developers.google.com/my-business/content/policies 、2026-08-28更新）は
+ * （https://developers.google.com/my-business/content/policies、2026-08-28更新）は
  *   「End users of your Business Profile APIs need to manually sign in to use it.」
  *   「They're not allowed automatic access to make manual or programmatic changes to their accounts.」
  *   「You cannot provide indirect access to your Business Profile project.」
@@ -259,18 +274,36 @@ describe('Googleビジネス：APIキーによる間接利用の遮断（受入�
     expect(response.status).toBe(200);
   });
 
-  it('Googleのルートを持つ4ファイルすべてが同じゲートを通している', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { fileURLToPath } = await import('node:url');
-    const here = fileURLToPath(new URL('.', import.meta.url));
-    for (const file of ['restaurant-google.ts', 'restaurant-google-profile.ts', 'restaurant-google-posts.ts', 'restaurant-google-performance.ts']) {
-      const source = readFileSync(`${here}${file}`, 'utf8');
-      expect(source, `${file} は googleAccessGuard を通していない`).toContain("use('/api/restaurant-test/google/*', googleAccessGuard)");
-    }
+  /*
+   * 4つを1つのアプリに載せると、先に載せたファイルのゲートが残りの道にも掛かり、
+   * 1ファイルがゲートを外しても見えない。ファイルごとに単独で載せて叩く。
+   */
+  it.each([
+    ['restaurant-google.ts', () => restaurantGoogle, '/api/restaurant-test/google/connection?account_id=account-2'],
+    ['restaurant-google-profile.ts', () => restaurantGoogleProfile, '/api/restaurant-test/google/profile?account_id=account-2'],
+    ['restaurant-google-posts.ts', () => restaurantGooglePosts, '/api/restaurant-test/google/posts?account_id=account-2'],
+    ['restaurant-google-performance.ts', () => restaurantGooglePerformance, '/api/restaurant-test/google/performance?account_id=account-2&days=7'],
+  ] as const)('%s だけを載せても、APIキーは403で止まる', async (_file, routes, path) => {
+    seedStore();
+    await seedConnection();
+    const single = new Hono<Env>();
+    single.use('*', authMiddleware);
+    single.route('/', routes());
+    const response = await single.request(path, { headers: { Authorization: 'Bearer owner-key' } }, env);
+    expect(response.status).toBe(403);
+    expect((await response.json() as { error: string }).error).toContain('ログイン');
+    expect(googleCalls).toHaveLength(0);
   });
 });
 
 describe('Googleビジネス：設定（接続）', () => {
+  it('統括に飲食店機能パックが無いと、環境が有効でも404にする', async () => {
+    testDb.raw.prepare(`UPDATE tenants SET feature_packs = '[]' WHERE id = ?`).run(TENANT);
+    seedStore();
+    const response = await call('/api/restaurant-test/google/connection?account_id=account-2');
+    expect(response.status).toBe(404);
+  });
+
   it('店舗未登録のLINEアカウントは1店舗として初期化し、接続画面を表示できる', async () => {
     testDb.raw
       .prepare(
@@ -341,6 +374,8 @@ describe('Googleビジネス：設定（接続）', () => {
     const state = url.searchParams.get('state')!;
     expect(json.mode).toBe('connect');
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+    // ブラウザが別のGoogleアカウントでログイン済みでも、アカウント選択画面を出す。
+    expect(url.searchParams.get('prompt')).toBe('select_account consent');
     expect(response.headers.get('set-cookie')).toContain(`lh_gb_state=${state}`);
     expect(response.headers.get('set-cookie')).toContain('HttpOnly');
     const row = testDb.raw.prepare('SELECT store_id, mode, code_verifier_enc FROM rt_google_oauth_states WHERE state = ?').get(state) as { store_id: string; mode: string; code_verifier_enc: string };
@@ -386,7 +421,7 @@ describe('Googleビジネス：設定（接続）', () => {
     const response = await startAndCallback((state) => `state=${state}&code=auth-code`, null);
     expect(response.status).toBe(302);
     const location = new URL(response.headers.get('location')!);
-    expect(location.origin + location.pathname).toBe('https://admin.example.test/restaurant-test/google');
+    expect(location.origin + location.pathname).toBe('https://admin.example.test/settings/sns');
     expect(location.searchParams.get('google')).toBe('connected');
     expect(location.searchParams.get('account_id')).toBe('account-2');
 
@@ -408,6 +443,41 @@ describe('Googleビジネス：設定（接続）', () => {
     expect(new URL(response.headers.get('location')!).searchParams.get('google')).toBe('error:invalid_state');
     expect(googleCalls).toHaveLength(0);
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_connections').get()).toEqual({ n: 0 });
+  });
+
+  /*
+   * 同意画面では権限ごとにチェックを外せる。business.manage を外したまま接続できると
+   * 「連携済みなのに全部403」になるので、接続時と更新時の両方で止める。
+   */
+  it('コールバック：business.manage を外した同意では接続を保存しない', async () => {
+    seedStore();
+    googleHandler = (url) => {
+      if (url === 'https://oauth2.googleapis.com/token') {
+        return jsonResponse({ access_token: 'access-1', refresh_token: 'refresh-1', expires_in: 3600, scope: 'openid email' });
+      }
+      // 許可の確かめが無ければ接続まで進めてしまう応答をそろえておく。
+      if (url.startsWith('https://openidconnect.googleapis.com/v1/userinfo')) return jsonResponse({ email: 'owner@example.test' });
+      if (url.startsWith('https://mybusinessaccountmanagement.googleapis.com/v1/accounts')) return jsonResponse({ accounts: [{ name: 'accounts/111' }] });
+      if (url.includes('/v1/accounts/111/locations')) return jsonResponse({ locations: [{ name: 'locations/222', title: 'こもれび食堂 渋谷店', metadata: { mapsUri: 'https://maps.google.com/?cid=1' } }] });
+      return jsonResponse({}, 404);
+    };
+    const response = await startAndCallback((state) => `state=${state}&code=auth-code`);
+    expect(response.status).toBe(302);
+    expect(new URL(response.headers.get('location')!).searchParams.get('google')).toBe('error:no_permission');
+    expect(googleCalls.map((entry) => entry.url)).toEqual(['https://oauth2.googleapis.com/token']);
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS n FROM rt_google_connections WHERE status = 'connected'").get()).toEqual({ n: 0 });
+  });
+
+  it('更新：連携後に business.manage だけ取り消されたら、同期で使わずに止める', async () => {
+    seedStore();
+    await seedConnection({ expires: '2000-01-01T00:00:00.000Z' });
+    googleHandler = (url) => (url === 'https://oauth2.googleapis.com/token'
+      ? jsonResponse({ access_token: 'access-2', expires_in: 3600, scope: 'openid email' })
+      : jsonResponse({ reviews: [] }));
+    const response = await call('/api/restaurant-test/google/reviews/sync?account_id=account-2', { body: {} });
+    expect(response.status).not.toBe(200);
+    expect(await response.json()).toMatchObject({ code: 'no_permission' });
+    expect(googleCalls.filter((entry) => entry.url !== 'https://oauth2.googleapis.com/token')).toHaveLength(0);
   });
 
   it('コールバック：店舗が複数なら候補を保存して選択待ちにし、選択で接続済みになる', async () => {
@@ -434,9 +504,11 @@ describe('Googleビジネス：設定（接続）', () => {
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_location_candidates').get()).toEqual({ n: 0 });
   });
 
-  it('再接続：別の店舗が選ばれたら保存せずに止める', async () => {
+  it('再接続：以前の店舗を持たないアカウントでも店舗選択へ進み、確認したときだけ切り替えて前の店舗のデータを消す', async () => {
     seedStore();
     await seedConnection();
+    testDb.raw.prepare(`UPDATE rt_google_connections SET average_rating = 4.5, total_review_count = 12, last_synced_at = '2026-09-30T00:00:00Z'`).run();
+    testDb.raw.prepare(`INSERT INTO rt_google_reviews (id, store_id, review_name, star_rating, create_time) VALUES ('rv-old', 'store-shibuya', ?, 5, '2026-09-01T00:00:00Z')`).run(`${LOCATION}/reviews/r1`);
     googleHandler = (url) => {
       if (url === 'https://oauth2.googleapis.com/token') return jsonResponse({ access_token: 'a2', refresh_token: 'r2', expires_in: 3600 });
       if (url.includes('userinfo')) return jsonResponse({ email: 'other@example.test' });
@@ -447,11 +519,43 @@ describe('Googleビジネス：設定（接続）', () => {
     const start = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {} });
     expect(((await start.json()) as { mode: string }).mode).toBe('reconnect');
     const response = await startAndCallback((state) => `state=${state}&code=c`);
-    expect(new URL(response.headers.get('location')!).searchParams.get('google')).toBe('error:location_mismatch');
-    const row = testDb.raw.prepare('SELECT location_name, google_account_email, refresh_token_enc FROM rt_google_connections').get() as Record<string, string>;
+    expect(new URL(response.headers.get('location')!).searchParams.get('google')).toBe('select_location');
+    const row = testDb.raw.prepare('SELECT status, location_name, location_title, google_account_email, refresh_token_enc FROM rt_google_connections').get() as Record<string, string>;
+    // 前の店舗はまだ残したまま「選択待ち」にする（切り替え確認の表示に使う）。
+    expect(row.status).toBe('pending_location');
     expect(row.location_name).toBe(LOCATION);
-    expect(row.google_account_email).toBe('owner@example.test');
-    expect(await decryptCredential(row.refresh_token_enc, ENC_KEY)).toBe('refresh-secret');
+    expect(row.google_account_email).toBe('other@example.test');
+    expect(await decryptCredential(row.refresh_token_enc, ENC_KEY)).toBe('r2');
+    const candidates = testDb.raw.prepare('SELECT location_name FROM rt_google_location_candidates').all() as Array<{ location_name: string }>;
+    expect(candidates.map((candidate) => candidate.location_name)).toEqual(['accounts/555/locations/777']);
+
+    // 確認なしでは切り替えない。
+    const unconfirmed = await call('/api/restaurant-test/google/connect/select-location?account_id=account-2', {
+      body: { locationName: 'accounts/555/locations/777' },
+    });
+    expect(unconfirmed.status).toBe(400);
+    expect(((await unconfirmed.json()) as { code?: string }).code).toBe('switch_confirmation_required');
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_reviews').get()).toEqual({ n: 1 });
+
+    const confirmed = await call('/api/restaurant-test/google/connect/select-location?account_id=account-2', {
+      body: { locationName: 'accounts/555/locations/777', confirmSwitch: true },
+    });
+    expect(confirmed.status).toBe(200);
+    expect(
+      testDb.raw.prepare('SELECT status, location_name, location_title, average_rating, total_review_count, last_synced_at FROM rt_google_connections').get(),
+    ).toEqual({
+      status: 'connected',
+      location_name: 'accounts/555/locations/777',
+      location_title: '別の店',
+      average_rating: null,
+      total_review_count: null,
+      last_synced_at: null,
+    });
+    // 前の店舗の取り込み済みデータは消す。切り替えの記録は残す。
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_reviews').get()).toEqual({ n: 0 });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_location_candidates').get()).toEqual({ n: 0 });
+    const log = testDb.raw.prepare(`SELECT kind, target_name, before_text, result FROM rt_google_write_log WHERE result = 'accepted' ORDER BY created_at DESC`).get() as Record<string, string>;
+    expect(log).toMatchObject({ kind: 'reconnect', target_name: 'accounts/555/locations/777', before_text: LOCATION });
   });
 
   it('接続解除は確認が必須。Googleから受け取ったものは消し、自分たちの送信記録は残す', async () => {
@@ -593,96 +697,125 @@ describe('Googleビジネス：口コミ', () => {
     return (testDb.raw.prepare('SELECT id FROM rt_google_reviews WHERE review_name = ?').get(`${LOCATION}/reviews/${reviewId}`) as { id: string }).id;
   }
 
+  beforeEach(()=>{testDb.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('account-2','test-2','店','','',?)").run(TENANT);testDb.raw.exec("INSERT INTO account_ai_features(account_id,feature,enabled,consent_by,consent_at,disclosure_version) VALUES('account-2','google_review',1,'owner-1','2026-10-16','2026-10-16')");});
+
+  it('事前設定なしでも、ボタンからの生成要求だけで下書きを作る',async()=>{
+    await seedReviews();
+    const run=vi.fn(async()=>({response:'ご来店ありがとうございます。'}));env.AI={run} as unknown as Ai;
+    testDb.raw.exec("DELETE FROM account_ai_features");googleCalls=[];
+    const response=await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`,{body:{}});
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({draft:'ご来店ありがとうございます。',aiGenerated:true});
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(googleCalls).toHaveLength(0);
+    expect(testDb.raw.prepare('SELECT reply_status, reply_draft FROM rt_google_reviews WHERE review_name = ?').get(`${LOCATION}/reviews/r1`)).toEqual({reply_status:'draft',reply_draft:'ご来店ありがとうございます。'});
+  });
+
   it('AI下書き：投稿者名を送らず、生成文を下書きとして保存する。staff も使える', async () => {
     await seedReviews();
     const run = vi.fn(async () => ({ response: 'お客様、このたびはご来店ありがとうございます。' }));
     env.AI = { run } as unknown as Ai;
     useStaffRole('staff');
-    const response = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: { mode: 'new' }, token: 'staff-session' });
+    const response = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: {}, token: 'staff-session' });
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ draft: 'お客様、このたびはご来店ありがとうございます。', aiGenerated: true, mode: 'new' });
+    expect(await response.json()).toMatchObject({ draft: 'お客様、このたびはご来店ありがとうございます。', aiGenerated: true });
     const payload = JSON.stringify(run.mock.calls[0]);
     expect(payload).toContain('季節の定食');
     expect(payload).not.toContain('Aki');
     expect(testDb.raw.prepare('SELECT reply_status, reply_draft_ai_generated FROM rt_google_reviews WHERE review_name = ?').get(`${LOCATION}/reviews/r1`)).toEqual({ reply_status: 'draft', reply_draft_ai_generated: 1 });
   });
 
-  it('短くする：画面で直した文章を元に書き直す。元の文章が無ければ 400', async () => {
-    await seedReviews();
-    const run = vi.fn(async () => ({ response: 'ご来店ありがとうございます。またお待ちしております。' }));
-    env.AI = { run } as unknown as Ai;
-    const id = reviewIdOf('r1');
-    // 保存前の画面の文章がそのまま書き換えの元になる。
-    const baseText = 'このたびはご来店いただき、またうれしいお言葉まで頂戴し、心より御礼申し上げます。季節の定食は毎月内容を変えてご用意しておりますので、またのご来店をお待ちしております。';
-    const response = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: 'shorter', baseText } });
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ mode: 'shorter' });
-    const payload = JSON.stringify(run.mock.calls[0]);
-    expect(payload).toContain('元の返信文（これを書き直す）');
-    expect(payload).toContain('大きく短く書き直');
-    expect(payload).toContain(`元の返信文（${baseText.length}文字）より必ず短くする`);
-    const empty = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: 'polite', baseText: '   ' } });
-    expect(empty.status).toBe(400);
-    expect(await empty.json()).toMatchObject({ code: 'draft_required' });
+  it('本文のない従来の生成リクエストも受け付ける',async()=>{
+    await seedReviews();env.AI={run:vi.fn(async()=>({response:'ご来店ありがとうございます。'}))} as unknown as Ai;
+    expect((await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`,{method:'POST'})).status).toBe(200);
   });
 
-  it('短くする：1回目が足りなければ作り直し、変化が大きい方を採用する', async () => {
+  it.each(['shorten','polite'])('AIで%s：編集中の下書きを使い、Googleへ送らず保存する',async(mode)=>{
     await seedReviews();
-    const baseText = 'あ'.repeat(130);
-    // 1回目は100字（元の77%）で足りず、厳しめの作り直しで70字まで短くなる。
-    const run = vi
-      .fn()
-      .mockResolvedValueOnce({ response: 'い'.repeat(100) })
-      .mockResolvedValueOnce({ response: 'う'.repeat(70) });
-    env.AI = { run } as unknown as Ai;
-    const id = reviewIdOf('r1');
-    const response = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: 'shorter', baseText } });
-    expect(response.status).toBe(200);
-    expect(run).toHaveBeenCalledTimes(2);
-    expect(await response.json()).toMatchObject({ draft: 'う'.repeat(70) });
-    expect(testDb.raw.prepare('SELECT reply_draft FROM rt_google_reviews WHERE id = ?').get(id)).toEqual({ reply_draft: 'う'.repeat(70) });
+    const run=vi.fn(async()=>({response:'ご来店ありがとうございます。'}));env.AI={run} as unknown as Ai;
+    const response=await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`,{body:{mode,replyDraft:'ご来店ありがとうございました。またのご来店を心よりお待ちしています。'}});
+    expect(response.status).toBe(200);expect(await response.json()).toMatchObject({draft:'ご来店ありがとうございます。'});
+    const payload=JSON.stringify(run.mock.calls[0]);
+    expect(payload).toContain('整える下書き');expect(payload).toContain(mode==='shorten'?'元の文より短く':'自然で丁寧');
+    expect(payload).not.toContain('Aki');
   });
 
-  it('書き換え：作り直しても十分に変わらなければ保存せず、やり直しを促す', async () => {
+  it('AI整形は不正な入力と生成中の他の保存を拒み、元の文を残す',async()=>{
+    await seedReviews();const id=reviewIdOf('r1'),path=`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`;
+    expect((await call(path,{body:{mode:'other'}})).status).toBe(400);
+    expect((await call(path,{body:{mode:'shorten',replyDraft:''}})).status).toBe(400);
+    env.AI={run:vi.fn(async()=>{
+      testDb.raw.prepare("UPDATE rt_google_reviews SET reply_draft='別の担当の文' WHERE id=?").run(id);
+      return {response:'生成した文'};
+    })} as unknown as Ai;
+    expect((await call(path,{body:{mode:'polite',replyDraft:'お礼の文'}})).status).toBe(409);
+    expect(testDb.raw.prepare('SELECT reply_draft FROM rt_google_reviews WHERE id=?').get(id)).toEqual({reply_draft:'別の担当の文'});
+  });
+
+  it('短くするAIが元の文より長い文を返したら保存しない',async()=>{
+    await seedReviews();const id=reviewIdOf('r1');
+    testDb.raw.prepare("UPDATE rt_google_reviews SET reply_draft='お礼の文' WHERE id=?").run(id);
+    env.AI={run:vi.fn(async()=>({response:'元よりも長くなったお礼の文章です。'}))} as unknown as Ai;
+    const response=await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`,{body:{mode:'shorten'}});
+    expect(response.status).toBe(502);expect(await response.json()).toMatchObject({code:'ai_not_shorter'});
+    expect(testDb.raw.prepare('SELECT reply_draft FROM rt_google_reviews WHERE id=?').get(id)).toEqual({reply_draft:'お礼の文'});
+  });
+
+  /** OpenAI の文章生成APIの返事を真似る。 */
+  function openAiHandler(body: unknown, status = 200): (url: string, init?: RequestInit) => Response {
+    return (url) => (url.startsWith('https://api.openai.com/') ? jsonResponse(body, status) : jsonResponse({}, 404));
+  }
+
+  it('AI下書き：鍵があるときは文章の上手な方（OpenAI）で書く', async () => {
     await seedReviews();
-    const id = reviewIdOf('r1');
-    const draftOf = () => (testDb.raw.prepare('SELECT reply_draft, reply_status FROM rt_google_reviews WHERE id = ?').get(id) as { reply_draft: string | null; reply_status: string });
-    const before = draftOf();
+    env.OPENAI_API_KEY = 'sk-test';
+    const run = vi.fn(async () => ({ response: 'こちらは使われない文章です。' }));
+    env.AI = { run } as unknown as Ai;
+    googleHandler = openAiHandler({ choices: [{ message: { content: '  この度はご来店いただき、誠にありがとうございました。  ' } }] });
+    const response = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: {} });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ draft: 'この度はご来店いただき、誠にありがとうございました。', aiGenerated: true });
+    expect(run).not.toHaveBeenCalled();
+    const sent = googleCalls.find((item) => item.url.startsWith('https://api.openai.com/'));
+    expect(sent).toBeDefined();
+    const sentBody = JSON.parse(String(sent?.init?.body)) as Record<string, unknown>;
+    // gpt-5 系は max_tokens と temperature を受け付けない。
+    expect(sentBody).toMatchObject({ model: 'gpt-5-mini', max_completion_tokens: 3000 });
+    expect(sentBody).not.toHaveProperty('max_tokens');
+    expect(sentBody).not.toHaveProperty('temperature');
+    expect(JSON.stringify(sentBody)).toContain('季節の定食');
+    expect(JSON.stringify(sentBody)).not.toContain('Aki');
+  });
 
-    const cases: Array<{ mode: 'shorter' | 'polite'; base: string; first: string; second: string | null }> = [
-      // 目安（65字）から遠い緩い縮み。作り直しも悪化（120字）なので保存しない。
-      { mode: 'shorter', base: 'あ'.repeat(130), first: 'い'.repeat(100), second: 'う'.repeat(120) },
-      // 短くするのに元と同じ長さのまま。
-      { mode: 'shorter', base: 'あ'.repeat(40), first: 'い'.repeat(40), second: 'う'.repeat(40) },
-      // 元が短い（目安の下限40字）ため、ほぼ無変化（1字減）でも目安の壁を超えず素通りしてしまっていた不具合の再現。
-      { mode: 'shorter', base: 'あ'.repeat(40), first: 'い'.repeat(39), second: 'う'.repeat(38) },
-      // 丁寧にするのに元より長くなっていない。
-      { mode: 'polite', base: 'あ'.repeat(400), first: 'い'.repeat(400), second: 'う'.repeat(400) },
-      // 元が長い（目安の上限4096字）ため、ほぼ無変化（1字増）でも目安の壁を超えず素通りしてしまっていた不具合の再現。
-      { mode: 'polite', base: 'あ'.repeat(4090), first: 'い'.repeat(4091), second: 'う'.repeat(4092) },
-      // 作り直し自体が失敗したときも、不十分な1回目を保存しない。
-      { mode: 'shorter', base: 'あ'.repeat(130), first: 'い'.repeat(100), second: null },
-    ];
+  it('AI下書き：OpenAI が失敗しても Workers AI に切り替えて下書きを作る', async () => {
+    await seedReviews();
+    env.OPENAI_API_KEY = 'sk-test';
+    const run = vi.fn(async () => ({ response: '切り替え後の下書きです。' }));
+    env.AI = { run } as unknown as Ai;
+    googleHandler = openAiHandler({ error: { message: 'too many requests' } }, 429);
+    const response = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: {} });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ draft: '切り替え後の下書きです。', aiGenerated: true });
+    expect(run).toHaveBeenCalledTimes(1);
+  });
 
-    for (const item of cases) {
-      const run = vi.fn();
-      run.mockResolvedValueOnce({ response: item.first });
-      if (item.second === null) run.mockRejectedValueOnce(new Error('ai down'));
-      else run.mockResolvedValueOnce({ response: item.second });
-      env.AI = { run } as unknown as Ai;
-      const response = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: item.mode, baseText: item.base } });
-      expect(response.status).toBe(502);
-      expect(await response.json()).toMatchObject({ code: 'rewrite_failed' });
-      expect(run).toHaveBeenCalledTimes(2);
-      // 不十分な文章は下書きに残さない。
-      expect(draftOf()).toEqual(before);
-    }
+  it('AI下書き：Workers AI が無く OpenAI も失敗したときは 502', async () => {
+    await seedReviews();
+    env.OPENAI_API_KEY = 'sk-test';
+    googleHandler = openAiHandler({ error: { message: 'bad key' } }, 401);
+    const response = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: {} });
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({ code: 'ai_failed' });
   });
 
   it('AI下書き：AI が無い環境は 503、返信済みの口コミは 409', async () => {
     await seedReviews();
+    // どちらの生成先も無い環境。
+    expect(env.AI).toBeUndefined();
+    expect(env.OPENAI_API_KEY).toBeUndefined();
     const unavailable = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: {} });
     expect(unavailable.status).toBe(503);
+    expect(await unavailable.json()).toMatchObject({ code: 'ai_unavailable' });
     env.AI = { run: vi.fn(async () => ({ response: 'x' })) } as unknown as Ai;
     const replied = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r3')}/draft/generate?account_id=account-2`, { body: {} });
     expect(replied.status).toBe(409);
@@ -764,4 +897,51 @@ describe('Googleビジネス：口コミ', () => {
     expect(await (await call(`/api/restaurant-test/google/reviews/${id}/reply?account_id=account-2`, { body: { confirmed: true, comment: 'x' }, token: 'admin-session' })).json()).toMatchObject({ code: 'write_disabled' });
     expect((await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {}, token: 'admin-session' })).status).toBe(200);
   });
+});
+
+describe('実際の本番・検証設定を組み合わせたルート', () => {
+  it.each(['production', 'staging'] as const)('%s のGoogle接続は開き、飲食店だけ独立して閉じる', async environment => {
+    const { unstable_readConfig } = await import('wrangler');
+    const config = unstable_readConfig({ config: fileURLToPath(new URL(environment === 'production' ? '../../wrangler.toml' : '../../wrangler.staging.toml', import.meta.url)) });
+    Object.assign(env, config.vars);
+    seedStore();
+    const google = await call('/api/restaurant-test/google/connection?account_id=account-2');
+    expect(google.status).toBe(200);
+    const body = await google.json() as { stores: { id: string; line_account_id: string }[] };
+    expect(body.stores).toContainEqual({ id: 'store-shibuya', name: 'こもれび食堂 渋谷店', line_account_id: 'account-2' });
+    for (const [endpoint, status] of [['reviews', 200], ['profile', 409], ['photos', 409], ['posts', 200], ['performance', 200]] as const) {
+      const response = await call(`/api/restaurant-test/google/${endpoint}?account_id=account-2`);
+      expect(response.status, endpoint).toBe(status); // 各画面のデータかGoogle未接続の案内まで到達する。
+    }
+    expect(googleCalls).toHaveLength(0);
+    const restaurant = await call('/api/restaurant-test/stores?account_id=account-2');
+    expect(restaurant.status).toBe(environment === 'production' ? 404 : 200);
+    if (environment === 'production') expect(await restaurant.json()).toEqual({ success: false, error: 'Not found' });
+    env.GOOGLE_BUSINESS_ENABLED = 'false';
+    const prepare = vi.spyOn(env.DB, 'prepare');
+    for (const endpoint of ['connection', 'reviews', 'profile', 'photos', 'posts', 'performance']) {
+      expect((await call(`/api/restaurant-test/google/${endpoint}?account_id=account-2`)).status).toBe(404);
+    }
+    // 共通のログイン確認はDBを読む。機能のデータには到達させない。
+    expect(prepare.mock.calls.map(([sql]) => sql).filter(sql => /\brt_/.test(sql))).toEqual([]);
+    prepare.mockRestore();
+    expect((await call('/api/restaurant-test/stores?account_id=account-2')).status).toBe(environment === 'production' ? 404 : 200);
+    expect(googleCalls.filter(call => call.url.includes('googleapis.com'))).toHaveLength(0);
+  });
+});
+
+
+it('Googleの店舗選択は同じ統括かつ担当範囲だけを返す', async () => {
+  seedStore();
+  testDb.raw.prepare("INSERT INTO rt_stores (id,organization_id,name,code,line_account_id) VALUES ('sibling','org-1','同じ統括の店','SIBLING','account-1')").run();
+  testDb.raw.prepare("INSERT INTO tenants (id,name) VALUES ('b368-other','別の統括')").run();
+  testDb.raw.prepare("INSERT INTO rt_organizations (id,account_id,tenant_id,name) VALUES ('other-org','account-9','b368-other','別の組織')").run();
+  testDb.raw.prepare("INSERT INTO rt_stores (id,organization_id,name,code,line_account_id) VALUES ('other-store','other-org','別の統括の店','OTHER','account-9')").run();
+  const owner = await call('/api/restaurant-test/google/connection?account_id=account-2');
+  expect((await owner.json() as { stores: { id: string }[] }).stores.map(store => store.id).sort()).toEqual(['sibling', 'store-shibuya']);
+  useStaffRole('admin', 'accounts', false);
+  testDb.raw.prepare("INSERT INTO staff_account_scopes (staff_id,line_account_id,created_at) VALUES ('admin-1','account-2','2026-10-17 00:00:00')").run();
+  const admin = await call('/api/restaurant-test/google/connection?account_id=account-2', { token: 'admin-session' });
+  expect(admin.status).toBe(200);
+  expect((await admin.json() as { stores: { id: string }[] }).stores.map(store => store.id)).toEqual(['store-shibuya']);
 });

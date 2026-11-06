@@ -1,4 +1,5 @@
 import type { MileageAdminHistoryItem, MileageHistoryItem } from '@/lib/api'
+import { formatDateTime, formatListDay, formatListTimestamp, formatNumber } from '@/lib/format'
 
 const ENTRY_TYPE_LABELS: Record<MileageHistoryItem['entryType'], string> = {
   grant: '付与',
@@ -126,7 +127,7 @@ export function actionScoreReasonLabel(reason: string | null) {
 }
 
 export function formatMileageChange(value: number): string {
-  const number = Math.abs(value).toLocaleString('ja-JP')
+  const number = formatNumber(Math.abs(value))
   if (value > 0) return `+${number}`
   if (value < 0) return `−${number}`
   return '0'
@@ -135,7 +136,7 @@ export function formatMileageChange(value: number): string {
 /** 数を日本語の桁区切りで出す。取れていない数・壊れた数は「—」にする。 */
 export function formatMileageNumber(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value)
-    ? new Intl.NumberFormat('ja-JP').format(value)
+    ? formatNumber(value)
     : '—'
 }
 
@@ -161,7 +162,7 @@ export function mileageRankProgress(input: {
       ? 'いちばん上のランクです'
       : (input.rankReason ?? 'ランク情報を確認できません')
   const detail = input.milesToNextRank != null
-    ? `あと ${input.milesToNextRank.toLocaleString('ja-JP')} マイル`
+    ? `あと ${formatNumber(input.milesToNextRank)} マイル`
     : unpublished
       ? null
       : (input.rankReason ?? 'ランク情報を確認できません')
@@ -172,13 +173,18 @@ export function formatMileageDate(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
+}
+
+/*
+ * 短い日時（絵は「9/30 14:12」「10/2 15:20」）。日本時間に直して出す。
+ * 端末の時差に振られないよう +9 時間ずらして読む。
+ */
+/* 月日だけ（絵は「9/30」。時刻なし）。日本時間に直して出す。 */
+export function formatMileageMonthDay(value: string | null): string {
+  return formatListDay(value)
+}
+
+export function formatMileageShortDateTime(value: string | null): string {
+  return formatListTimestamp(value, { fallback: '—' })
 }

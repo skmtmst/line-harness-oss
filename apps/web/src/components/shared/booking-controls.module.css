@@ -1,0 +1,105 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/* 時間×卓の予約・空き枠・卓の選択。既定の Button の見た目に影響しない。 */
+.block {
+  position: absolute;
+  inset: var(--tpl-rs-rsv-block-inset);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-rs-panel-head-text-gap);
+  height: auto;
+  min-height: 0;
+  padding: var(--tpl-rs-rsv-block-pad);
+  overflow: hidden;
+  box-sizing: border-box;
+  border-radius: var(--radius-segment);
+  text-align: left;
+  cursor: pointer;
+}
+.block[data-placement='cell'] { position: static; width: 100%; min-height: var(--tpl-people-block-height); }
+.block[data-placement='calendar'] {
+  inset: auto;
+  inset-block: 0;
+  inset-inline-start: calc(100% * var(--calendar-lane) / var(--calendar-lanes) + var(--polish-space-row) / 2);
+  inline-size: calc(100% * var(--calendar-span) / var(--calendar-lanes) - var(--polish-space-row));
+  pointer-events: auto;
+  padding: var(--polish-space-row);
+  gap: 0;
+  font-size: var(--text-micro);
+}
+.block[data-placement='calendar'] > span { max-inline-size: 100%; min-inline-size: 0; }
+
+.block[data-placement='timeline'] { container-type: inline-size; container-name: booking-card; gap: 0; padding: calc(var(--polish-space-row) - var(--booking-stroke)); line-height: var(--tpl-rs-lh-11); }
+.block[data-placement='timeline'] > * { flex-shrink: 0; }
+.block[data-placement='board'] { position: static; width: 100%; height: 100%; gap: 0; padding: var(--tpl-sd-entry-pad); }
+.block[data-placement='month'] { position: static; width: 100%; padding: var(--polish-space-row); gap: 0; font-size: var(--text-micro); }
+.block > strong { font-weight: 600; }
+.block > span { font-variant-numeric: var(--font-numeric); }
+.block[data-selected] { outline: var(--polish-focus-width) solid var(--color-ink); outline-offset: -2px; }
+.slotAdd {
+  position: absolute;
+  top: var(--tpl-rs-rsv-add-top);
+  left: var(--tpl-rs-rsv-add-side);
+  right: var(--tpl-rs-rsv-add-side);
+  height: var(--tpl-rs-rsv-add-h);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  color: var(--color-action);
+  font-size: var(--text-nano);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-10);
+  opacity: 1;
+  cursor: pointer;
+}
+
+/* 縦の担当盤では、空き枠をセルの通常の流れに置く。 */
+.slotAdd[data-placement='cell'] { position: static; width: 100%; }
+
+.phoneTable {
+  flex: 1 1 var(--tpl-rs-rsv-phone-table-basis);
+  height: var(--tpl-rs-rsv-phone-table-h);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-segment);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-12);
+  cursor: pointer;
+}
+
+.phoneTableTaken {
+  background: var(--tpl-rs-occupied-bg);
+  outline-color: var(--tpl-rs-occupied-line);
+  cursor: not-allowed;
+}
+
+.phoneTableChosen {
+  background: var(--color-accent-soft);
+  outline: var(--tpl-rs-table-card-line) solid var(--color-accent-deep);
+  outline-offset: calc(var(--tpl-rs-table-card-line) * -1);
+  color: var(--color-accent-deep);
+}
+
+.slotAdd:focus-visible {
+  opacity: 1;
+}
+
+.block:focus-visible, .slotAdd:focus-visible, .phoneTable:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 1px; }
+}
+
+/* 時間の幅は変えず、最小の箱だけ余白を縮めて人数と注意を残す。 */
+@container booking-entry (max-width: 4rem) {
+  .block[data-placement='timeline'] { padding-inline: 0; inset-inline: 0; }
+}

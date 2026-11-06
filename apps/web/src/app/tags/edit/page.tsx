@@ -1,12 +1,11 @@
 'use client'
 
+import PagePending from '@/components/templates/page-pending'
+import { routePendingForPath } from '@/lib/route-pending'
 import { Suspense } from 'react'
-import EditTagPageV4 from '@/components/friend-fields/edit-tag-page-v4'
+import Screen from '@/v8/tag-edit/edit'
 
+/** V8 の入口。URL・読み書き・権限は画面側で保つ。 */
 export default function EditTagPage() {
-  return (
-    <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>
-      <EditTagPageV4 />
-    </Suspense>
-  )
+  return <Suspense fallback={<PagePending stage="route" {...routePendingForPath("/tags/edit")} />}><Screen /></Suspense>
 }

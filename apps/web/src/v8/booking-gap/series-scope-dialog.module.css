@@ -1,0 +1,8 @@
+.body { --gap-m: 12px; --gap-l: 16px; --cell-pad-y: 16px; --cell-pad-x: 16px; display: flex; flex-direction: column; gap: var(--gap-l); }
+.heading { margin: var(--tpl-layout-zero); font-size: var(--text-body); font-weight: 700; color: var(--color-ink); }
+
+.note { margin: var(--tpl-layout-zero); font-size: var(--text-caption); color: var(--color-ink-secondary); }
+.error { margin: var(--tpl-layout-zero); color: var(--color-danger); font-size: var(--text-label); }
+.retry { border: 0; background: none; color: var(--color-action); font-weight: 600; cursor: pointer; }
+
+.feeNotice { color: var(--color-danger); }

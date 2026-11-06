@@ -1,28 +1,26 @@
 'use client'
 
+import { lineAccountConnectionState } from '@/lib/line-account-state'
 import type { AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Avatar from '@/components/shared/avatar'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { formatNumber } from '@/lib/format'
 
 export function accountIconUrl(account: AccountWithStats): string | null {
-  return account.pictureUrl || account.iconUrl || null
+  return account.iconUrl || account.pictureUrl || null
 }
 
 function AccountIcon({ account }: { account: AccountWithStats }) {
-  const src = accountIconUrl(account)
-  if (src) {
-    // eslint-disable-next-line @next/next/no-img-element -- LINE公式アカウントのCDN画像
-    return <img src={src} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
-  }
-  const label = (account.displayName || account.name).trim().slice(0, 1)
-  return <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent-deep">{label}</span>
+  const name = account.displayName || account.name
+  return <Avatar name={name} src={accountIconUrl(account)} size={36} shape="rounded" alt={name} />
 }
 
-function ConnectionStatus({ status }: { status: 'ok' | 'warn' | 'unknown' | undefined }) {
-  const tone: StatusBadgeTone = status === 'ok' ? 'success' : status === 'warn' ? 'warning' : 'neutral'
-  const label = status === 'ok' ? '正常' : status === 'warn' ? '要確認' : '未確認'
-  return <StatusBadge tone={tone} size="compact">{label}</StatusBadge>
+function ConnectionStatus({ account }: { account: AccountWithStats }) {
+  const state = lineAccountConnectionState(account)
+  const tone: StatusBadgeTone = state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'
+  return <StatusBadge tone={tone} size="compact">{state.label}</StatusBadge>
 }
 
 export default function HqAccountList({
@@ -37,7 +35,7 @@ export default function HqAccountList({
   selectLabel?: string
 }) {
   return (
-    <section data-design="List" data-design-node="vLMQ5" className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+    <section data-design="List" data-design-node="vLMQ5" className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card-surface">
       {/*
         U042: 768px 未満では表の右端にある操作（ログイン・設定）へ
         横スクロールしないと届かなかった。スマホでは名前＋状態＋操作が
@@ -55,7 +53,7 @@ export default function HqAccountList({
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <StatusBadge tone={account.isActive ? 'success' : 'neutral'} size="compact">{account.isActive ? '有効' : '停止中'}</StatusBadge>
-              <ConnectionStatus status={account.connection?.status} />
+              <ConnectionStatus account={account} />
             </div>
             <div className="mt-3 flex gap-2">
               {onSettings ? <Button type="button" variant="secondary" onClick={() => onSettings(account)}>設定</Button> : null}
@@ -66,15 +64,15 @@ export default function HqAccountList({
               <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-control bg-canvas-sunken px-2 py-2">
                   <dt className="text-nano text-ink-faint">友だち数</dt>
-                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{(account.stats?.friendCount ?? 0).toLocaleString('ja-JP')}</dd>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.friendCount ?? 0))}</dd>
                 </div>
                 <div className="rounded-control bg-canvas-sunken px-2 py-2">
                   <dt className="text-nano text-ink-faint">今月の配信数</dt>
-                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{(account.stats?.messagesThisMonth ?? 0).toLocaleString('ja-JP')}</dd>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.messagesThisMonth ?? 0))}</dd>
                 </div>
                 <div className="rounded-control bg-canvas-sunken px-2 py-2">
                   <dt className="text-nano text-ink-faint">担当者数</dt>
-                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{(account.stats?.staffCount ?? 0).toLocaleString('ja-JP')}人</dd>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.staffCount ?? 0))}人</dd>
                 </div>
               </dl>
             </details>
@@ -106,10 +104,10 @@ export default function HqAccountList({
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{(account.stats?.friendCount ?? 0).toLocaleString('ja-JP')}</td>
-                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{(account.stats?.messagesThisMonth ?? 0).toLocaleString('ja-JP')}</td>
-                <td className="px-4 py-2"><ConnectionStatus status={account.connection?.status} /></td>
-                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{(account.stats?.staffCount ?? 0).toLocaleString('ja-JP')}人</td>
+                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.friendCount ?? 0))}</td>
+                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.messagesThisMonth ?? 0))}</td>
+                <td className="px-4 py-2"><ConnectionStatus account={account} /></td>
+                <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.staffCount ?? 0))}人</td>
                 <td className="px-4 py-2"><StatusBadge tone={account.isActive ? 'success' : 'neutral'} size="compact">{account.isActive ? '有効' : '停止中'}</StatusBadge></td>
                 <td className="px-5 py-2 text-right">
                   <div className="flex justify-end gap-2">

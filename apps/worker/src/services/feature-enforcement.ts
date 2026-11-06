@@ -1,3 +1,7 @@
+export type { FeatureJobEnforcement, FeatureJobMetadata } from './feature-job-types.js';
+import type { FeatureJobEnforcement, FeatureJobMetadata } from './feature-job-types.js';
+import {recordFeatureExecutionSkipped} from './feature-skip-audit.js';
+export {recordFeatureExecutionSkipped} from './feature-skip-audit.js';
 import {
   getAccountSettings,
   getTenantBilling,
@@ -10,40 +14,18 @@ import {
   featureCatalogEntry,
   type FeatureId,
 } from '@line-crm/shared';
+
 import { featureContractIsAvailable, resolveEntitlements } from './billing-plans.js';
+import {
+  PERSONAL_DATA_RETENTION_JOB,
+  TENANT_DATA_RETENTION_JOB,
+  GOOGLE_CONTENT_RETENTION_JOB,
+} from './retention-job-manifest.js';
 
 const FEATURE_SETTINGS_BUNDLE_KEY = 'feature.settings_bundle_v1';
 
 type FeatureSettingsBundle = {
   features?: Partial<Record<FeatureId, boolean>>;
-};
-
-/**
- * 実装側のoff強制の在り処(#643)。
- *
- * manifest に名前を足すだけでは「本当に止まるか」は分からない。
- * `gated` は判定を書いたファイルと、そこに必ず現れる目印を持ち、
- * feature-job-manifest.test.ts が実ソースを読んで機械照合する。
- * `exempt` は外部呼び出しも状態更新もしない処理だけで、理由を必ず書く。
- */
-export type FeatureJobEnforcement =
-  | {
-    readonly mode: 'gated';
-    /** 判定を書いたファイル(リポジトリ相対)。全て存在すること。 */
-    readonly sources: readonly string[];
-    /** sources のどこかに必ず現れる判定の目印。全て見つかること。 */
-    readonly markers: readonly string[];
-  }
-  | { readonly mode: 'exempt'; readonly reason: string };
-
-export type FeatureJobMetadata = {
-  name: string;
-  /** delivery Cron で送信・通知を取り出す dispatcher だけに付ける。 */
-  dispatchLane?: 'delivery';
-  classification:
-    | { kind: 'feature'; featureId: FeatureId }
-    | { kind: 'core'; reason: string };
-  enforcement: FeatureJobEnforcement;
 };
 
 /**
@@ -54,6 +36,46 @@ export type FeatureJobMetadata = {
  * 照合するため、判定を消したり移したりすると必ずテストが落ちる。
  */
 export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
+  {name:'operator push digest',classification:{kind:'core',reason:'受信箱の運用者通知'},enforcement:{mode:'exempt',reason:'基本受信箱の通知で個別機能に属さない。送信直前に本人の停止・店の範囲・会話権限を確認する'}},
+  {name:'makeup credit expiry',classification:{kind:'core',reason:'保存済みの振替券の期限の後始末'},enforcement:{mode:'exempt',reason:'送信や新規予約を行わず、予約機能の停止中も保存済みの期限を守る'}},
+  {name:'AB test decisions (test transport)',classification:{kind:'feature',featureId:'broadcasts'},enforcement:{mode:'gated',sources:['apps/worker/src/features/broadcasts/broadcast-ab.ts'],markers:["gate.canRun(db,t.line_account_id,'broadcasts','AB test decisions (test transport)')"]}},
+  {name:'calendar busy cache and switch jobs',classification:{kind:'feature',featureId:'booking'},enforcement:{mode:'gated',sources:['apps/worker/src/features/booking/booking-calendar-settings.ts'],markers:["gate.canRun(db,j.line_account_id,'booking','calendar busy cache and switch jobs')","gate.canRun(db,r.line_account_id,'booking','calendar busy cache and switch jobs')"]}},
+  PERSONAL_DATA_RETENTION_JOB,
+  {name:'line webhook recovery',classification:{kind:'core',reason:'保存済みのLINE受信から未完の工程だけを再開する'},enforcement:{mode:'exempt',reason:'基本受信の回収は単一機能に属さない。停止した契約・アカウントを除外し、採点・マイル・自動化・配送は既存の個別停止判定に従う。返信鍵なしと送達不明は要確認に止める'}},
+  {name:'durable tracked click continuation',classification:{kind:'feature',featureId:'inflow_tracking'},enforcement:{mode:'gated',sources:['apps/worker/src/services/tracked-click-steps.ts'],markers:["featureId:'inflow_tracking'","job:'durable tracked click continuation'"]}},
+  {name:'durable banner generation',classification:{kind:'core',reason:'統括のバナー生成の継続'},enforcement:{mode:'exempt',reason:'店舗別機能スイッチの対象外。生成の直前に統括の契約・枚数上限・停止依頼を判定する'}},
+  { name: 'form document retention', classification: { kind: 'core', reason: '本人確認書類の保存期限と未送信添付の後始末' }, enforcement: { mode: 'exempt', reason: '送信・公開をせず、フォーム機能の停止中も保存期限を守る' } },
+  {name:'API draft and integration retention',classification:{kind:'core',reason:'保存期限を過ぎた下書きと連携の一時情報の消去'},enforcement:{mode:'exempt',reason:'外部送信をせず、機能の有効・無効にかかわらず保存期限を守る'}},
+  {name:'restaurant followup jobs',classification:{kind:'feature',featureId:'restaurant_test'},enforcement:{mode:'gated',sources:['apps/worker/src/features/scenarios/scenario-source-jobs.ts'],markers:["featureId: 'restaurant_test'",'featureJobCanRun(db,']}},
+  {name:'restaurant events',classification:{kind:'core',reason:'保存済みの飲食のできごとの再配送'},enforcement:{mode:'exempt',reason:'店舗の検証スイッチを確認し、スタンプ・マイル・オートメーションの可否は受取先の停止判定に従う。外向きWebhookは配送しない'}},
+  {name:'visit stamps',classification:{kind:'feature',featureId:'visit_stamps'},enforcement:{mode:'gated',sources:['apps/worker/src/services/visit-stamps.ts'],markers:["featureId:'visit_stamps'","job:'visit stamps'"]}},
+  {name:'booking waitlist expiry and promotion',classification:{kind:'core',reason:'人・席の待ちの期限と先着順を保つ'},enforcement:{mode:'exempt',reason:'保存済みの待ちの後始末。LINE送信はsendAutomaticBookingLineで機能停止・外部更新停止を個別判定する'}},
+  {
+    name: 'booking sync notices',
+    classification: { kind: 'feature', featureId: 'booking' },
+    enforcement: {
+      mode: 'gated',
+      sources: [
+        'apps/worker/src/features/booking/booking-sync-rules.ts',
+        'apps/worker/src/features/booking/booking-automatic-line.ts',
+      ],
+      markers: [
+        "featureId:'booking'",
+        'featureJobCanRun(db,',
+        "featureId:input.featureId,job:'予約の自動通知'",
+      ],
+    },
+  },
+  {
+    name: 'follower import continuation',
+    classification: { kind: 'core', reason: 'LINEアカウント登録後の既存友だちの取り込み継続' },
+    enforcement: { mode: 'exempt', reason: '登録処理の後半で、個別機能の有効・無効には属さない' },
+  },
+  {
+    name: 'restaurant hold expiry',
+    classification: { kind: 'core', reason: '保存済み予約の仮押さえ期限と予約済み価格変更の後始末' },
+    enforcement: { mode: 'exempt', reason: '飲食店の検証環境だけ。保存済みの期限と変更を確定し、自動通知はsendAutomaticBookingLineが機能・停止を個別判定する' },
+  },
   {
     name: 'friend bulk runs',
     classification: { kind: 'core', reason: '複数機能の友だち一括操作' },
@@ -74,7 +96,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'mileage' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/mileage-reward-delivery.ts'],
+      sources: ['apps/worker/src/features/mileage/mileage-reward-delivery.ts'],
       markers: [
         "job: 'mileage reward delivery retry'",
         "job: 'mileage reward delivery'",
@@ -100,7 +122,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'mileage' },
     enforcement: {
       mode: 'gated',
-      sources: ['packages/db/src/mileage.ts'],
+      sources: ['packages/db/src/mileage/queue.ts'],
       markers: [
         "isAccountFeatureEnabled(db, owner.line_account_id, 'mileage')",
         // 取り出し(LIMIT前)と停滞回収の両方をSQLで止める。
@@ -187,12 +209,12 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
-    // K(#822): 公開中のリッチメニューを1日1回だけ見て、ずれを台帳に残す。
+    // 公開中のリッチメニューを1日1回だけ見て、ずれを台帳に残す。
     name: 'rich menu daily reconcile',
     classification: { kind: 'feature', featureId: 'rich_menus' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/rich-menu-daily-reconcile.ts'],
+      sources: ['apps/worker/src/features/rich-menus/rich-menu-daily-reconcile.ts'],
       markers: ["job: 'rich menu daily reconcile'"],
     },
   },
@@ -221,7 +243,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'friend_fields' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/friend-field-reminders.ts'],
+      sources: ['apps/worker/src/features/friends/friend-field-reminders.ts'],
       markers: ["job: 'friend field reminders'"],
     },
   },
@@ -232,7 +254,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       mode: 'gated',
       sources: [
         'packages/db/src/action-score-rules.ts',
-        'apps/worker/src/services/action-score-events.ts',
+        'apps/worker/src/services/action-score-handlers.ts',
       ],
       markers: [
         "isAccountFeatureEnabled(db, row.line_account_id, 'mileage')",
@@ -300,7 +322,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'media' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/media-usage-scan.ts'],
+      sources: ['apps/worker/src/features/media/media-usage-scan.ts'],
       markers: ["'media', 'media usage scan'"],
     },
   },
@@ -314,7 +336,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'mileage' },
     enforcement: {
       mode: 'gated',
-      sources: ['packages/db/src/mileage.ts'],
+      sources: ['packages/db/src/mileage/queue.ts'],
       markers: ["accountFeatureOffExclusionSql('f.line_account_id', 'mileage')"],
     },
   },
@@ -323,7 +345,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'booking' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/booking-expirer.ts'],
+      sources: ['apps/worker/src/features/booking/booking-expirer.ts'],
       markers: ["job: 'booking expirer'"],
     },
   },
@@ -336,6 +358,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       markers: ["job: 'event booking expirer'"],
     },
   },
+  TENANT_DATA_RETENTION_JOB,
   {
     name: 'restaurant raw mail retention',
     classification: { kind: 'feature', featureId: 'restaurant_test' },
@@ -371,31 +394,14 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       reason: '機能offの間もトークンを生かし続けるのが目的で、offで止めると放置失効して再接続が必要になる',
     },
   },
-  {
-    name: 'google business content retention',
-    classification: { kind: 'core', reason: 'Googleから受け取った内容の保存期限（暦日30日）' },
-    enforcement: {
-      mode: 'exempt',
-      reason:
-        'Googleの利用者データポリシーで決まった保存期限の掃除で、機能をoffにした店舗の古いコピーが残り続けるほうが違反になる',
-    },
-  },
-  {
-    name: 'instagram transient data retention',
-    classification: { kind: 'core', reason: '期限切れの認可待ちと、受信メッセージの控えの保存期限（90日）' },
-    enforcement: {
-      mode: 'exempt',
-      reason:
-        '外部送信をせず、機能の有効・無効にかかわらず保存期限を守る。offにした店舗の古いコピーを残すほうがMetaの利用者データポリシー違反になる',
-    },
-  },
+  GOOGLE_CONTENT_RETENTION_JOB,
   {
     name: 'automation deliveries',
     dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'automations' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/automation-engine.ts'],
+      sources: ['apps/worker/src/features/automations/automation-engine.ts'],
       markers: ["job: 'automation runs'"],
     },
   },
@@ -405,7 +411,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'booking' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/booking-reminders.ts'],
+      sources: ['apps/worker/src/features/booking/booking-reminders.ts'],
       markers: ["job: 'booking reminders'"],
     },
   },
@@ -435,7 +441,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'webinars' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/webinar-reminders.ts'],
+      sources: ['apps/worker/src/features/webinars/webinar-reminders.ts'],
       markers: ["job: 'webinar-reminders'"],
     },
   },
@@ -445,7 +451,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'webinars' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/webinar-notifications.ts'],
+      sources: ['apps/worker/src/features/webinars/webinar-notifications.ts'],
       markers: ["job: 'webinar-notifications'"],
     },
   },
@@ -455,7 +461,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'webinars' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/webinar-followups.ts'],
+      sources: ['apps/worker/src/features/webinars/webinar-followups.ts'],
       markers: ["job: 'webinar followups'"],
     },
   },
@@ -478,7 +484,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'common_vars' },
     enforcement: {
       mode: 'gated',
-      sources: ['packages/db/src/common-vars.ts'],
+      sources: ['packages/db/src/common-vars/schedules.ts'],
       markers: ['isCommonVarsEnabled(db, current.line_account_id)'],
     },
   },
@@ -500,7 +506,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       sources: [
         'apps/worker/src/services/step-delivery.ts',
         'packages/db/src/scenario-delivery-timestamps.ts',
-        'packages/db/src/scenarios.ts',
+        'packages/db/src/scenarios/enrollment-dispatch.ts',
       ],
       markers: [
         "job: 'scenario deliveries'",
@@ -515,7 +521,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'broadcasts' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/broadcast.ts'],
+      sources: ['apps/worker/src/features/broadcasts/broadcast.ts'],
       markers: ["job: 'broadcast deliveries'"],
     },
   },
@@ -534,7 +540,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     classification: { kind: 'feature', featureId: 'booking' },
     enforcement: {
       mode: 'gated',
-      sources: ['apps/worker/src/services/booking-calendar-sync.ts'],
+      sources: ['apps/worker/src/features/booking/booking-calendar-sync.ts'],
       markers: [
         "'booking', 'booking calendar delete retry'",
         // 候補読取(LIMIT前)でオフのアカウントを外す。
@@ -560,7 +566,7 @@ async function accountCompanyFeatureSettings(
     FEATURE_SETTINGS_BUNDLE_KEY,
   );
   // 一括設定に無い分だけ旧 `feature.<キー>` を読む。機能ごとの往復にせず
-  // 1往復でまとめて取る(#633)。
+  // 1往復でまとめて取る。
   const missing = featureIds.filter(
     (featureId) => typeof bundle?.data.features?.[featureId] !== 'boolean',
   );
@@ -657,7 +663,7 @@ async function contractAvailability(
       featureContractIsAvailable(entitlements, entry.entitlementKey),
     ])) as Record<FeatureId, boolean>;
   }
-  // tenant_id 読取 + tenants 読取の2往復を1往復の結合読取へ(#633)。
+  // tenant_id 読取 + tenants 読取の2往復を1往復の結合読取へ。
   const entitlements = resolveEntitlements(
     await getTenantBillingByLineAccount(db, accountId),
   );
@@ -774,38 +780,6 @@ export async function accountFeatureIsEnabled(
   return (await accountFeatureAvailability(db, accountId, featureId)).effectiveEnabled;
 }
 
-export async function recordFeatureExecutionSkipped(
-  db: D1Database,
-  input: { accountId: string; featureId: FeatureId; job: string; occurredAt?: string },
-): Promise<void> {
-  const occurredAt = input.occurredAt ?? new Date().toISOString();
-  console.info(JSON.stringify({
-    event: 'feature.execution.skipped',
-    lineAccountId: input.accountId,
-    featureId: input.featureId,
-    job: input.job,
-    occurredAt,
-  }));
-  // 同じ job が5分ごとに監査表を増やさないよう、日・account・feature・job を
-  // 一意な監査IDにする。構造化ログはtickごとの観測用なので毎回残す。
-  const auditId = `feature-skip:${occurredAt.slice(0, 10)}:${input.accountId}:${input.featureId}:${input.job}`;
-  try {
-    await recordAuditEvent(db, {
-      id: auditId,
-      lineAccountId: input.accountId,
-      category: 'business',
-      actorPrincipalId: 'system',
-      actorRole: 'system',
-      action: 'feature.execution.skipped',
-      targetKind: 'scheduled_job',
-      targetId: input.job,
-      result: 'denied',
-      createdAt: occurredAt,
-    });
-  } catch (error) {
-    if (!String(error).toLowerCase().includes('unique')) throw error;
-  }
-}
 
 export async function featureJobCanRun(
   db: D1Database,

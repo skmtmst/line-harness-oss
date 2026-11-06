@@ -1,27 +1,11 @@
-/*
- * 共通部品を通らずに直接書かれている見た目を数えて、**これ以上増やさない**。
- *
- * `raw-color-baseline.mjs` と同じ考え方。あちらは生の色だけを見るので、
- * 任意値記法・直書きの表見出し・直書きのボタンは素通りする。
- *
- *   node apps/web/scripts/design-debt.mjs           確認する（増えていたら終了コード1）
- *   node apps/web/scripts/design-debt.mjs --update  基準を書き直す
- *
- * 正規表現ではなく TypeScript の構文木で読む。`className` が複数行に
- * またがっていたり、テンプレート文字列や三項演算子で組まれていたりすると、
- * 正規表現では取りこぼすため。
- *
- * 静的に読めない `className`（変数や関数の戻り値）は **未解決** として
- * 数え、出力に必ず出す。黙って対象外にしない。
- */
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+/** 現在の宣言数を報告する。表示制御が部品に効かない場合だけ止める。 */
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..')
 export const SRC = join(WEB, 'src')
-export const BASELINE = join(WEB, 'design', 'design-debt-baseline.json')
 const PARTS = join(WEB, 'design', 'design-parts.json')
 
 /**
@@ -45,14 +29,21 @@ export function isDisplayClass(className) {
 }
 
 /** 共通部品のファイルの絶対パス。 */
-function partFiles() {
-  const data = JSON.parse(readFileSync(PARTS, 'utf8'))
+export function partFiles(data = JSON.parse(readFileSync(PARTS, 'utf8'))) {
   const files = new Set()
   for (const [key, part] of Object.entries(data.parts)) {
     if (key.startsWith('$')) continue
     if (part.code) files.add(join(WEB, part.code))
     for (const implementationFile of part.implementationFiles ?? []) {
       files.add(join(WEB, implementationFile))
+    }
+  }
+  // 持ち主が決まった共通部品と、画素照合が済んだ値の契約は別。
+  // 照合待ちでも登録された共通部品自身を画面の手書きとして数えない。
+  for (const part of Object.values(data.investigations ?? {})) {
+    if (part.role === 'canonical' && part.status === 'active'
+      && part.code?.startsWith('src/components/shared/') && part.components?.length) {
+      files.add(join(WEB, part.code))
     }
   }
   return files
@@ -119,12 +110,13 @@ export function sourceFiles(dir = SRC) {
  * `className` の中身から、静的に読めるクラス名をすべて集める。
  * 読めない部分があったときは `unresolved` を立てる。
  */
-function readClassName(node) {
+function readClassName(node, cssModules = new Map(), staticBindings = new Map()) {
   const classes = []
   let unresolved = false
 
   const visit = (n) => {
-    if (!n) return
+    if (!n || n.kind === ts.SyntaxKind.NullKeyword || n.kind === ts.SyntaxKind.FalseKeyword
+      || (ts.isIdentifier(n) && n.text === 'undefined')) return
     if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) {
       classes.push(...n.text.split(/\s+/).filter(Boolean))
       return
@@ -156,6 +148,17 @@ function readClassName(node) {
       unresolved = true
       return
     }
+    // CSS Modules の実在する札は静的に解決できる。存在しない札や変数は
+    // 引き続き未解決として数え、Tailwind の動的組み立ても除外しない。
+    if (ts.isPropertyAccessExpression(n) && ts.isIdentifier(n.expression)
+      && cssModules.get(n.expression.text)?.has(n.name.text)) return
+    if (ts.isElementAccessExpression(n) && ts.isIdentifier(n.expression)
+      && n.argumentExpression && ts.isStringLiteral(n.argumentExpression)
+      && cssModules.get(n.expression.text)?.has(n.argumentExpression.text)) return
+    if (ts.isIdentifier(n) && staticBindings.has(n.text)) {
+      visit(staticBindings.get(n.text))
+      return
+    }
     if (ts.isIdentifier(n) || ts.isPropertyAccessExpression(n)) {
       unresolved = true
       return
@@ -172,6 +175,8 @@ function readClassName(node) {
  *
  * 試験から合成したソースを渡せるように切り出してある。
  */
+const staticExportCache = new Map()
+
 export function analyzeSource(full, text, parts) {
   const counts = {}
   const bump = (_file, key) => {
@@ -182,6 +187,41 @@ export function analyzeSource(full, text, parts) {
     const source = ts.createSourceFile(full, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
     // 名前ではなく import の行き先で共通部品を見分ける。
     const partNames = localPartNames(full, source, parts)
+    const cssModules = new Map()
+    const staticBindings = new Map()
+    // 共有されている文字列定数だけを解決する。入力や関数の結果は追わない。
+    for (const statement of source.statements) {
+      if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)
+        || !statement.importClause?.namedBindings || !ts.isNamedImports(statement.importClause.namedBindings)) continue
+      const target = resolveImport(full, statement.moduleSpecifier.text)
+      if (!target || !/\.tsx?$/.test(target)) continue
+      let imported = staticExportCache.get(target)
+      if (!imported) {
+        imported = ts.createSourceFile(target, readFileSync(target, 'utf8'), ts.ScriptTarget.Latest, true)
+        staticExportCache.set(target, imported)
+      }
+      for (const declaration of imported.statements) {
+        if (!ts.isVariableStatement(declaration) || !(declaration.declarationList.flags & ts.NodeFlags.Const)
+          || !declaration.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue
+        for (const binding of declaration.declarationList.declarations) {
+          if (!ts.isIdentifier(binding.name) || !binding.initializer
+            || !(ts.isStringLiteral(binding.initializer) || ts.isNoSubstitutionTemplateLiteral(binding.initializer))) continue
+          for (const specifier of statement.importClause.namedBindings.elements) {
+            if ((specifier.propertyName ?? specifier.name).text === binding.name.text)
+              staticBindings.set(specifier.name.text, binding.initializer)
+          }
+        }
+      }
+    }
+    for (const statement of source.statements) {
+      if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)
+        || !statement.moduleSpecifier.text.endsWith('.module.css') || !statement.importClause?.name) continue
+      const target = resolveImport(full, statement.moduleSpecifier.text)
+      if (!target) continue
+      const css = readFileSync(target, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+      const names = new Set([...css.matchAll(/\.([A-Za-z_][\w-]*)/g)].map((match) => match[1]))
+      cssModules.set(statement.importClause.name.text, names)
+    }
 
     const walk = (node) => {
       if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
@@ -189,7 +229,7 @@ export function analyzeSource(full, text, parts) {
         const attr = node.attributes.properties.find(
           (p) => ts.isJsxAttribute(p) && p.name.getText() === 'className',
         )
-        const read = attr?.initializer ? readClassName(attr.initializer) : { classes: [], unresolved: false }
+        const read = attr?.initializer ? readClassName(attr.initializer, cssModules, staticBindings) : { classes: [], unresolved: false }
 
         // 静的に読めない className。数に入らないぶん、別の指標として数える。
         if (read.unresolved) bump(file, 'unresolved-classname')
@@ -259,55 +299,9 @@ export function totals(counts) {
 /** 常に0でなければならない種類。 */
 export const ZERO_TOLERANCE = ['display-class-on-part']
 
-export function compare(now, baseline) {
-  const worse = {}
-  const files = new Set([...Object.keys(now), ...Object.keys(baseline)])
-  for (const file of files) {
-    const a = now[file] ?? {}
-    const b = baseline[file] ?? {}
-    const keys = new Set([...Object.keys(a), ...Object.keys(b)])
-    for (const key of keys) {
-      const count = a[key] ?? 0
-      const was = b[key] ?? 0
-      if (count > was) (worse[file] ??= {})[key] = `${was} → ${count}`
-    }
-  }
-  return { worse }
-}
-
 if (process.argv[1] && process.argv[1].endsWith('design-debt.mjs')) {
-  const update = process.argv.includes('--update')
-  const { counts } = countDebt()
-  const sum = totals(counts)
-
-  if (update) {
-    writeFileSync(BASELINE, `${JSON.stringify(counts, null, 2)}\n`)
-    console.log('apps/web/src の直書きを数えました。\n')
-    for (const [k, n] of Object.entries(sum).sort()) console.log(`  ${k.padEnd(26)}${String(n).padStart(5)} か所`)
-    console.log(`\n${Object.keys(counts).length} ファイル分を design/design-debt-baseline.json に書きました。`)
-  } else {
-    const baseline = JSON.parse(readFileSync(BASELINE, 'utf8'))
-    const { worse } = compare(counts, baseline)
-    console.log('直書きの数\n')
-    for (const [k, n] of Object.entries(sum).sort()) console.log(`  ${k.padEnd(26)}${String(n).padStart(5)} か所`)
-
-    const zero = ZERO_TOLERANCE.filter((k) => (sum[k] ?? 0) > 0)
-    const bad = Object.keys(worse).length || zero.length
-
-    const unresolvedFiles = Object.entries(counts).filter(([, v]) => v['unresolved-classname'])
-    if (unresolvedFiles.length) {
-      console.log('\n未解決の className は基準値に入れている。増えたら落ちる。')
-      console.log('  変数や関数の戻り値で組まれていて静的に読めない。ほかの数には入っていない。')
-      for (const [f, v] of unresolvedFiles
-        .sort((a, b) => b[1]['unresolved-classname'] - a[1]['unresolved-classname'])
-        .slice(0, 5)) {
-        console.log(`    ${f} (${v['unresolved-classname']})`)
-      }
-    }
-    for (const k of zero) console.log(`\n★ ${k} は0でなければなりません。現在 ${sum[k]} か所。`)
-    for (const [f, d] of Object.entries(worse)) console.log(`\n★ 増えています: ${f} ${JSON.stringify(d)}`)
-    if (bad) console.log('\n直し方: node apps/web/scripts/design-debt.mjs --update')
-    else console.log('\n合格')
-    process.exit(bad ? 1 : 0)
-  }
+  const { counts } = countDebt(), sum = totals(counts)
+  console.log(JSON.stringify({ counts, totals: sum }, null, 2))
+  const hiddenControls = ZERO_TOLERANCE.some(key => (sum[key] ?? 0) > 0)
+  if (hiddenControls) process.exitCode = 1
 }

@@ -5,9 +5,10 @@ import {
   listRichMenuManualPublishRequests,
   type RichMenuGroupWithPages,
 } from '@line-crm/db';
+
 import { deleteRichMenuShells, type LineRichMenuClient } from './rich-menu-publisher.js';
 
-// K-2(#822): DBの記録とLINE上の実体の照合。ずれの種類ごとに直し方を1つ決める。
+// DBの記録とLINE上の実体の照合。ずれの種類ごとに直し方を1つ決める。
 // 画面の「どうするか」欄は fix.label をそのまま出す。
 
 export type ReconcileDiffKind =

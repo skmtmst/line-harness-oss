@@ -11,7 +11,7 @@ import { knowledgeArticleKind } from './knowledge-format'
 import { BookOpen, ArrowRight } from 'lucide-react'
 import styles from './knowledge.module.css'
 
-/** Approved V6 37-6-C: automatic generation is separate from explicit human approval. */
+/** Approved 管理画面 37-6-C: automatic generation is separate from explicit human approval. */
 export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetail; onRefresh: () => void }) {
   const [article, setArticle] = useState<OpsKnowledgeArticle | null>(null)
   const [busy, setBusy] = useState(false)
@@ -32,7 +32,7 @@ export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetai
     const res = await opsCall(api.ops.knowledge.retry(detail.ticket.id))
     setBusy(false)
     if (res.success) onRefresh()
-    else setError(res.error || '再試行できませんでした')
+    else setError(res.error || '再試行できませんでした。時間をおいて、もう一度お試しください。')
   }
   return <section className="grid gap-2" aria-label="ナレッジの確認">
     <NoteBar>{current?.sourceCurrent
@@ -46,11 +46,21 @@ export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetai
       {job?.status === 'failed' && <Button size="field" disabled={busy} onClick={() => void retry()}>もう一度試す</Button>}
     </div>
     {error && <p role="alert" className="text-caption text-danger">{error}</p>}
-    {article && <KnowledgeEditor key={article.id} article={article} onClose={() => setArticle(null)} onSaved={onRefresh} />}
+    {article && <KnowledgeEditor
+      key={article.id}
+      article={article}
+      ticket={{
+        label: detail.ticket.ticketLabel,
+        resolved: detail.ticket.stage === 'resolved' || detail.ticket.stage === 'closed',
+        stageLabel: detail.ticket.stageLabel,
+      }}
+      onClose={() => setArticle(null)}
+      onSaved={onRefresh}
+    />}
   </section>
 }
 
-/** Approved V6 37-6-D LT8m5. Votes describe fit for this reply, not article correctness. */
+/** Approved 管理画面 37-6-D LT8m5. Votes describe fit for this reply, not article correctness. */
 export function KnowledgeReferences({ references, requestId, busy, onExclude }: {
   references: OpsKnowledgeReference[]; requestId: string; busy: boolean; onExclude: (id: string) => void
 }) {
@@ -63,7 +73,7 @@ export function KnowledgeReferences({ references, requestId, busy, onExclude }: 
     const res = await opsCall(api.ops.knowledge.feedback(id, requestId, value))
     setPending(false)
     if (res.success) setFeedback(state => ({ ...state, [`${id}:${references.find(ref => ref.id === id)?.version}`]: value }))
-    else setError(res.error || '保存できませんでした')
+    else setError(res.error || '保存できませんでした。時間をおいて、もう一度お試しください。')
   }
   const open = async (id: string) => {
     setPending(true); setError('')

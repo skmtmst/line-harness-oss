@@ -1,0 +1,628 @@
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, renameSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { describe, expect, it } from 'vitest'
+
+// @ts-expect-error 点検の道具は素のJSで型定義を持たない。
+import { DEFAULT_CATALOG, forwardedEntryMoves, hardcodedKind, judgePenInstances, loadCatalog, newCodeFindings, penNodes, run, scanPenBoard, scanCodeFile, stripThemeScope } from './v8-pattern-audit.mjs'
+
+const ROOT = join(__dirname, '../..')
+
+function put(root: string, rel: string, body: string) {
+  const path = join(root, rel)
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, body)
+}
+
+/** 小さな作りものの repo と板で、当たるべき所・当たってはいけない所を確かめる。 */
+function fixture() {
+  const root = mkdtempSync(join(tmpdir(), 'pattern-audit-'))
+  put(root, 'apps/liff/src/App.tsx', 'export default function App() { return null }')
+  // (a) 手書きの数のマス（当たる）／コメントの中の名前（当たらない）
+  put(root, 'apps/web/src/v8/demo/list.tsx', [
+    "import styles from './list.module.css'",
+    "import { Button } from '@/components/shared/button'",
+    '// function StatCard は昔の名前（コメントは数えない）',
+    'function StatCard() { return <div /> }',
+    'export function List() {',
+    '  return (',
+    '    <section>',
+    '      <Button',
+    '        variant="primary"',
+    '        className={styles.loud}',
+    '      >作る</Button>',
+    '      <Button className={styles.wide}>幅だけ</Button>',
+    '    </section>',
+    '  )',
+    '}',
+  ].join('\n'))
+  // (a) 線だけのカード（当たる）／正しいカード（当たらない）。(b) 子孫の button の塗り直し。(c) 直書きの色・角丸
+  put(root, 'apps/web/src/v8/demo/list.module.css', [
+    '.box { border: 1px solid var(--color-hairline); border-radius: var(--radius-card); }',
+    '.good { border: 1px solid var(--card-edge); border-radius: var(--radius-card); box-shadow: var(--card-shadow); }',
+    '.loud { background: #ff0000; }',
+    '.wide { width: 320px; }',
+    ":global([data-theme='v8']) .wrap { display: flex; }",
+    '.wrap button { color: var(--color-ink); border-radius: 6px; }',
+  ].join('\n'))
+  // 持ち主の中は (a)(b)(c) に数えない
+  put(root, 'apps/web/src/components/shared/kpi-card.tsx', 'export function KpiCard() { return null }\nfunction StatCard() { return null }\n')
+  put(root, 'apps/web/src/components/shared/card.module.css', '.card { border: 1px solid #dadde2; border-radius: 12px; }\n')
+  // 試験のファイルは数えない
+  put(root, 'apps/web/src/v8/demo/list.test.tsx', 'function StatCard() { return null }\n')
+  // KpiBand を使う画面（効く範囲）
+  put(root, 'apps/web/src/v8/other/page.tsx', "import { KpiBand } from '@/components/shared/kpi-band'\nexport const P = () => <KpiBand items={[]} />\n")
+
+  const pen = join(root, 'pen')
+  const button = (style: string, inner = '<div data-pencil-name="文字" style="">作る</div>') => `<div data-pencil-name="ボタン/主" style="${style}">${inner}</div>`
+  const base = 'background-color: #087a3e; border-radius: 8px'
+  put(pen, 'components-q4UhqD.html', `<div data-pencil-name="部品" data-pencil-id="root">${'<div data-pencil-name="ボタン/主" data-pencil-id="doYdE" style="background-color: #087a3e; border-radius: 8px"><div data-pencil-name="文字">作る</div></div>'}</div>`)
+  const boards = ['B1', 'B2', 'B3', 'B4', 'B5']
+  for (const b of boards) put(pen, `${b}.html`, `<div data-pencil-name="板 ${b}" style="">${button(base)}</div>`)
+  // 文字だけ違う写し・中身の差し込み口（空き・数字を含む名前）は数えない・角丸を上書き（数える）・部品に無い中身（数える）
+  put(pen, 'B6.html', `<div data-pencil-name="板 B6" style="">${button(base, '<div data-pencil-name="文字">別の言葉</div><div data-pencil-name="列 名前 2"></div>')}</div>`)
+  put(pen, 'B7.html', `<div data-pencil-name="板 B7" style="">${button('background-color: #087a3e; border-radius: 4px')}</div>`)
+  put(pen, 'B8.html', `<div data-pencil-name="板 B8" style="">${button(base, '<div data-pencil-name="文字">作る</div><div data-pencil-name="手で足した印"></div>')}</div>`)
+  // 手描きのカード（白地・角丸12・線だけ）と、影のあるカード（数えない）
+  put(pen, 'B9.html', '<div data-pencil-name="板 B9" style=""><div data-pencil-name="箱" style="background-color: #ffffff; border-radius: 12px; outline: 1px solid #1d1d1f12"></div><div data-pencil-name="箱2" style="background-color: #ffffff; border-radius: 12px; outline: 1px solid #1d1d1f12; box-shadow: 0px 1px 1px #1d1d1f29, 0px 2px 4px #1d1d1f14"></div></div>')
+  return { root, pen }
+}
+
+describe('型の対応表の点検', () => {
+  it('顧客名への敬称は共有関数を通し、同じ直書きを増やさない', () => {
+    const files = execFileSync('rg', ['--files', join(ROOT, 'apps/web/src/v8'), '-g', '*.tsx'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean)
+    const directHonorific = /\$\{[^}]*\b(?:friendName|customerName|customer_name|displayName|friend_name|owner_name|names\.name|owner\.name)[^}]*\}\s*(?:さん|様|さま)/u
+    const findings = files.flatMap(file => {
+      const source = readFileSync(file, 'utf8')
+      return directHonorific.test(source) ? [file.slice(ROOT.length + 1)] : []
+    })
+    expect(findings).toEqual([])
+    expect(directHonorific.test('${customerName}さん')).toBe(true)
+  })
+
+  it('V8の画面は全状態の凡例を直接出さず、表示中の状態を共通部品へ渡す', () => {
+    const files = execFileSync('rg', ['--files', join(ROOT, 'apps/web/src/v8'), '-g', '*.tsx'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean)
+    const directLegend = /<BookingLegend(?:\s|\/|>)/u
+    const findings = files.flatMap(file => directLegend.test(readFileSync(file, 'utf8')) ? [file.slice(ROOT.length + 1)] : [])
+    expect(findings).toEqual([])
+    expect(directLegend.test('<BookingLegend />')).toBe(true)
+  })
+
+  it('正の道具列のsearchSlotは通し、隣の検索欄と同名の自作は検出する', () => {
+    const { root } = fixture()
+    put(root, 'apps/web/src/components/shared/list-toolbar.tsx', 'export default function ListToolbar() { return null }')
+    const pattern = loadCatalog(DEFAULT_CATALOG).patterns.find((row: { id: string }) => row.id === 'toolbar')
+    const file = 'apps/web/src/v8/demo/search.tsx'
+    const scan = (source: string) => scanCodeFile(pattern, file, source, {}, root).filter((hit: { signal: string }) => hit.signal === 'search-alone')
+    const imports = "import Tools from '@/components/shared/list-toolbar'; import SearchField from '@/components/shared/search-field';"
+    expect(scan(imports + 'export const P=()=> <Tools searchSlot={<SaveErrorField><SearchField /></SaveErrorField>} />')).toHaveLength(0)
+    expect(scan(imports + 'export const P=()=> <><Tools /><SearchField /></>')).toHaveLength(1)
+    expect(scan("import Tools from './own-toolbar'; export const P=()=> <Tools searchSlot={<SearchField />} />")).toHaveLength(1)
+    expect(scan('function ListToolbar(){return null} export const P=()=> <ListToolbar searchSlot={<SearchField />} />')).toHaveLength(1)
+  })
+  it('題の正の型へ渡す説明を実ファイルまで照合し、偽の再公開や説明内の操作は止める', () => {
+    const { root } = fixture()
+    put(root, 'apps/web/src/components/templates/create-page.tsx', 'export function CreatePage() { return null }')
+    put(root, 'apps/web/src/components/templates/index.ts', "export { CreatePage } from './create-page'")
+    const file = 'apps/web/src/v8/demo/help.tsx'
+    const findings = () => run({ code: root }).code.a['tap-extra'].filter((hit: { file: string }) => hit.file.endsWith('help.tsx'))
+    put(root, file, "import { CreatePage as Page } from '@/components/templates'; export const P = () => <Page help=\"タグを付ける条件を設定します\" />")
+    expect(findings()).toHaveLength(0)
+    put(root, file, "import { CreatePage } from '@/components/templates/create-page'; export const P = () => <CreatePage help={'タグを付ける条件を設定します'} />")
+    expect(findings()).toHaveLength(0)
+    put(root, 'apps/web/src/components/shared/create-page.tsx', 'export default function CreatePage() { return null }')
+    put(root, file, "import Page from '@/components/shared/create-page'; export const P = () => <Page help=\"タグを付ける条件を設定します\" />")
+    expect(findings()).toHaveLength(0)
+    put(root, file, "import { CreatePage } from '@/components/templates'; export const P = () => <CreatePage help={<button>タグを付ける</button>} />")
+    expect(findings()).toHaveLength(1)
+    put(root, file, "import { CreatePage } from './own-page'; export const P = () => <CreatePage help=\"タグを付ける条件を設定します\" />")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/index.ts', "export { CreatePage } from './own-page'")
+    put(root, 'apps/web/src/components/templates/own-page.tsx', 'export function CreatePage() { return null }')
+    put(root, file, "import { CreatePage } from '@/components/templates'; export const P = () => <CreatePage help=\"タグを付ける条件を設定します\" />")
+    expect(findings()).toHaveLength(1)
+  })
+  it('持ち主ファイルでhelpを題へ一度だけ渡す入口の説明を通し、操作への転用は止める', () => {
+    const { root } = fixture()
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', 'export function PageHeading() { return null }')
+    const owner = 'apps/web/src/components/templates/create-page.tsx'
+    const forward = "import { PageHeading } from './page-frame'; export function LockedCreatePage({help}) { return <PageHeading help={help} /> }"
+    put(root, owner, forward)
+    put(root, 'apps/web/src/components/templates/index.ts', "export { LockedCreatePage } from './create-page'")
+    const file = 'apps/web/src/v8/demo/locked-help.tsx'
+    const source = "import { LockedCreatePage as Page } from '@/components/templates'; export const P = () => <Page help=\"タグを付ける条件を設定します\" />"
+    const findings = () => run({ code: root }).code.a['tap-extra'].filter((hit: { file: string }) => hit.file === file)
+    put(root, file, source)
+    expect(findings()).toHaveLength(0)
+    for (const body of [
+      "const PageHeading = (p) => <button>{p.help}</button>; return <PageHeading help={help}/>",
+      "return <><PageHeading help={help}/><button>{arguments[0].help}</button></>",
+      "return <><PageHeading help={help}/><PageHeading help={help}/></>",
+      "return <PageHeading title={help} help={help}/>",
+      "return <button><PageHeading help={help}/></button>",
+      "return <Button><PageHeading help={help}/></Button>",
+      "return <Link><PageHeading help={help}/></Link>",
+      "return <div role='button' tabIndex={0}><PageHeading help={help}/></div>",
+      "return <div onClick={()=>{}}><PageHeading help={help}/></div>",
+      "return <div ref={()=>{}}><PageHeading help={help}/></div>",
+      "return <div elementRef={()=>{}}><PageHeading help={help}/></div>",
+      "return <div onPointerUp={()=>{}}><PageHeading help={help}/></div>",
+      "return <div id={function callback(){}}><PageHeading help={help}/></div>",
+    ]) {
+      put(root, owner, `import { PageHeading } from './page-frame'; export function LockedCreatePage({help}) { ${body} }`)
+      expect(findings()).toHaveLength(1)
+    }
+    put(root, owner, "import { PageHeading } from './page-frame'; export function LockedCreatePage({help, PageHeading}) { return <PageHeading help={help}/> }")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', 'export function PageHeading() { return null }; export function PageFrame({children}) { return <div>{children}</div> }')
+    put(root, owner, "import { PageHeading, PageFrame } from './page-frame'; export function LockedCreatePage({help}) { return <PageFrame kind='create'><PageHeading help={help}/></PageFrame> }")
+    expect(findings()).toHaveLength(0)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', readFileSync(join(ROOT, 'apps/web/src/components/templates/page-frame.tsx'), 'utf8'))
+    expect(findings()).toHaveLength(0)
+    put(root, 'apps/web/src/components/templates/frame-entry.tsx', "export { PageFrame } from './page-frame'")
+    put(root, owner, "import { PageHeading } from './page-frame'; import { PageFrame } from './frame-entry'; export function LockedCreatePage({help}) { return <PageFrame><PageHeading help={help}/></PageFrame> }")
+    expect(findings()).toHaveLength(0)
+    put(root, owner, "import { PageHeading, PageFrame } from './page-frame'; export function LockedCreatePage({help}) { return <PageFrame elementRef={()=>{}}><PageHeading help={help}/></PageFrame> }")
+    expect(findings()).toHaveLength(1)
+    put(root, owner, "import { PageHeading, PageFrame } from './page-frame'; export function LockedCreatePage({help}) { return <PageFrame><PageHeading help={help}/></PageFrame> }")
+    const realFrame = readFileSync(join(ROOT, 'apps/web/src/components/templates/page-frame.tsx'), 'utf8')
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', realFrame.replace('ref={elementRef}', 'ref={el => el?.addEventListener("click", () => {})}'))
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', realFrame.replace('ref={elementRef}', 'ref={callbackRef}'))
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', realFrame.replace('const resolvedHeight =', "const attach = (() => { document.addEventListener('click', () => {}) })(); const resolvedHeight ="))
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', realFrame)
+    put(root, owner, "import { PageHeading, PageFrame } from './page-frame'; export function LockedCreatePage({help}) { const PageFrame=({children})=><button>{children}</button>; return <PageFrame><PageHeading help={help}/></PageFrame> }")
+    expect(findings()).toHaveLength(1)
+    put(root, owner, "import { PageHeading, PageFrame } from './page-frame'; export function LockedCreatePage({help}) { return <PageFrame role='button'><PageHeading help={help}/></PageFrame> }")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', 'export function PageHeading() { return null }; export function PageFrame({children}) { return <button>{children}</button> }')
+    put(root, owner, "import { PageHeading, PageFrame } from './page-frame'; export function LockedCreatePage({help}) { return <PageFrame><PageHeading help={help}/></PageFrame> }")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', 'export function PageHeading() { return null }')
+    put(root, owner, "import { PageHeading } from './page-frame'; export function LockedCreatePage({help, help: h}) { return <><PageHeading help={help}/><button>{h}</button></> }")
+    expect(findings()).toHaveLength(1)
+    put(root, owner, "import { PageHeading } from './fake-heading'; export function LockedCreatePage({help}) { return <PageHeading help={help}/> }")
+    put(root, 'apps/web/src/components/templates/fake-heading.tsx', 'export function PageHeading() { return null }')
+    expect(findings()).toHaveLength(1)
+    put(root, owner, "import { PageHeading } from './page-frame'; export function Inner({help}) { return <PageHeading help={help}/> }; export function LockedCreatePage({help}) { return <Inner help={help}/> }")
+    expect(findings()).toHaveLength(1)
+    put(root, owner, "import { PageHeading } from './page-frame'; export function LockedCreatePage({help}) { return <><PageHeading help={help}/><button>{help}</button></> }")
+    expect(findings()).toHaveLength(1)
+    put(root, owner, forward)
+    put(root, file, "import { LockedCreatePage as Page } from '@/components/templates'; export const P = () => <Page help={<button>タグを付ける</button>} />")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/v8/demo/own-page.tsx', forward)
+    put(root, file, source.replace("'@/components/templates'", "'./own-page'"))
+    expect(findings()).toHaveLength(1)
+  })
+  it('正の行うことの選択肢データを通し、同じ語の手書きや偽の持ち主は止める', () => {
+    const { root } = fixture()
+    put(root, 'apps/web/src/components/shared/action-list.tsx', 'export default function ActionList() { return null }')
+    put(root, 'apps/web/src/components/shared/fixed-action-list.tsx', 'export default function FixedActionList() { return null }')
+    put(root, 'apps/web/src/v8/demo/choices.tsx', [
+      "import FixedActionList from '@/components/shared/fixed-action-list'",
+      "import ActionList from '@/components/shared/action-list'",
+      "export const P = () => <><FixedActionList options={[{id:'tag',label:'タグを付ける'}]} /><ActionList choices={[{id:'score',label:'スコアを足す'}]} /></>",
+    ].join('\n'))
+    const findings = () => run({ code: root }).code.a['tap-extra'].filter((hit: { file: string }) => hit.file.endsWith('choices.tsx'))
+    expect(findings()).toHaveLength(0)
+    put(root, 'apps/web/src/v8/demo/choices.tsx', "export const P = () => <button>タグを付ける</button>")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/v8/demo/choices.tsx', "import FixedActionList from './own-actions'; export const P = () => <FixedActionList options={[{label:'タグを付ける'}]} />")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/v8/demo/choices.tsx', "import FixedActionList from '@/components/shared/fixed-action-list'; export const P = () => <FixedActionList options={[{label:'別の動作',editor:<button>タグを付ける</button>}]} />")
+    expect(findings()).toHaveLength(1)
+  })
+  it('予約の箱を手で組む追加を検出し、共通の内容へ戻すと通る', () => {
+    const { root } = fixture()
+    const file = 'apps/web/src/v8/demo/booking.tsx'
+    put(root, file, 'export const P = () => <BookingBlock><BookingCardContent name="花子" time="10:00" menu="カット" /></BookingBlock>')
+    const audit = () => run({ code: root, only: ['booking-card-content'] })
+    const before = audit()
+    put(root, file, 'export const P = () => <BookingBlock state="confirmed" onClick={() => open()}><BookingName>花子</BookingName><BookingTime>10:00</BookingTime></BookingBlock>')
+    expect(newCodeFindings(before, audit())).toHaveLength(1)
+    put(root, file, 'export const P = () => <BookingBlock><BookingCardContent name="花子" time="10:00" menu="カット" /></BookingBlock>')
+    expect(newCodeFindings(before, audit())).toHaveLength(0)
+  })
+  it('ページ送りの件数文の再導入を止め、共通部品へ渡す数値は通す', () => {
+    const { root } = fixture()
+    const file = 'apps/web/src/v8/other/pager.tsx'
+    put(root, file, 'export const Pager = () => <Pagination page={1} pageCount={1} onPageChange={change} range={{ total: 7, first: 1, last: 7 }} />')
+    const audit = () => run({ code: root, only: ['pagination'] })
+    const before = audit()
+    put(root, file, 'export const Pager = () => <Pagination page={1} pageCount={1} onPageChange={change} summary={`${total}件中 ${first}〜${last}件`} />')
+    expect(newCodeFindings(before, audit()).some((item: { signal: string }) => item.signal === 'own-range-text')).toBe(true)
+  })
+  it('移動した同じ中身は通し、コピー・中身の変更・移動先の新しい手書きは止める', () => {
+    const { root } = fixture()
+    const old = 'apps/web/src/v8/other/source.tsx'
+    const next = 'apps/web/src/v8/other/moved.tsx'
+    const source = 'export function ErrorMessage() { return <p className="text-danger text-sm" role="alert">失敗しました。内容を確かめて、もう一度お試しください。</p> }'
+    put(root, old, source)
+    const audit = () => run({ code: root, only: ['field-error'] })
+    const before = audit()
+    put(root, next, source)
+    expect(newCodeFindings(before, audit())).toHaveLength(1)
+    renameSync(join(root, old), join(root, next))
+    expect(newCodeFindings(before, audit())).toEqual([])
+    put(root, next, source.replace('text-danger', 'text-warning'))
+    expect(newCodeFindings(before, audit())).toHaveLength(1)
+    put(root, next, `${source}\nexport const Extra = () => <p role="alert">新しい手書き</p>`)
+    expect(newCodeFindings(before, audit())).toHaveLength(1)
+  })
+
+  it('V8固定の同じJSXとCSSは通し、値の変更や新しい手書きは止める', () => {
+    const { root } = fixture()
+    const rel = 'apps/web/src/v8/other/theme.tsx'
+    const css = 'apps/web/src/v8/other/theme.module.css'
+    const source = "import styles from './theme.module.css'\nexport const P = () => isV8 ? <><Button className=\"v7:h-10 text-ink\">保存</Button><Tr className={styles.row}/></> : <div/>"
+    const rule = ":global([data-theme='v8']) .row { color: var(--color-ink); }\n:global([data-theme='v8']) .wrap button { color: var(--color-ink); }"
+    put(root, rel, source)
+    put(root, css, rule)
+    const audit = () => run({ code: root, only: ['primary-button', 'table', 'field-error'] })
+    const before = audit()
+    put(root, rel, source.replace('isV8 ? ', '').replace(' : <div/>', '').replace('v7:h-10 ', ''))
+    for (const scope of [':global(:root) ', '']) {
+      put(root, css, rule.replaceAll(":global([data-theme='v8']) ", scope))
+      expect(newCodeFindings(before, audit())).toEqual([])
+    }
+    put(root, css, rule.replaceAll(":global([data-theme='v8']) ", '').replaceAll('--color-ink', '--color-danger'))
+    expect(newCodeFindings(before, audit()).some((h: { category: string }) => h.category === 'b')).toBe(true)
+    put(root, css, rule)
+    put(root, rel, `${source}\nexport const Extra = () => <p role="alert">新しい手書き</p>`)
+    expect(newCodeFindings(before, audit())).toHaveLength(1)
+  })
+
+  it('V8の指定を外した同じ位置は通し、位置や色を変えれば止める', () => {
+    const { root } = fixture()
+    const rel = 'apps/web/src/v8/other/position.tsx'
+    const audit = () => run({ code: root, only: ['primary-button'] })
+    put(root, rel, 'export const P = () => <Button className="absolute top-[17px] text-ink v8:top-3">閉じる</Button>')
+    const before = audit()
+    put(root, rel, 'export const P = () => <Button className="absolute top-3 text-ink">閉じる</Button>')
+    expect(newCodeFindings(before, audit())).toEqual([])
+    put(root, rel, 'export const P = () => <Button className="absolute top-4 text-ink">閉じる</Button>')
+    expect(newCodeFindings(before, audit())).toHaveLength(1)
+    put(root, rel, 'export const P = () => <Button className="absolute top-3 text-danger">閉じる</Button>')
+    expect(newCodeFindings(before, audit())).toHaveLength(1)
+  })
+
+  it('Gitの改名を認識しても、移動先のCSSの値が変われば止める', () => {
+    const { root } = fixture()
+    execFileSync('git', ['init', '-q'], { cwd: root })
+    execFileSync('git', ['add', '.'], { cwd: root })
+    execFileSync('git', ['-c', 'user.name=Pattern Test', '-c', 'user.email=pattern-test@example.invalid', 'commit', '-qm', 'baseline'], { cwd: root })
+    const old = 'apps/web/src/v8/demo/list.tsx', next = 'apps/web/src/v8/demo/moved.tsx'
+    renameSync(join(root, old), join(root, next))
+    execFileSync('git', ['add', '-A'], { cwd: root })
+    const script = join(ROOT, 'scripts/visual-qa/v8-pattern-audit.mjs')
+    const audit = () => spawnSync(process.execPath, [script, '--code', root, '--base', 'HEAD', '--out', join(root, 'audit')], { encoding: 'utf8' })
+    expect(audit().status).toBe(0)
+    const css = join(root, 'apps/web/src/v8/demo/list.module.css')
+    writeFileSync(css, readFileSync(css, 'utf8').replace('#ff0000', '#00ff00'))
+    expect(audit().status).toBe(1)
+  })
+
+  it('検索文字列とコメントを画面の手書きにしないが、自作のJSXと矢印関数は止める', () => {
+    const { root } = fixture()
+    const rel = 'apps/web/src/v8/other/queries.tsx'
+    const audit = () => run({ code: root, only: ['dialog', 'phone-preview'] })
+    put(root, rel, `/* role="dialog" */\nexport const Query = () => document.querySelector('[role="dialog"]')\nexport const loadPreview = async () => fetch('/preview')`)
+    expect(audit().code.a.dialog).toEqual([])
+    expect(audit().code.a['phone-preview']).toEqual([])
+    put(root, rel, 'export const PhonePreview = () => <div role="dialog">手書きの窓</div>')
+    expect(audit().code.a.dialog).toHaveLength(1)
+    expect(audit().code.a['phone-preview']).toHaveLength(1)
+  })
+  it('LIFFの正の手順のimportだけを認め、同名の自作と隣の違反は止める', () => {
+    const { root } = fixture()
+    const rel = 'apps/liff/src/pages/seat/reserve.tsx'
+    put(root, 'apps/liff/src/components/ui/Stepper.tsx', 'export default function Stepper() { return null }')
+    const audit = () => run({ code: root, only: ['steps', 'field-error', 'date-time', 'toggle'] })
+    put(root, rel, "import Stepper from '../../components/ui/Stepper.js';\nexport const P = () => <Stepper appearance=\"restaurant\" steps={[]} current={0} />")
+    expect(audit().code.a.steps).toEqual([])
+    put(root, rel, 'function Stepper() { return null }; export const P = () => <Stepper />')
+    expect(audit().code.a.steps.map((h: { signal: string }) => h.signal)).toEqual(['old-stepper'])
+    put(root, rel, "import Stepper from './Stepper.js';\nexport const P = () => <Stepper />")
+    expect(audit().code.a.steps.map((h: { signal: string }) => h.signal)).toEqual(['old-stepper'])
+    put(root, rel, "import Stepper from '../../components/ui/Stepper.js';\nexport const P = () => <><Stepper /><p role=\"alert\">失敗</p><input type=\"date\" /><div role=\"radiogroup\" /></>")
+    const result = audit()
+    expect(result.code.a['field-error'].some((h: { signal: string }) => h.signal === 'raw-alert')).toBe(true)
+    expect(result.code.a['date-time'].some((h: { signal: string }) => h.signal === 'native')).toBe(true)
+    expect(result.code.a.toggle.some((h: { signal: string }) => h.signal === 'switch')).toBe(true)
+  })
+
+  it('共通のFieldとFormFieldを認識しても、隣の手書きエラーは止める', () => {
+    const { root } = fixture()
+    const rel = 'apps/web/src/v8/demo/error.tsx'
+    const audit = () => run({ code: root, only: ['field-error'] })
+    for (const component of ['Field', 'FormField']) {
+      put(root, rel, `export const P = () => <${component} error={error}><TextField /></${component}>`)
+      expect(audit().code.reach['field-error'].files).toBe(1)
+      expect(audit().code.a['field-error']).toEqual([])
+      put(root, rel, `export const P = () => <><${component} error={error}><TextField /></${component}><p role="alert">失敗</p></>`)
+      expect(audit().code.a['field-error'].map((h: { signal: string }) => h.signal)).toEqual(['raw-alert'])
+    }
+  })
+
+  it('共通の表への動きの追加・改行は通し、上書きの変更・増殖は止める', () => {
+    const { root } = fixture()
+    const rel = 'apps/web/src/v8/demo/table.tsx'
+    const css = 'apps/web/src/v8/demo/table.module.css'
+    const beforeSource = "import styles from './table.module.css'\nexport const P = () => <Tr key={row.id} className={styles.row}><Td className={styles.cell}>名前</Td></Tr>"
+    const afterSource = "import styles from './table.module.css'\nexport const P = () => <Tr key={row.id} className={styles.row} detailKey=\"affiliate\" onOpen={() => { open(row.id) }}>\n<Td className={styles.cell}>別の名前</Td>\n</Tr>"
+    const goodCss = '.row { color: var(--color-ink); display: grid; }\n.cell { font-size: var(--text-caption); }'
+    put(root, rel, beforeSource)
+    put(root, css, goodCss)
+    const audit = () => run({ code: root, only: ['table'] })
+    const before = audit()
+    put(root, rel, afterSource)
+    expect(newCodeFindings(before, audit())).toEqual([])
+    put(root, css, goodCss.replace('--color-ink', '--color-danger'))
+    expect(newCodeFindings(before, audit()).some((h: { kind: string }) => h.kind === 'prop:className')).toBe(true)
+    put(root, css, goodCss)
+    put(root, rel, afterSource.replace('className={styles.row}', 'className="text-red-500"'))
+    expect(newCodeFindings(before, audit()).some((h: { kind: string }) => h.kind === 'prop:className')).toBe(true)
+    put(root, rel, `${afterSource}\nexport const Extra = () => <Tr className={styles.row} />`)
+    expect(newCodeFindings(before, audit()).filter((h: { kind: string }) => h.kind === 'prop:className')).toHaveLength(1)
+    put(root, rel, afterSource.replace('className={styles.row}', 'style={{ color: "var(--color-danger)" }}'))
+    expect(newCodeFindings(before, audit()).some((h: { kind: string }) => h.kind === 'prop:style')).toBe(true)
+  })
+
+  it('CLIはbaseとの比較で違反を拒否し、行移動と持ち主への委譲は許可する', () => {
+    const { root, pen } = fixture()
+    execFileSync('git', ['init', '-q'], { cwd: root })
+    execFileSync('git', ['add', '.'], { cwd: root })
+    execFileSync('git', ['-c', 'user.name=Pattern Test', '-c', 'user.email=pattern-test@example.invalid', 'commit', '-qm', 'baseline'], { cwd: root })
+    const script = join(ROOT, 'scripts/visual-qa/v8-pattern-audit.mjs')
+    const audit = () => spawnSync(process.execPath, [script, '--code', root, '--base', 'HEAD', '--out', join(root, 'audit')], { encoding: 'utf8' })
+    const rel = 'apps/web/src/v8/other/page.tsx'
+    const good = readFileSync(join(root, rel), 'utf8')
+    put(root, rel, `\n\n${good}`)
+    expect(audit().status).toBe(0)
+    // 正しい帯を1つ使っていても、隣に手書きした帯を見逃さない。
+    put(root, rel, `${good}\nexport const Example = () => <><ReadOnlyNotice /><p className={styles.viewerBand}>閲覧のみで見ています</p></>\n`)
+    expect(audit().status).toBe(1)
+    put(root, rel, `${good}\nexport const Example = () => <p className={styles.readOnly}>閲覧のみで見ています</p>\n`)
+    expect(audit().status).toBe(1)
+    put(root, rel, `${good}\nexport const Example = () => <p className={styles.readonly}>閲覧のみで見ています</p>\n`)
+    expect(audit().status).toBe(1)
+    put(root, rel, `${good}\nexport const Example = () => <ReadOnlyNotice />\n`)
+    expect(audit().status).toBe(0)
+    put(root, rel, `${good}\nexport const Warning = () => <Notice tone="warn" role="alert">制約があります</Notice>\n`)
+    expect(audit().status).toBe(0)
+    put(root, rel, `${good}\nexport const Warning = () => <><Notice tone="warn" role="alert">制約があります</Notice><p role="alert">失敗しました</p></>\n`)
+    expect(audit().status).toBe(1)
+    put(root, rel, good)
+    put(root, 'apps/web/src/v8/other/new.module.css', '.bad { color: #ff0000; border-radius: 7px; }')
+    expect(audit().status).toBe(1)
+  }, 30_000)
+  it('行の移動は通し、手書き・上書き・直書きの新規と同じ候補の増殖は止める', () => {
+    const hit = { file: 'apps/web/src/v8/demo/list.tsx', line: 3, scope: 'v8', signal: 'own-stat', text: 'function StatCard() {}' }
+    const before = { code: { a: { 'kpi-band': [hit] }, b: {}, c: {} } }
+    expect(newCodeFindings(before, { code: { a: { 'kpi-band': [{ ...hit, line: 30 }] } } })).toEqual([])
+    const additions = [
+      { ...hit, line: 40 },
+      { ...hit, file: 'apps/web/src/v8/other/list.tsx' },
+    ]
+    const after = { code: {
+      a: { 'kpi-band': [hit, ...additions] },
+      b: { 'primary-button': [{ ...hit, kind: 'prop:className', text: '<Button className={styles.loud} />' }] },
+      c: { card: [{ ...hit, kind: 'radius', text: '.card { border-radius: 7px }' }] },
+    } }
+    expect(newCodeFindings(before, after).map((h: { category: string }) => h.category)).toEqual(['a', 'a', 'b', 'c'])
+  })
+
+  it('見張りが実際の壊し方で止まる（正しい部品へ戻すと通る）', () => {
+    const { root, pen } = fixture()
+    const before = run({ code: root, pen })
+    const rel = 'apps/web/src/v8/other/page.tsx'
+    const good = readFileSync(join(root, rel), 'utf8')
+    put(root, rel, `${good}\nfunction StatCard() { return <div /> }\n`)
+    expect(newCodeFindings(before, run({ code: root, pen })).some((h: { category: string; file: string }) => h.category === 'a' && h.file === rel)).toBe(true)
+    put(root, rel, good)
+    expect(newCodeFindings(before, run({ code: root, pen }))).toEqual([])
+  })
+  it('対応表の正規表現が全部読め、持ち主のファイルがこの repo にある', () => {
+    const catalog = loadCatalog(DEFAULT_CATALOG)
+    expect(catalog.patterns.length).toBeGreaterThanOrEqual(34)
+    const ids = catalog.patterns.map((p: { id: string }) => p.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const pattern of catalog.patterns) {
+      for (const file of pattern.owner?.code?.files ?? []) expect(existsSync(join(ROOT, file)), `${pattern.id}: ${file}`).toBe(true)
+      for (const test of pattern.guard?.tests ?? []) expect(existsSync(join(ROOT, test)), `${pattern.id}: ${test}`).toBe(true)
+      expect(pattern.rules.length, pattern.id).toBeGreaterThan(0)
+    }
+  })
+
+  it('(a) 手書きを拾い、コメント・試験・持ち主の中は拾わない', () => {
+    const { root, pen } = fixture()
+    const report = run({ code: root, pen, only: ['kpi-band', 'card', 'primary-button'] })
+    const kpi = report.code.a['kpi-band']
+    expect(kpi.map((h: { file: string; line: number }) => `${h.file}:${h.line}`)).toEqual(['apps/web/src/v8/demo/list.tsx:4'])
+    const card = report.code.a.card.map((h: { file: string; line: number }) => `${h.file}:${h.line}`)
+    expect(card).toEqual(['apps/web/src/v8/demo/list.module.css:1'])
+    // 効く範囲：KpiBand を読む画面は1ファイル
+    expect(report.summary.find((r: { id: string }) => r.id === 'kpi-band').reach.codeFiles).toBe(1)
+  })
+
+  it('(b) 見た目を足す className と子孫の塗り直しだけを拾い、幅だけの className と見た目の範囲指定は拾わない', () => {
+    const { root, pen } = fixture()
+    const report = run({ code: root, pen, only: ['primary-button'] })
+    const props = report.code.b['primary-button'].filter((h: { kind: string }) => h.kind.startsWith('prop:'))
+    expect(props.map((h: { line: number }) => h.line)).toEqual([10])
+    const css = report.code.b['primary-button'].filter((h: { kind: string }) => h.kind === 'css')
+    expect(css.map((h: { text: string }) => h.text)).toEqual(['.wrap button'])
+    expect(stripThemeScope(":global([data-theme='v8']) .wrap")).toBe('.wrap')
+  })
+
+  it('(c) 変数を読まない色・角丸を拾い、var() と 0 は拾わない', () => {
+    expect(hardcodedKind('background', '#ff0000')).toBe('color')
+    expect(hardcodedKind('color', 'var(--color-ink, #111)')).toBeNull()
+    expect(hardcodedKind('border-radius', '6px')).toBe('radius')
+    expect(hardcodedKind('border-radius', '0')).toBeNull()
+    expect(hardcodedKind('box-shadow', 'var(--card-shadow)')).toBeNull()
+    expect(hardcodedKind('width', '100%')).toBeNull()
+    const { root, pen } = fixture()
+    const report = run({ code: root, pen, only: ['primary-button'] })
+    const all = Object.values(report.code.c).flat() as { file: string; kind: string }[]
+    expect(all.every((h) => !h.file.includes('components/shared/'))).toBe(true)
+    expect(all.filter((h) => h.file.endsWith('list.module.css')).map((h) => h.kind).sort()).toEqual(['color', 'radius', 'size'])
+  })
+
+  it('(d) Pen：角丸の上書きと手で足した中身を拾い、文字だけの違いは拾わない。手描きのカードは影の無いものだけ', () => {
+    const { root, pen } = fixture()
+    const report = run({ code: root, pen, only: ['primary-button', 'card'] })
+    const inst = report.pen.inst['primary-button'].map((h: { board: string; kind: string }) => `${h.board}:${h.kind}`).sort()
+    expect(inst).toEqual(['B7:pen:look', 'B8:pen:detached'])
+    expect(report.summary.find((r: { id: string }) => r.id === 'primary-button').reach.penBoards).toBe(8)
+    expect(report.pen.hand.card.map((h: { board: string; name: string }) => `${h.board}:${h.name}`)).toEqual(['B9:箱'])
+  })
+
+  it('板の html の入れ子を読み、祖先で除ける', () => {
+    const nodes = penNodes('<div data-pencil-name="左メニュー"><div data-pencil-name="箱" style="background-color: #ffffff; border-radius: 12px; outline: 1px solid #000"></div></div>')
+    expect(nodes[1].ancestors).toEqual(['左メニュー'])
+    expect(nodes[0].end).toBe(2)
+    const catalog = loadCatalog(DEFAULT_CATALOG)
+    const card = catalog.patterns.find((p: { id: string }) => p.id === 'card')
+    expect(scanPenBoard(card, 'X', nodes)).toEqual([])
+    expect(judgePenInstances([], ['border-radius'])).toEqual([])
+    expect(readFileSync(DEFAULT_CATALOG, 'utf8')).toContain('"owner"')
+  })
+})
+
+it('顧客欄とLIFF外枠は共通部品の利用を認識し、同じ名前の自作は引き続き止める', () => {
+  const root = mkdtempSync(join(tmpdir(), 'pattern-canonical-'))
+  const file = 'apps/web/src/v8/demo/panel.tsx'
+  put(root, file, "import { CustomerInfoPanel, CustomerInfoRail } from '@/components/shared/customer-info-panel'\nimport LiffPhoneFrame from '@/components/shared/liff-phone-frame'\nexport function FriendInfoSidebar() { return <CustomerInfoPanel /> }\nexport function FormPhone() { return <LiffPhoneFrame /> }\nexport function OverviewTab() { return <CustomerInfoRail><aside /></CustomerInfoRail> }")
+  const good = run({code:root,only:['customer-info','phone-preview','detail-panel']})
+  expect(Object.values(good.code.a).flat()).toEqual([])
+  put(root, file, "import { CustomerInfoRail } from '@/components/shared/customer-info-panel'\nexport function OverviewTab() { return <CustomerInfoRail><aside>手書きの別の欄</aside></CustomerInfoRail> }")
+  expect(run({code:root,only:['detail-panel']}).code.a['detail-panel'].some((h: {signal: string}) => h.signal === 'aside')).toBe(true)
+  put(root, file, "import { CustomerInfoPanel } from './my-panel'\nexport function FriendInfoSidebar() { return <CustomerInfoPanel /> }")
+  expect(run({code:root,only:['customer-info']}).code.a['customer-info'].length).toBeGreaterThan(0)
+  put(root, file, 'export function FriendInfoSidebar() { return <div>顧客情報をすべて表示</div> }\nexport function FormPhone() { return <div /> }\nexport function OverviewTab() { return <aside /> }')
+  const broken = run({code:root,only:['customer-info','phone-preview','detail-panel']})
+  expect(broken.code.a['customer-info'].length).toBeGreaterThan(0)
+  expect(broken.code.a['phone-preview'].length).toBeGreaterThan(0)
+  expect(broken.code.a['detail-panel'].length).toBeGreaterThan(0)
+})
+
+
+describe('列車26b: ファイル移動と共通部品の読み上げ属性', () => {
+  it('同じ画面のdefault再exportだけを移動の証拠にし、コピーの追加は残す', () => {
+    const root = mkdtempSync(join(tmpdir(), 'pattern-forward-'))
+    const old = mkdtempSync(join(tmpdir(), 'pattern-forward-base-'))
+    const entry = 'apps/web/src/app/chats/page.tsx', target = 'apps/web/src/v8/chat/screen.tsx'
+    put(old, entry, 'export default function Chat(){ return <button>さらに読み込む</button> }')
+    put(root, entry, "export { default } from '@/v8/chat/screen'")
+    put(root, target, 'export default function Chat(){ return <button>さらに読み込む</button> }')
+    const moves = forwardedEntryMoves(root, old)
+    expect(moves.get(entry)).toBe(target)
+    const hit = { file: entry, scope: 'other', signal: 'more', identity: 'same', text: 'same' }
+    const before = { code: { a: { pagination: [hit] } } }
+    const moved = { ...hit, file: target, scope: 'v8' }
+    expect(newCodeFindings(before, { code: { a: { pagination: [moved] } } }, moves)).toEqual([])
+    expect(newCodeFindings(before, { code: { a: { pagination: [moved, moved] } } }, moves)).toHaveLength(1)
+    put(root, entry, "export { default } from '@/v8/chat/screen'; export const another = 1")
+    expect(forwardedEntryMoves(root, old).has(entry)).toBe(false)
+  })
+  it('クリックの検索文字列は窓やメニューに数えず、実際のnative roleは検出する', () => {
+    const { root, pen } = fixture(), rel = 'apps/web/src/v8/guard/probe.tsx'
+    put(root, rel, `export function Probe(){return <div onClick={event => event.target.closest('[role="menu"]')}>本文</div>}`)
+    const before = run({ code: root, pen })
+    expect(before.code.a.select?.filter((hit: {file:string})=>hit.file===rel) ?? []).toEqual([])
+    put(root, rel, `export function Probe(){return <div role="menu">新しい手書き</div>}`)
+    expect(newCodeFindings(before, run({ code: root, pen })).some((hit: {file:string;pattern:string})=>hit.file===rel&&hit.pattern==='select')).toBe(true)
+  })
+  it('窓の読み上げ名を保ったroleの移動は1件のまま、別の窓と同じ窓の複製は新規になる', () => {
+    const { root, pen } = fixture(), rel = 'apps/web/src/v8/guard/dialog.tsx'
+    put(root, rel, `export function Probe(){return <div role="dialog" aria-label="元の窓"><div>本文</div></div>}`)
+    const before = run({ code: root, pen })
+    put(root, rel, `export function Probe(){return <div><div role="dialog" aria-label="元の窓">本文</div></div>}`)
+    expect(newCodeFindings(before, run({ code: root, pen })).filter((hit: {pattern:string})=>hit.pattern==='dialog')).toEqual([])
+    put(root, rel, `export function Probe(){return <><div role="dialog" aria-label="元の窓">本文</div><div role="dialog" aria-label="元の窓">複製</div><div role="dialog" aria-label="別の窓">本文</div></>}`)
+    expect(newCodeFindings(before, run({ code: root, pen })).filter((hit: {pattern:string})=>hit.pattern==='dialog')).toHaveLength(2)
+  })
+})
+
+
+it('行うことの共通部品への設定だけを区別し、隣やeditor内の手書きと同名の自作は止める', () => {
+  const root = mkdtempSync(join(tmpdir(), 'fixed-action-ownership-'))
+  put(root, 'apps/web/src/components/shared/fixed-action-list.tsx', readFileSync(join(ROOT, 'apps/web/src/components/shared/fixed-action-list.tsx'), 'utf8'))
+  const catalog = loadCatalog()
+  const pattern = catalog.patterns.find((p: { id: string }) => p.id === 'tap-extra')
+  const file = 'apps/web/src/v8/demo/create.tsx'
+  const shared = `import Actions from '@/components/shared/fixed-action-list'; export default function Page() { return <Actions options={[{ id: 'tag', label: 'タグを付ける', enabled: false, onEnabledChange() {} }]} /> }`
+  const scan = (source: string) => scanCodeFile(pattern, file, source, catalog._global, root).filter((hit: { signal: string }) => hit.signal === 'own-extra')
+  expect(scan(shared)).toHaveLength(0)
+  expect(scan(shared + `; export function Other() { return <button>タグを付ける</button> }`)).toHaveLength(1)
+  expect(scan(shared.replace("enabled: false", "editor: <button>タグを付ける</button>, enabled: false"))).toHaveLength(1)
+  expect(scan(shared.replace("@/components/shared/fixed-action-list", './fake'))).toHaveLength(1)
+})
+
+
+describe('F01: 分割した宣言も一対一で元の形と照合する', () => {
+  it('件数の宣言を移しただけなら同じ候補、複製・値変更は新しい候補', () => {
+    const { root, pen } = fixture()
+    const old = 'apps/web/src/v8/guard/screen.tsx', next = 'apps/web/src/v8/guard/model.tsx'
+    put(root, old, 'const PHOTO_PAGE_SIZE = 200; export function Screen(){return <div>一覧</div>}')
+    const before = run({ code: root, pen })
+    put(root, old, 'export function Screen(){return <div>一覧</div>}')
+    put(root, next, 'export const PHOTO_PAGE_SIZE = 200;')
+    expect(newCodeFindings(before, run({ code: root, pen }))).toEqual([])
+    put(root, old, 'const PHOTO_PAGE_SIZE = 200; export function Screen(){return <div>一覧</div>}')
+    expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'pagination')).toHaveLength(1)
+    put(root, old, 'export function Screen(){return <div>一覧</div>}')
+    put(root, next, 'export const PHOTO_PAGE_SIZE = 201;')
+    expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'pagination')).toHaveLength(1)
+  })
+  it('見本の式を名前付き関数へ移しても同じ形、本文変更・複製は新規', () => {
+    const { root, pen } = fixture()
+    const old = 'apps/web/src/v8/guard/screen.tsx', next = 'apps/web/src/v8/guard/preview.tsx'
+    const body = '<><div className="phone"><p>変えずに渡す見本の本文と操作。元の機能と内容を長い状態でも保って、既存の見本として移動を照合する。</p><button>確かめる</button></div></>'
+    put(root, old, `const renderPreview = () => (${body});`)
+    const before = run({ code: root, pen })
+    put(root, old, 'export const value = 1')
+    put(root, next, `export function renderOtherPreview(){return (${body})}`)
+    expect(newCodeFindings(before, run({ code: root, pen }))).toEqual([])
+    put(root, old, `const renderPreview = () => (${body});`)
+    expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'phone-preview')).toHaveLength(1)
+    put(root, old, 'export const value = 1')
+    put(root, next, `export function renderOtherPreview(){return (${body.replace('確かめる','新しい操作')})}`)
+    expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'phone-preview')).toHaveLength(1)
+  })
+})
+
+
+it('名前と属性が同じパネルの移動は保持し、コピー・見た目変更は検出する', () => {
+  const { root, pen } = fixture()
+  const old = 'apps/web/src/v8/guard/one.tsx', next = 'apps/web/src/v8/guard/two.tsx'
+  put(root, old, 'export function Screen(){return <aside aria-label="見本" className={styles.rail}><button>古い切替</button></aside>}')
+  const before = run({ code: root, pen })
+  put(root, old, 'export const empty = true')
+  const moved = 'export function Rail(){return <aside aria-label="見本" className={styles.rail}><SharedSwitch /></aside>}'
+  put(root, next, moved)
+  expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'detail-panel')).toEqual([])
+  put(root, old, moved)
+  expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'detail-panel')).toHaveLength(1)
+  put(root, old, 'export const empty = true')
+  put(root, next, moved.replace('styles.rail', 'styles.changed'))
+  expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'detail-panel')).toHaveLength(1)
+})
+
+describe('画面の押し口は共通部品を通す', () => {
+  it('共通Buttonの隣に手書きを足したら拾い、共通へ戻せば消える', () => {
+    const catalog = loadCatalog(DEFAULT_CATALOG)
+    const pattern = catalog.patterns.find((item: { id: string }) => item.id === 'primary-button')
+    const scan = (body: string) => scanCodeFile(pattern, 'apps/web/src/v8/demo/actions.tsx', body, catalog._global).filter((hit: { signal: string }) => hit.signal === 'raw-button')
+    const common = "import Button from '@/components/shared/button'; export const A = () => <Button>詳細</Button>"
+    expect(scan(common)).toHaveLength(0)
+    expect(scan(common + '; export const B = () => <button>詳細</button>')).toHaveLength(1)
+    expect(scan(common + '; const sample = "<button>詳細</button>"')).toHaveLength(0)
+    expect(scan(common)).toHaveLength(0)
+  })
+})

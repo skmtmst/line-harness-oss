@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
-import { describeSendFailure } from './send-failure'
+import { describeSendFailure } from '@/v8/inbox-chat/send-failure'
 
 const NOW = new Date('2026-09-17T00:00:00.000Z')
 
@@ -14,7 +14,7 @@ describe('describeSendFailure: N-028/N-029 失敗理由の言い換え', () => {
     for (const code of ['LINE_DELIVERY_UNKNOWN', 'OUTBOUND_CONFIRMATION_FAILED']) {
       const text = describeSendFailure(new ApiError(409, '', code, { retryable: false }), NOW)
       expect(text).toContain('二重送信')
-      expect(text).not.toContain('もう一度送信')
+      expect(text).not.toContain('もう一度送る')
     }
   })
 

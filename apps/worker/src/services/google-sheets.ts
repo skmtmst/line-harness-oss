@@ -1,5 +1,8 @@
+import { jstDate as japanDate } from '@line-crm/shared';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 /**
- * #838 第2段: Google Sheets への直接書き出し。
+ *  第2段: Google Sheets への直接書き出し。
  *
  * - OAuth・トークン・再試行は services/google-business.ts の実装を使う。
  *   ここでは Sheets API の形（タブ・行の upsert）と同期の流れだけを持つ。
@@ -15,7 +18,8 @@ import {
   isAccountFeatureEnabled,
   type LineAccount,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import {
   GoogleBusinessError,
   authorizedJson,
@@ -102,14 +106,36 @@ export function parseSpreadsheetId(input: string): string | null {
 
 // ---------- OAuthクライアント ----------
 
+/**
+ * Sheets 専用の OAuth クライアントが無い環境では、同じ Google プロジェクトの
+ * Googleビジネス用クライアントを共用する。OAuthクライアントは「このアプリ」を表す
+ * 資格情報で、実際に何を許可するかは認可のたびに渡すスコープ側で決まるため、
+ * 用途ごとにクライアントを分けなくても要求する権限は変わらない。
+ * 共用する場合でも、Google側にこのコールバックURLの登録は必要。
+ * 専用クライアントを設定した環境ではそちらが優先される。
+ */
 export function sheetsOauthClient(
-  env: Pick<Env['Bindings'], 'GOOGLE_SHEETS_OAUTH_CLIENT_ID' | 'GOOGLE_SHEETS_OAUTH_CLIENT_SECRET'>,
+  env: Pick<
+    Env['Bindings'],
+    | 'GOOGLE_SHEETS_OAUTH_CLIENT_ID'
+    | 'GOOGLE_SHEETS_OAUTH_CLIENT_SECRET'
+    | 'GOOGLE_BUSINESS_OAUTH_CLIENT_ID'
+    | 'GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET'
+  >,
   redirectUri: string,
 ): GoogleOAuthClient | null {
-  const clientId = env.GOOGLE_SHEETS_OAUTH_CLIENT_ID?.trim();
-  const clientSecret = env.GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?.trim();
-  if (!clientId || !clientSecret) return null;
-  return { clientId, clientSecret, redirectUri };
+  // IDとシークレットは必ず同じクライアントの組で使う。
+  // 片方だけ設定された環境で別クライアントの相方と混ざると認可が必ず失敗するため。
+  const pairs: Array<[string | undefined, string | undefined]> = [
+    [env.GOOGLE_SHEETS_OAUTH_CLIENT_ID, env.GOOGLE_SHEETS_OAUTH_CLIENT_SECRET],
+    [env.GOOGLE_BUSINESS_OAUTH_CLIENT_ID, env.GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET],
+  ];
+  for (const [rawId, rawSecret] of pairs) {
+    const clientId = rawId?.trim();
+    const clientSecret = rawSecret?.trim();
+    if (clientId && clientSecret) return { clientId, clientSecret, redirectUri };
+  }
+  return null;
 }
 
 // ---------- データ種別の定義（固定マッピング） ----------
@@ -172,8 +198,14 @@ const formAnswersSource: DataSource = {
   sheetTitle: '回答',
   header: ANSWERS_HEADER,
   async fetchPage(db, lineAccountId, cursor) {
-    const binds: unknown[] = [lineAccountId];
-    let where = 'fa.line_account_id = ?';
+    const binds: unknown[] = [lineAccountId, lineAccountId];
+    /*
+     * フォームが複数アカウントへ共有されていても、書き出すのはこの
+     * アカウントの友だちの回答だけ。管理画面の回答一覧と同じ
+     * 所属条件（回答した友だちの所属アカウント）に揃える。
+     * 友だちが消えて所属が分からない回答は、どのアカウントにも出さない。
+     */
+    let where = 'fa.line_account_id = ? AND fr.line_account_id = ?';
     if (cursor) {
       where += ` AND ${changedAfterClause('s', 'created_at')}`;
       binds.push(cursor.after, cursor.after, cursor.lastId);
@@ -304,10 +336,16 @@ async function appendRows(
   rows: (string | null)[][],
 ): Promise<void> {
   if (rows.length === 0) return;
+  /*
+   * append は「行を足す」操作なので自動再試行しない。
+   * Google が保存した直後に応答だけ落ちたとき、そのまま再送すると
+   * 同じ行が二度並ぶ。送達不明のまま失敗扱いにし、次の同期が
+   * キー列を読み直して既に入った分を上書きへ回すので欠落しない。
+   */
   await authorizedJson(
     options,
     `${SHEETS_API}/${enc(spreadsheetId)}/values/${enc(`'${sheetTitle}'!A1`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
-    { method: 'POST', body: { values: rows } },
+    { method: 'POST', body: { values: rows }, retry: false },
   );
 }
 
@@ -345,10 +383,26 @@ export async function sheetsAccessToken(
 
 // ---------- カーソル ----------
 
+/**
+ * 再開点は出力先（スプレッドシートID）ごとに持つ。
+ * `{ "targets": { "<spreadsheetId>": { "friends": {...}, "form_answers": {...} } } }`。
+ *
+ * 出力先を切り替えた直後の新しいシートでは再開点が無い＝全件を書き出す
+ * （キー列で upsert するので行は重ならない）。切り替え前に走っていた同期が
+ * あとからカーソルを書いても旧出力先の欄に置かれ、新しい出力先の
+ * 再開点を汚さない。切り替え前の古い形（種別名が直上のキー）は、どの
+ * 出力先のものか確かめられないため信用しない。
+ */
+interface SyncCursorStore {
+  targets?: Record<string, Record<string, SyncCursor | undefined> | undefined>;
+}
+
 export function readSyncCursor(integration: GoogleSheetsIntegrationRow, type: GoogleSheetsDataType): SyncCursor | null {
+  const spreadsheetId = integration.spreadsheet_id;
+  if (!spreadsheetId) return null;
   try {
-    const parsed = JSON.parse(integration.sync_cursor_json || '{}') as Record<string, SyncCursor | undefined>;
-    const cursor = parsed[type];
+    const parsed = JSON.parse(integration.sync_cursor_json || '{}') as SyncCursorStore;
+    const cursor = parsed.targets?.[spreadsheetId]?.[type];
     if (cursor && typeof cursor.after === 'string' && typeof cursor.lastId === 'string') return cursor;
   } catch {
     // 壊れたカーソルは全件やり直し（upsert なので再実行しても安全）。
@@ -363,13 +417,20 @@ async function writeSyncCursor(
   cursor: SyncCursor,
   now: string,
 ): Promise<void> {
-  let parsed: Record<string, unknown> = {};
+  let parsed: SyncCursorStore = {};
   try {
-    parsed = JSON.parse(integration.sync_cursor_json || '{}') as Record<string, unknown>;
+    const candidate = JSON.parse(integration.sync_cursor_json || '{}') as SyncCursorStore;
+    if (candidate && typeof candidate === 'object' && candidate.targets && typeof candidate.targets === 'object') {
+      parsed = candidate;
+    }
   } catch {
     // 上と同じく、壊れていれば作り直す。
   }
-  parsed[type] = cursor;
+  const spreadsheetId = integration.spreadsheet_id;
+  if (!spreadsheetId) return;
+  const targets = { ...(parsed.targets ?? {}) };
+  targets[spreadsheetId] = { ...(targets[spreadsheetId] ?? {}), [type]: cursor };
+  parsed = { targets };
   await db.prepare(
     'UPDATE google_sheets_integrations SET sync_cursor_json = ?, updated_at = ? WHERE id = ?',
   ).bind(JSON.stringify(parsed), now, integration.id).run();
@@ -388,20 +449,32 @@ export interface SyncOneResult {
 }
 
 function jstDate(iso: string): string {
-  return new Date(Date.parse(iso) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return japanDate(new Date(iso));
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
- * 死んでいる running 行を畳み、それでも生きている running が残れば false。
+ * 死んでいる running 行を畳み、それでも生きている running が残れば null。
  * 手動・定期・他プロセスの重複をここで1回だけ断る。
+ *
+ * 空を読んでから INSERT する並びだと、同時に始まった2処理がどちらも
+ * 空を見て実行権を持ってしまう。先に自分の行を入れ、連携内で
+ * もっとも先に入った running 行だけを勝者にする。負けた側は自分の行を
+ * 消して null を返すので、履歴に「失敗した実行」が勝手に増えない。
  */
 export async function acquireSyncRun(
   db: D1Database,
   integrationId: string,
   type: GoogleSheetsDataType,
-  input: { kind: 'manual' | 'scheduled'; now: string },
+  input: {
+    kind: 'manual' | 'scheduled';
+    now: string;
+    /** 定期実行の所属日（JSTの日付）。同日の定期実行はこれで絞る。 */
+    runDate?: string | null;
+    /** この実行が書き出す先。履歴でどの出力先への結果か分かるようにする。 */
+    spreadsheetId?: string | null;
+  },
 ): Promise<{ id: string } | null> {
   const staleBefore = new Date(Date.parse(input.now) - RUN_STALE_MS).toISOString();
   await db.prepare(
@@ -409,17 +482,20 @@ export async function acquireSyncRun(
         SET status = 'error', error = 'stale_run', finished_at = ?
       WHERE integration_id = ? AND status = 'running' AND started_at < ?`,
   ).bind(input.now, integrationId, staleBefore).run();
-  const running = await db.prepare(
-    `SELECT id FROM google_sheets_sync_runs
-      WHERE integration_id = ? AND status = 'running' LIMIT 1`,
-  ).bind(integrationId).first<{ id: string }>();
-  if (running) return null;
   const id = crypto.randomUUID();
   await db.prepare(
     `INSERT INTO google_sheets_sync_runs
-       (id, integration_id, kind, data_type, status, started_at)
-     VALUES (?, ?, ?, ?, 'running', ?)`,
-  ).bind(id, integrationId, input.kind, type, input.now).run();
+       (id, integration_id, kind, data_type, status, started_at, run_date, spreadsheet_id)
+     VALUES (?, ?, ?, ?, 'running', ?, ?, ?)`,
+  ).bind(id, integrationId, input.kind, type, input.now, input.runDate ?? null, input.spreadsheetId ?? null).run();
+  const winner = await db.prepare(
+    `SELECT id FROM google_sheets_sync_runs
+      WHERE integration_id = ? AND status = 'running' ORDER BY rowid LIMIT 1`,
+  ).bind(integrationId).first<{ id: string }>();
+  if (winner?.id !== id) {
+    await db.prepare('DELETE FROM google_sheets_sync_runs WHERE id = ?').bind(id).run();
+    return null;
+  }
   return { id };
 }
 
@@ -463,7 +539,12 @@ export async function syncOneDataType(
   const fetchFn = input.fetch ?? fetch;
   const sleep = input.sleep ?? defaultSleep;
   const source = DATA_SOURCES[type];
-  const run = await acquireSyncRun(db, integration.id, type, { kind: input.kind, now: input.now });
+  const run = await acquireSyncRun(db, integration.id, type, {
+    kind: input.kind,
+    now: input.now,
+    runDate: input.kind === 'scheduled' ? jstDate(input.now) : null,
+    spreadsheetId: integration.spreadsheet_id,
+  });
   if (!run) return { dataType: type, status: 'already_running', rowsWritten: 0 };
 
   let rowsWritten = 0;
@@ -605,11 +686,20 @@ export async function processDueGoogleSheetsSyncs(
         skipped += 1;
         continue;
       }
+      /*
+       * 実行日は日本時間で持つ。started_at のUTC日付と比べると、
+       * JSTの0時〜9時に走った分と同日の9時以降の分が別日扱いになり、
+       * 同じJST日に定期同期が二度走っていた。
+       * 出力先も条件に入れる。出力先を変えた日に、変える前のシートへの
+       * 定期実行が残っていても、新しい出力先への初回実行を止めない。
+       * run_date が NULL の古い行は判定に使わない（導入前の行は一度だけ
+       * 同日の再実行を許すが、同じ行を二度書き込むわけではない）。
+       */
       const already = await db.prepare(
         `SELECT id FROM google_sheets_sync_runs
           WHERE integration_id = ? AND kind = 'scheduled'
-            AND substr(started_at, 1, 10) = ? LIMIT 1`,
-      ).bind(integration.id, today).first<{ id: string }>();
+            AND run_date = ? AND spreadsheet_id = ? LIMIT 1`,
+      ).bind(integration.id, today, integration.spreadsheet_id).first<{ id: string }>();
       if (already) {
         skipped += 1;
         continue;
@@ -629,13 +719,7 @@ export async function processDueGoogleSheetsSyncs(
     } catch (error) {
       failed += 1;
       // 詳細メッセージは応答内容を含み得るので、種別名だけを記録する。
-      console.error(JSON.stringify({
-        event: 'google_sheets_sync_failed',
-        integrationId: integration.id,
-        error: error instanceof GoogleBusinessError
-          ? error.kind
-          : error instanceof Error ? error.name : 'unknown',
-      }));
+      logger.error("google_sheets.sync_failed");
     }
   }
   return { synced, skipped, failed };

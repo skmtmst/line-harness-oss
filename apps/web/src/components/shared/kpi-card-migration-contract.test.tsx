@@ -7,11 +7,10 @@ import { fileURLToPath } from 'node:url'
 import KpiCard from './kpi-card'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const WEB = join(SRC, '..')
 const readSource = (path: string) => readFileSync(join(SRC, path), 'utf8')
 
 describe('KpiCardへの一本化契約', () => {
-  it('数のカードはKpiCardだけを使い、V6の見せ方にする', () => {
+  it('数のカードは現在のV8へ固定し、数の整形と行き先を保つ', () => {
     const html = renderToStaticMarkup(
       <KpiCard
         title="成果"
@@ -22,25 +21,25 @@ describe('KpiCardへの一本化契約', () => {
       />,
     )
 
-    expect(html).toContain('data-design-version="v6"')
-    expect(html).toContain('1,234件')
+    expect(html).toContain('data-design-version="v8"')
+    expect(html.replace(/<[^>]*>/g, '')).toContain('1,234件')
     expect(html).toContain('href="/conversions"')
   })
 
-  it('配信告知をbroadcast variantとして明示する', () => {
+  it('配信告知も現在のV8のカードで数と単位を表示する', () => {
     const html = renderToStaticMarkup(
-      <KpiCard title="今週の配信" value={3} unit="通" detail="過去7日" variant="broadcast" />,
+      <KpiCard title="今週の配信" value={3} unit="通" detail="過去7日" />,
     )
 
-    expect(html).toContain('data-design-version="broadcast"')
-    expect(html).toContain('3通')
+    expect(html).toContain('data-design-version="v8"')
+    expect(html.replace(/<[^>]*>/g, '')).toContain('3通')
   })
 
   it('3系統の実装元が共通KpiCardだけを描画する', () => {
     const files = [
       'components/friends/friend-kpis.tsx',
       'components/shared/list-kpis.tsx',
-      'components/users/summary-bar.tsx',
+      'v8/friends/merged/merged.tsx',
     ]
 
     for (const file of files) {
@@ -49,15 +48,14 @@ describe('KpiCardへの一本化契約', () => {
       expect(source, `${file} に旧カードの影が残っている`).not.toContain('shadow-[')
       expect(source, `${file} に旧カードの任意角丸が残っている`).not.toContain('rounded-[')
     }
-
-    expect(readSource('components/dashboard/kpi-card.tsx')).toContain("from '@/components/shared/kpi-card'")
+    // 旧 import の互換層（components/dashboard/kpi-card.tsx）は使う所が無くなったので 2026-10-07 に消した。
   })
 
   it('旧SummaryCardの入口が残っていない', () => {
     const files = [
       'components/friends/friend-kpis.tsx',
       'components/shared/list-kpis.tsx',
-      'components/users/summary-bar.tsx',
+      'v8/friends/merged/merged.tsx',
     ]
 
     for (const file of files) {
@@ -65,21 +63,5 @@ describe('KpiCardへの一本化契約', () => {
       expect(source, `${file} に旧名が残っている`).not.toContain('SummaryCard')
     }
     expect(readSource('components/shared/kpi-card.tsx')).not.toMatch(/function SummaryCard/)
-  })
-
-  it('V5基準・V6優先と9ルートの影響範囲を契約へ残す', () => {
-    const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
-    const part = contract.parts['kpi-card']
-
-    expect(part.status).toBe('active')
-    expect(part.pencilNodes).toEqual(expect.arrayContaining(['XywGr', 'mNUQ3']))
-    expect(part.routes.v5).toEqual(['/friends', '/tags', '/users'])
-    expect(part.routes.broadcast).toEqual(['/scenarios'])
-    expect(part.routes.v6).toEqual(
-      expect.arrayContaining(['/analytics', '/conversions', '/inflow-links', '/affiliates', '/reminders', '/templates']),
-    )
-    expect(Object.values(part.routes).flat()).toHaveLength(10)
-    expect(part.visualVerification.status).toBe('unverified')
-    expect(part.visualVerification.requiredViewports).toEqual([1440, 1920])
   })
 })

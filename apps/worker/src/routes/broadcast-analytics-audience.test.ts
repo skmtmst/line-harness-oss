@@ -1,5 +1,5 @@
 /*
- * 分析で作った一時対象者を配信へ渡す検証(N-274 / #842)。
+ * 分析で作った一時対象者を配信へ渡す検証。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物の broadcasts ルートを当てる。
  * 対象者は24時間で消えるため、保存・送信直前のたびに所属と期限を確かめ直す。
@@ -12,11 +12,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
-vi.mock('../services/broadcast.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../services/broadcast.js')>();
+vi.mock('../features/broadcasts/broadcast.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../features/broadcasts/broadcast.js')>();
   return {
     ...actual,
     processQueuedBroadcasts: vi.fn().mockResolvedValue(undefined),

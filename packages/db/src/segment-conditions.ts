@@ -1,8 +1,10 @@
+import {asString,asStringArray,asRecord,buildDateRange} from './segment-condition-values.js';
+import { sqlIdSet } from './id-queries.js';
 /*
  * 友だちの絞り込み条件を SQL に組み立てる。
  *
- * 以前は worker の services にあったが、成果の「数えない条件」(R40)でも
- * 同じ条件を記録時・試算時に評価する必要があり、packages/db 側へ移した。
+ * 成果の「数えない条件」でも
+ * 同じ条件を記録時・試算時に評価する必要があるため、packages/db 側に置く。
  * worker からは `services/segment-query.js` の再公開を通して従来どおり
  * 使える。実体はここ1つ。
  *
@@ -30,67 +32,8 @@ export type FieldOperator =
   | 'lte'
   | 'lt'
 
-export interface SegmentRule {
-  type:
-    | 'tag_exists'
-    | 'tag_not_exists'
-    | 'tag_all'
-    | 'tag_not_all'
-    | 'metadata_equals'
-    | 'metadata_not_equals'
-    | 'ref_code'
-    | 'is_following'
-    | 'scenario_subscribed'
-    | 'name'
-    | 'private_memo'
-    | 'status_message'
-    | 'registered_at'
-    | 'support_mark'
-    | 'is_hidden'
-    | 'friend_field'
-    | 'scenario_state'
-    | 'form_answered'
-    | 'last_reaction_at'
-    | 'reaction_state'
-    | 'score_range'
-    /**
-     * 対応状況（chats.status）。友だち一覧の「対応」絞り込みの引継ぎ用。
-     * 画面の条件ビルダーには出さない。
-     */
-    | 'chat_status'
-    /**
-     * 対応の担当者（chats.operator_id）。友だち一覧の「担当者」絞り込みの
-     * 引継ぎ用。画面の条件ビルダーには出さない。
-     */
-    | 'operator_id'
-    /**
-     * 分析画面で作った一時対象者（analytics_result_audiences）。friend ID を
-     * 条件へ埋めず audience ID だけを持ち、評価のたびに所属・期限を見直す。
-     * 画面の条件ビルダーには出さない。
-     */
-    | 'analytics_audience'
-    /**
-     * 指定した一斉配信を受け取り、その中の計測リンクを押した／押さなかった人。
-     * 配信詳細の「押していない人へ追送」で作る引き継ぎ条件。
-     * 画面の条件ビルダーには出さない。
-     */
-    | 'broadcast_link_clicked'
-    /** 内部用途: 作成時点の宛先IDを固定した配信。画面の条件ビルダーには出さない。 */
-    | 'friend_id_in'
-  value: unknown
-}
-
-export interface SegmentCondition {
-  operator: 'AND' | 'OR'
-  rules: SegmentRule[]
-  /**
-   * 入れ子のグループ。Lステップの「いずれか1つ以上を満たす必要がある条件
-   * (or条件)」にあたる。親の operator でこの結果とつなぐ。
-   *
-   * 省略できる。以前の形（rules だけ）で保存された条件がそのまま動く。
-   */
-  groups?: SegmentCondition[]
-}
+import type { SegmentCondition, SegmentRule } from '@line-crm/shared';
+export type { SegmentCondition, SegmentRule } from '@line-crm/shared';
 
 /** 名前をどの欄から探すか。 */
 const NAME_COLUMNS: Record<string, string> = {
@@ -107,55 +50,9 @@ export type ReactionState = (typeof REACTION_STATES)[number]
 const CHAT_STATUSES = ['unread', 'in_progress', 'on_hold', 'resolved'] as const
 export type ChatStatus = (typeof CHAT_STATUSES)[number]
 
-function asString(value: unknown, ruleType: string): string {
-  if (typeof value !== 'string') {
-    throw new Error(`${ruleType} rule requires a string value`)
-  }
-  return value
-}
 
-function asStringArray(value: unknown, ruleType: string): string[] {
-  if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) {
-    throw new Error(`${ruleType} rule requires an array of string IDs`)
-  }
-  if (value.length === 0) {
-    throw new Error(`${ruleType} rule requires at least one ID`)
-  }
-  return value as string[]
-}
 
-function asRecord(value: unknown, ruleType: string): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error(`${ruleType} rule requires an object value`)
-  }
-  return value as Record<string, unknown>
-}
 
-/**
- * 期間の条件。from / to はどちらも省略できるが、両方省略は受け付けない。
- * 「期間を指定したつもりで全員に一致する」事故を防ぐため。
- */
-function buildDateRange(column: string, value: unknown, ruleType: string): { sql: string; bindings: unknown[] } {
-  const v = asRecord(value, ruleType)
-  const from = typeof v.from === 'string' && v.from !== '' ? v.from : null
-  const to = typeof v.to === 'string' && v.to !== '' ? v.to : null
-  if (!from && !to) {
-    throw new Error(`${ruleType} rule requires at least one of from / to`)
-  }
-  const parts: string[] = []
-  const bindings: unknown[] = []
-  if (from) {
-    parts.push(`${column} >= ?`)
-    bindings.push(from)
-  }
-  if (to) {
-    // 「〜まで」は、その日の終わりまでを含める。日付だけを渡されたときに
-    // 当日ぶんが落ちると、指定した本人の期待とずれる。
-    parts.push(`${column} <= ?`)
-    bindings.push(to.length === 10 ? `${to}T23:59:59.999` : to)
-  }
-  return { sql: `(${parts.join(' AND ')})`, bindings }
-}
 
 /**
  * 値の比較。友だち情報欄で使う。
@@ -201,6 +98,23 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
   const bindings: unknown[] = []
 
   switch (rule.type) {
+    case 'customer_segment': {
+      const v=asRecord(rule.value,rule.type),r=Number(v.r),f=Number(v.f),basis=v.basis??'both',measure=v.measure??'count';
+      if(![r,f].every(n=>Number.isInteger(n)&&n>=1&&n<=5)||!['visit','purchase','both'].includes(String(basis))||!['count','amount'].includes(String(measure)))throw new Error('invalid customer segment');
+      return {sql:`EXISTS(SELECT 1 FROM customer_activity_daily c WHERE c.account_id=f.line_account_id AND c.friend_id=f.id AND c.basis=? AND c.r_bucket=? AND c.${measure==='amount'?'m_bucket':'f_bucket'}=?)`,bindings:[basis,r,f]};
+    }
+    case 'visit_count': case 'purchase_amount': {
+      const v=asRecord(rule.value,rule.type),min=Number(v.min??0),max=v.max===undefined?Number.MAX_SAFE_INTEGER:Number(v.max);
+      if(!Number.isFinite(min)||!Number.isFinite(max)||min<0||max<min)throw new Error('invalid customer activity range');
+      const column=rule.type==='visit_count'?'activity_count':'amount',basis=rule.type==='visit_count'?'visit':'purchase';
+      return {sql:`EXISTS(SELECT 1 FROM customer_activity_daily c WHERE c.account_id=f.line_account_id AND c.friend_id=f.id AND c.basis=? AND c.${column} BETWEEN ? AND ?)`,bindings:[basis,min,max]};
+    }
+    case 'last_activity_at': {
+      const range=buildDateRange('c.last_activity_at',rule.value,rule.type);
+      return {sql:`EXISTS(SELECT 1 FROM customer_activity_daily c WHERE c.account_id=f.line_account_id AND c.friend_id=f.id AND c.basis='both' AND ${range.sql})`,bindings:range.bindings};
+    }
+    case 'member_tier': return {sql:'EXISTS(SELECT 1 FROM member_ranks r WHERE r.account_id=f.line_account_id AND r.friend_id=f.id AND r.tier_id=?)',bindings:[asString(rule.value,rule.type)]};
+
     case 'friend_id_in': {
       const ids = [...new Set(asStringArray(rule.value, 'friend_id_in'))];
       // IDごとの ? を並べるとD1のbind上限へ当たる。JSONは1 bindで展開する。
@@ -238,8 +152,8 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
     /* 選択したタグを全て含む人。 */
     case 'tag_all': {
       const ids = asStringArray(rule.value, 'tag_all')
-      const placeholders = ids.map(() => '?').join(', ')
-      bindings.push(...ids, ids.length)
+      const placeholders = sqlIdSet(ids).sql
+      bindings.push(...(ids.length ? sqlIdSet(ids).binds : []), ids.length)
       return {
         sql: `(SELECT COUNT(DISTINCT ft.tag_id) FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id IN (${placeholders})) = ?`,
         bindings,
@@ -249,8 +163,8 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
     /* 選択したタグを全て含む人を除外。 */
     case 'tag_not_all': {
       const ids = asStringArray(rule.value, 'tag_not_all')
-      const placeholders = ids.map(() => '?').join(', ')
-      bindings.push(...ids, ids.length)
+      const placeholders = sqlIdSet(ids).sql
+      bindings.push(...(ids.length ? sqlIdSet(ids).binds : []), ids.length)
       return {
         sql: `(SELECT COUNT(DISTINCT ft.tag_id) FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id IN (${placeholders})) < ?`,
         bindings,
@@ -325,7 +239,7 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
       if (v === '') throw new Error('operator_id rule requires a non-empty value')
       bindings.push(v)
       return {
-        sql: `EXISTS (SELECT 1 FROM chats c WHERE c.friend_id = f.id AND c.operator_id = ?)`,
+        sql: `EXISTS (SELECT 1 FROM chats c WHERE c.friend_id = f.id AND COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) = ?)`,
         bindings,
       }
     }
@@ -403,7 +317,7 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
         (t): t is string => typeof t === 'string' && t in NAME_COLUMNS,
       )
       /*
-       * R258: targets の指定と未指定を区別する。空配列は「選んでいない」
+       * targets の指定と未指定を区別する。空配列は「選んでいない」
        * 状態のまま保存されたもので、全欄への拡大はしない（fail-closed。
        * 空文字や空IDと同じく作り直しを促す）。未指定（古い保存形）は
        * これまでどおり全欄で探す。
@@ -425,11 +339,12 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
       return { sql: `(${perWord.join(' OR ')})`, bindings }
     }
 
+    // 保存済み条件の名前は互換性のため維持し、内容は受信箱のメモだけで探す。
     case 'private_memo': {
       const text = asString(rule.value, 'private_memo')
       if (text === '') throw new Error('private_memo rule requires a non-empty value')
       bindings.push(`%${text}%`)
-      return { sql: `f.private_memo LIKE ?`, bindings }
+      return { sql: `EXISTS (SELECT 1 FROM chats memo_chat WHERE memo_chat.friend_id = f.id AND memo_chat.notes LIKE ?)`, bindings }
     }
 
     case 'status_message': {
@@ -446,8 +361,8 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
     case 'support_mark': {
       const v = asRecord(rule.value, 'support_mark')
       const ids = asStringArray(v.markIds, 'support_mark')
-      const placeholders = ids.map(() => '?').join(', ')
-      bindings.push(...ids)
+      const placeholders = sqlIdSet(ids).sql
+      bindings.push(...(ids.length ? sqlIdSet(ids).binds : []))
       const inClause = `f.support_mark_id IN (${placeholders})`
       return { sql: v.exclude === true ? `(f.support_mark_id IS NULL OR NOT ${inClause})` : inClause, bindings }
     }
@@ -555,7 +470,7 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
         bindings.push(max)
       }
       /*
-       * R300: 行動スコア一覧の帯は「点数がついている人」だけを数える
+       * 行動スコア一覧の帯は「点数がついている人」だけを数える
        * （`f.score != 0 OR 履歴あり`）。低い帯の引き継ぎで未採点の0点まで
        * 拾わないよう、引き継ぎ側が `scoredOnly: true` を付けて同じ定義にする。
        * 付けない既存の条件は従来どおり（点数範囲だけ）。
@@ -614,8 +529,7 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
     }
 
     default: {
-      const exhaustive: never = rule.type
-      throw new Error(`Unknown segment rule type: ${exhaustive}`)
+      throw new Error(`Unknown segment rule type: ${rule.type}`)
     }
   }
   throw new Error(`Unhandled segment rule: ${String(rule.type)}`)

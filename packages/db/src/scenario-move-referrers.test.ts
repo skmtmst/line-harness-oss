@@ -8,7 +8,7 @@ import {
   getScenarioById,
   listMoveReferrers,
   updateScenario,
-} from './scenarios.js';
+} from './scenarios/index.js';
 
 const packageRoot = join(import.meta.dirname, '..');
 

@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { appendFormSubmitClaimStep, CLAIM_SCOPE_WHERE, claimBindings, completeFormSubmitClaim, createFormSubmitClaim, failFormSubmitClaim, getFormSubmitClaim, getFormSubmitClaimBySubmissionId, getFormSubmitClaimsBySubmissionIds, readFormSubmitClaimEffectStats, readFormSubmitClaimSteps, saveFormSubmitClaimEffectStats, saveFormSubmitClaimWebhook, takeoverFormSubmitClaim } from './forms/claims.js';

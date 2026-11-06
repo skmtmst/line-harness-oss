@@ -1,0 +1,26 @@
+/*
+ * ★V8-B 案件を作る。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
+ * 枠は共通Card（本文24/16・右16/8）へ渡す。ここは中身だけ。寸法は --tpl-wa-af-*。
+ */
+.back { color: var(--color-action); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-wa-af-back-lh); text-decoration: none; }
+.back:hover { text-decoration: underline; }
+
+.viewerBand { margin: 0; }
+
+.note { margin: 0; color: var(--color-success); font-size: var(--text-caption); line-height: var(--tpl-wa-af-note-lh); }
+
+/* 段のカード。 */
+
+
+/* 入力：題（13/20）＋欄（間6）。 */
+
+/* 成果を認めたときにすること：枠の行（余白 10/12・間12）。つまみ＋名前と中身。 */
+.switchNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-wa-af-note-lh); }
+.retry { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-wa-af-field-gap); }
+
+/* 右の列の箱。 */
+
+.previewName { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-wa-af-preview-lh); }
+.previewDesc { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-wa-af-note-lh); }
+.previewReward { margin: 0; color: var(--color-accent-deep); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-wa-af-preview-lh); }
+.careList { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-wa-af-care-lh); }

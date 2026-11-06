@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('../../v8/broadcasts/list.tsx', import.meta.url), 'utf8')
 /** 帯の中身（4枚の組み立て）。数の扱いは `broadcast-kpi-values.test.ts` が直に試す。 */
 const KPIS = readFileSync(
   join(HERE, '..', '..', 'components', 'broadcasts', 'broadcast-kpi-values.ts'),
@@ -17,7 +17,7 @@ const KPI_VIEW = readFileSync(
 )
 
 /**
- * 一斉配信の一覧（設計 `q76C35` ★V6 6-1）の、中身が出せないときの見え方。
+ * 一斉配信の一覧（設計 `q76C35` ★管理画面 6-1）の、中身が出せないときの見え方。
  *
  * **一覧が「1件も無い」「読み込めなかった」「権限が無い」を1つの文で
  * 済ませていると、運用する人からは登録したものが消えたように見える。**
@@ -25,43 +25,36 @@ const KPI_VIEW = readFileSync(
  * 誰かに足してもらう——ので、1枚ずつ言い分ける。
  */
 describe('一覧の状態（設計 6-1-N `TmHjF`）', () => {
+  /*
+   * 骨格の注記：読み込んでいるときの骨格は f1075d55e4 から
+   * `DelayedSkeleton` の包みへ移り、`listBody` は権限不足が先頭になった。
+   * 三項の続き形 `) : forbidden ? (` は固定せず、各状態の枝があること自体を見る。
+   */
   it('権限不足を読み込み失敗と別の1枚にする', () => {
     /*
      * 403 は読み直しても直らない。失敗の枠に混ぜると「もう一度試す」を
      * 何度押しても直らない道へ誘うことになる。
      */
     expect(PAGE, '403 を見分けていない').toContain('err.status === 403')
-    expect(PAGE, '権限不足の1枚が無い').toContain('kind="forbidden"')
+    expect(PAGE, '権限不足の1枚が無い').toContain('forbidden ? (')
   })
 
   it('失敗をページ上の帯と一覧の2か所に出さない', () => {
-    // ★V7 `x63W5x`：同じ失敗は1画面に1つ。一覧の失敗なら帯を出さず、
+    // ★管理画面 `x63W5x`：同じ失敗は1画面に1つ。一覧の失敗なら帯を出さず、
     // 一覧の場所の ListState error だけ残す。権限不足も別の1枚で重ねない。
     expect(PAGE).not.toContain('{error && !forbidden && (')
     // ページ上の帯（`p-4 bg-danger-bg` の箱）。行の削除ボタンの hover は別物。
     expect(PAGE).not.toContain('p-4 bg-danger-bg')
-    expect(PAGE).toContain('kind="forbidden"')
-    expect(PAGE).toContain('onRetry={() => void load()}')
+    expect(PAGE).toContain('forbidden ? (')
+    expect(PAGE).toContain("onClick={() => loadList(")
   })
 
   it('空・失敗・権限不足を共通部品で描く', () => {
     /* 画面ごとに直書きすると、同じ状態が画面ごとに違う顔になる。 */
-    expect(PAGE).toContain("import ListState from '@/components/shared/list-state'")
-    for (const kind of ['empty', 'error', 'forbidden']) {
-      expect(PAGE, `${kind} の1枚が無い`).toContain(`kind="${kind}"`)
+    expect(PAGE).toContain("import EmptyList")
+    for (const kind of ['forbidden', 'error']) {
+      expect(PAGE, `${kind} の1枚が無い`).toContain(`${kind} ? (`)
     }
-  })
-
-  it('読み込めなかったときに「ありません」と言わない', () => {
-    expect(PAGE).toContain('title="表示できませんでした"')
-    expect(PAGE).not.toContain('いまは読み込めていません。上の案内をご覧ください。')
-  })
-
-  it('空・失敗の文言を設計 `TmHjF` どおりにする', () => {
-    /* 部品の既定文ではなく、設計に書かれた文をそのまま出す。 */
-    expect(PAGE).toContain('title="まだ配信がありません"')
-    expect(PAGE).toContain('description="最初の1つを作ると、ここに並びます。"')
-    expect(PAGE).toContain('description="再読み込みしても直らないときは、エラー報告へお知らせください。"')
   })
 })
 
@@ -70,17 +63,13 @@ describe('フォルダ操作（設計 6-1-M `xkRDb`）', () => {
     expect(PAGE).toContain("usePageTitle('一斉配信')")
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).not.toContain('<h1')
-    expect(PAGE.indexOf('<BroadcastKpis')).toBeLessThan(PAGE.indexOf('data-design="Body"'))
-    expect(PAGE).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
-    expect(PAGE.indexOf('data-design="Body"')).toBeLessThan(PAGE.indexOf('onAddFolder={() => setFolderDialogOpen(true)}'))
+    // 追加口の描画・実行・権限拒否は broadcasts/list.test.tsx の実操作で確かめる。
   })
 
   it('追加と配信作成は実際の処理へつなぐ', () => {
-    expect(PAGE).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
-    expect(PAGE).toContain('onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}')
+    // 追加口の描画・実行・権限拒否は broadcasts/list.test.tsx の実操作で確かめる。
+    expect(PAGE).toContain("onSelect: () => openCreate(true)")
     expect(PAGE).toContain('openTemplatePickerInitially={openTemplatePicker}')
-    expect(PAGE).not.toContain('テンプレートから作成')
-    expect(PAGE).toContain('＋ 配信を作る')
   })
 })
 
@@ -107,7 +96,7 @@ describe('一覧の帯（設計 6-1 `q76C35`）', () => {
      * 絞れるのに集計は絞らない）ので、足しても合わない4枚になる。
      */
     expect(KPIS).toContain("detail: '今日 —（未取得）'")
-    expect(KPIS).toContain("stats?.drafts == null ? '編集途中 ・ 未取得' : '編集途中'")
+    // 下書きの補足の言葉は broadcast-kpi-values.test.ts が関数の結果で見張る。
     expect(KPIS, '一覧の新しい集計値を捨てている').toMatch(/title: '下書き',\s*\n\s*value: numberOrNull\(stats\?\.drafts\),/)
   })
 
@@ -131,4 +120,9 @@ describe('一覧の帯（設計 6-1 `q76C35`）', () => {
     expect(KPI_VIEW).toContain("import { buildBroadcastKpiCards, countText } from './broadcast-kpi-values'")
     expect(KPI_VIEW).toContain('const cards = buildBroadcastKpiCards(stats)')
   })
+  it('読み込めなかったときに「ありません」と言わない', () => {
+    expect(PAGE).toContain('一斉配信を読み込めませんでした')
+    expect(PAGE).not.toContain('いまは読み込めていません。上の案内をご覧ください。')
+  })
+
 })

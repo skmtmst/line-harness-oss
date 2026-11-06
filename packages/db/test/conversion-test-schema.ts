@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 
-// #652 新規試験用の軽量構成。全migration適用(1件あたりCIで1秒級)の代わりに、
+// 新規試験用の軽量構成。全migration適用(1件あたりCIで1秒級)の代わりに、
 // 対象の口が触る表だけを本番と同じ列で用意する。外部キー制約は付けない
 // (参照整合の試験は全構成の既存試験とFK付き移行試験が担う)。
 // 本番の列が増えたらここにも足す。足りない列があると試験が落ちて知らせる。
@@ -40,6 +40,8 @@ export function applyConversionTestSchema(db: Database.Database): void {
       reversal_policy TEXT NOT NULL DEFAULT 'manual',
       -- N-270: 外部受信の鍵(暗号化)と受け口の停止時刻。
       ingest_secret_encrypted TEXT, ingest_disabled_at TEXT,
+      -- F-13(582): 成果のフォルダ。
+      folder_id TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     -- N-270: 外部受信の成否台帳。is_test は #1037(IDEA-19)の検証受信の目印。

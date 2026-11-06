@@ -1,3 +1,7 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -33,7 +37,9 @@ import {
   type SupportStage,
   type SupportTicketRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/platform-admin.js';
 import { clientIp } from '../services/admin-session.js';
 import { dbFor } from '../services/db-router.js';
@@ -43,7 +49,7 @@ import { serializeKnowledge } from './ops-knowledge.js';
 import { knowledgeNames, redactKnowledgeText, KnowledgeAiTimeout } from '../services/platform-knowledge.js';
 
 /**
- * 運営コンソールのお問い合わせ（チケット）★V6 37-6 / 37-6-A / 37-6-B。
+ * 運営コンソールのお問い合わせ（チケット）★37-6 / 37-6-A / 37-6-B。
  *
  * 表は統括側 36-3 と同じ hq_support_requests。運営マスターだけが呼べる。
  * 返信は統括の登録メールへ送り、統括の画面（36-3 の履歴）にも載る。
@@ -75,7 +81,7 @@ function safeKeys(raw: string): string[] {
 }
 
 function jstMonthStarts(): { monthStart: string; prevMonthStart: string } {
-  const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const now = japanCalendar();
   const y = now.getUTCFullYear();
   const m = now.getUTCMonth();
   const fmt = (yy: number, mm: number) => `${yy}-${String(mm + 1).padStart(2, '0')}-01T00:00:00.000+09:00`;
@@ -164,15 +170,15 @@ opsSupport.get('/api/ops/support/tickets', async (c) => {
   const priority = priorityRaw && (SUPPORT_PRIORITIES as readonly string[]).includes(priorityRaw) ? (priorityRaw as SupportPriority) : undefined;
   const sortRaw = c.req.query('sort');
   const sort = sortRaw === 'oldest' || sortRaw === 'priority' ? sortRaw : 'newest';
-  const limit = Number(c.req.query('limit') ?? 50);
-  const offset = Number(c.req.query('offset') ?? 0);
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 50, limitPolicy: { fallback: 'finite', minimum: 1, maximum: 200 }, offsetPolicy: { fallback: 'finite', minimum: 0 } });
   const { rows, total } = await listSupportTickets(db, {
     stage, priority, q: c.req.query('q') ?? '', sort,
-    limit: Number.isFinite(limit) ? limit : 50, offset: Number.isFinite(offset) ? offset : 0,
+    limit, offset,
   });
   const replies = await countRepliesForRequests(db, rows.map((r) => r.id));
   const base = workerUrl(c);
-  return c.json({ success: true, data: rows.map((r) => serializeTicket(r, base, replies.get(r.id) ?? 0)), total });
+  const responseItems = rows.map((r) => serializeTicket(r, base, replies.get(r.id) ?? 0));
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems, total, items: responseItems, paging: { limit, offset }, sort: [] }));
 });
 
 // ---------------------------------------------------------------------------
@@ -192,7 +198,7 @@ opsSupport.get('/api/ops/support/tickets/:id', async (c) => {
   const base = workerUrl(c);
   // 閲覧の記録（統括には見せない）。失敗しても画面は出す。
   await audit(c, { action: 'ticket.view', ticket, visibleToTenant: false }).catch((error) => {
-    console.error('[ops-support] audit failed', { branch: 'ticket.view', message: error instanceof Error ? error.message : String(error) });
+    logger.error("ops_support.ops_support_tickets_by_id_get_failed");
   });
   return c.json({
     success: true,
@@ -208,24 +214,24 @@ opsSupport.get('/api/ops/support/tickets/:id', async (c) => {
   });
 });
 
-opsSupport.patch('/api/ops/support/tickets/:id', requirePlatformAdminWrite(), async (c) => {
+opsSupport.patch('/api/ops/support/tickets/:id', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const body = await c.req.json<{ stage?: unknown; priority?: unknown }>().catch(() => null);
-  if (!body) return c.json({ success: false, error: '内容を読み取れませんでした' }, 400);
+  if (!body) return inputError(c, { success: false, error: '内容を読み取れませんでした' }, 400, []);
   const patch: { stage?: SupportStage; priority?: SupportPriority } = {};
   if (body.stage !== undefined) {
     if (typeof body.stage !== 'string' || !(SUPPORT_STAGES as readonly string[]).includes(body.stage)) {
-      return c.json({ success: false, error: '状態の値が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '状態の値が正しくありません' }, 400, ["stage"]);
     }
     patch.stage = body.stage as SupportStage;
   }
   if (body.priority !== undefined) {
     if (typeof body.priority !== 'string' || !(SUPPORT_PRIORITIES as readonly string[]).includes(body.priority)) {
-      return c.json({ success: false, error: '優先度の値が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '優先度の値が正しくありません' }, 400, ["priority"]);
     }
     patch.priority = body.priority as SupportPriority;
   }
-  if (!patch.stage && !patch.priority) return c.json({ success: false, error: '変更する項目がありません' }, 400);
+  if (!patch.stage && !patch.priority) return inputError(c, { success: false, error: '変更する項目がありません' }, 400, ["stage","priority"]);
   const before = await getSupportTicket(db, c.req.param('id'));
   if (!before) return c.json({ success: false, error: 'チケットが見つかりません' }, 404);
   const after = await updateSupportTicket(db, before.id, patch);
@@ -260,18 +266,18 @@ function replyMailBody(input: { staffName: string; ticketLabel: string; subject:
   ].join('\n');
 }
 
-opsSupport.post('/api/ops/support/tickets/:id/reply', requirePlatformAdminWrite(), async (c) => {
+opsSupport.post('/api/ops/support/tickets/:id/reply', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const staff = c.get('staff');
   const body = await c.req.json<{ body?: unknown; nextStage?: unknown; aiAssisted?: unknown }>().catch(() => null);
-  if (!body) return c.json({ success: false, error: '内容を読み取れませんでした' }, 400);
+  if (!body) return inputError(c, { success: false, error: '内容を読み取れませんでした' }, 400, []);
   const text = typeof body.body === 'string' ? body.body.trim() : '';
-  if (!text) return c.json({ success: false, error: '返信を入力してください' }, 400);
-  if (text.length > REPLY_MAX) return c.json({ success: false, error: `返信は${REPLY_MAX}文字以内で入力してください` }, 400);
+  if (!text) return inputError(c, { success: false, error: '返信を入力してください' }, 400, ["body"]);
+  if (text.length > REPLY_MAX) return inputError(c, { success: false, error: `返信は${REPLY_MAX}文字以内で入力してください` }, 400, ["body"]);
   let nextStage: SupportStage | undefined;
   if (body.nextStage !== undefined) {
     if (typeof body.nextStage !== 'string' || !(SUPPORT_STAGES as readonly string[]).includes(body.nextStage)) {
-      return c.json({ success: false, error: '状態の値が正しくありません' }, 400);
+      return inputError(c, { success: false, error: '状態の値が正しくありません' }, 400, ["nextStage"]);
     }
     nextStage = body.nextStage as SupportStage;
   }
@@ -292,7 +298,7 @@ opsSupport.post('/api/ops/support/tickets/:id/reply', requirePlatformAdminWrite(
       deliveredVia.push('email');
     } catch (error) {
       // メールが落ちても返信は記録する。画面には「メールは送れなかった」と返す。
-      console.error('[ops-support] reply mail failed', { message: error instanceof Error ? error.message : String(error) });
+      logger.error("ops_support.ops_support_tickets_by_id_reply_create_failed");
     }
   }
   const message = await addSupportReply(db, {
@@ -319,12 +325,12 @@ opsSupport.post('/api/ops/support/tickets/:id/reply', requirePlatformAdminWrite(
   }, 201);
 });
 
-opsSupport.put('/api/ops/support/tickets/:id/draft', requirePlatformAdminWrite(), async (c) => {
+opsSupport.put('/api/ops/support/tickets/:id/draft', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const staff = c.get('staff');
   const body = await c.req.json<{ body?: unknown }>().catch(() => null);
   const text = typeof body?.body === 'string' ? body.body : '';
-  if (text.length > REPLY_MAX) return c.json({ success: false, error: `下書きは${REPLY_MAX}文字以内です` }, 400);
+  if (text.length > REPLY_MAX) return inputError(c, { success: false, error: `下書きは${REPLY_MAX}文字以内です` }, 400, ["body"]);
   const ticket = await getSupportTicket(db, c.req.param('id'));
   if (!ticket) return c.json({ success: false, error: 'チケットが見つかりません' }, 404);
   if (!text.trim()) {
@@ -351,7 +357,7 @@ function aiText(result: unknown): string {
   return typeof content === 'string' ? content.trim() : '';
 }
 
-/** AI に渡す材料（★V6 37-6-A）。個人のメールアドレスや LINE ID は渡さない。 */
+/** AI に渡す材料（★37-6-A）。個人のメールアドレスや LINE ID は渡さない。 */
 export function buildDraftPrompt(input: {
   ticket: { ticketLabel: string; subject: string; body: string; kindLabel: string; staffName: string; staffRole: string | null; tenantName: string; planLabel: string };
   messages: Array<{ authorKind: 'tenant' | 'ops'; authorName: string; body: string }>;
@@ -407,7 +413,7 @@ async function currentReferences(db: D1Database, json: string): Promise<Knowledg
   return result.filter((ref): ref is NonNullable<typeof ref> => ref !== null);
 }
 
-opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWrite(), async (c) => {
+opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const staff = c.get('staff');
   if (!c.env.AI) return c.json({ success: false, error: 'AI の下書きは、この環境では使えません（AI の設定が未設定）' }, 503);
@@ -416,12 +422,11 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
   const messages = await listSupportMessages(db, ticket.id);
   const body = await c.req.json<{ excludeArticleIds?: unknown }>().catch(() => ({} as { excludeArticleIds?: unknown }));
   if (!body || typeof body !== 'object' || Array.isArray(body) || (body.excludeArticleIds !== undefined && (!Array.isArray(body.excludeArticleIds) || body.excludeArticleIds.length > 50 || body.excludeArticleIds.some(id => typeof id !== 'string' || id.length > 100)))) {
-    return c.json({ success: false, error: '除外する記事を確認してください' }, 400);
+    return inputError(c, { success: false, error: '除外する記事を確認してください' }, 400, ["excludeArticleIds"]);
   }
   const names = [...knowledgeNames(ticket, messages), staff.name];
   const clean = (text: string) => redactKnowledgeText(text, names);
-  // Most recent customer details enter the bounded search vocabulary first.
-  // The generation prompt below still includes the complete conversation.
+  // 最新の顧客情報を制限付き検索語へ先に含める。生成への入力には会話全体を保つ。
   const searchText = [...messages].reverse().filter(m => m.author_kind === 'tenant').map(m => m.body)
     .concat(ticket.subject, ticket.body, [...messages].reverse().filter(m => m.author_kind === 'ops').map(m => m.body)).join('\n');
   const articles = await searchKnowledge(db, ticket.kind, clean(searchText), (body.excludeArticleIds ?? []) as string[]);
@@ -446,7 +451,7 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
     id: article.id, kind: knowledgeKindLabel(article.article_kind), title: clean(article.title),
     question: clean(article.question), answer: clean(article.answer),
   })));
-  if (prompt.user.length > 30_000) return c.json({ success: false, error: 'やり取りが長いため、内容を確認して手で返信してください' }, 422);
+  if (prompt.user.length > 30_000) return inputError(c, { success: false, error: 'やり取りが長いため、内容を確認して手で返信してください' }, 422, []);
   const model = c.env.OPS_SUPPORT_AI_MODEL || DEFAULT_AI_MODEL;
   const callId = crypto.randomUUID();
   const started = Date.now();
@@ -473,7 +478,7 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
       if (timer) clearTimeout(timer);
     }
   } catch (error) {
-    console.error('[ops-support] AI draft failed', { model, code: error instanceof KnowledgeAiTimeout ? 'timeout' : 'provider_failure' });
+    logger.error("ops_support.ops_support_tickets_by_id_draft_ai_create_failed");
     if (error instanceof KnowledgeAiTimeout) {
       return c.json({ success: false, error: 'AI の応答が 45 秒以内に返りませんでした。手で書くか、少し待ってからもう一度お試しください' }, 504);
     }
@@ -494,22 +499,22 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
 // 運営が起票する（＋ チケットを作る）
 // ---------------------------------------------------------------------------
 
-opsSupport.post('/api/ops/support/tickets', requirePlatformAdminWrite(), async (c) => {
+opsSupport.post('/api/ops/support/tickets', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
   const db = dbFor(c.env);
   const staff = c.get('staff');
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body) return c.json({ success: false, error: '内容を読み取れませんでした' }, 400);
+  if (!body) return inputError(c, { success: false, error: '内容を読み取れませんでした' }, 400, []);
   const tenantId = typeof body.tenantId === 'string' ? body.tenantId : '';
   const tenant = tenantId
     ? await db.prepare('SELECT id, name FROM tenants WHERE id = ?').bind(tenantId).first<{ id: string; name: string }>()
     : null;
-  if (!tenant) return c.json({ success: false, error: '契約先を選んでください' }, 400);
+  if (!tenant) return inputError(c, { success: false, error: '契約先を選んでください' }, 400, ["tenantId"]);
   const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
-  if (!subject) return c.json({ success: false, error: '件名を入力してください' }, 400);
-  if (subject.length > SUBJECT_MAX) return c.json({ success: false, error: `件名は${SUBJECT_MAX}文字以内で入力してください` }, 400);
+  if (!subject) return inputError(c, { success: false, error: '件名を入力してください' }, 400, ["subject"]);
+  if (subject.length > SUBJECT_MAX) return inputError(c, { success: false, error: `件名は${SUBJECT_MAX}文字以内で入力してください` }, 400, ["subject"]);
   const text = typeof body.body === 'string' ? body.body.trim() : '';
-  if (!text) return c.json({ success: false, error: '本文を入力してください' }, 400);
-  if (text.length > BODY_MAX) return c.json({ success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400);
+  if (!text) return inputError(c, { success: false, error: '本文を入力してください' }, 400, ["body"]);
+  if (text.length > BODY_MAX) return inputError(c, { success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400, ["body"]);
   const kind = typeof body.kind === 'string' && (HQ_SUPPORT_KINDS as readonly string[]).includes(body.kind) ? (body.kind as HqSupportKind) : 'other';
   const priority = typeof body.priority === 'string' && (SUPPORT_PRIORITIES as readonly string[]).includes(body.priority) ? (body.priority as SupportPriority) : 'medium';
   const channel = body.channel === 'line' ? 'line' : 'ops';

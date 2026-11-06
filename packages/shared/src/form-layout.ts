@@ -1,254 +1,59 @@
-/**
- * 回答フォームの中身（レイアウト）。
- *
- * これまでフォームは `forms.fields` の平らな配列だけで持っていた。項目を
- * 縦に並べるところまでは足りるが、次の3つが表現できない。
- *
- *   1. ページ分け（セクション）と、選択肢による分岐
- *   2. 選択肢ごとに「押されたら何が起きるか」（タグ・友だち情報・アクション）
- *   3. 入力欄ではない飾り（画像・見出し・説明文・ボタン）
- *
- * そこで `forms.layout` に、この形の JSON を1本入れる。`fields` は
- * **捨てない**。保存のたびに layout の入力ブロックから作り直して書き戻す。
- * 送信時の必須チェック・回答一覧の見出し・友だち詳細の表示が、これまで
- * どおり `fields` を読んで動き続けるようにするため。
- *
- * 型と一緒に、layout を読む/作る/検証する関数もここに置く。管理画面
- * （apps/web）・回答画面（apps/liff）・保存側（apps/worker）の3か所が
- * 同じ判定を使わないと、「画面では通ったのに保存で弾かれる」が起きる。
- */
+import { jstCalendar as japanCalendar } from './jst-datetime.js';
+import { parseFormReferences } from './form-public-references.js';
+import type {
+  FormInputType, FormInputFormat, FormInputBlock, FormBlock, FormOptions,
+  FormTheme, FormLayout, FormFieldCompat, FormAddressValue, FormDecorationBlock,
+} from './types/form-layout.js';
+export type {
+  FormInputType, FormInputFormat, FormDestinations, FormInputLimit, FormInputBlock,
+  FormFileAnswer, FormDecorationBlock, FormBlock, FormSection, FormOptions,
+  CustomerDesignPreset, FormFontFamily, FormCornerRadius, FormTheme, FormLayout,
+  FormFieldCompat, FormAddressValue,
+} from './types/form-layout.js';
+import { CUSTOMER_DESIGN_IDS } from './form-design-presets.js';
+export { CUSTOMER_DESIGN_IDS } from './form-design-presets.js';
+import type { FormChoice, FormAction } from './form-choice-types.js';
+export type { FormChoice, FormAction } from './form-choice-types.js';
+import type { FormBookingValue } from './form-booking-types.js';
+export type { FormBookingConfig, FormBookingValue } from './form-booking-types.js';
+import { isCalendarDateString } from './form-calendar-date.js'
+export { isCalendarDateString } from './form-calendar-date.js'
+import { FIXED_FRIEND_FIELDS, ageFromBirthday, validateAllergyValues, type FixedFriendFieldKey } from "./fixed-friend-fields.js";
 
-// ---------------------------------------------------------------------------
-// ブロック
-// ---------------------------------------------------------------------------
+/** 保存するブロックの許可一覧。画面・Workerで同じ一覧を使う。 */
+export const FORM_INPUT_TYPES: readonly FormInputType[] = [
+  "text", "textarea", "radio", "checkbox", "select", "file", "date", "prefecture", "rating", "address", "booking",
+];
+const FORM_BLOCK_KINDS = ["input", "image", "heading", "text", "button"];
 
-/** 入力欄の種類。値は回答データの形とひも付くので、後から変えない。 */
-export type FormInputType =
-  | "text" // 単一行
-  | "textarea" // 複数行
-  | "radio" // ラジオボタン
-  | "checkbox" // チェックボックス
-  | "select" // プルダウン
-  | "file" // ファイル添付
-  | "date" // 日付
-  | "prefecture"; // 都道府県
-
-/** 単一行の入力制限。空欄や「指定なし」は検証しない。 */
-export type FormInputFormat =
-  | "none"
-  | "kana"
-  | "email"
-  | "tel"
-  | "integer"
-  | "time"
-  | "zip";
-
-/**
- * 回答の登録先。
- *
- * 友だち情報欄は複数選べる（同じ回答を「本名」と「お名前（漢字）」の
- * 両方に入れたい、という運用があるため）。`realName` などは友だちレコード
- * 本体の列に入れる指定。
- */
-export interface FormDestinations {
-  /** 友だち情報欄の項目ID。複数可 */
-  friendFieldIds?: string[];
-  /** friends.real_name に入れる */
-  realName?: boolean;
-  /** friends.display_name（システム表示名）に入れる */
-  displayName?: boolean;
-  /** friends.note（個別メモ）に追記する */
-  note?: boolean;
+/** 旧い fields だけを受け取る口でも未知の種類を通さない。 */
+export function legacyFormFieldTypeError(fields: unknown): string | null {
+  if (!Array.isArray(fields)) return "入力欄の形を確認してください";
+  const allowed = [...FORM_INPUT_TYPES, "email", "tel", "number", "heading"];
+  return fields.some(field => !field || typeof field !== "object" ||
+    !allowed.includes(String((field as Record<string, unknown>).type ?? "text")))
+    ? "この入力欄の種類は保存できません" : null;
 }
 
-/** 入力制限。 */
-export interface FormInputLimit {
-  format?: FormInputFormat;
-  /** 最小文字数。未設定は下限なし */
-  min?: number;
-  /** 最大文字数。未設定は上限なし */
-  max?: number;
-  /** 入力欄の下に出る文字数カウンタを消す */
-  hideCounter?: boolean;
+/** A block accepting identity documents protects every attachment at the strictest level. */
+export function formFileKinds(block: FormInputBlock): ("image" | "pdf" | "identity")[] {
+  return block.fileKinds ?? [block.fileKind ?? "image"];
+}
+export function formFileKind(block: FormInputBlock): "image" | "pdf" | "identity" {
+  const kinds = formFileKinds(block);
+  return kinds.includes("identity") ? "identity" : kinds.includes("image") ? "image" : "pdf";
 }
 
-/**
- * 選択肢1つ。
- *
- * 「選んだら何が起きるか」は選択肢ごとに違う。ブロック側の `choiceMode`
- * がどの列を使うかを決める。
- */
-export interface FormChoice {
-  id: string;
-  label: string;
-  /** choiceMode = 'tag' のとき付けるタグ */
-  tagId?: string | null;
-  /** choiceMode = 'friendField' のとき情報欄へ入れる値。空ならラベルを入れる */
-  value?: string;
-  /** choiceMode = 'action' のとき実行する動作 */
-  actions?: FormAction[];
-  /** 最初から選んだ状態で出す */
-  defaultSelected?: boolean;
-  /** 定員。埋まった選択肢は選べなくする */
-  capacity?: { enabled: boolean; limit?: number } | null;
-  /** 選んだ人だけ飛ばすセクション。未設定なら次のセクションへ進む */
-  jumpToSectionId?: string | null;
-  /** 「その他」（自由入力を伴う選択肢） */
-  isOther?: boolean;
-}
+export const FORM_DOCUMENT_SCAN_NOTE = '危ないファイルの検査は内蔵の検査が標準です。外部の検査は設定した店だけで行います。';
 
-/**
- * 選択肢や回答後に実行する動作。
- *
- * こちら側に受け皿がある動作だけを型に入れている。Lステップにある
- * 「対応マーク操作」「イベント予約操作」「共通情報操作」は、繋ぐ先の
- * 仕様を決めてから足す。型に無い動作は保存時に落とす。
- */
-export type FormAction =
-  | { kind: "send_text"; text: string }
-  | { kind: "send_template"; templateId: string }
-  | { kind: "tag"; op: "add" | "remove"; tagIds: string[] }
-  | { kind: "friend_field"; fieldId: string; value: string }
-  | { kind: "scenario"; op: "start" | "stop"; scenarioId: string }
-  | { kind: "reminder"; reminderId: string };
-
-/** 入力欄のブロック。 */
-export interface FormInputBlock {
-  id: string;
-  kind: "input";
-  type: FormInputType;
-  /**
-   * 回答データの見出し。**作ったあとは変えない。**
-   * ここを変えると、それまでの回答と結びつかなくなる。
-   */
-  name: string;
-  label: string;
-  required?: boolean;
-  /** 画面に出さない。既定値や自動入力だけ入れたいときに使う */
-  hidden?: boolean;
-  description?: string;
-  placeholder?: string;
-  defaultValue?: string;
-  destinations?: FormDestinations;
-  limit?: FormInputLimit;
-  /** 選択肢系（radio / checkbox / select）で、選んだときに何をするか */
-  choiceMode?: "tag" | "friendField" | "action";
-  /** choiceMode = 'friendField' のときの登録先。選択肢の値をここへ入れる */
-  choiceFriendFieldId?: string | null;
-  choices?: FormChoice[];
-  /** 選択肢を横に並べる（radio / checkbox） */
-  inline?: boolean;
-  /** チェックボックスの選択数制限 */
-  selectionLimit?: { min?: number; max?: number };
-  /** 日付の出し方 */
-  dateStyle?: "calendar" | "ymd";
-  /** 入力された日付を起点にリマインダを動かす */
-  reminder?: { reminderId: string; time: string } | null;
-  /** ファイルの種類。いまは画像だけ */
-  fileKind?: "image";
-}
-
-/** 飾りのブロック（入力欄ではないもの）。 */
-export type FormDecorationBlock =
-  | {
-      id: string;
-      kind: "image";
-      mediaUrl: string;
-      size?: "normal" | "full";
-      linkUrl?: string;
-    }
-  | { id: string; kind: "heading"; text: string; level?: 1 | 2 | 3 }
-  | { id: string; kind: "text"; text: string }
-  | {
-      id: string;
-      kind: "button";
-      label: string;
-      url: string;
-      style?: "default" | "outline";
-    };
-
-export type FormBlock = FormInputBlock | FormDecorationBlock;
-
-/** セクション＝1ページ。 */
-export interface FormSection {
-  id: string;
-  name: string;
-  blocks: FormBlock[];
-}
-
-// ---------------------------------------------------------------------------
-// フォーム全体の設定
-// ---------------------------------------------------------------------------
-
-export interface FormOptions {
-  /** 送信後に飛ばす先。空なら thanksText を出す */
-  thanksUrl?: string | null;
-  thanksText?: string | null;
-  /** 2回目以降、前回の回答を初期値として出す */
-  restorePrevious?: boolean;
-  /** ブラウザのタブに出る名前 */
-  pageTitle?: string | null;
-  submitLabel?: string;
-  prevLabel?: string;
-  nextLabel?: string;
-  /** 複数セクションのときの見出しの出し方 */
-  sectionHeader?: "pageNumber" | "name" | "none";
-  confirmDialog?: {
-    enabled: boolean;
-    text?: string;
-    okLabel?: string;
-    cancelLabel?: string;
-  };
-  /** 回答期限。過ぎたら受け付けない */
-  deadline?: { enabled: boolean; endsAt?: string | null; message?: string };
-  /** 1人1回だけ */
-  oncePerFriend?: { enabled: boolean; message?: string };
-  /** 全体の受付上限 */
-  totalLimit?: { enabled: boolean; max?: number; message?: string };
-  /** 送信できたあとに動かす動作 */
-  afterActions?: FormAction[];
-  /** 回答者に見せるフォームの色・書体・角丸。任意のCSSは保存しない。 */
-  theme?: FormTheme;
-}
-
-export type FormFontFamily = "sans" | "serif";
-export type FormCornerRadius = "none" | "medium" | "round";
-
-/**
- * フォームの見た目は5つの色の役割だけで持つ。
- *
- * CSS文字列を受け取らないことで、管理画面から任意のコードを公開画面へ
- * 混ぜられないようにする。
- */
-export interface FormTheme {
-  main: string;
-  sub: string;
-  accent: string;
-  error: string;
-  text: string;
-  fontFamily: FormFontFamily;
-  cornerRadius: FormCornerRadius;
-  backgroundImageUrl: string | null;
-}
-
-export interface FormLayout {
-  version: 2;
-  /** 全セクションの先頭に出る共通部分 */
-  header: FormBlock[];
-  sections: FormSection[];
-  options: FormOptions;
-}
-
-/** 互換のために `forms.fields` へ書き戻す平らな項目定義。 */
-export interface FormFieldCompat {
-  name: string;
-  label: string;
-  type: string;
-  required?: boolean;
-  options?: string[];
-  placeholder?: string;
-  description?: string;
-  friendFieldId?: string | null;
+/** 既存のメール・電話・住所・本名のブロックも同じ基本欄へ保存する。 */
+export function fixedFieldForBlock(block: FormInputBlock): FixedFriendFieldKey | undefined {
+  if (block.fixedField) return block.fixedField;
+  if (block.destinations?.realName) return "name";
+  if (block.type === "address") return "address";
+  if (block.type === "text" && block.limit?.format === "email") return "email";
+  if (block.type === "text" && block.limit?.format === "tel") return "tel";
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -320,20 +125,14 @@ export function isFormAnswerEmpty(value: unknown): boolean {
       (item) => item === undefined || item === null || String(item).trim() === "",
     );
   }
+  if (typeof value === "object") {
+    const entries = Object.values(value as Record<string, unknown>);
+    if (entries.length === 0) return true;
+    return entries.every(
+      (item) => item === undefined || item === null || String(item).trim() === "",
+    );
+  }
   return false;
-}
-
-/** YYYY-MM-DD の形で、暦に存在する日付か（2/30 や 13/40 を通さない）。 */
-export function isCalendarDateString(value: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return (
-    !Number.isNaN(date.getTime()) &&
-    date.getUTCFullYear() === Number(match[1]) &&
-    date.getUTCMonth() + 1 === Number(match[2]) &&
-    date.getUTCDate() === Number(match[3])
-  );
 }
 
 /** 「その他」の選択肢がある設問で、回答値が自由記入の値（どの選択肢ラベルでもない文字列）か。 */
@@ -430,6 +229,9 @@ function compatType(block: FormInputBlock): string {
   }
   if (block.type === "prefecture") return "select";
   if (block.type === "file") return "file";
+  if (block.type === "rating") return "rating";
+  if (block.type === "address") return "address";
+  if (block.type === "booking") return "booking";
   return block.type;
 }
 
@@ -504,6 +306,12 @@ function liftType(type: string): FormInputType {
       return "file";
     case "prefecture":
       return "prefecture";
+    case "rating":
+      return "rating";
+    case "address":
+      return "address";
+    case "booking":
+      return "booking";
     default:
       // text / email / tel / number は単一行＋入力制限へ寄せる
       return "text";
@@ -570,6 +378,9 @@ function safeJsonArray(raw: string): unknown[] {
 export function normalizeLayout(input: unknown): FormLayout | null {
   if (!input || typeof input !== "object") return null;
   const raw = input as Record<string, unknown>;
+  const references = parseFormReferences(raw.references);
+  if (!references) return null;
+  if (formBlockTypeError(input)) return null;
 
   const sections = Array.isArray(raw.sections)
     ? raw.sections
@@ -587,6 +398,7 @@ export function normalizeLayout(input: unknown): FormLayout | null {
 
   return {
     version: 2,
+    ...(raw.references === undefined ? {} : { references }),
     header: normalizeBlocks(raw.header),
     sections: sections.length
       ? sections
@@ -635,13 +447,13 @@ export const FORM_THEME_MIN_CONTRAST = 4.5;
  *
  * P（回答フォームの読みにくい色）：お客さま画面は文字（text）を背景（sub）
  * の上に置く（`apps/liff/src/pages/Form.tsx`・`form-preview.tsx`）。この2色の
- * 差が 4.5:1 未満なら保存できない。測った比を文に入れて返す。問題なければ null。
+ * 差が 4.5:1 未満なら注意を返す。保存・公開は妨げない。問題なければ null。
  */
 export function formThemeContrastError(theme: FormTheme): string | null {
   const ratio = contrastRatio(theme.text, theme.sub);
   if (ratio >= FORM_THEME_MIN_CONTRAST) return null;
   const shown = Math.floor(ratio * 10) / 10;
-  return `文字と背景の色の組み合わせが読みにくいため保存できません（いま ${shown}:1、4.5:1以上が必要です）。文字か背景の色を変えてください`;
+  return `文字と背景の色が近く、読みづらい可能性があります（いま ${shown}:1、4.5:1以上を推奨します）。文字か背景の色を変えると読みやすくなります`;
 }
 
 /** 主ボタンの背景に対して、4.5:1以上を優先して読みやすい文字色を返す。 */
@@ -727,7 +539,7 @@ const FORMAT_RULES: Record<
     message: "全角カタカナで入力してください",
   },
   email: {
-    test: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+    test: (v) => v.length <= 254 && /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(v),
     message: "メールアドレスの形になっていません",
   },
   // ハイフンあり・なしの両方を通す
@@ -750,6 +562,145 @@ const FORMAT_RULES: Record<
 };
 
 /**
+ * 郵便番号の数字だけ（ハイフンなし・7桁）。先頭0を保つ。
+ *
+ * 許すのは「7桁」「3桁-4桁」と前後の空白・全角数字だけ。
+ * `abc1000001` のような無関係文字の除去で有効化しない。
+ */
+export function normalizePostalCodeDigits(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.replace(/^[\s\u3000]+|[\s\u3000]+$/g, "");
+  const half = trimmed.replace(/[０-９]/g, (ch) => String("０１２３４５６７８９".indexOf(ch)));
+  if (!/^[0-9]{3}-?[0-9]{4}$/.test(half)) return null;
+  return half.replace("-", "");
+}
+
+/** 7桁を 123-4567 の表示形にする。7桁でなければそのまま返す。 */
+export function formatPostalCode(value: string): string {
+  const digits = value.replace(/[^0-9]/g, "");
+  return /^\d{7}$/.test(digits) ? `${digits.slice(0, 3)}-${digits.slice(3)}` : value;
+}
+
+/**
+ * 住所オブジェクトを人向けの1行にする。
+ *
+ * 汎用の `String(value)` でそのまま出すと `[object Object]` になる。
+ * 転記・通知・一覧の表示はこの関数を通す。
+ */
+export function formatAddressValue(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value !== "object" || Array.isArray(value)) return String(value);
+  const v = value as Partial<FormAddressValue>;
+  const postal = typeof v.postalCode === "string" && v.postalCode.trim() !== ""
+    ? `〒${formatPostalCode(v.postalCode.trim())} `
+    : "";
+  const body = [v.prefecture, v.city, v.addressLine1, v.addressLine2]
+    .filter((part) => typeof part === "string" && part.trim() !== "")
+    .map((part) => String(part).trim())
+    .join("");
+  return `${postal}${body}`.trim();
+}
+
+/** 回答値を人向けの文字にする（rating・address対応）。 */
+export function formatAnswerValue(block: FormInputBlock, value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (block.type === "rating") {
+    const n = normalizeRatingValue(value);
+    return n === null ? "" : String(n);
+  }
+  if (block.type === "address") return formatAddressValue(value);
+  if (block.type === "booking") {
+    const booking = normalizeBookingValue(value);
+    return booking === null ? "" : formatBookingStartsAt(booking.startsAt);
+  }
+  if (Array.isArray(value)) return value.map(String).join(", ");
+  return String(value);
+}
+
+/** 住所オブジェクトが空（未回答）か。全部空なら未回答。 */
+export function isAddressValueEmpty(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === "string") return value.trim() === "";
+  if (typeof value !== "object" || Array.isArray(value)) return false;
+  const v = value as Partial<FormAddressValue>;
+  const parts = [v.postalCode, v.prefecture, v.city, v.addressLine1, v.addressLine2];
+  // 指定済みの非文字列（数・配列・物）は空にしない。後の型検査へ回す。
+  return parts.every((part) => part === undefined || part === null || part === "" ||
+    (typeof part === "string" && part.trim() === ""));
+}
+
+/**
+ * ASCII空白（0x20）だけを落とす。SQLiteのTRIMと範囲を合わせる。
+ *
+ * JSのtrimは全角空白・タブ・改行も落とすが、平均集計のSQLite TRIMは
+ * ASCII空白だけを落とす。受入と平均を一致させるため、ratingの前後空白は
+ * ASCII空白だけを許す（「　3　」・タブ付きは受け入れない）。
+ */
+export function trimAsciiSpaces(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value.charCodeAt(start) === 32) start++;
+  while (end > start && value.charCodeAt(end - 1) === 32) end--;
+  return value.slice(start, end);
+}
+
+/** ASCII空白だけからなる文字列か（ratingの未入力判定用）。 */
+export function isAsciiBlank(value: string): boolean {
+  return /^ *$/.test(value);
+}
+
+/**
+ * 「予約を入れる」の回答の形か。menuId・staffId・startsAt（ISO日時）の
+ * 3つが文字列で揃っていれば通す。枠が今も空いているかの再確認は
+ * 予約の受け口（確保の直前）が担い、ここでは形だけを見る。
+ */
+export function normalizeBookingValue(value: unknown): FormBookingValue | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const v = value as Record<string, unknown>;
+  if (v.kind === 'seats') {
+    if (typeof v.storeId !== 'string' || !v.storeId || !Number.isSafeInteger(v.guestCount) || Number(v.guestCount)<1 || Number(v.guestCount)>100 || typeof v.startsAt !== 'string' || !Number.isFinite(Date.parse(v.startsAt)) || (v.courseId!=null && typeof v.courseId!=='string')) return null;
+    return {kind:'seats',storeId:v.storeId,courseId:v.courseId as string|null|undefined,guestCount:Number(v.guestCount),startsAt:v.startsAt,menuId:'',staffId:''};
+  }
+  if (v.kind !== undefined && v.kind !== 'people') return null;
+  if (typeof v.menuId !== "string" || v.menuId.trim() === "") return null;
+  if (typeof v.staffId !== "string" || v.staffId.trim() === "") return null;
+  if (typeof v.startsAt !== "string" || Number.isNaN(Date.parse(v.startsAt))) return null;
+  return { menuId: v.menuId, staffId: v.staffId, startsAt: v.startsAt };
+}
+
+/** ISO日時を「M/D H:mm」（日本時間）にする。壊れた日時はそのまま返す。 */
+export function formatBookingStartsAt(startsAt: string): string {
+  const time = Date.parse(startsAt);
+  if (Number.isNaN(time)) return startsAt;
+  const jst = japanCalendar(new Date(time));
+  const month = jst.getUTCMonth() + 1;
+  const day = jst.getUTCDate();
+  const hour = String(jst.getUTCHours()).padStart(2, "0");
+  const minute = String(jst.getUTCMinutes()).padStart(2, "0");
+  return `${month}/${day} ${hour}:${minute}`;
+}
+
+/**
+ * 5段階評価の値か。1〜5の整数と、ちょうどの "1"〜"5" だけ。
+ *
+ * "3.0" や "3e0" は数としては3だが、保存・平均の数え方（文字列1〜5・
+ * SQLite整数）と合わせるため認めない。真偽値は数に混ぜない。
+ * 前後の空白はASCII空白だけを許す。全角空白・タブ・改行付きは
+ * SQLiteのTRIMと範囲が合わず平均から外れるため受け入れない。
+ */
+export function normalizeRatingValue(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value >= 1 && value <= 5 ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = trimAsciiSpaces(value);
+    return /^(1|2|3|4|5)$/.test(trimmed) ? Number(trimmed) : null;
+  }
+  return null;
+}
+
+/**
  * 回答1件を検証する。返すのは利用者に見せる文言。問題なければ null。
  *
  * 管理画面のプレビュー・回答画面・保存側の3か所から呼ぶ。
@@ -758,12 +709,95 @@ export function validateAnswer(
   block: FormInputBlock,
   value: unknown,
 ): string | null {
-  const isEmpty = isFormAnswerEmpty(value);
+  if (block.type === "rating") {
+    const empty = value === undefined || value === null
+      || (typeof value === "string" && isAsciiBlank(value));
+    if (block.required && empty) return `${block.label} は必須項目です`;
+    if (empty) return null;
+    if (normalizeRatingValue(value) === null) {
+      return `${block.label} は1〜5で選んでください`;
+    }
+    return null;
+  }
 
+  if (block.type === "address") {
+    const empty = isAddressValueEmpty(value);
+    if (block.required && empty) return `${block.label} は必須項目です`;
+    if (empty) return null;
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return `${block.label} の住所を入力してください`;
+    }
+    // 指定済みの各欄は型と長さを検査する。数・配列・物を黙って空にしない。
+    // 未指定（null・なし・空文字）は任意欄として保持する。
+    const v = value as Record<string, unknown>;
+    const names: Record<keyof Omit<FormAddressValue, "postalCode" | "prefecture">, string> = {
+      city: "市区町村",
+      addressLine1: "番地",
+      addressLine2: "建物名",
+    };
+    const checkText = (key: string, label: string, max: number): string | null => {
+      const raw = v[key];
+      if (raw === undefined || raw === null || raw === "") return null;
+      if (typeof raw !== "string") return `${block.label} の${label}は文字で入力してください`;
+      if (raw.trim().length > max) return `${block.label} の${label}が長すぎます`;
+      return null;
+    };
+    const postalRaw = v.postalCode;
+    if (postalRaw !== undefined && postalRaw !== null && postalRaw !== "") {
+      if (typeof postalRaw !== "string") {
+        return `${block.label} の郵便番号は 123-4567 のように入力してください`;
+      }
+      const postal = postalRaw.trim();
+      if (postal.length > 8) return `${block.label} の郵便番号は 123-4567 のように入力してください`;
+      if (normalizePostalCodeDigits(postal) === null) {
+        return `${block.label} の郵便番号は 123-4567 のように入力してください`;
+      }
+    }
+    const prefectureRaw = v.prefecture;
+    if (prefectureRaw !== undefined && prefectureRaw !== null && prefectureRaw !== "") {
+      if (typeof prefectureRaw !== "string") {
+        return `${block.label} は都道府県から選んでください`;
+      }
+      if (!(PREFECTURES as readonly string[]).includes(prefectureRaw.trim())) {
+        return `${block.label} は都道府県から選んでください`;
+      }
+    }
+    for (const [key, label] of Object.entries(names)) {
+      const problem = checkText(key, label, 255);
+      if (problem !== null) return problem;
+    }
+    return null;
+  }
+
+  if (block.type === "booking") {
+    const empty = isFormAnswerEmpty(value);
+    if (block.required && empty) return `${block.label} は必須項目です`;
+    if (empty) return null;
+    if (normalizeBookingValue(value) === null) {
+      return `${block.label} は日時を選び直してください`;
+    }
+    return null;
+  }
+
+  const isEmpty = isFormAnswerEmpty(value);
   if (block.required && isEmpty) {
     return `${block.label} は必須項目です`;
   }
   if (isEmpty) return null;
+
+  if (block.fixedField) {
+    if (block.fixedField === "allergy") {
+      const checked = validateAllergyValues(value);
+      if (!checked.ok) return checked.error;
+    }
+    if (block.fixedField === "birthday" && ageFromBirthday(String(value)) === null) return `${block.label} は過去の存在する日付で入力してください`;
+    if (block.fixedField === "age" && (!/^\d{1,3}$/.test(String(value)) || Number(value) > 150)) return `${block.label} は0〜150の整数で入力してください`;
+    const spec = FIXED_FRIEND_FIELDS.find(f => f.key === block.fixedField);
+    if (spec && spec.format !== "none") {
+      const problem = validateAnswer({ ...block, fixedField: undefined, limit: { ...block.limit, format: spec.format } }, value);
+      if (problem) return problem;
+    }
+  }
 
   // 選択肢系
   if (hasChoices(block)) {
@@ -780,7 +814,7 @@ export function validateAnswer(
       if (typeof min === "number" && selected.length < min) {
         return `${block.label} は${min}つ以上選んでください`;
       }
-      if (typeof max === "number" && selected.length > max) {
+      if (typeof max === "number" && max > 0 && selected.length > max) {
         return `${block.label} は${max}つまで選べます`;
       }
     }
@@ -805,6 +839,12 @@ export function validateAnswer(
   }
 
   if (block.type === "file") {
+    if (Array.isArray(value)) {
+      const max = formFileKind(block) === "identity" && block.fileBothSides ? 2 : Math.min(10, Math.max(1, block.fileMaxCount ?? 1));
+      if (value.length > max || value.some(v => !v || typeof v !== "object" || typeof v.fileId !== "string" || !/^[0-9a-f-]{36}$/i.test(v.fileId))) return `${block.label} の添付を確認してください`;
+      if (value.length && formFileKind(block) === "identity" && block.fileBothSides && value.length !== 2) return `${block.label} の表と裏を送ってください`;
+      return null;
+    }
     // 回答に入るのは、預けた画像のURL。中身そのものは入らない。
     // 別の場所を指すURLを書き込まれても困るので、こちらが返す形だけを通す。
     if (!/^https?:\/\/[^\s]+\/images\/form-uploads\//.test(String(value))) {
@@ -837,7 +877,7 @@ export function validateAnswers(
   layout: FormLayout,
   answers: Record<string, unknown>,
 ): string | null {
-  for (const block of collectInputs(layout)) {
+  for (const block of collectReachableInputs(layout, answers)) {
     // 出していない欄は、答えが無くても責めない
     if (block.hidden) continue;
     const error = validateAnswer(block, answers[block.name]);
@@ -878,6 +918,18 @@ export function nextSectionIndex(
   return currentIndex + 1;
 }
 
+/** 回答の分岐で実際に通る欄。共通ヘッダはどの経路でも含める。 */
+export function collectReachableInputs(layout: FormLayout, answers: Record<string, unknown>): FormInputBlock[] {
+  const sections: FormLayout['sections'] = [];
+  const visited = new Set<number>();
+  for (let index = 0; index < layout.sections.length && !visited.has(index);) {
+    visited.add(index);
+    sections.push(layout.sections[index]!);
+    index = nextSectionIndex(layout, index, answers);
+  }
+  return collectInputs({ ...layout, sections });
+}
+
 // ---------------------------------------------------------------------------
 // フォーム定義の検証（保存時・公開時）
 // ---------------------------------------------------------------------------
@@ -898,7 +950,41 @@ function isHttpUrl(value: string): boolean {
  * 動作のように、下書きは許すが公開では止めるものは
  * `validateFormForPublish` が見る。
  */
+/** 保存前に未知のブロックを拒否する。正規化で消してから検証すると誤って保存できてしまう。 */
+export function formBlockTypeError(input: unknown): string | null {
+  if (!input || typeof input !== "object") return null;
+  const raw = input as Record<string, unknown>;
+  const groups = [raw.header, ...(Array.isArray(raw.sections) ? raw.sections.map(s => s && typeof s === "object" ? (s as Record<string, unknown>).blocks : []) : [])];
+  for (const blocks of groups) {
+    if (!Array.isArray(blocks)) continue;
+    for (const block of blocks) {
+      if (!block || typeof block !== "object") return "ブロックの種類を確認してください";
+      const b = block as Record<string, unknown>;
+      if (!FORM_BLOCK_KINDS.includes(String(b.kind))) return "このブロックの種類は保存できません";
+      if (b.kind === "input" && !FORM_INPUT_TYPES.includes(b.type as FormInputType)) return "この入力欄の種類は保存できません";
+      if (b.fixedField !== undefined) {
+        const spec = FIXED_FRIEND_FIELDS.find(f => f.key === b.fixedField);
+        if (b.kind !== "input" || !spec || (b.type !== spec.type && !(b.fixedField === 'allergy' && b.type === 'text'))) return "決まった答えの種類を確認してください";
+      }
+    }
+  }
+  return null;
+}
+
 export function validateFormDefinition(layout: FormLayout): string | null {
+  const references = parseFormReferences(layout.references);
+  if (!references) return '表示する参照の形が正しくありません';
+  const blocks = [...layout.header, ...layout.sections.flatMap(section => section.blocks)];
+  for (const reference of references) {
+    const owners = blocks.filter(block => block.id === reference.blockId);
+    if (owners.length !== 1 || owners[0]?.kind !== (reference.kind === 'image' ? 'image' : 'text')) {
+      return '表示する参照に対応するブロックを選んでください';
+    }
+  }
+  const design = layout.options.customerDesign;
+  if (design !== undefined && (!design || !['account','fixed'].includes(design.mode) || !CUSTOMER_DESIGN_IDS.includes(design.preset))) return 'デザインの型を選び直してください';
+  const typeError = formBlockTypeError(layout);
+  if (typeError) return typeError;
   const seenNames = new Set<string>();
   const groups: { where: string; blocks: FormBlock[] }[] = [
     { where: "共通ヘッダ", blocks: layout.header },
@@ -912,7 +998,7 @@ export function validateFormDefinition(layout: FormLayout): string | null {
     let imageCount = 0;
     for (const block of group.blocks) {
       /*
-       * R197: 画像のURLと、押したときに開くURLもボタンのリンク先と
+       * 画像のURLと、押したときに開くURLもボタンのリンク先と
        * 同じ決めごとで見る。空は「未指定」（下書きでは許す）とし、
        * 入っているのにURLの形でないものだけ止める。
        */
@@ -937,6 +1023,18 @@ export function validateFormDefinition(layout: FormLayout): string | null {
           return `回答データの見出し「${block.name}」が重複しています`;
         }
         seenNames.add(block.name);
+        if (block.type === "booking" && block.booking != null) {
+          if (typeof block.booking !== "object" || Array.isArray(block.booking)) return `${at}の予約設定を確認してください`;
+          for (const [key, label] of [["allowMenuSelection", "メニューを選んでもらう"], ["requireApproval", "未承認で入れる"]] as const) {
+            if (block.booking[key] !== undefined && typeof block.booking[key] !== "boolean") return `${at}の「${label}」はオン・オフで指定してください`;
+          }
+        }
+        if (block.type === "file") {
+          if (block.fileKinds !== undefined && (!Array.isArray(block.fileKinds) || !block.fileKinds.length || block.fileKinds.some(kind => !["image", "pdf", "identity"].includes(kind)))) return `${at}で受け取る種類を1つ以上選んでください`;
+          if (block.fileKind && !["image", "pdf", "identity"].includes(block.fileKind)) return `${at}のファイルの種類を選んでください`;
+          if (block.fileMaxCount !== undefined && (!Number.isInteger(block.fileMaxCount) || block.fileMaxCount < 1 || block.fileMaxCount > 10)) return `${at}の枚数の上限は1〜10枚です`;
+          if (block.fileBothSides !== undefined && typeof block.fileBothSides !== "boolean") return `${at}の表と裏の設定を確認してください`;
+        }
 
         if (hasChoices(block)) {
           const choices = block.choices ?? [];
@@ -1012,7 +1110,11 @@ export function validateFormDefinition(layout: FormLayout): string | null {
     }
   }
 
+  const completionMode = layout.options.completionMode;
+  if (completionMode !== undefined && !["thanks", "chat", "url"].includes(completionMode)) return "答え終わったあとの動きを選び直してください";
   const thanksUrl = layout.options.thanksUrl?.trim() ?? "";
+  if (completionMode === "url" && !thanksUrl) return "答えたあとに開くURLを入力してください";
+  if ((completionMode === "chat" || completionMode === "thanks") && thanksUrl) return "URLを開く場合は、答え終わったあとの動きをURLにしてください";
   if (thanksUrl !== "" && !isHttpUrl(thanksUrl)) {
     return "答えたあとに開くページがURLの形ではありません";
   }
@@ -1172,7 +1274,7 @@ function validateFormBranchGraph(layout: FormLayout): string | null {
 /**
  * 初期値が、その欄の回答の決まりに合っているか。
  *
- * R196: 空の初期値は「未設定」で許す。入っているのに型・選択肢・
+ * 空の初期値は「未設定」で許す。入っているのに型・選択肢・
  * 入力制限に合わないものは、公開の直前で止める。そのまま公開すると
  * 管理者が入れた初期値のせいで回答者が送信できなくなるため。
  * 判定は回答検証 `validateAnswer` と同じものを使う（必須だけ外す。
@@ -1214,6 +1316,29 @@ export function validateFormForPublish(layout: FormLayout): string | null {
     validateFormActionsReady(layout) ??
     validateFormBranchGraph(layout) ??
     validateFormDefaultValues(layout) ??
-    formThemeContrastError(normalizeFormTheme(layout.options?.theme))
+    validateFormBookingReady(layout)
   );
+}
+
+/**
+ * 「予約を入れる」ブロックはメニューが決まっていないと公開できない。
+ * 下書きの保存までは止めない。担当の指定が無ければ「だれでも」、
+ * 期間が無ければ14日として扱うので、止めるのはメニューだけ。
+ */
+export function validateFormBookingReady(layout: FormLayout): string | null {
+  const groups = [layout.header, ...layout.sections.map((section) => section.blocks)];
+  for (const blocks of groups) {
+    for (const block of blocks) {
+      if (block.kind !== "input" || block.type !== "booking") continue;
+      const at = `「${block.label.trim() || block.name}」`;
+      if (block.booking?.kind === 'seats') {
+        if (!block.booking.storeId) return `${at}のお店が選ばれていません`;
+        continue;
+      }
+      if (!block.booking?.menuId) {
+        return `${at}の予約メニューが選ばれていません`;
+      }
+    }
+  }
+  return null;
 }

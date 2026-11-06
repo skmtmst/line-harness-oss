@@ -1,0 +1,6 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-8); min-width: 0; }
+.message { min-width: 0; overflow-wrap: anywhere; }
+.return { margin-left: auto; }
+}

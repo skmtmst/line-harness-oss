@@ -1,0 +1,625 @@
+/*
+ * ★V8 ログインユーザー（・閲覧のみ ・1152 ・止める ）。
+ * 寸法は globals.css の --tpl-sa-*。
+ * 板の頭（題・説明・タブ）→ 閲覧のみの帯 → 設定の中のメニュー｜一覧｜右の補足。
+ */
+
+/* 板の頭：題 22・説明 12・タブ。下に線。 */
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sa-staff-head-gap);
+  padding: var(--tpl-sa-staff-head-pad);
+  box-shadow: var(--tpl-sa-line-bottom);
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
+  line-height: var(--tpl-title-lh);
+}
+
+.desc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sa-staff-desc-lh);
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--tpl-sa-staff-tab-gap);
+}
+
+.tab {
+  padding-bottom: var(--tpl-sa-staff-tab-pad);
+  border-bottom: var(--tpl-sa-staff-tab-line) solid transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-sa-staff-name-lh);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--color-ink);
+}
+
+.tabCurrent {
+  border-bottom-color: var(--color-ink);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* 閲覧のみの帯（薄い青・印 16・文 13/20）。 */
+.viewerBandRow {
+  padding: var(--tpl-sa-band-pad);
+}
+
+.viewerIcon {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/* 本体：設定の中のメニュー｜一覧｜右の補足。 */
+.body {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-sa-staff-main-gap);
+  min-width: 0;
+  padding: var(--tpl-sa-staff-main-pad);
+}
+
+.aside {
+  display: flex;
+  flex: 0 0 var(--tpl-sa-staff-aside-w);
+  flex-direction: column;
+  gap: var(--tpl-sa-staff-aside-gap);
+  align-self: stretch;
+  min-width: 0;
+  padding: var(--tpl-sa-staff-aside-pad);
+  box-shadow: var(--tpl-sa-line-left);
+}
+
+/* 道具の段：探す（220）・札・間・招待。 */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sa-tool-gap);
+  min-width: 0;
+}
+
+.search {
+  flex: 0 0 var(--tpl-sa-staff-search-w);
+  width: var(--tpl-sa-staff-search-w);
+}
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sa-tool-gap);
+}
+
+/* 利用状態の札（絵：選んだ札は墨の地に白い字・印なし）。 */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-sa-chip-h);
+  padding: 0 var(--tpl-sa-chip-pad-x);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-sa-ring);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--color-ink);
+  box-shadow: var(--tpl-sa-ring-ink);
+  color: var(--color-on-accent);
+}
+
+.chip:focus-visible {
+  outline: var(--tpl-sa-focus-w) solid var(--color-accent);
+  outline-offset: var(--tpl-sa-focus-w);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.inviteSpace {
+  flex: 0 0 var(--tpl-sa-staff-invite-w);
+  height: var(--tpl-sa-control-h);
+}
+
+/* 一覧の段：枠1本・角丸 12・余白 20・間 12。 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  padding: var(--tpl-sa-staff-card-pad);
+  border-radius: var(--radius-card);
+  border: 0;
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-sa-staff-col-gap);
+  min-width: 0;
+  padding-bottom: var(--polish-space-section);
+  border-bottom: 1px solid var(--tpl-sa-staff-divider);
+}
+
+.cardHeadText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-sa-step-text-gap);
+  min-width: 0;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-sa-staff-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-sa-pool-name-lh);
+}
+
+.cardSubRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-sa-tool-gap);
+  min-width: 0;
+}
+
+.cardSub {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sa-staff-sub-lh);
+}
+
+.cardWarn {
+  margin: 0;
+  min-width: 0;
+  color: var(--color-status-warn-deep);
+  font-size: var(--text-micro);
+}
+
+.cardTools {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-sa-tool-gap);
+}
+
+.toolSelect {
+  width: var(--tpl-sa-staff-select-w);
+}
+
+.toolSelect :global(*) {
+  max-width: 100%;
+}
+
+.colPerson {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--tpl-sa-staff-avatar-gap);
+  min-width: 0;
+}
+
+.colRole { flex: 0 0 var(--tpl-sa-staff-role-w); }
+.colLast { flex: 0 0 var(--tpl-sa-staff-last-w); white-space: nowrap; }
+.colMenu { flex: 0 0 var(--tpl-sa-staff-menu-w); }
+
+.avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-sa-staff-avatar);
+  height: var(--tpl-sa-staff-avatar);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-pearl);
+  box-shadow: var(--tpl-sa-ring);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.personText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sa-staff-text-gap);
+  min-width: 0;
+}
+
+.personName {
+  max-width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--tpl-sa-staff-name-lh);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.personName:hover {
+  text-decoration: underline;
+}
+
+.personName:focus-visible {
+  outline: var(--tpl-sa-focus-w) solid var(--color-accent);
+  outline-offset: var(--tpl-sa-focus-w);
+}
+
+.personSub {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-sa-label-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 行の「…」（28 角）：開いたメニューの目印が行の中で段を取らないよう、箱で包む。 */
+.menuBox {
+  display: flex;
+  align-items: center;
+}
+
+.row .colMenu .menuButton {
+  flex-basis: var(--tpl-sa-staff-menu-w);
+  width: var(--tpl-sa-staff-menu-w);
+  min-width: var(--tpl-sa-staff-menu-w);
+  height: var(--tpl-sa-staff-menu-w);
+  min-height: var(--tpl-sa-staff-menu-w);
+}
+
+.stateRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-sa-tool-gap);
+  margin: 0;
+  padding: var(--tpl-sa-staff-row-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.listFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-sa-tool-gap);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.listFoot p {
+  margin: 0;
+}
+
+/* 権限のかたまり（タブ）のカード。 */
+.roleCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tpl-sa-staff-select-w), 1fr));
+  gap: var(--tpl-sa-staff-card-gap);
+}
+
+.roleCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sa-card-gap);
+  padding: var(--tpl-sa-card-pad);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
+}
+
+.roleCardHead {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tpl-sa-tool-gap);
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.roleCount {
+  color: var(--color-accent-deep);
+  font-size: var(--text-micro);
+  font-weight: 600;
+}
+
+.roleCardBody,
+.roleCardFoot {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.roleCardFoot {
+  color: var(--color-ink-faint);
+}
+
+/* 右の補足：カード（余白 16・間 12）。 */
+.asideCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sa-staff-card-gap);
+  padding: var(--tpl-sa-card-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+}
+
+.selfSecurityCard {
+  width: 100%;
+  max-width: var(--tpl-sa-self-security-max-width);
+  margin-inline-start: auto;
+  gap: var(--polish-space-row);
+}
+
+.selfSecurityFullWidth {
+  max-width: none;
+}
+
+.selfSecurityTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-sa-self-security-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-sa-self-security-title-line-height);
+}
+
+.securityState {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.securityHint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: 1.5;
+}
+
+.passkeyBlock,
+.authenticatorBlock,
+.passkeyList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-row);
+  min-width: 0;
+}
+
+.passkeyItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--polish-space-row);
+  min-height: var(--tpl-sa-passkey-row-min-height);
+  padding: var(--polish-space-row);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.passkeyItem > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--tpl-sa-passkey-meta-gap);
+  font-size: var(--text-micro);
+}
+
+.passkeyItem strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.passkeyItem span {
+  color: var(--color-ink-faint);
+}
+
+.securityDivider {
+  height: 1px;
+  background: var(--color-divider);
+  margin-block: var(--polish-space-row);
+}
+
+.asideTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-sa-card-title-lh);
+}
+
+.guideCard {
+  gap: var(--tpl-sa-staff-guide-card-gap);
+}
+
+.guideCard .asideNote {
+  margin-top: var(--tpl-sa-staff-guide-note-gap);
+}
+
+.guideList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guideRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-sa-staff-guide-gap);
+  padding: var(--tpl-sa-staff-guide-pad);
+  box-shadow: var(--tpl-sa-line-bottom-soft);
+}
+
+.guideChip {
+  display: flex;
+  flex: 0 0 var(--tpl-sa-staff-guide-chip-w);
+}
+
+.guideBody {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sa-staff-line-lh);
+}
+
+.asideNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-sa-label-lh);
+}
+
+.suspendNote {
+  margin: 0;
+  padding: var(--tpl-sa-row-pad);
+  border-radius: var(--tpl-sa-row-radius);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.dialogNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+
+/* 狭い幅でも本人の認証設定を操作できるよう、右欄を一覧の下へ送る。 */
+@media (max-width: 1279.98px) {
+  .body {
+    flex-wrap: wrap;
+  }
+
+  .aside {
+    flex: 0 0 100%;
+    width: 100%;
+    box-shadow: none;
+  }
+
+  .selfSecurityCard {
+    max-width: none;
+  }
+
+  .search {
+    flex-basis: var(--tpl-sa-staff-search-w-narrow);
+    width: var(--tpl-sa-staff-search-w-narrow);
+  }
+
+  .colLast { flex-basis: var(--tpl-sa-staff-last-w-narrow); }
+}
+
+/* 窓の中（今の画面から写した）：高さの上限・見せる範囲の2列・通知の行・2段階の QR。 */
+.modalPanel {
+  max-height: var(--tpl-sa-modal-max-h);
+}
+
+@media (min-width: 1024px) {
+  .scopeGrid {
+    grid-template-columns: minmax(0, 1fr) var(--tpl-sa-scope-side-w);
+  }
+}
+
+.notifyRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+}
+
+@media (min-width: 640px) {
+  .twoFactorGrid {
+    grid-template-columns: var(--tpl-sa-qr) 1fr;
+  }
+}
+
+.qrImage {
+  width: var(--tpl-sa-qr);
+  height: var(--tpl-sa-qr);
+}
+
+.table { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w) var(--tpl-sa-staff-menu-w); }
+@media (max-width: 1279px) { .table { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w-narrow) var(--tpl-sa-staff-menu-w); } }
+@media (max-width: 1279px) {
+  .readOnlyTable { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w-narrow) var(--tpl-sa-staff-menu-w); }
+}
+
+/* ユーザー一覧はカードの余白を起点に列をそろえ、見本の区切りを最後まで通す。 */
+html:root .table.table :global([data-shared-part='list-head']),
+html:root .table.table :global([data-shared-part='list-row']) {
+  padding-inline: 0;
+  border-bottom: 1px solid var(--tpl-sa-staff-divider);
+  box-shadow: none;
+}
+
+html:root .table.table :global([data-shared-part='list-head']) {
+  height: var(--tpl-sa-staff-head-h);
+  min-height: var(--tpl-sa-staff-head-h);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+html:root .table.table :global([data-shared-part='list-row']) {
+  height: var(--tpl-sa-staff-row-h);
+  min-height: var(--tpl-sa-staff-row-h);
+}
+
+.colRole :global([data-role]) {
+  min-width: var(--tpl-sa-staff-role-chip-w);
+  height: var(--tpl-sa-staff-role-chip-h);
+  justify-content: center;
+}

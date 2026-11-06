@@ -11,6 +11,7 @@ import type {
   FriendAddRuleStatus,
 } from '@/lib/api'
 import { resendSuppressionText } from './friend-add-text'
+import { formatNumber } from '@/lib/format'
 
 export type FriendAddFlowStep = {
   key: 'route' | 'firstMessage' | 'attributes' | 'nextDelivery'
@@ -41,7 +42,8 @@ export function friendAddFlowSteps(input: {
   scenarioName: string | null
 }): FriendAddFlowStep[] {
   const { definition } = input
-  // 再追加で「何も配信しない」はメッセージもシナリオも動かない（R261）。
+  // 再追加で「何も配信しない」は最初の案内を届けない（R261）。
+  // 案内後のアクション（タグ付けやシナリオ開始）は実行される。
   const deliversNothing = input.friendKind === 'returning' && definition.returningMode === 'none'
 
   // ① 経路 —— どこから来た人か。基本URLと個別QRは同じ経路URLとして扱う。
@@ -56,7 +58,7 @@ export function friendAddFlowSteps(input: {
       : '対象の流入リンクは未選択です'
     const notes = ['選んだ経路のURL・QR（どちらも同じ入口）から追加された人に動きます。']
     if (input.missingRouteCount > 0) {
-      notes.push(`停止・削除済みの経路が${input.missingRouteCount}件含まれています。`)
+      notes.push(`停止・削除済みの経路が${formatNumber(input.missingRouteCount)}件含まれています。`)
     }
     notes.push('基本の追加URLなど経路を特定できない追加には、この設定ではなく「経路が分からなかった人」の設定が動きます。')
     routeDetail = notes.join('')
@@ -86,7 +88,9 @@ export function friendAddFlowSteps(input: {
   // ④ 次の配信 —— 登録するシナリオと、シナリオ開始アクション
   const nextParts: string[] = []
   if (deliversNothing) {
-    nextParts.push('「何も配信しない」の設定のため、シナリオは動かしません。')
+    // 実行側と同じ区別：最初の案内は届けないが、案内後のアクションとして
+    // 設定したシナリオ開始は動く。動かないと断定すると下の文と矛盾する（R261）。
+    nextParts.push('「何も配信しない」の設定のため、最初の案内は届きません。')
   } else if (definition.scenarioId) {
     nextParts.push(input.scenarioName
       ? `シナリオ「${input.scenarioName}」を開始します。`
@@ -137,7 +141,7 @@ export function timeWindowsSummary(windows: FriendAddTimeWindow[] | undefined): 
   const list = windows ?? []
   if (list.length === 0) return 'いつでも'
   if (list.length === 1) return `${list[0].start}〜${list[0].end}`
-  return `${list[0].start}〜${list[0].end} など${list.length}件`
+  return `${list[0].start}〜${list[0].end} など${formatNumber(list.length)}件`
 }
 
 /**
@@ -162,7 +166,10 @@ export function friendAddReaddLines(input: {
     // 未選択は実行側の既定（別のシナリオ扱い）に合わせる。
     const mode = input.definition.returningMode ?? 'other'
     if (mode === 'none') {
-      lines.push('再追加では初回案内とシナリオを動かしません。')
+      // 実行側と同じ区別：最初の案内は届けないが、案内後のアクション
+      // （シナリオ開始を含む）は実行される。「シナリオを動かさない」と
+      // 書くと、開始するよう設定した文と矛盾する（R261）。
+      lines.push('再追加では最初の案内は届きません。')
       lines.push(input.definition.actions.length > 0
         ? '設定したアクションは実行されます。'
         : 'アクションも実行されません。')

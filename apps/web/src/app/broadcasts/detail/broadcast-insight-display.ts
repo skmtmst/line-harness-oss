@@ -1,3 +1,4 @@
+import { formatDateTime, formatNumber } from '@/lib/format'
 type BroadcastInsight = {
   delivered: number | null
   uniqueImpression: number | null
@@ -13,15 +14,7 @@ export function formatBroadcastDateTime(value: string | null | undefined): strin
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function percent(value: number, base: number): string {
@@ -36,7 +29,7 @@ export function openInsightDetail(insight: BroadcastInsight): string {
   if (insight?.suppressedByAudienceSize) return '配信先が20人未満のため取れません'
   if (insight?.uniqueImpression == null || insight.delivered == null) return '—'
   if (insight.delivered === 0) return 'LINE集計の到達 0件（割合は算出できません）'
-  return `LINE集計の到達 ${insight.delivered.toLocaleString('ja-JP')}件のうち ${percent(
+  return `LINE集計の到達 ${formatNumber(insight.delivered)}件のうち ${percent(
     insight.uniqueImpression,
     insight.delivered,
   )}`
@@ -54,7 +47,7 @@ export function clickInsightDetail(insight: BroadcastInsight): string {
   if (insight?.suppressedByAudienceSize) return '配信先が20人未満のため取れません'
   if (insight?.uniqueClick == null || insight.delivered == null) return '—'
   if (insight.delivered === 0) return 'LINE集計の到達 0件（割合は算出できません）'
-  return `LINE集計の到達 ${insight.delivered.toLocaleString('ja-JP')}件のうち ${percent(
+  return `LINE集計の到達 ${formatNumber(insight.delivered)}件のうち ${percent(
     insight.uniqueClick,
     insight.delivered,
   )}`

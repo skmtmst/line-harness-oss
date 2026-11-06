@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { tenants } from './tenants.js';
 
@@ -40,6 +40,10 @@ beforeEach(() => {
   testDb.raw.prepare(`INSERT INTO staff_members
     (id, name, role, api_key, tenant_id) VALUES (?, ?, ?, ?, ?)`).run(
       'owner-1', 'Owner', 'owner', 'owner-key', DEFAULT_TENANT_ID,
+    );
+  testDb.raw.prepare(`INSERT INTO staff_members
+    (id, name, role, api_key, tenant_id) VALUES (?, ?, ?, ?, ?)`).run(
+      'admin-1', 'Admin', 'admin', 'admin-key', DEFAULT_TENANT_ID,
     );
 });
 
@@ -105,7 +109,7 @@ describe('current tenant', () => {
       body: JSON.stringify({ name }),
     }, environment());
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ success: false, error });
+    await expect(response.json()).resolves.toMatchObject({ success: false, error , fields: expect.any(Object) });
   });
 });
 
@@ -184,5 +188,21 @@ describe('tenant boundary preview', () => {
         accountsWithoutTenant: 1,
       },
     });
+  });
+});
+
+describe('account-scoped admin tenant boundary', () => {
+  it('denies company details, tenant changes, and boundary diagnostics', async () => {
+    testDb.raw.prepare("UPDATE staff_members SET account_scope = 'accounts' WHERE id = 'admin-1'").run();
+    const accountAdmin = app(operator('admin'));
+    const bindings = environment();
+    expect((await accountAdmin.request('/api/tenants/me/company-contact', {}, bindings)).status).toBe(403);
+    expect((await accountAdmin.request('/api/tenants/me/company-contact', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }, bindings)).status).toBe(403);
+    expect((await accountAdmin.request('/api/tenants/me', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: '変更不可' }),
+    }, bindings)).status).toBe(403);
+    expect((await accountAdmin.request('/api/tenants/boundary-preview', {}, bindings)).status).toBe(403);
   });
 });

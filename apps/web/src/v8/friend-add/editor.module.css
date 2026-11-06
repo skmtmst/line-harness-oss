@@ -1,0 +1,360 @@
+/*
+ * ★V8 友だち追加時の配信を作る・直す（・・・・・・）。
+ * 枠・頭・手順の輪・右の列・下の帯は型（CreatePage）が持つ。ここは左の段（カード）の中身だけ。
+ */
+
+/* 段（カード）：枠1・角12・余白20・中の間14。 */
+.card { min-width: 0; }
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-fa-ed-head-gap);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-fa-ed-title-lh);
+}
+.cardDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-fa-ed-field-gap);
+  min-width: 0;
+}
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-chip-label-lh);
+}
+.fieldError {
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+/* だれに送るか：2枚の選ぶカード（高さ98・余白14）。 */
+.kindPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-rule-row-gap);
+}
+.kindTriple {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-rule-row-gap);
+}
+.kindCard {
+  min-height: var(--tpl-fa-ed-kind-h);
+}
+
+/* 流入リンク：探す欄・選ぶ行・足す行。 */
+.routeSearch {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-body-gap);
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-fa-ed-search-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink-faint);
+}
+/* 選ぶ行は共通のチェックのカード。絵の行（余白10/12・角10・名前13/600）に合わせて寸法だけ当てる。 */
+:global(:root) label.routeCard {
+  align-items: center;
+  min-height: 0;
+  padding: var(--tpl-fa-ed-route-pad);
+  border-radius: var(--radius-control);
+}
+:global(:root) label.routeCard > span:last-child > span:first-child {
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+}
+.routeSub,
+.routeWarn {
+  display: block;
+  overflow: hidden;
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-row-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.routeSub { color: var(--color-ink-secondary); }
+.routeWarn { color: var(--color-status-warn-deep); }
+.routeFoot {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-body-gap);
+}
+.spacer { flex: 1 1 0; }
+.countNote {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-text-sm-lh);
+}
+
+/* 対象をしぼる（任意）：段の中の小さな箱（余白16）。 */
+.narrowBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-fa-ed-sub-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: var(--card-shadow);
+}
+.subTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-chip-label-lh);
+}
+.subDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wb-pill-lh);
+}
+.datePair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-rule-row-gap);
+}
+.conditionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-body-gap);
+}
+.conditionReadOnly {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conditionField {
+  width: var(--tpl-fa-ed-cond-w);
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 最初に送るもの：選ぶ札（選んだ札は墨の地に白い字）。 */
+.chipRow,
+.weekRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-fa-ed-chip-row-gap);
+}
+.pickChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-chip-gap);
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-chip-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-wb-pill-lh);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pickChip[data-selected] {
+  outline-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+.pickChip:disabled { cursor: not-allowed; }
+
+/* 本文の箱：余白14・文と差し込みの行の間12。 */
+.segRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+}
+.timeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-body-gap);
+}
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+}
+.switchText {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-row-name-lh);
+}
+
+/* あわせて行うこと。 */
+.actionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-body-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-action-row-gap);
+  padding: var(--tpl-action-row-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+.actionIndex {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.actionLabel {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.actionAdd {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-body-gap);
+}
+.actionSelect { width: var(--tpl-fa-ed-folder-w); }
+.actionSelect :global(*) { max-width: 100%; }
+
+/* 確認。 */
+.confirmRows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.confirmRow {
+  display: grid;
+  grid-template-columns: var(--tpl-fa-ed-confirm-label-w) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-side-row-pad) 0;
+  box-shadow: var(--shadow-row-line);
+  font-size: var(--text-label);
+}
+.confirmRow dt { color: var(--color-ink-secondary); }
+.confirmRow dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.textLink {
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.checkList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-body-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-action-row-gap);
+}
+.checkMark { color: var(--color-status-warn-deep); }
+.checkMark[data-ok] { color: var(--color-success); }
+.checkText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-label);
+}
+.checkText small {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.compareRows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.compareRow {
+  display: grid;
+  grid-template-columns: var(--tpl-fa-ed-confirm-label-w) minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-side-row-pad) 0;
+  box-shadow: var(--shadow-row-line);
+  font-size: var(--text-caption);
+}
+.compareRow dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewerBand { margin: 0; }
+
+/* 右の列（1152・）：絵の列は型の中身より広い（左右に少し出す）。ボタンは列の上の余白に寄せる。 */
+.narrowSide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-section-gap);
+  width: calc(100% + var(--tpl-fa-ed-narrow-grow));
+  margin-top: calc(var(--tpl-fa-ed-narrow-lift) * -1);
+  margin-left: calc(var(--tpl-fa-ed-narrow-pull) * -1);
+}
+.previewOpen {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+.previewButton { width: 100%; }
+/* スマホの中の「友だち追加しました」の札。 */
+.talkChip {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+}
+.talkChip > span {
+  padding: var(--tpl-wb-pill-pad);
+  border-radius: var(--radius-pill);
+  background: var(--v8-bphone-chip);
+  color: var(--v8-bphone-chip-ink);
+  font-size: var(--text-micro);
+}
+
+/* 閲覧のみ：選んでいる流入リンクを、チェックの札ではなく名前の行で見せる。 */
+.readOnlyRoute { display: flex; align-items: baseline; gap: var(--tpl-rule-row-gap); margin: 0; min-width: 0; }
+.readOnlyRouteName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--color-ink); }
+
+.pickChip[data-selected] { font-weight: 600; }

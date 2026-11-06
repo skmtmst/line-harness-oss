@@ -1,5 +1,5 @@
 /**
- * N-411 (#866): 予約の項目別権限がルートへ接続されていることの対照試験。
+ *  予約の項目別権限がルートへ接続されていることの対照試験。
  *
  * 実D1(Miniflare)で検証する:
  *   - 予約管理(booking)と予約設定(booking.settings)は別permission
@@ -17,7 +17,7 @@ import { resolve } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { Miniflare } from 'miniflare';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const access = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(async (_db: unknown, _staff: unknown, ids: string[]) => (

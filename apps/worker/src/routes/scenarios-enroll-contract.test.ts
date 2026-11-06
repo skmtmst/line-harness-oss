@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const accountAccessMocks = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(),
@@ -26,7 +26,7 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
-vi.mock('../services/scenario-stats.js', () => ({
+vi.mock('../features/scenarios/scenario-stats.js', () => ({
   computeScenarioStats: vi.fn(),
 }));
 
@@ -86,11 +86,7 @@ beforeEach(() => {
 });
 
 /**
- * 点検 #495 中12 の再発防止。
- *
- * 手動登録は本物の購読を作るのに、友だち側のアカウント確認と
- * ブロック中の確認が無かった。別アカウントの友だちを混ぜられ、
- * 届かない購読が積まれた。テスト送信と同じ境界にする。
+ * 別アカウントやブロック中の友だちに届かない購読を作らないよう、手動登録をテスト送信と同じ境界で検証する。
  */
 describe('POST /api/scenarios/:id/enroll/:friendId の友だち側境界', () => {
   test('別アカウントの友だちは422で止める', async () => {

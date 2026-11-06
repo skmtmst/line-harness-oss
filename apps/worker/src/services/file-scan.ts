@@ -1,7 +1,11 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { jstNow } from '@line-crm/db';
+import { isFinalMediaKey } from './media-upload-storage.js';
+import { imageDimensions } from '../features/media/media-metadata/index.js';
+import { allowedFileScanEndpoint, isFileScanSecretRef } from '../lib/file-scan-policy.js';
 
 /*
- * 危険なファイルの検査（m12b）。
+ * 危険なファイルの検査。
  *
  * 上げる口（メディア・写真の投稿・フォームの添付・友だち属性の画像/PDF）で
  * 保存の前後にこの検査を通す。状態は pending → clean / rejected / quarantined。
@@ -62,6 +66,7 @@ export const FILE_SCAN_REASON_LABELS: Record<string, string> = {
   office_macro: 'マクロが見つかりました',
   executable_signature: '実行ファイルの印があります',
   external_flagged: '外部の検査で問題が見つかりました',
+  scan_attempts_exhausted: '検査が終わらなかったため、使えません',
   scan_unavailable: '検査が止まっています',
 };
 
@@ -300,6 +305,10 @@ export interface ThreatScanner {
   ): Promise<'clean' | 'quarantined'>;
 }
 
+export const FORM_FILE_SCAN_MAX_ATTEMPTS = 5;
+export function isPrivateFormDocumentScan(scan: Pick<FileScanRow, 'subject_kind' | 'subject_id'>): boolean {
+  return scan.subject_kind === 'form_file' && scan.subject_id.startsWith('private/form-documents/');
+}
 export class ScanRetryableError extends Error {}
 
 export function nextFileScanRetryAt(attempts: number, nowMs: number): string {
@@ -399,13 +408,19 @@ export async function markFileScanQuarantined(
   ).bind(reasonCode, detail, now, now, now, id).run();
 }
 
-export async function markFileScanPendingRetry(db: ScanDb, id: string, attempts: number): Promise<void> {
+export async function markFileScanPendingRetry(db: ScanDb, id: string, attempts: number, maxAttempts?: number): Promise<FileScanStatus> {
   const now = jstNow();
+  if (maxAttempts !== undefined && attempts + 1 >= maxAttempts) {
+    await db.prepare(`UPDATE media_file_scans SET attempts = ? WHERE id = ?`).bind(attempts + 1, id).run();
+    await markFileScanRejected(db, id, 'scan_attempts_exhausted', `検査を${maxAttempts}回試しても終わりませんでした`);
+    return 'rejected';
+  }
   await db.prepare(
     `UPDATE media_file_scans
         SET status = 'pending', attempts = ?, next_retry_at = ?, updated_at = ?
       WHERE id = ?`,
   ).bind(attempts + 1, nextFileScanRetryAt(attempts, Date.now()), now, id).run();
+  return 'pending';
 }
 
 /** 内蔵検査を回して行を進める。外の検査は呼び出し側が ThreatScanner で足す。 */
@@ -433,18 +448,19 @@ export async function runBuiltinScanAndStore(
 export interface ScanObjectStore {
   get(
     key: string,
-    options?: { range: { offset: number; length?: number } | { suffix: number } },
-  ): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
+    options?: { range?: { offset: number; length?: number } | { suffix: number }; onlyIf?: { etagMatches: string } },
+  ): Promise<{ etag?: string; arrayBuffer?: () => Promise<ArrayBuffer> } | null>;
 }
 
 async function readSlice(
   store: ScanObjectStore,
   key: string,
   range: { offset: number; length?: number } | { suffix: number },
+  etag?: string,
 ): Promise<Uint8Array | null> {
   try {
-    const obj = await store.get(key, { range });
-    if (!obj) return null;
+    const obj = await store.get(key, { range, ...(etag ? { onlyIf: { etagMatches: etag } } : {}) });
+    if (!obj?.arrayBuffer) return null;
     return new Uint8Array(await obj.arrayBuffer());
   } catch {
     return null;
@@ -462,27 +478,33 @@ export async function runScanForStoredObject(
   r2Key: string,
   dims?: { width?: number | null; height?: number | null },
   overrides?: { maxBytes?: number | null; maxPixels?: number | null },
+  etag?: string,
 ): Promise<FileScanRow> {
-  const head = await readSlice(store, r2Key, { offset: 0, length: FILE_SCAN_HEAD_BYTES });
+  const head = await readSlice(store, r2Key, { offset: 0, length: FILE_SCAN_HEAD_BYTES }, etag);
   if (!head || head.length === 0) {
-    await markFileScanPendingRetry(db, scan.id, scan.attempts);
-    return { ...scan, status: 'pending', attempts: scan.attempts + 1 };
+    const status = await markFileScanPendingRetry(db, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined);
+    return { ...scan, status, attempts: scan.attempts + 1 };
   }
   const tail = scan.size_bytes > head.length
-    ? await readSlice(store, r2Key, { suffix: FILE_SCAN_TAIL_BYTES })
+    ? await readSlice(store, r2Key, { suffix: FILE_SCAN_TAIL_BYTES }, etag)
     : null;
+  if (scan.size_bytes > head.length && !tail) {
+    const status = await markFileScanPendingRetry(db, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined);
+    return { ...scan, status, attempts: scan.attempts + 1 };
+  }
+  const measured = scan.mime_type.startsWith('image/') ? imageDimensions(head, scan.mime_type) : null;
   return runBuiltinScanAndStore(db, scan, head, {
     filename: scan.filename,
     mimeType: scan.mime_type,
     sizeBytes: scan.size_bytes,
-    width: dims?.width ?? null,
-    height: dims?.height ?? null,
+    width: dims?.width ?? measured?.width ?? null,
+    height: dims?.height ?? measured?.height ?? null,
     tail,
   }, overrides);
 }
 
 export type MediaGateResult =
-  | { allowed: true }
+  | { allowed: true; etag?: string }
   | { allowed: false; code: 'file_scan_pending' | 'file_scan_blocked'; message: string };
 
 export interface MediaGateInfo {
@@ -527,22 +549,55 @@ export async function checkMediaGate(
     height?: number | null;
   },
 ): Promise<MediaGateResult> {
-  let scan = await getLatestMediaScan(db, media.id);
+  const pending: MediaGateResult = { allowed: false, code: 'file_scan_pending', message: '確かめています。確かめ終わるまで使えません' };
+  // 代替画像が安全でも、親メディアの隔離を上書きしない。
+  const parent = await getFileScanBySubject(db, 'media', media.id);
+  if (parent?.status === 'pending') return pending;
+  if (parent && (parent.status === 'quarantined' || parent.status === 'rejected')) {
+    return { allowed: false, code: 'file_scan_blocked', message: '確認のため使えません。管理者が確かめるまで、どこにも出ません' };
+  }
+  const session = await db.prepare(
+    `SELECT id, status, expires_at, filename FROM media_upload_sessions
+      WHERE r2_key = ? AND line_account_id = ? ORDER BY created_at DESC LIMIT 1`,
+  ).bind(media.r2Key, media.lineAccountId).first<{ id: string; status: string; expires_at: string; filename: string }>();
+  if (session && (session.status !== 'completed'
+    || (!isFinalMediaKey(media.r2Key) && Date.parse(session.expires_at) > Date.now()))) return pending;
+  const version = await db.prepare(`SELECT id, etag FROM media_versions WHERE media_id = ? AND r2_key = ? AND published_at IS NOT NULL LIMIT 1`)
+    .bind(media.id, media.r2Key).first<{ id: string; etag: string | null }>();
+  // 署名 URL が期限後に完了しても、最初に検証した版へすべての検査と読取を固定する。
+  const etag = session && !isFinalMediaKey(media.r2Key) ? version?.etag?.replace(/^"|"$/g, '') : undefined;
+  if (session && !isFinalMediaKey(media.r2Key) && !etag) return pending;
+  // verified は形式確認だけなので、別の版の安全判定を再利用せず、実際のバイトごとに結果を付ける。
+  const subjectKind = session && isFinalMediaKey(media.r2Key) ? 'upload_session' : version ? 'media_version' : 'media';
+  const subjectId = subjectKind === 'upload_session' ? session!.id : subjectKind === 'media_version' ? version!.id : media.id;
+  let scanFilename = session?.filename ?? media.filename;
+  if (!session) {
+    const current = version && !media.r2Key.startsWith('banner/')
+      ? await db.prepare('SELECT r2_key FROM media WHERE id = ?').bind(media.id).first<{ r2_key: string }>()
+      : null;
+    // 元の名前がない過去ファイルの形式を、後からの代替ファイル名で決めない。現在のアップロード検査は緩めない。
+    if (media.r2Key.startsWith('banner/') || (version && current?.r2_key !== media.r2Key)) {
+      const basename = media.r2Key.slice(media.r2Key.lastIndexOf('/') + 1);
+      const spec = ALLOWED_MIME[media.mimeType];
+      scanFilename = spec?.ext.includes(extensionOf(basename)) ? basename : spec ? `stored.${spec.ext[0]}` : scanFilename;
+    }
+  }
+  let scan = await getFileScanBySubject(db, subjectKind, subjectId);
   if (!scan) {
     scan = await createFileScan(db, {
       lineAccountId: media.lineAccountId,
-      subjectKind: 'media',
-      subjectId: media.id,
+      subjectKind,
+      subjectId,
       mediaId: media.id,
-      filename: media.filename,
+      filename: scanFilename,
       mimeType: media.mimeType,
       sizeBytes: media.sizeBytes,
     });
     scan = await runScanForStoredObject(db, store, scan, media.r2Key, {
       width: media.width ?? null, height: media.height ?? null,
-    });
+    }, undefined, etag);
   }
-  if (scan.status === 'clean') return { allowed: true };
+  if (scan.status === 'clean') return { allowed: true, ...(etag ? { etag } : {}) };
   if (scan.status === 'pending') {
     return {
       allowed: false, code: 'file_scan_pending',
@@ -602,8 +657,8 @@ export async function getFileScanConfig(db: ScanDb, lineAccountId: string): Prom
 }
 
 /**
- * 外の検査サービスを使う口。設定がなければ null（内蔵検査だけ）。
- * 鍵は設定に置かず、設定の secret_ref が指す名前の環境値から読む。
+ * 不許可の古い設定も null（内蔵検査だけ）。運営が許可した宛先と
+ * 検査専用の名前の同じ組を確認し終わるまで、選択された環境値を読まない。
  */
 export function resolveExternalScanner(
   env: Record<string, string | undefined>,
@@ -611,18 +666,23 @@ export function resolveExternalScanner(
 ): ThreatScanner | null {
   const endpoint = config?.external_endpoint_url?.trim();
   if (!config?.external_provider || !endpoint) return null;
-  const timeoutMs = Math.max(1000, config.external_timeout_ms || 10000);
   const secretRef = config.external_secret_ref?.trim();
+  if (!isFileScanSecretRef(secretRef)) return null;
+  const url = allowedFileScanEndpoint(endpoint, env.FILE_SCAN_ALLOWED_PAIRS, secretRef);
+  if (!url) return null;
+  const timeoutMs = Math.max(1000, config.external_timeout_ms || 10000);
   return {
     name: config.external_provider,
     async scan(bytes, context) {
       const headers: Record<string, string> = { 'content-type': context.mimeType };
-      if (secretRef && env[secretRef]) headers.authorization = `Bearer ${env[secretRef]}`;
+      const token = env[secretRef];
+      if (token) headers.authorization = `Bearer ${token}`;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const res = await fetch(endpoint, {
+        const res = await fetch(url.href, {
           method: 'POST',
+          redirect: 'manual',
           headers: {
             ...headers,
             'x-file-scan-filename': encodeURIComponent(context.filename),
@@ -632,6 +692,10 @@ export function resolveExternalScanner(
           body: bytes as unknown as BodyInit,
           signal: controller.signal,
         });
+        // Workerの型はtypeをdefault/errorに限定する。互換fetchのopaque転送も拒否する。
+        if (String(res.type) === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+          throw new ScanRetryableError('external scanner redirect refused');
+        }
         if (!res.ok) throw new ScanRetryableError(`external scanner responded ${res.status}`);
         const data = await res.json<{ verdict?: unknown }>().catch(() => null);
         if (data?.verdict === 'clean') return 'clean';
@@ -639,7 +703,8 @@ export function resolveExternalScanner(
         throw new ScanRetryableError('external scanner returned an unknown verdict');
       } catch (err) {
         if (err instanceof ScanRetryableError) throw err;
-        throw new ScanRetryableError(err instanceof Error ? err.message : 'external scanner failed');
+        // fetch例外にはURLや資格情報が含まれる可能性があるので記録へ持ち込まない。
+        throw new ScanRetryableError('external scanner failed');
       } finally {
         clearTimeout(timer);
       }

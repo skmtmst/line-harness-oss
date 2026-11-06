@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-// N-062: 即時送信の直前に送信枠と後続アクション版を見直す。
+// 即時送信の直前に送信枠と後続アクション版を見直す。
 // 実 route＋実DBで確かめる。通信の境界だけ差し替える：
 // LINE API の枠取得は global fetch、LINE 送信は LineClient。
 const lineCalls = vi.hoisted(() => ({ broadcast: 0, failTimes: 0 }));
@@ -231,5 +231,24 @@ describe('N-062 即時送信の直前再確認', () => {
     const second = await send(app);
     expect(second.status).toBe(200);
     expect(rowOf(testDb.raw).status).toBe('sent');
+  });
+});
+
+
+describe('過去日時からの確認なし送信を防ぐ', () => {
+  test.each(['2000-01-01T00:00:00Z', 'not-a-date', ''])('作成・更新は不正な予約日時 %s を保存しない', async (scheduledAt) => {
+    const db = createTestD1(); seedBase(db.raw);
+    const app = setupApp(db);
+    for (const method of ['POST', 'PUT']) {
+      const response = await app.request(method === 'POST' ? '/api/broadcasts' : '/api/broadcasts/bc-1', {
+        method, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: '予約', messageType: 'text', messageContent: '本文', targetType: 'all', lineAccountId: 'acc-1', expectedVersion: 1, scheduledAt }),
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: 'SCHEDULE_MUST_BE_FUTURE' });
+    }
+    expect(db.raw.prepare('SELECT COUNT(*) AS n FROM broadcasts').get()).toEqual({ n: 1 });
+    expect(rowOf(db.raw)).toEqual({ status: 'draft' });
+    db.raw.close();
   });
 });

@@ -1,0 +1,178 @@
+{
+  "decision": "B-178",
+  "reference": "v19Ivv",
+  "boards": [
+    {
+      "id": "nF4ts",
+      "source": "v8/friends/list/list.tsx",
+      "url": "/friends"
+    },
+    {
+      "id": "l5V9a",
+      "source": "v8/broadcasts/list.tsx",
+      "url": "/broadcasts"
+    },
+    {
+      "id": "U4Eep0",
+      "source": "v8/hq-broadcasts/list.tsx",
+      "url": "/hq/broadcasts"
+    },
+    {
+      "id": "Z3FoM",
+      "source": "v8/restaurant/booking-kit/shell.tsx",
+      "url": "/restaurant-test/reservations?view=list"
+    },
+    {
+      "id": "LRc93",
+      "source": "v8/hq-templates/store-list.tsx",
+      "url": "/hq/templates"
+    },
+    {
+      "id": "wTIej",
+      "source": "v8/nen-pets/pets.tsx",
+      "url": "/nen/pets"
+    },
+    {
+      "id": "I1E7Bt",
+      "source": "v8/tags/tags-tab.tsx",
+      "url": "/tags"
+    },
+    {
+      "id": "noVq4",
+      "source": "v8/hq-templates/store-list.tsx",
+      "url": "/hq/rich-menus"
+    },
+    {
+      "id": "UyUMw",
+      "source": "v8/webinars/list.tsx",
+      "url": "/webinars"
+    },
+    {
+      "id": "B9ZAr",
+      "source": "v8/hq-banners/list.tsx",
+      "url": "/hq/banners",
+      "layout": "cards"
+    },
+    {
+      "id": "Jxmqh",
+      "source": "v8/nen-campaigns/list.tsx",
+      "url": "/nen-campaigns?tab=columns"
+    },
+    {
+      "id": "MuhWR",
+      "source": "v8/nen-campaigns/list.tsx",
+      "url": "/nen-campaigns"
+    },
+    {
+      "id": "AOWoJ",
+      "source": "v8/nen-members/members.tsx",
+      "url": "/nen/members"
+    },
+    {
+      "id": "MRhef",
+      "source": "v8/friend-add/list.tsx",
+      "url": "/friend-add-settings"
+    },
+    {
+      "id": "rZEGN",
+      "source": "v8/rich-menus/list.tsx",
+      "url": "/rich-menus"
+    },
+    {
+      "id": "LWQXd",
+      "source": "v8/automations/list.tsx",
+      "url": "/automations"
+    },
+    {
+      "id": "O7hUt7",
+      "source": "v8/contents/list.tsx",
+      "url": "/contents",
+      "layout": "cards"
+    },
+    {
+      "id": "xbHxg",
+      "source": "v8/inflow-links/list.tsx",
+      "url": "/inflow-links"
+    },
+    {
+      "id": "mIwA4",
+      "source": "v8/nen-health/health.tsx",
+      "url": "/nen/health"
+    },
+    {
+      "id": "wZPua",
+      "source": "v8/hq-templates/store-list.tsx",
+      "url": "/hq/form-submissions"
+    },
+    {
+      "id": "ZSbFY",
+      "source": "v8/webhooks/outgoing.tsx",
+      "url": "/webhooks"
+    },
+    {
+      "id": "uE9gf",
+      "source": "v8/auto-replies/list.tsx",
+      "url": "/auto-replies"
+    },
+    {
+      "id": "FM94M",
+      "source": "v8/common-vars/list.tsx",
+      "url": "/contents/vars"
+    },
+    {
+      "id": "I3L41O",
+      "source": "v8/forms/list.tsx",
+      "url": "/form-submissions"
+    },
+    {
+      "id": "i0Ao0R",
+      "source": "v8/hq-templates/store-list.tsx",
+      "url": "/hq/templates"
+    },
+    {
+      "id": "JXq9G",
+      "source": "v8/conversions/list.tsx",
+      "url": "/conversions"
+    },
+    {
+      "id": "r6dJFy",
+      "source": "v8/conversions/list.tsx",
+      "url": "/conversions"
+    },
+    {
+      "id": "e2ekFu",
+      "source": "v8/events/list.tsx",
+      "url": "/events"
+    },
+    {
+      "id": "apLqS",
+      "source": "app/reminders/list-v8.tsx",
+      "url": "/reminders"
+    },
+    {
+      "id": "axFrW",
+      "source": "v8/scenarios/list.tsx",
+      "url": "/scenarios"
+    },
+    {
+      "id": "v19Ivv",
+      "source": "v8/templates/list.tsx",
+      "url": "/templates"
+    }
+  ],
+  "parts": [
+    {
+      "url": "/templates/carousel?visual=1",
+      "expected": [
+        "image-frame",
+        "sticky-bar"
+      ]
+    },
+    {
+      "url": "/auto-replies/edit?id=ar-new&step=response",
+      "expected": [
+        "event-actions"
+      ]
+    }
+  ]
+}

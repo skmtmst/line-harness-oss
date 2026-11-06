@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
-import { photoNoticeFor } from './photo-notice'
+import { photoNoticeFor } from '@/v8/nen-posts/notice'
 
 const FALLBACK = '審査結果を保存できませんでした。'
 
@@ -22,14 +22,21 @@ describe('写真審査の失敗文面', () => {
     expect(photoNoticeFor(new ApiError(403), FALLBACK)).toContain('権限')
   })
 
-  it('口の日本語(400の本文)はそのまま見せる', () => {
+  it('400の入力案内に日本語の理由を添える', () => {
     expect(photoNoticeFor(new ApiError(400, '見送る理由を選んでください'), FALLBACK))
-      .toBe('見送る理由を選んでください')
+      .toBe('入力を直してください。見送る理由を選んでください')
   })
 
   it('知らない失敗は呼び出し側の文面を使う', () => {
     expect(photoNoticeFor(new ApiError(500), FALLBACK)).toBe(FALLBACK)
     expect(photoNoticeFor(new Error('API error: 503'), FALLBACK)).toBe(FALLBACK)
     expect(photoNoticeFor('壊れた値', FALLBACK)).toBe(FALLBACK)
+  })
+
+  it('M508: 保存の失敗（500）は競合の文面にならない', () => {
+    // 409 だけが「ほかの担当者」。500 は呼び出し側の保存失敗の文面になる。
+    expect(photoNoticeFor(new ApiError(500, 'API error: 500', 'REVIEW_SAVE_FAILED'), FALLBACK)).toBe(FALLBACK)
+    expect(photoNoticeFor(new ApiError(409, 'Already reviewed', 'VERSION_CONFLICT'), FALLBACK))
+      .toBe('ほかの担当者が先に審査しました。一覧を読み直してから、もう一度お試しください。')
   })
 })

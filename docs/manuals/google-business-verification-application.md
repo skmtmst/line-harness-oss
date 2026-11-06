@@ -1,63 +1,17 @@
+> 文書：申請書類：Googleビジネス連携（機密スコープ business.manage）の審査申請｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 申請書類：Googleビジネス連携（機密スコープ `business.manage`）の審査申請
 
 対象：運営（Google Cloud管理画面の操作をする人）。
 用途：`https://console.cloud.google.com/auth/branding` と `https://console.cloud.google.com/auth/verification` にそのまま貼る文面をまとめたもの。
 手順の順番は `google-business-oauth-setup.md` の「2-5. 本番を公開するときの審査」を見る。
 
-**2026-10-08の結論：この申請は出さなくてよい。** コンソールは `business.manage` を非機密に分類していて確認センターに申請ボタンが出ず、実機でも未接続のGoogleアカウントから警告なしで接続できた。経緯と根拠は0-2章と0-3章。
-**この書類の文面は、Googleが分類を機密へ戻した場合、または接続時に「このアプリは確認されていません」が出るようになった場合の申し立て用に残している。**
-
 **値（クライアントIDやシークレット）はチャット・Issue・PRに貼らないこと。** この書類にも書かない。
 
 ## 0. この申請が必要な理由
 
-Googleの公式ドキュメントは `.../auth/business.manage` を**機密スコープ（sensitive scope）**として扱っている。機密スコープは審査を通さないと同意画面に「このアプリは確認されていません」が出たままになり、利用者は合計100人までに制限される。
-さらに公開ステータスが「テスト」のままだと**許可が7日で切れる**ため、お店の人が7日ごとに再接続しないとGoogle連携が止まる。これはGoogleの仕様で、こちらのコードでは直せない。本番公開にするのが解決策。
-
-### 0-2. 2026-10-08時点の実際のコンソール表示（公式ドキュメントと食い違っている）
-
-本番プロジェクトのコンソールを実際に見ると、上の前提と合わない。**申請する前にここを確認すること。**
-
-| 見る場所 | 実際の表示 |
-| --- | --- |
-| `/auth/audience` 公開ステータス | **本番環境**（すでに公開済み。「テストに戻る」ボタンが出ている状態） |
-| `/auth/scopes` 非機密のスコープ | `.../auth/business.manage`・`.../auth/userinfo.email`・`openid` の**3件すべてがここに入っている** |
-| `/auth/scopes` 機密性の高いスコープ | **「表示する行がありません」**（0件） |
-| `/auth/verification` 確認センター | 申請ボタン（「管理権限申請」「Request verification」）が**出ない** |
-
-つまりGoogleのコンソールは `business.manage` を**非機密**に分類している。確認センターは機密スコープの申請を受け付ける場所なので、機密スコープが0件なら出すものが無く、ボタンも出ない。**機密／非機密の分類はGoogleが決めるもので、こちらで手動で機密側へ移すことはできない。**
-
-この状態で分かっていること：
-
-- **7日で認可が切れる問題はすでに解消している。** 原因は公開ステータス「テスト」で、現在は「本番環境」のため。審査を急いでいた一番の理由はこれだった
-- ただし**同じ症状の未解決の報告がある。** コンソールが「非機密」と表示していても、実際にはテストユーザー以外の全員が `Error 403: access_denied` でブロックされた事例（[Google Developer forums、2026-07-23](https://discuss.google.dev/t/oauth-business-manage-shown-as-non-sensitive-in-auth-platform-but-backend-blocks-all-external-users-with-error-403-access-denied-no-submit-for-verification-path-exists/384175)）。この投稿にGoogleからの解決策は付いておらず、Business Profileサポートは「スコープの再分類も検証開始もできない、Auth Platformチームへ」と回答している
-- `https://developers.google.com/my-business/content/implement-oauth` には、sensitiveの判定・確認の手順・申請フォームのURLがいずれも書かれていない
-
-### 0-3. 実機確認の結果（2026-10-08）— **審査は不要と確定**
-
-公開ステータスが本番環境になっているとテストユーザーの登録は認可の判定に使われない（`/auth/audience` のテストユーザー欄そのものが消える）ため、**一度もmusuboを接続したことがないGoogleアカウント**で `admin.musubo.jp` からGoogleビジネスの「接続」を実行して確かめた。
-
-**結果：警告もエラーも出ず、そのまま接続できた。**
-
-- 「このアプリは確認されていません」の画面は出なかった
-- `Error 403: access_denied` も出なかった（上のフォーラムの症状は、このプロジェクトでは起きていない）
-
-`/auth/audience` の「OAuth ユーザー数の上限」の説明にこう書かれている。
-
-> ユーザーに「未確認のアプリ」の画面が表示されている場合は、OAuth リクエストに未承認追加のスコープが含まれていることが原因です。
-
-その画面が出なかったので、未承認のスコープは含まれていない。同じ説明の前半のとおり、上限が適用されるのは**未承認の機密スコープ・制限付きスコープを要求する場合だけ**なので、**100人の上限もこのアプリには適用されない**（ページ上には「1人のユーザー ／ ユーザー数の上限 100」と表示され続けるが、効いていない）。
-
-したがって現時点で確定していること：
-
-| 項目 | 状態 |
-| --- | --- |
-| OAuth確認（審査）の申請 | **不要。** 機密スコープが0件で申請対象が無い |
-| 7日で認可が切れる問題 | **解消済み。** 公開ステータスが「本番環境」のため |
-| 利用者100人の上限 | **適用されない。** 未承認の機密スコープを要求していないため |
-| 年次セキュリティ評価（#14） | 現時点では求められない見込み。Googleから案内が来たら対応する |
-
-**この書類と2-5章の手順は、Googleが将来 `business.manage` を機密へ分類し直した場合、または上のフォーラムと同じ症状が後から出た場合のために残す。** その兆候は「接続時に『このアプリは確認されていません』が出る」「`/auth/scopes` の『機密性の高いスコープ』に行が増える」の2つ。どちらかを見つけたら1〜4章の文面で申し立てる。
+`.../auth/business.manage` はGoogleの**機密スコープ**。審査を通さないと同意画面に「このアプリは確認されていません」が出たままになり、利用者は合計100人までに制限される。
+さらに公開ステータスが「テスト」のままだと**許可が7日で切れる**ため、お店の人が7日ごとに再接続しないとGoogle連携が止まる。これはGoogleの仕様で、こちらのコードでは直せない。審査を通して本番公開にするのが唯一の解決策。
 
 ## 1. ブランディングページに入れる値（`/auth/branding`）
 
@@ -117,7 +71,7 @@ Googleの公式ドキュメントは `.../auth/business.manage` を**機密ス�
 >
 > There is no narrower scope available. The Google Business Profile APIs do not publish a read-only scope, a reviews-only scope or a performance-only scope — `business.manage` is the single scope these APIs accept, so every operation above requires it.
 >
-> Consent handling: the authorisation request asks for exactly three scopes — `business.manage`, `openid` and `email`. We do not send `include_granted_scopes`, so a token we store never carries a scope that was not shown on that consent screen. Google's consent screen also lets the user decline an individual permission; if "Manage your Business Profile" is not granted, we refuse the connection instead of storing a token that cannot be used — the callback stores nothing and the dashboard asks the owner to connect again with that permission granted. The same check runs every time we refresh the access token, so a permission the owner removes later in their Google account puts the connection into a "needs re-consent" state in our dashboard rather than failing silently.
+> Consent handling: the authorisation request asks for exactly three scopes — `business.manage`, `openid` and `email`. We do not send `include_granted_scopes`, so a token we store never carries a scope that was not shown on that consent screen. Google's consent screen also lets the user clear an individual permission; if "Manage your Business Profile" is left unchecked, we refuse the connection instead of storing a token that cannot be used — the callback stores nothing and the dashboard asks the owner to connect again with that permission granted. The same check runs every time we refresh the access token, so a permission the owner removes later in their Google account puts the connection into a "needs re-consent" state in our dashboard rather than failing silently.
 >
 > We do not create or delete locations, do not transfer or change ownership of a location, and do not access any account the user does not already administer. Write operations are additionally restricted to users holding the owner or admin role inside musubo, and are gated by a server-side switch per environment.
 >
@@ -150,7 +104,7 @@ Googleの公式ドキュメントは `.../auth/business.manage` を**機密ス�
 >
 > より狭いスコープは存在しません。Google Business Profile APIには読み取り専用・口コミ専用・実績専用のスコープが公開されておらず、上記のすべてが `business.manage` だけで受け付けられます。
 >
-> 許可の扱い：認可リクエストで要求するのは `business.manage` と `openid`・`email` の3つだけで、`include_granted_scopes` は送りません。したがって保存するトークンに、その同意画面に出ていないスコープが含まれることはありません。Googleの同意画面では権限ごとに許可しないことを選べますが、「ビジネス情報の管理」が許可されないままの場合は接続を保存せず、画面でその権限を付けたまま接続し直すよう案内します。同じ確認はアクセストークンの更新時にも行うので、後からGoogleアカウント側で権限を取り消した場合も、黙って失敗するのではなく「再連携が必要」という状態として表示します。
+> 許可の扱い：認可リクエストで要求するのは `business.manage` と `openid`・`email` の3つだけで、`include_granted_scopes` は送りません。したがって保存するトークンに、その同意画面に出ていないスコープが含まれることはありません。Googleの同意画面では権限ごとにチェックを外せますが、「ビジネス情報の管理」が外れたままの場合は接続を保存せず、画面でその権限を付けたまま接続し直すよう案内します。同じ確認はアクセストークンの更新時にも行うので、後からGoogleアカウント側で権限を取り消した場合も、黙って失敗するのではなく「再連携が必要」という状態として表示します。
 >
 > 店舗の新規作成・削除、オーナー権限の移転・変更、本人が管理していないアカウントへのアクセスは一切行いません。書き込みはmusubo内のオーナー／管理者の権限を持つ利用者に限られ、さらに環境ごとのサーバー側スイッチで制御しています。
 >
@@ -178,11 +132,8 @@ YouTube Studioへアップロードし、公開設定は**「限定公開（Unli
 
 撮影前・撮影後のチェックリスト、申請フォームに貼る公開URLの一覧、審査員向けのデモアカウント手順、追加質問が来たときの回答集は `docs/manuals/google-business-review-package.md` にまとめてある。撮影当日はそのチェックリストを上から順に潰す。
 
-**撮影当日に手元で見るのは `docs/manuals/google-business-demo-video-shoot-sheet.md`。** 下の台本を秒数つきの時間割にしてあり、英語字幕は `docs/manuals/google-business-demo-video-subtitles.srt` をYouTubeへそのまま上げられる（33行が下の手順と1対1で対応している）。
-
 - **管理画面の文言は日本語しかない。** 英語化の仕組みは入っていないので、画面は日本語のまま撮り、**英語の字幕（またはYouTubeの字幕ファイル）を必ず付ける**。レビュー担当は英語で読む
-- **Googleアカウントの表示言語を English にする**（Googleの**許可画面だけ**が英語で出る。`myaccount.google.com` →「個人情報」→「ウェブ向けの全般設定」→「言語」。ログイン中のGoogleのページはブラウザの言語設定を見ないため、Chromeの言語設定を変えても英語にならない）。管理画面は日本語のまま。撮影後に日本語へ戻す
-- **撮影前に `https://myaccount.google.com/connections` → musubo →「すべてのアクセス権を削除」を実行する**。管理画面側の「接続を解除」はトークンの取り消しだけで、Googleアカウント側の許可の記録は残る。残ったままだと許可画面が「`musubo already has some access`」の青い帯だけになり、**要求する許可の文言が1つも表示されず撮り直しになる**（詳細な手順は `docs/manuals/google-business-demo-video-shoot-sheet.md` の 1-B）
+- **ブラウザの表示言語を英語にする**（Googleの**許可画面だけ**は英語で出る。Chromeの設定→言語→Englishを一番上へ）。管理画面は日本語のまま
 - **アドレスバーを画面に入れる**。許可画面のURLに `client_id=` が写っている必要がある（**OAuthクライアントIDは動画に写ってよい。シークレットは絶対に写さない**）
 - ターミナル、他のタブ、秘密値が写る画面は閉じる
 - 実在する自分の店舗のGoogleアカウントを使う。返信の投稿と店舗情報の変更まで実演するので、**あとで元に戻せる口コミ・項目**を選ぶ（例：紹介文の末尾に1文足して、撮影後に戻す）
@@ -202,7 +153,7 @@ YouTube Studioへアップロードし、公開設定は**「限定公開（Unli
 2. 左メニューの「Googleビジネス」を開き、「設定」タブでまだ接続されていない状態を見せる
 3. 「Googleアカウントを接続」を押す。**ここでアドレスバーに `accounts.google.com/o/oauth2/...` と `client_id=` が写るところを2〜3秒静止**
 4. Googleのアカウント選択画面で、店舗を管理しているアカウントを選ぶ
-5. 同意画面を映す。**アプリ名が `musubo` と出ていること**、要求しているスコープ（Manage your Business Profile / email / openid）が読めるように静止。**すべての許可を認める場合は「Allow」を押す**。1つ以上の許可を拒否する場合、各スコープの 「許可しないことを選ぶ」でそれを外すと、選んだスコープが付与されないまま接続され、「この許可を付けたまま接続し直してください」の案内が出る（仕様どおりの動作）
+5. 同意画面を映す。**アプリ名が `musubo` と出ていること**、要求しているスコープ（Manage your Business Profile / email / openid）が読めるように静止。**「Manage your Business Profile」のチェックは外さずに**「Allow」を押す（外したまま進むと、仕様どおり接続せず「この許可を付けたまま接続し直してください」の案内が出る）
 6. 管理画面に戻り、接続済みの表示と接続したGoogleアカウントのメールが出るところを見せる（→ `openid` / `userinfo.email` の用途の実演）
 7. 「接続する店舗を選ぶ」で、管理している店舗の一覧が出るところを見せ、1つ選ぶ（→ 読み取り1）
 8. 「プロフィール」タブで、店舗名・所在地・電話番号・営業時間・ウェブサイト・紹介文・写真が表示されるところを見せる（→ 読み取り2）
@@ -235,7 +186,7 @@ YouTube Studioへアップロードし、公開設定は**「限定公開（Unli
 
 申請を出すまでに次が必要。**この書類だけでは申請できない。**
 
-済んだもの（2026-10-04時点）
+済んだもの（2026-10-05時点）
 
 | # | やったこと | 結果 |
 | --- | --- | --- |
@@ -244,23 +195,22 @@ YouTube Studioへアップロードし、公開設定は**「限定公開（Unli
 | 3 | apex `musubo.jp` のDNSと本番配備 | 完了（5ページ公開済み） |
 | 4 | Google Search Console で `musubo.jp` の所有権確認 | 完了 |
 | 5 | `/auth/branding` の確認と公開 | 完了 |
+| 6 | プライバシーポリシー第6項・利用規約第3項を実装どおり（読み取り5件・書き込み4件）に書き換え、施行日を `2026-10-04` にする | 完了（Claude実装） |
+| 7 | 更新した `musubo.jp` を本番へ再配備し、privacy/terms の本文と施行日が反映されたことを確認する | 完了（2026-10-05・Codex配備。`/`・`/privacy/`・`/terms/`・`/legal/`・`/contact/` が200、施行日 `2026-10-04`、`noindex` なし、`sitemap.xml` に `<loc>` 5件） |
 
 残り
 
 | # | やること | 担当 |
 | --- | --- | --- |
-| 6 | プライバシーポリシー第6項・利用規約第3項を実装どおり（読み取り5件・書き込み4件）に書き換え、施行日を `2026-10-04` にする | Claude（実装済み） |
-| 7 | 更新した `musubo.jp` を本番へ再配備し、privacy/terms の本文と施行日が反映されたことを確認する | Codex（Jev経由で依頼） |
 | 8 | 本番用のOAuthクライアントを作る。リダイレクトURIは**1行だけ**（`https://api.musubo.jp/api/restaurant-test/google/oauth/callback`）。スプレッドシート連携のコールバックは**登録しない**（下の注を参照）。IDもシークレットも申請書類・チャットに貼らず、`pnpm exec wrangler secret put GOOGLE_BUSINESS_OAUTH_CLIENT_ID` と `… _SECRET` で本人のターミナルから入れる。手順は `docs/manuals/google-business-oauth-setup.md` 6章 | 利用者（Claudeが画面を案内） |
 | 9 | 本番Worker設定：`apps/worker/wrangler.toml` に `RESTAURANT_TEST_ENABLED="true"` ／ `GOOGLE_BUSINESS_WRITE_ENABLED="true"` | Claude（実装済み） |
 | 9-2 | 本番管理画面のビルド値：`.github/workflows/deploy-cloudflare-admin.yml` の `NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'` | Claude（実装済み） |
 | 9-3 | 本番Workerとページの再配備（Pagesプロジェクト `nen-line-admin-98712679`）。配備後に `admin.musubo.jp` の左メニューに「Googleビジネス」が出ることを確認 | Codex（Jev経由で依頼） |
-| 10 | デモ動画を3章の台本で撮り、限定公開でアップロード。撮影前後のチェックリストは `docs/manuals/google-business-review-package.md` 1章 | 利用者（**完了**。限定公開＋英語字幕、ログイン中・ログアウト中の両方で再生確認済み） |
-| 10-2 | **実機確認**（まだ一度もmusuboを接続したことがないGoogleアカウントで `admin.musubo.jp` からGoogleビジネスの「接続」を押し、警告・エラーの有無を見る） | 利用者（**完了**。2026-10-08、警告もエラーも出ずに接続できた。結果は0-3章） |
-| 11 | ~~確認（審査）の申請~~ → **不要と確定。** #10-2で未確認アプリの警告も `Error 403` も出なかった。機密スコープが0件で `/auth/verification` に申請対象も無い。1〜4章の文面は、Googleが分類を機密へ戻した場合の申し立て用に残す | — |
-| 12 | ~~審査（通常3〜5営業日）~~ → **不要。** #11を行わないため | — |
-| 13 | ~~審査通過後に `/auth/audience` で「アプリを公開」にする~~ → **完了済み。** 現行UIでは公開が審査より先で、本番プロジェクトはすでに「本番環境」。7日で切れる問題は解消している | — |
-| 14 | 年次セキュリティ評価（Annual Security Assessment）への対応。Googleは機密スコープを使うアプリに、指定の第三者評価機関による年1回の評価と「Letter of Assessment」の提出を求めることがある。費用と日程が発生するため、Googleから案内が来た時点で評価機関を選び、見積もりを確認してから申し込む。**#10-2で未確認アプリ扱いにならなかったため、現時点では求められない見込み。Googleから案内が来たらこの行を実行する** | 利用者（Claudeが要件整理と資料準備を担当） |
+| 10 | デモ動画を3章の台本で撮り、限定公開でアップロード。撮影前後のチェックリストは `docs/manuals/google-business-review-package.md` 1章 | 利用者 |
+| 11 | `/auth/verification` で2章の理由と動画リンク、4章のドキュメントリンクを提出。貼るURLの一覧は審査パッケージ2章、追加質問が来たときの回答は同4章、審査員用の試用アカウント手順は同3章 | 利用者 |
+| 12 | 審査（通常3〜5営業日）。追加質問はデベロッパー連絡先に来る | Google |
+| 13 | 審査通過後、`/auth/audience` で「アプリを公開」にする → 7日で切れる問題が解消 | 利用者 |
+| 14 | 年次セキュリティ評価（Annual Security Assessment）への対応。Googleは機密スコープを使うアプリに、指定の第三者評価機関による年1回の評価と「Letter of Assessment」の提出を求めることがある。費用と日程が発生するため、Googleから案内が来た時点で評価機関を選び、見積もりを確認してから申し込む | 利用者（Claudeが要件整理と資料準備を担当） |
 
 注意：
 
@@ -272,4 +222,4 @@ YouTube Studioへアップロードし、公開設定は**「限定公開（Unli
   - Sheets連携を実運用で使うときは、専用のOAuthクライアントを別に作り、`spreadsheets` の同意画面登録と申請理由は**この審査が通ったあとに別途**行う（同意画面のスコープはGoogleプロジェクト単位のため）。
   - 検証環境は審査対象ではないので現状のままでよい。詳細は `docs/manuals/google-business-oauth-setup.md` 6章。
 - **28日で消す処理は定期実行（6時間ごと）に入っている**（`apps/worker/src/services/google-business-retention.ts`、登録は `apps/worker/src/index.ts`）。定期実行の設定があるのは本番だけ（`apps/worker/wrangler.staging.toml` には `[triggers]` を置いていない）ので、公開文書に書いた「28日後に削除」が実際に動くのは #9-3 の再配備後。解除時の即時削除は定期実行に依存せず、その場で動く。
-- #7・#8・#9-3 が終わるまで #10 の撮影はできない。
+- #8・#9-3 が終わるまで #10 の撮影はできない（#7は2026-10-05に完了）。

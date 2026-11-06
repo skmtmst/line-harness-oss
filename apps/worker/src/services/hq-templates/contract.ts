@@ -6,6 +6,7 @@ import {
   type HqTemplateType,
 } from '@line-crm/db';
 
+
 export { HQ_TEMPLATE_DISTRIBUTION_MODES, HQ_TEMPLATE_TYPES };
 export type { HqTemplateDistributionMode, HqTemplateStatement, HqTemplateType };
 
@@ -110,7 +111,7 @@ export interface HqTemplateDuplicate {
   reason: string;
 }
 
-/** Persisted preflight decision for one source item. Secrets are never carried here. */
+/** 参照1件の事前確認を永続化し、秘密値は含めない。 */
 export interface HqTemplateResolution {
   sourceId: string;
   itemKind: string;
@@ -126,6 +127,8 @@ export interface HqTemplateOwnedR2Object {
   key: string;
   ownerToken: string;
   bytes: Uint8Array;
+  /** 大きな不変メディアは必要時に複製し、長さ・ETag・SHA-256を検証する。 */
+  streamSource?: import('../hq-media-stream.js').HqMediaStreamSource;
   contentType?: string;
 }
 
@@ -156,7 +159,7 @@ export interface HqTemplateAdapterContext {
   mode: HqTemplateDistributionMode;
   snapshotToken: HqTemplateSnapshotToken;
   resolutions: readonly HqTemplateResolution[];
-  /** Internal store-attempt fence. Never accepted from HTTP request bodies. */
+  /** 店舗の実行権は内部で発行し、HTTP 本文の値は採用しない。 */
   executionAttempt?: number;
 }
 
@@ -210,3 +213,5 @@ export function unsupportedHqTemplateAdapter(type: HqTemplateType): HqTemplateAd
     buildCommitPlan: () => unsupported('commit'),
   };
 }
+
+export type HqInitialResourceCommit = (account:string,resolutions:readonly HqTemplateResolution[])=>Promise<HqTemplateStatement[]>;

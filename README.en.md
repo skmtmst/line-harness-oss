@@ -1,3 +1,5 @@
+> 文書：LINE Harness｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 > **Frozen at v0.13.2 (2026-09-03).** The Japanese `README.md` is the source of truth and the only version kept up to date.
 
 🌐 [日本語](README.md) | **English** | [简体中文](README.zh-CN.md) | [한국어](README.ko.md) | [Español](README.es.md)
@@ -13,7 +15,7 @@ Runs on Cloudflare's free tier. **$0/month server cost.** Fully operable from Cl
 
 [![Click to play on YouTube — LINE Harness setup guide](https://img.youtube.com/vi/DiRuGaeq1sM/maxresdefault.jpg)](https://youtu.be/DiRuGaeq1sM)
 
-**Current version**: v0.13.2 ・ MIT License ・ TypeScript / Cloudflare Workers + D1
+**Document snapshot**: v0.13.2 (current version: [package.json](package.json)) ・ MIT License ・ TypeScript / Cloudflare Workers + D1
 
 ---
 
@@ -92,7 +94,7 @@ Takes about 5 minutes. Once done, the dashboard at `https://<your-name>-admin.pa
 - **Timeline tracking** — records click → friend-add → conversion in sequence, attribution via last-touch
 - **Approval workflow** — approve/reject attributed conversions to finalize rewards, with duplicate-account flags to surface potential fraud
 - **LINE push notifications** — automatic push to the affiliate when a conversion is confirmed
-- Details: [docs/wiki/27-Affiliate-ASP.md](docs/wiki/27-Affiliate-ASP.md)
+- Details: [docs/v6-requirements/v6-16-affiliate-requirements-draft.md](docs/v6-requirements/v6-16-affiliate-requirements-draft.md)
 
 ### Automation
 - **IF-THEN rules** — 7 trigger types × 6 action types
@@ -110,7 +112,7 @@ Takes about 5 minutes. Once done, the dashboard at `https://<your-name>-admin.pa
 ### AI integration
 - **MCP server included** (`@line-harness/mcp-server`) — natural-language operation from Claude Code
   - `list_conversations` / `get_conversation` — AI-monitored unanswered conversations
-  - `create_scenario` / `update_step` — let AI design scenarios
+  - `create_scenario` / `update_step` — let AI design scenarios — created inactive; review, then activate via `manage_scenarios` update (publish permission required)
   - `broadcast` / `send_message` — sending requires user confirmation
 - **Official SDK** (`@line-harness/sdk`) — typed TypeScript SDK, ESM + CJS, zero dependencies
 

@@ -1,0 +1,90 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * バナー生成パネルの小さな部品の見た目。
+ * 承認: musubo-design/バナー生成.pen フレーム `g64HOD`・2026-10-06・
+ * 利用者回答「この案で承認する」。
+ *
+ * 画面の見え方は承認したときと同じで、書き方だけを直書きから約束の値
+ * （トークン）へ移している。数字で書く必要があるのは承認済みの寸法
+ * （高さ 26・枠 1.5・左右の余白 9）だけに留める。
+ */
+@layer components {
+.v8LineRemove { min-height: 0; display: inline-flex; align-items: center; justify-content: center; padding: 0; width: 14px; height: 14px; color: var(--color-ink-faint); }
+.v8LineAdd { min-height: 0; display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; color: var(--color-accent-deep); font-size: var(--text-caption); font-weight: 600; line-height: normal; }
+.v8ColorNote { margin-top: 4px; color: var(--color-ink-secondary); font-size: var(--text-micro); line-height: normal; }
+
+.v8UsageLabels { display: flex; justify-content: space-between; font-size: var(--text-micro); line-height: normal; color: var(--color-ink-secondary); }
+.v8SmallMuted { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: normal; }
+.v8SmallTitle { color: var(--color-ink); font-size: var(--text-micro); line-height: normal; font-weight: 600; }
+.v8ColorTitle { font-size: var(--text-label); font-weight: 700; line-height: 17px; color: var(--color-ink); }
+.v8Caption { color: var(--color-ink); font-size: var(--text-caption); line-height: normal; font-weight: 600; }
+.v8TextRow { display: flex; align-items: center; gap: 6px; }
+.v8LineNumber { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: normal; font-weight: 600; }
+.v8Emphasis { padding: 0 8px; height: 25px; border-width: 1px; }
+
+.v8HeadTitle { color: var(--color-ink); font-size: var(--text-body); line-height: var(--tpl-hq-nav-item-lh-20); font-weight: 700; }
+.v8Body { display: flex; flex-direction: column; gap: var(--tpl-hq-plans-gap); padding: var(--tpl-hq-form-gap) var(--tpl-hq-plans-gap) var(--tpl-hq-plans-gap); }
+
+/*
+ * 「強調」の入り切り（`g64HOD` の行ごとのボタン）。
+ * 高さ 26・枠 1.5・左右の余白 9・文字 11/600・丸はぴったり丸い端。
+ * 入っていないときは白地＋薄い線、入っているときは薄い緑地＋濃い緑。
+ */
+.emphasis {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 26px;
+  padding: 0 8px;
+  border: 1.5px solid;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-micro);
+  /* 以前の `text-micro` クラスは行の高さも一緒に決めていたので、同じ値を添える。 */
+  line-height: var(--text-micro--line-height);
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
+}
+
+.emphasis:disabled {
+  opacity: var(--polish-disabled-opacity);
+}
+
+/* 入っている行（強調カラーで目立たせる行）。 */
+.emphasisOn {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+/* 入っていない行。押せることが分かるように、重ねたときだけ面をわずかに沈める。 */
+.emphasisOff {
+  border-color: var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+}
+
+.emphasisOff:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+/*
+ * 使い方の説明（★BG-B `R6MBHf`）の1行ぶん。名前と説明を縦に積む。
+ * 板は名前 `UPIq5`（上 919・高さ 16）の 2px 下に説明 `Z55Iao`（上 937）を置く。
+ * 正規の余白段（4px きざみ）に寄せると、3 行ぶん積み上がって最後の説明が
+ * 6px ずれ、±4px の照合を外す。ここだけ板どおりの 2px が要るので、
+ * 画面側の CSS に理由つきで書く（#704 のラチェットは 4px きざみを守るための
+ * もので、板の寸法そのものを否定しない。docs/v8-design-rules.md §1 の2）。
+ */
+.howToText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+}

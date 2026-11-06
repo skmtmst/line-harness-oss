@@ -21,9 +21,10 @@ const mocks = vi.hoisted(() => {
       this.status = status
     }
   }
-  return { runs: vi.fn(), retryRun: vi.fn(), MockApiError }
+  return { runs: vi.fn(), retryRun: vi.fn(), staffMe: vi.fn(), MockApiError }
 })
 const { runs: runsMock, retryRun: retryRunMock, MockApiError } = mocks
+const staffMeMock = mocks.staffMe
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -32,6 +33,9 @@ vi.mock('@/lib/api', () => ({
       retryRun: mocks.retryRun,
       update: vi.fn(),
     },
+    // R530: この試験は変更できる担当者の筋書き。見るだけの出し分けは
+    // runs-viewer-gating で見る。
+    staff: { me: mocks.staffMe },
   },
   ApiError: mocks.MockApiError,
 }))
@@ -112,6 +116,13 @@ async function renderPage() {
     root.render(<AutoReplyRunsPage />)
   })
   await flush()
+  await openRunMenu()
+}
+
+async function openRunMenu(index = 0) {
+  const more = container.querySelectorAll<HTMLButtonElement>('button[aria-label$="記録の操作"]')[index]
+  await act(async () => { more.click() })
+  await flush()
 }
 
 afterEach(() => {
@@ -125,10 +136,11 @@ afterEach(() => {
 beforeEach(() => {
   runsMock.mockResolvedValue(listResponse())
   retryRunMock.mockResolvedValue({ success: true, data: { status: 'completed' } })
+  staffMeMock.mockResolvedValue({ success: true, data: { role: 'owner' } })
 })
 
 function retryButtons(): HTMLButtonElement[] {
-  return Array.from(container.querySelectorAll('button'))
+  return Array.from(document.querySelectorAll('[role="menu"] button'))
     .filter((button) => /もう一度実行|実行しています/.test(button.textContent ?? ''))
 }
 
@@ -140,6 +152,9 @@ describe('自動応答・実行結果の再実行（N-081）', () => {
     ]))
     await renderPage()
     expect(retryButtons()).toHaveLength(1)
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+    await openRunMenu(1)
+    expect(retryButtons()).toHaveLength(0)
   })
 
   it('押すと再実行の口を呼び、成功したら一覧を読み直す', async () => {
@@ -180,6 +195,7 @@ describe('自動応答・実行結果の再実行（N-081）', () => {
       button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(retryRunMock).toHaveBeenCalledTimes(1)
+    await openRunMenu()
     expect(retryButtons()[0].disabled).toBe(true)
 
     await act(async () => {
@@ -208,4 +224,45 @@ describe('自動応答・実行結果の再実行（N-081）', () => {
     // 失敗時は一覧を読み直さない。
     expect(runsMock).toHaveBeenCalledTimes(1)
   })
+
+  it('403 は読み直しではなく権限の説明を出す（R530）', async () => {
+    retryRunMock.mockRejectedValue(new MockApiError(403, 'この操作には管理者権限が必要です'))
+    await renderPage()
+
+    await act(async () => {
+      retryButtons()[0].dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flush()
+
+    expect(container.querySelector('[role="status"]')?.textContent)
+      .toContain('この操作の権限がありません')
+    // 権限不足は読み直しても直らないので読み直さない。
+    expect(runsMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+it('件数はこのページの実行結果で数え、詳細とコピーへ顧客本文や生のエラーを渡さない', async () => {
+  const response = listResponse([
+    runItem({ inputPreview: '顧客だけの本文', errorCode: 'token=private-secret', detail: 'token=private-secret' }),
+    runItem({ id: 'waiting-2', status: 'pending', canRetry: false }),
+  ])
+  response.data.summary.errors = 999
+  response.data.handovers.waiting = 99
+  response.data.pagination.total = 500
+  runsMock.mockResolvedValue(response)
+  const writeText = vi.fn(async (_text: string) => {})
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+  await renderPage()
+  expect(container.textContent).not.toMatch(/顧客だけの本文|private-secret/)
+  expect(container.querySelector('button[aria-label="すべて 2件（このページ）"]')?.textContent).toBe('すべて 2')
+  expect(container.querySelector('button[aria-label="確認待ち 1件（このページ）"]')?.textContent).toBe('確認待ち 1')
+  const detail = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(item => item.textContent === '実行の詳細を見る')!
+  await act(async () => detail.click())
+  const dialog = document.querySelector('[role="dialog"]')!
+  expect(dialog.textContent).toContain('田中さん')
+  expect(dialog.textContent).toContain('処理を完了できませんでした')
+  expect(dialog.textContent).not.toMatch(/顧客だけの本文|private-secret/)
+  await act(async () => (dialog.querySelector('[aria-label="この記録をコピー"]') as HTMLElement).click())
+  expect(writeText.mock.calls[0][0]).toContain('相手：田中さん')
+  expect(writeText.mock.calls[0][0]).not.toMatch(/顧客だけの本文|private-secret/)
 })

@@ -1,0 +1,2 @@
+/* 動画の枠とプレビュー画像の小さい枠を横に並べる（Z7vd2）。 */
+.videoRow { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-slot-w-compact); gap: var(--tpl-slot-row-gap); align-items: start; }

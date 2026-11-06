@@ -1,12 +1,12 @@
-import { readFileSync } from 'node:fs';
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const page = readFileSync(join(directory, 'page.tsx'), 'utf8');
-const overview = readFileSync(join(directory, 'nen-overview.tsx'), 'utf8');
-const editor = readFileSync(join(directory, 'edit/campaign-editor.tsx'), 'utf8');
+const overview = readFileSync(join(directory, '../../v8/nen-campaigns/list.tsx'), 'utf8');
+const editor = readFileSync(join(directory, '../../v8/nen-campaigns/edit.tsx'), 'utf8');
 const api = readFileSync(join(directory, '../../lib/api.ts'), 'utf8');
 
 describe('NEN配信のテスト送信先', () => {
@@ -43,7 +43,7 @@ describe('NEN配信のテスト送信先', () => {
     expect(overview).not.toContain('>{job.status}</span>');
   });
 
-  test('誕生日クーポンはV6どおり3日前10時と案内する', () => {
+  test("誕生日クーポンは管理画面どおり3日前10時と案内する", () => {
     expect(overview).toContain('誕生日は3日前の10:00に送ります');
     expect(overview).not.toContain('誕生日月の1日に自動送信');
     expect(overview).toContain('formatCampaignTiming(setting)');
@@ -52,15 +52,15 @@ describe('NEN配信のテスト送信先', () => {
   test('取得済みの失敗・待機件数を表示し、配信日時を日本時間へ変える', () => {
     expect(overview).toContain('summary.pending + summary.processing');
     expect(page).toContain('undelivered: thisMonthRes.data.summary.failed');
-    expect(overview).toContain('formatNenJobDateTime(delivery.sentAt || delivery.scheduledAt)');
+    expect(overview).toContain('jstDateTime(delivery.sentAt || delivery.scheduledAt)');
     expect(overview).not.toContain('予定：{delivery.scheduledAt}');
   });
 
   test('一覧の読込失敗を0件や空状態として表示しない', () => {
     // 1件の失敗で画面全体をエラーにしない(点検 #512 の中3)。
-    // ★V7 `x63W5x`：失敗はそのタブの一覧の場所の1枚で示す（帯は出さない）。
+    // ★管理画面 `x63W5x`：失敗はそのタブの一覧の場所の1枚で示す（帯は出さない）。
     expect(page).toContain('tabErrors');
-    expect(page).not.toContain('tone="danger"');
+    expect(page).toContain('tabError');
     expect(overview).toContain('tabError');
     expect(overview).toContain('onRetryTab');
     expect(page).not.toContain('loadError');

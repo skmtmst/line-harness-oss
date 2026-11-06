@@ -1,5 +1,5 @@
 /*
- * N-101(#622): 友だち追加の送信は1回だけ・送れなかったら再送可能。
+ * 友だち追加の送信は1回だけ・送れなかったら再送可能。
  *
  * 実DB・実振り分け・実送信権予約で確かめる。外部LINEへは送らない
  *（line-sdk だけ差し替える）。DBはテスト用D1（better-sqlite3）を使う。
@@ -7,10 +7,10 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
 import type Database from 'better-sqlite3';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { publishScenarioVersion } from '@line-crm/db';
-import { isFriendAddResendSuppressed } from '../services/friend-add-routing.js';
+import { isFriendAddResendSuppressed } from '../features/friends/friend-add-routing.js';
 
 const lineClientMocks = vi.hoisted(() => ({
   getProfile: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock('@line-crm/line-sdk', async () => {
   return {
     ...actual,
     verifySignature: vi.fn(),
-    LineClient: vi.fn().mockImplementation(() => lineClientMocks),
+    LineClient: vi.fn().mockImplementation(function () { return lineClientMocks; }),
   };
 });
 
@@ -87,7 +87,7 @@ async function seedBase(): Promise<void> {
   insertFriend(raw, 'friend-1', {
     line_user_id: 'U-1', line_account_id: 'account-1', unfollow_count: 0, ref_code: 'REF001',
   });
-  // 参加には明示公開が要る（351 / #644）。公開していないシナリオへは登録
+  // 参加には明示公開が要る。公開していないシナリオへは登録
   // しないので、ここで1度だけ公開して稼働中の状態にする。
   await publishScenarioVersion(db, 'scenario-1', {
     staffId: null,
@@ -99,6 +99,7 @@ async function postFollow(
   webhookEventId: string,
   useDb: D1Database = db,
   extraEnv: Record<string, unknown> = {},
+  timestamp = Date.now(),
 ): Promise<void> {
   const app = new Hono();
   app.route('/', webhook);
@@ -107,8 +108,9 @@ async function postFollow(
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
     body: JSON.stringify({
+      destination: 'bot',
       events: [{
-        type: 'follow', webhookEventId, timestamp: Date.now(),
+        type: 'follow', webhookEventId, timestamp,
         source: { type: 'user', userId: 'U-1' }, replyToken: `reply-${webhookEventId}`,
         follow: { isUnblocked: false },
       }],
@@ -147,7 +149,7 @@ function breakOnceOn(useDb: D1Database, needle: string, error: Error): { db: D1D
               throw error;
             };
             // RETURNING を使う文は first で走るので、両方を壊す。
-            return { ...bound, run: fail, first: fail };
+            return { ...bound, run: fail, first: fail, all: fail };
           },
         };
       };
@@ -169,7 +171,7 @@ beforeEach(async () => {
   await seedBase();
   vi.mocked(verifySignature).mockResolvedValue(true);
   /*
-   * `vi.clearAllMocks()` は呼び出し記録しか消さないので、`...Once` の
+   * `vi.clearAllMocks` は呼び出し記録しか消さないので、`...Once` の
    * 待ち行列が残ると次の試験へ漏れる（送れたはずの試験が送達不明になる）。
    * 送信の口だけは毎回まっさらにしてから既定を敷き直す。
    */
@@ -191,7 +193,8 @@ describe('POST /webhook — 並行followの単一化 (#622)', () => {
     lineClientMocks.replyMessage.mockImplementation(
       async () => { await new Promise((resolve) => setTimeout(resolve, 50)); },
     );
-    await Promise.all([postFollow('webhook-a'), postFollow('webhook-b')]);
+    const occurredAt=Date.now();
+    await Promise.all([postFollow('webhook-a',db,{},occurredAt), postFollow('webhook-b',db,{},occurredAt)]);
 
     const sends = lineClientMocks.replyMessage.mock.calls.length
       + lineClientMocks.pushMessage.mock.calls.length;
@@ -396,12 +399,8 @@ describe('POST /webhook — 送信の結末を分ける (#622)', () => {
  * 間に予約を奪われても気づけず、奪った側と両方が送ってしまう。
  */
 /*
- * 送達不明のあとの復旧。
- *
- * 「送り始めた」印を消す経路が予約の解放しか無く、送達不明では解放しないため、
- * 印を無期限にすると**1回の送達不明でその友だちへ二度と届かなくなる**。
- * 引き金は混雑時の 429 でも起きるので、例外的な事故ではない。
- * 印に有効期限を持たせ、時間が経てば次の追加で届くようにする。
+ * 送達不明は予約を解放できず、送信開始印を無期限にすると以後の友だち追加も届かなくなる。
+ * 印に期限を設け、期限後の追加操作では再び送信できるようにする。
  */
 /*
  * 振り分けの登録・アクションも、外部送信と同じ予約の下で行う。
@@ -820,7 +819,8 @@ describe('POST /webhook — 流入リンクの案内も同じ送信権の下 (#6
     lineClientMocks.replyMessage.mockImplementation(
       async () => { await new Promise((resolve) => setTimeout(resolve, 50)); },
     );
-    await Promise.all([postFollow('webhook-a'), postFollow('webhook-b')]);
+    const occurredAt=Date.now();
+    await Promise.all([postFollow('webhook-a',db,{},occurredAt), postFollow('webhook-b',db,{},occurredAt)]);
 
     // シナリオ1通（reply）＋ 流入リンクの案内1通（push）。負けた側は0通。
     expect(lineClientMocks.replyMessage.mock.calls.length).toBe(1);
@@ -912,5 +912,55 @@ describe('POST /webhook — 流入リンクの案内の共通情報 (N-189)', ()
     // テキスト型の本文は {"text":"…"} のJSONで保持される
     expect(messages[0].text).toContain('営業時間は10時から18時です');
     expect(messages[0].text).not.toContain('{{var.');
+  });
+});
+
+
+test('公開した初回のテキストを共通情報を解決して1回だけ送り、送信履歴を残す', async () => {
+  raw.prepare(`UPDATE friend_add_rule_versions SET status='draft' WHERE id='version-1'`).run();
+  raw.prepare(`INSERT INTO friend_add_rule_versions(id,rule_id,version_number,definition_snapshot,status) SELECT 'text-version','rule-1',2,json_set(definition_snapshot,'$.messageType','text','$.messageText','こんにちは {{var.shop}}','$.scenarioId',NULL),'published' FROM friend_add_rule_versions WHERE id='version-1'`).run();
+  raw.prepare(`UPDATE friend_add_rules SET current_version_id='text-version' WHERE id='rule-1'`).run();
+  raw.prepare(`INSERT INTO common_vars(id,line_account_id,name,var_key,type,value) VALUES ('shop','account-1','店名','shop','text','お店')`).run();
+  await postFollow('direct-text');
+  expect(lineClientMocks.pushMessage).toHaveBeenCalledWith('U-1', [{ type: 'text', text: 'こんにちは お店' }], expect.any(String));
+  expect(raw.prepare(`SELECT routing_status,delivery_count FROM friend_add_events WHERE webhook_event_id='direct-text'`).get()).toMatchObject({ routing_status: 'completed', delivery_count: 1 });
+  await postFollow('direct-text');
+  expect(lineClientMocks.pushMessage).toHaveBeenCalledTimes(1);
+  expect(raw.prepare(`SELECT count(*) n FROM friend_scenarios`).get()).toEqual({ n: 0 });
+});
+
+describe('クーポンQRからの初回追加', () => {
+  function seedEntryCoupon() {
+    raw.prepare(`INSERT INTO broadcast_message_assets(id,line_account_id,kind,name,payload_json,published_version,created_at,updated_at)
+      VALUES('entry-coupon','account-1','coupon','店頭10%オフ',?,1,'2026-10-01','2026-10-01')`)
+      .run(JSON.stringify({ description: '10%オフ', startsAt: '2020-01-01', endsAt: '2099-01-01', oncePerFriend: true }));
+    raw.exec("UPDATE entry_routes SET coupon_enabled=1,coupon_asset_id='entry-coupon' WHERE id='route-1'");
+  }
+  test('追加時にこの経路のクーポンを送る。別IDのfollowが再び届いても2枚目は送らない', async () => {
+    seedEntryCoupon();
+    await postFollow('coupon-follow');
+    const coupons = () => lineClientMocks.pushMessage.mock.calls.filter((call) => JSON.stringify(call).includes('coupon_use:entry-coupon:'));
+    expect(coupons()).toHaveLength(1);
+    const receipt = raw.prepare('SELECT id,status FROM entry_route_coupon_receipts').get() as { id: string; status: string };
+    expect(receipt.status).toBe('sent');
+    expect(coupons()[0][2]).toBe(receipt.id);
+    await postFollow('coupon-follow-duplicate');
+    expect(coupons()).toHaveLength(1);
+  });
+  test.each(['draft', 'returning'])('未公開と再フォローには送らない: %s', async (kind) => {
+    seedEntryCoupon();
+    if (kind === 'draft') raw.exec("UPDATE broadcast_message_assets SET published_version=0 WHERE id='entry-coupon'");
+    else raw.exec("UPDATE friends SET unfollow_count=1 WHERE id='friend-1'");
+    await postFollow('coupon-blocked');
+    expect(lineClientMocks.pushMessage.mock.calls.filter((call) => JSON.stringify(call).includes('coupon_use:entry-coupon:'))).toHaveLength(0);
+    expect(raw.prepare('SELECT COUNT(*) AS n FROM entry_route_coupon_receipts').get()).toEqual({ n: 0 });
+  });
+  test('追加イベントの到着が遅れ、送信時に期限切れなら発行しない', async () => {
+    seedEntryCoupon();
+    raw.prepare("UPDATE broadcast_message_assets SET payload_json=? WHERE id='entry-coupon'")
+      .run(JSON.stringify({ description: '10%オフ', startsAt: '2020-01-01', endsAt: new Date(Date.now() - 60_000).toISOString(), oncePerFriend: true }));
+    await postFollow('coupon-delayed', db, {}, Date.now() - 120_000);
+    expect(lineClientMocks.pushMessage.mock.calls.filter((call) => JSON.stringify(call).includes('coupon_use:entry-coupon:'))).toHaveLength(0);
+    expect(raw.prepare('SELECT COUNT(*) AS n FROM entry_route_coupon_receipts').get()).toEqual({ n: 0 });
   });
 });

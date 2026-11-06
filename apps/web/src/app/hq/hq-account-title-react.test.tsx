@@ -7,17 +7,22 @@ const titles = vi.hoisted(() => ({ seen: [] as unknown[] }))
 // 描画のたびに別物が返ると effect が回り続けるので、固定の1つを返す。
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {},
   usePageTitle: (title: unknown) => { titles.seen.push(title) },
+  usePageChrome: () => ({}),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(window.location.search),
   useRouter: () => router,
+  usePathname: () => '/hq',
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ setSelectedAccountId: vi.fn(), refreshAccounts: vi.fn(async () => {}) }),
+  useAccount: () => ({ accounts: [], setSelectedAccountId: vi.fn(), refreshAccounts: vi.fn(async () => {}) }),
 }))
 vi.mock('@/lib/api', () => ({
   api: {
+    tenants: { me: vi.fn(async () => ({ success: true, data: { name: '然' } })) },
+    staff: { me: vi.fn(async () => ({ success: true, data: { role: 'owner' } })) },
+    lineAccountFolders: { list: vi.fn(async () => ({ success: true, data: { folders: [] } })) },
     lineAccounts: { list: vi.fn(async () => ({ success: true, data: [] })) },
     hqNotices: { list: vi.fn(async () => ({ success: true, data: [] })), markRead: vi.fn() },
     operatorHistory: vi.fn(async () => ({ success: true, data: [] })),
@@ -56,13 +61,13 @@ async function settle() {
 }
 
 describe('本部のアカウント一覧の見出し', () => {
-  it('/hq が見出し「アカウント」を出す', async () => {
+  it('hq が見出し「アカウント」を出す', async () => {
     await act(async () => { root.render(<HqPage />) })
     await settle()
     expect(titles.seen).toContain('アカウント')
   })
 
-  it('/hq/open が見出し「アカウント」を出す', async () => {
+  it('hq/open が見出し「アカウント」を出す', async () => {
     window.history.replaceState(null, '', '/hq/open?target=tags')
     await act(async () => { root.render(<HqOpenPage />) })
     await settle()
@@ -70,3 +75,5 @@ describe('本部のアカウント一覧の見出し', () => {
     expect(host.textContent).toContain('どのアカウントのタグを開きますか')
   })
 })
+
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))

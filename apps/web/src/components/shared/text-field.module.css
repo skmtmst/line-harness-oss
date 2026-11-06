@@ -1,17 +1,11 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
-/*
- * 入力欄。Pencil V5 の `ytG7l`「共通 入力欄」（102回）と
- * `keKe3`「共通 入力欄（複数行）」（22回）。
- *
- * 1行と複数行で、地・枠・角丸・文字は同じ。違うのは高さと余白だけ。
- *   1行   高さ40px  余白 [0,12]
- *   複数行 高さ120px 余白 14px  行間1.7
- */
+/* 共通の1行・複数行入力。寸法は globals.css の共通入力値から読む。 */
 
 .field {
   display: block;
   width: 100%;
-  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border: 1px solid var(--color-field-border); /* stroke: $hairline */
   border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
   background: var(--color-canvas); /* fill: $canvas */
   color: var(--color-ink); /* fill: $ink */
@@ -20,43 +14,45 @@
    * 同じ大きさにそろえる（以前は `$size-label` の13pxで小さかった）。
    */
   font-size: var(--text-body);
-  font-weight: 400; /* fontWeight: normal */
+  font-weight: var(--font-weight-ui); /* fontWeight: normal */
   font-family: inherit;
 }
 
 .field::placeholder {
-  color: var(--color-ink-faint);
+  color: var(--color-placeholder);
+  opacity: 1;
 }
 
 .field:disabled {
   cursor: not-allowed;
-  background: var(--color-canvas-sunken);
-  opacity: 0.6;
 }
 
-.field:focus-visible {
-  outline: 2px solid var(--color-action);
-  outline-offset: 2px;
+/* 計算で決まる読むだけの欄（年齢など）。絵 ：灰色の地・薄い文字。 */
+.field[data-look='derived'] {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
 }
+
 
 /* ytG7l 共通 入力欄 */
-.single {
-  height: 40px; /* height: 40 */
-  padding: 0 12px; /* padding: [0, 12] */
+.single { /* height: 40 */ /* padding: [0, 12] */
 }
 
-/* keKe3 共通 入力欄（複数行） */
+/* keKe3 共通 入力欄（複数行）／★V8 i5BW8b。最小の高さ120・縦にだけ広げられる（下の層の外の決まり）。 */
 .multi {
-  min-height: 120px; /* height: 120 */
-  padding: 14px; /* padding: 14 */
-  line-height: 1.7; /* lineHeight: 1.7 */
+  min-height: var(--tpl-textarea-min-h); /* height: 120 */
+  padding: var(--tpl-textarea-pad); /* padding: 14 */
+  line-height: var(--tpl-textarea-lh); /* lineHeight: 1.7 */
   resize: vertical;
+}
+.multi[data-density='compact'] {
+  font-size: var(--text-label);
+  line-height: var(--tpl-compact-textarea-lh);
+  padding: var(--tpl-compact-textarea-pad);
+  min-height: var(--tpl-compact-textarea-h);
 }
 
 /* 入力が正しくないとき。枠を赤くするだけで、文字色は変えない。 */
-.invalid {
-  border-color: var(--color-status-danger);
-}
 
 /*
  * #976 U079/U083: タッチ端末は入力文字16px・欄の高さ44px。
@@ -71,4 +67,100 @@
     height: 44px;
   }
 }
+
+/* ★V8「枠線の色」：操作する欄の枠は control-border。誤りの赤は変えない。 */
+:root .field {
+  border-color: var(--color-control-border);
+  box-shadow: var(--control-shadow);
+  font-size: var(--polish-text-body);
 }
+
+@media (pointer: coarse) {
+  :root .field { font-size: var(--text-lead); }
+}
+
+:root .invalid {
+  border-color: var(--color-status-danger);
+}
+
+/* V8の1行欄。高さ・左右の余白・行間は共通値。 */
+:root .single { height: var(--tpl-field-h); border: 0; padding: 0 var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow); line-height: var(--tpl-field-lh); font-family: var(--font-sans); }
+:root .single[aria-invalid='true'] { outline-color: var(--color-danger); }
+/* 誤りのある欄へ移したとき、青い枠で赤を消さない（2026-10-08 オーナー：入力が要る欄は周りが赤くなってそこへ移る）。 */
+
+
+:root .single { gap: 0; }
+/* 1行の欄は、入りきらない見本の文・中身を字の途中で切らず「…」で省く（全文は欄を押すと読める）。 */
+:root .single { text-overflow: ellipsis; }
+
+/*
+ * 打ち直している間（Field の data-field-quiet）は v8 の複数行も普段の枠に戻す。
+ * 1行は outline 側で form-controls.module.css が戻す。
+ */
+:root [data-field-quiet] .multi[aria-invalid='true'] { border-color: var(--color-control-border); }
+}
+
+/*
+ * 複数行の入力欄の決まり（2026-10-08 共通部品の1本化）。
+ * 縦にだけ手で広げられる・横は広げられない。層の外に置くのは、画面が
+ * className で resize-none などを渡しても、この決まりを上書きさせないため。
+ * 管理画面 の TextArea（form-controls の包み）は form-controls.module.css が
+ * 互換経路のときだけ元の resize: none に戻す（管理画面 の見た目は変えない）。
+ */
+.multi {
+  resize: vertical;
+  max-width: 100%;
+  min-height: var(--tpl-textarea-min-h);
+  padding: var(--tpl-textarea-pad);
+  line-height: var(--tpl-textarea-lh);
+}
+
+/* 2行の説明用。指定した欄だけを小さくする。 */
+:root .multiCompact { min-height: var(--tpl-textarea-compact-h); padding: var(--tpl-e78-pair-gap); line-height: var(--tpl-e78-name-lh); }
+:root .multi[data-density="compact"] { padding: var(--tpl-rt-gray-note-pad); border: 0; border-radius: var(--tpl-rt-inner-radius); outline: 1px solid var(--color-control-border); outline-offset: -1px; font-size: var(--text-caption); line-height: var(--tpl-rt-draft-lh); }
+:root .multi[data-density="compact"][aria-invalid="true"] { outline-color: var(--color-danger); }
+
+:root .multi[data-height='post'] { min-height: var(--tpl-rt-summary-h); height: var(--tpl-rt-summary-h); }
+:root .multi[data-height='reply'] { min-height: var(--tpl-rt-draft-h); height: var(--tpl-rt-draft-h); }
+
+/* 見送りの補足2行。指定した欄だけを56pxにする。 */
+:root .multiShort { min-height: var(--tpl-nm-textarea-h); height: var(--tpl-nm-textarea-h); padding: var(--tpl-nm-textarea-pad); font-size: var(--tpl-nm-row-size); line-height: var(--tpl-nm-textarea-lh); }
+
+/* コラムの紹介文。改行を保ち、最初は1行分の高さで表示する。 */
+:root .multiSingleRow { min-height: var(--tpl-field-h); height: var(--tpl-field-h); border: 0; padding: var(--tpl-field-pad-y) var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -1px; line-height: var(--tpl-field-lh); box-shadow: var(--control-shadow); }
+:root .multiSingleRow[aria-invalid='true'] { outline-color: var(--color-danger); }
+
+/* ・仕上げ7 */
+:root .field:disabled { opacity: var(--polish-disabled-opacity); }
+
+
+/* 前後の固定文字も同じ入力枠へ。既定の1行欄の寸法は変えない。 */
+html:root .affixed { display: flex; align-items: center; flex: 1 1 0; gap: var(--space-8); min-width: 0; }
+html:root .affixed[data-affixed-layout="field"] { flex: none; }
+html:root .affixed[data-monospace] { font-family: var(--font-mono); }
+html:root .affixed .affixedControl { width: auto; min-width: 0; max-width: 100%; height: 100%; flex: 0 1 auto; padding: 0; border: 0; outline: 1px solid transparent; box-shadow: none; background: transparent; font: inherit; field-sizing: content; }
+html:root .adornment { flex-shrink: 0; color: var(--color-ink-faint); }
+html:root .affixed:is([data-disabled], :has(.affixedControl:disabled)) { opacity: var(--polish-disabled-opacity); }
+html:root .affixed .affixedControl:disabled { opacity: 1; }
+
+/*
+ * 文字を入れる欄も選ぶ欄（プルダウン）と同じ影と地で浮かせる。
+ * 細い線だけだと平らに見えて埋もれる。焦点の青い輪・誤りの赤い枠・計算で決まる灰色の欄は今のまま。
+ * 前後の固定文字つきの欄は外枠だけに付け、中の入力は透明のまま。
+ */
+html:root .field:is(.single, .multi):not(.affixedControl):not([data-look='derived']):not(:global([data-input-field] *)) {
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+}
+html:root .field:is(.single, .multi):not(.affixedControl):not([data-look='derived']):not([aria-invalid='true']):not(:focus-visible):not(:focus-within) {
+  outline-color: transparent;
+  border-color: transparent;
+}
+html:root .field:is(.single, .multi):not(.affixedControl)[aria-invalid='true']:is(:focus-visible, :focus-within):not(:global([data-input-field] *)) {
+  box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
+}
+
+/* 権限で止めた欄にも保存済みの内容と焦点の輪を残す。 */
+html:root .field[data-permission-locked] { color: var(--color-ink-secondary); cursor: not-allowed; }
+html:root .field[data-permission-locked]:not(.affixedControl),
+html:root .field:is(.single, .multi)[data-permission-locked]:not(.affixedControl):not([data-look='derived']):not(:global([data-input-field] *)) { background: var(--color-canvas-sunken); }

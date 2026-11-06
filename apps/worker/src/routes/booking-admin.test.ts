@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const bookingCustomerMocks = vi.hoisted(() => ({
   createBookingCustomer: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock('@line-crm/db', async (importOriginal) => ({
 const availabilityMocks = {
   computeSlots: vi.fn(() => [] as { start: string; end: string }[]),
   // 候補の instant 契約に合わせる。route は壁時刻ではなく startUtc の
-  // 完全一致で確定する（#651）ので、置き換えでも instant を付ける。
+  // 完全一致で確定するので、置き換えでも instant を付ける。
   // この試験の店舗は Asia/Tokyo。
   getAvailability: vi.fn(async (_db: unknown, params: { from: string; staffId?: string }) => ({
     by_staff: [{
@@ -42,8 +42,8 @@ vi.mock('../services/availability.js', async (importOriginal) => ({
 
 const notifierMocks = { sendBookingNotification: vi.fn() };
 // 送る側だけ差し替える。文面の組み立て（時刻・残り時間）は本物を使う。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   ...notifierMocks,
 }));
 
@@ -299,9 +299,7 @@ const execCtx = {
 } as unknown as ExecutionContext;
 
 describe('POST /api/booking/admin/bookings', () => {
-  // Always 7 days in the future at 02:00Z (= JST 11:00, inside the mocked
-  // 10:00-19:00 shift). A fixed date here becomes a time bomb: the route
-  // rejects past slots with 422 once the calendar catches up.
+  // 実行日によって過去枠として422にならないよう、7日後の02:00Z（JST11時、シフト内）を使う。
   const futureStartsAt = (() => {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() + 7);
@@ -317,6 +315,11 @@ describe('POST /api/booking/admin/bookings', () => {
 
   function happyDb(insertChanges = 1) {
     return scriptedDb([
+      ['SELECT line_account_id, friend_id, staff_id, menu_id, starts_at,', { first: {
+        line_account_id: 'acc1', friend_id: 'f1', staff_id: 's1', menu_id: 'm1',
+        starts_at: validBody.starts_at, notification_policy_snapshot: '{}',
+      } }],
+      ['UPDATE booking_operation_runs SET opened_at', { run: { meta: { changes: 1 } } }],
       ['FROM friends', { first: { id: 'f1', is_following: 1 } }],
       ['FROM staff WHERE', { first: { ok: 1 } }],
       [
@@ -341,7 +344,7 @@ describe('POST /api/booking/admin/bookings', () => {
 
   function happyCustomerDb(insertChanges = 1) {
     return scriptedDb([
-      ['FROM booking_customers', { first: { id: 'customer-1', friend_id: null } }],
+      ['SELECT id, friend_id FROM booking_customers', { first: { id: 'customer-1', friend_id: null } }],
       ['FROM staff WHERE', { first: { ok: 1 } }],
       [
         'FROM menus m',
@@ -376,7 +379,7 @@ describe('POST /api/booking/admin/bookings', () => {
       execCtx,
     );
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ error: 'missing_idempotency_key' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'missing_idempotency_key' , fields: expect.any(Object), error: expect.any(String) });
   });
 
   test('400 without account_id', async () => {
@@ -501,7 +504,7 @@ describe('POST /api/booking/admin/bookings', () => {
 
   test('404 when staff belongs to another account', async () => {
     availabilityMocks.computeSlots.mockReturnValue([{ start: '11:00', end: '12:00' }]);
-    // friend exists, but the staff-in-account assertion returns no row.
+    // 友だちは存在するが、アカウント所属のスタッフ検証が見つからない状態を作る。
     const db = scriptedDb([
       ['FROM friends', { first: { id: 'f1', is_following: 1 } }],
       ['FROM staff WHERE', { first: null }],
@@ -518,7 +521,7 @@ describe('POST /api/booking/admin/bookings', () => {
       execCtx,
     );
     expect(res.status).toBe(404);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; code: string };
     expect(body.error).toBe('staff_not_found');
   });
 
@@ -526,12 +529,10 @@ describe('POST /api/booking/admin/bookings', () => {
     availabilityMocks.computeSlots.mockReturnValue([{ start: '11:00', end: '12:00' }]);
     const db = happyDb();
     const { app, env } = makeApp(db);
-    // September exercises the old `.replace('-09', ...)` mangling bug, but the
-    // year must stay in the future (past slots are rejected with 422 before the
-    // window query runs) — pick this year's Sep 10 or next year's once passed.
+    // 日付文字列の月置換による破損を検出するため9月を使う。過去枠の拒否より先へ進むよう、未来の9月10日を選ぶ。
     const now = new Date();
     const sepYear =
-      now.getTime() < Date.UTC(now.getUTCFullYear(), 8, 1) // before Sep 1
+      now.getTime() < Date.UTC(now.getUTCFullYear(), 8, 1) // 9月1日より前を指定する。
         ? now.getUTCFullYear()
         : now.getUTCFullYear() + 1;
     const res = await app.request(
@@ -688,7 +689,7 @@ describe('POST /api/booking/admin/bookings', () => {
       execCtx,
     );
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: 'line_notification_unavailable' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'line_notification_unavailable' , fields: expect.any(Object), error: expect.any(String) });
     expect(db.calls.some((call) => call.sql.includes('INSERT INTO bookings'))).toBe(false);
   });
 
@@ -748,7 +749,7 @@ describe('jstDayWindowUtc', () => {
 });
 
 describe('PATCH /api/booking/admin/requests/:id の再試行 (N-065)', () => {
-  test('取消ずみへの再送は409にせずV6だけ止める', async () => {
+  test('取消ずみへの再送は409にせずだけ止める', async () => {
     const sqlite = new Database(':memory:');
     try {
       sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
@@ -804,7 +805,7 @@ describe('PATCH /api/booking/admin/requests/:id の再試行 (N-065)', () => {
         env,
         execCtx,
       );
-      // 業務は取消ずみだが V6 が残っている (部分失敗の残り)。再送で V6 を止める。
+      // 業務は取消ずみだが が残っている (部分失敗の残り)。再送で を止める。
       const res = await send();
       expect(res.status).toBe(200);
       await expect(res.json()).resolves.toEqual({ status: 'cancelled' });
@@ -822,7 +823,7 @@ describe('PATCH /api/booking/admin/requests/:id の再試行 (N-065)', () => {
     }
   });
 
-  test('却下でもV6の未送信予定を止める (N-065)', async () => {
+  test('却下でもの未送信予定を止める (N-065)', async () => {
     const sqlite = new Database(':memory:');
     try {
       sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
@@ -869,7 +870,7 @@ describe('PATCH /api/booking/admin/requests/:id の再試行 (N-065)', () => {
         env,
         execCtx,
       );
-      // 却下ずみになり、V6 の未送信予定が止まる (通知だけでは残る不具合の修正)。
+      // 却下ずみになり、の未送信予定が止まる (通知だけでは残る不具合の修正)。
       expect(res.status).toBe(200);
       await expect(res.json()).resolves.toEqual({ status: 'rejected' });
       expect(sqlite.prepare(`SELECT status FROM friend_reminders WHERE id = 'FR2'`).get()).toEqual({
@@ -1076,27 +1077,27 @@ describe('staff breaks API (N-405 #655)', () => {
         ],
       });
       expect(overlap.status).toBe(422);
-      await expect(overlap.json()).resolves.toEqual({ error: 'break_overlap' });
+      await expect(overlap.json()).resolves.toMatchObject({ code: 'break_overlap' , fields: expect.any(Object), error: expect.any(String) });
 
       const outside = await putKind(app, env, 'breaks', {
         expectedVersion: version,
         breaks: [{ weekday: 3, start_time: '12:00', end_time: '13:00' }],
       });
       expect(outside.status).toBe(422);
-      await expect(outside.json()).resolves.toEqual({ error: 'break_outside_working_hours' });
+      await expect(outside.json()).resolves.toMatchObject({ code: 'break_outside_working_hours', error: expect.any(String), fields: expect.any(Object) });
 
       const inverted = await putKind(app, env, 'breaks', {
         expectedVersion: version,
         breaks: [{ weekday: 1, start_time: '13:00', end_time: '12:00' }],
       });
       expect(inverted.status).toBe(422);
-      await expect(inverted.json()).resolves.toEqual({ error: 'invalid_time_range' });
+      await expect(inverted.json()).resolves.toMatchObject({ code: 'invalid_time_range', error: expect.any(String), fields: expect.any(Object) });
 
       const noVersion = await putKind(app, env, 'breaks', {
         breaks: [{ weekday: 1, start_time: '12:00', end_time: '13:00' }],
       });
       expect(noVersion.status).toBe(400);
-      await expect(noVersion.json()).resolves.toEqual({ error: 'invalid_version' });
+      await expect(noVersion.json()).resolves.toMatchObject({ code: 'invalid_version', error: expect.any(String), fields: expect.any(Object) });
     } finally {
       sqlite.close();
     }
@@ -1270,7 +1271,7 @@ describe('staff breaks API (N-405 #655)', () => {
         breaks: [{ work_date: '2026-03-08', start_time: '02:30', end_time: '03:30' }],
       });
       expect(gap.status).toBe(422);
-      await expect(gap.json()).resolves.toEqual({ error: 'dst_gap' });
+      await expect(gap.json()).resolves.toMatchObject({ code: 'dst_gap' , fields: expect.any(Object), error: expect.any(String) });
     } finally {
       sqlite.close();
     }
@@ -1289,7 +1290,7 @@ describe('staff breaks API (N-405 #655)', () => {
         breaks: [{ work_date: '2026-09-24', start_time: '12:00', end_time: '13:00' }],
       });
       expect(noWork.status).toBe(422);
-      await expect(noWork.json()).resolves.toEqual({ error: 'break_outside_working_hours' });
+      await expect(noWork.json()).resolves.toMatchObject({ code: 'break_outside_working_hours' , fields: expect.any(Object), error: expect.any(String) });
     } finally {
       sqlite.close();
     }
@@ -1523,5 +1524,34 @@ describe('GET /api/booking/admin/requests-summary のタブ件数', () => {
     } finally {
       sqlite.close();
     }
+  });
+});
+
+describe('飲食1 人の予約の共通表示', () => {
+  test('日時・アカウント・ページを絞り、既存の版と担当者を返す', async () => {
+    const { createTestD1 } = await import('../test-utils/d1-sqlite.js');
+    const fixture = createTestD1();
+    try {
+      fixture.raw.exec(`
+        INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','ca','店','t','s'),('b','cb','別店','t','s');
+        INSERT INTO staff(id,line_account_id,name,display_name) VALUES('sa','a','担当の内部名','担当A'),('sb','b','別','担当B');
+        INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES('ma','a','相談',60,1000),('mb','b','別店',60,1000);
+        INSERT INTO booking_customers(id,line_account_id,display_name,phone_normalized_hash,phone_encrypted,phone_last4) VALUES('cust','a','予約者','hash','enc','1234'),('cust-b','b','別店客','hash-b','enc','4321');
+        INSERT INTO bookings(id,line_account_id,booking_customer_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at,lock_version) VALUES
+          ('r1','a','cust','sa','ma','2027-01-01T01:00:00Z','2027-01-01T02:00:00Z','2027-01-01T02:00:00Z','confirmed',1000,'2026-10-01',3),
+          ('r2','a','cust','sa','ma','2027-01-01T02:00:00Z','2027-01-01T03:00:00Z','2027-01-01T03:00:00Z','confirmed',1000,'2026-10-01',0),
+          ('foreign','b','cust-b','sb','mb','2027-01-01T01:00:00Z','2027-01-01T02:00:00Z','2027-01-01T02:00:00Z','confirmed',1000,'2026-10-01',1);
+      `);
+      const { app, env } = makeApp(fixture.db);
+      const url='/api/booking/admin/board?account_id=a&from=2027-01-01T01:00:00Z&to=2027-01-01T03:00:00Z&limit=1';
+      const res=await app.request(url,{},env as never);
+      expect(res.status).toBe(200);
+      const body=await res.json() as {data:{entries:unknown[];total:number}};
+      expect(body.data).toMatchObject({total:2,entries:[{id:'r1',kind:'people',version:3,scopeId:'a',customerName:'予約者',resourceIds:['sa'],resourceLabel:'担当A'}]});
+      const next=await app.request(url+'&offset=1',{},env as never);
+      expect((await next.json() as {data:{entries:Array<{id:string;version:number}>}}).data.entries[0]).toMatchObject({id:'r2',version:0});
+      expect((await app.request('/api/booking/admin/board/r2?account_id=a',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({kind:'people',expectedVersion:-1,startsAt:'2027-01-01T03:00:00Z'})},env as never)).status).toBe(400);
+      expect((await app.request('/api/booking/admin/board?account_id=a&from=bad&to=bad',{},env as never)).status).toBe(400);
+    } finally {fixture.raw.close();}
   });
 });

@@ -5,7 +5,9 @@
  * - R288: 行に「元の報酬−差し引き」を出し、繰り越しの帯で方針を示す。
  */
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { AffiliateShell } from '@/v8/affiliates/frame'
+import PaymentTab from '@/v8/affiliates/payment'
 
 const fixture = vi.hoisted(() => ({
   previewImpl: null as null | (() => Promise<unknown>),
@@ -67,7 +69,9 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { default: AffiliatePaymentTab } = await import('./payment-tab')
+function AffiliatePaymentTab({ accountId }: { accountId: string }) {
+  return <AffiliateShell.Provider value={{ tab: 'payment', readonly: false, narrow: false, accountId, counts: {}, setCount: () => {}, focusAffiliateId: null }}><PaymentTab /></AffiliateShell.Provider>
+}
 
 afterEach(() => {
   cleanup()
@@ -85,7 +89,7 @@ describe('R287 締め後に開き直しても明細・CSVを再開できる', ()
       expect(screen.getByText(/締めた記録を読み出しました/)).toBeTruthy()
     })
     expect(screen.getByRole('button', { name: '支払明細をまとめて出す' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '振込用CSVを書き出す' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /銀行用 CSV/ })).toBeTruthy()
   })
 })
 
@@ -97,8 +101,8 @@ describe('R288 支払い画面の差し引き表示', () => {
     await waitFor(() => {
       expect(screen.getByText('今回 払う額')).toBeTruthy()
     })
-    expect(screen.getByText('¥700')).toBeTruthy()
-    expect(screen.getByText(/元の報酬 ¥1,000 − 取消の差し引き ¥300/)).toBeTruthy()
+    expect(within(screen.getByRole('row', { name: /田中/ })).getByText('¥700')).toBeTruthy()
+    expect(screen.getByText(/元の報酬 ¥1,000 − 取消 ¥300/)).toBeTruthy()
     expect(screen.getByText(/締めたあとに取り消された分 ¥300 を差し引いています/)).toBeTruthy()
     expect(screen.getByText(/今回引ききれない ¥100 は次回へ繰り越し/)).toBeTruthy()
   })

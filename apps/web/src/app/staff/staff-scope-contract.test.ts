@@ -1,19 +1,19 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 const staffSource = readFileSync(join(directory, 'page.tsx'), 'utf8')
-const actionsSource = readFileSync(join(directory, 'staff-actions.ts'), 'utf8')
+const actionsSource = readFileSync(join(directory, '../../v8/settings/staff/staff-actions.ts'), 'utf8')
 
-describe('V6 30 見せる範囲の保存と名寄せ(#530)', () => {
+describe("管理画面 30 見せる範囲の保存と名寄せ", () => {
   it('保存ボタンは閉じるだけでなく更新口を呼ぶ', () => {
     // N-424: bundle名をそのまま送る。roleへ潰すと「受付」と「運用」が区別できない。
     expect(staffSource).toContain('roleBundle: bundle')
     expect(staffSource).not.toContain('scopeBundleToStaffRole(bundle)')
     expect(staffSource).toContain('api.staff.update(memberId')
-    expect(staffSource).toContain('保存中…')
+    expect(staffSource).toContain('busy={saving}')
     expect(staffSource).toContain('setSaveError')
   })
 

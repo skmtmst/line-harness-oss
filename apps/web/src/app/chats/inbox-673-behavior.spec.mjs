@@ -198,6 +198,14 @@ async function prepareInbox(page, options = {}) {
       })
       return
     }
+    // V8 の絞り込み件数は会話の詳細ではない。予約語を ID として数えない。
+    if (path === '/api/chats/quick-counts') {
+      await fulfillJson(route, { success: true, data: {
+        all: 2, reply: 2, overdue: 0,
+        line: { all: 1, reply: 1, overdue: 0 }, email: { all: 1, reply: 1, overdue: 0 },
+      } })
+      return
+    }
     if (path === '/api/chats/stats') {
       await fulfillJson(route, { success: true, data: {
         total: 1, unread: 1, inProgress: 0, onHold: 0, resolved: 0,

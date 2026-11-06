@@ -14,6 +14,8 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import type { StaffMember } from '@line-crm/shared'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const SCENARIO_ID = 'sc-1'
@@ -73,7 +75,7 @@ vi.mock('next/link', () => ({
     </a>
   ),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn() }),
 }))
 vi.mock('@/contexts/account-context', () => ({
@@ -166,7 +168,7 @@ vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit)
   return json({ success: false, error: `未用意の経路: ${init?.method ?? 'GET'} ${pathname}` }, 404)
 })
 
-const { default: ScenarioDetailClient } = await import('./scenario-detail-client')
+const { default: ScenarioDetailClient } = await import('@/v8/scenario-detail/detail')
 const { scenarioReferenceData } = await import('@/components/scenarios/scenario-reference-data')
 
 let host: HTMLDivElement
@@ -220,6 +222,7 @@ async function typeNumber(input: HTMLInputElement, value: string) {
 }
 
 beforeEach(async () => {
+  rememberStaffIdentity({ role: 'owner', permissionKeys: [] } as unknown as StaffMember)
   fixture.scenario.deliveryMode = 'elapsed'
   fixture.scenario.steps[0].delayMinutes = 0
   fixture.scenario.steps[0].offsetDays = 0
@@ -234,6 +237,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await unmount()
   host.remove()
+  forgetStaffIdentity()
 })
 
 describe('SC-02b: 配信時間の変更は配信の流れ・設定サマリーへ届く', () => {

@@ -1,3 +1,5 @@
+import { formatYen as sharedFormatYen } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 import { LineClient } from '@line-crm/line-sdk';
 import { resolveLineToken } from './line-token.js';
 import {
@@ -6,58 +8,28 @@ import {
   getLineAccountById,
 } from '@line-crm/db';
 
-/**
- * Affiliate push notifications (ASP).
- *
- * Two operator-facing events push a LINE message to the affiliate (the person
- * who owns the referral link), not to the friend who converted:
- *   A) friend-add via an affiliate link  → notifyAffiliateFriendAdd
- *   B) conversion approved               → notifyAffiliateApproval
- *
- * Both flow through notifyAffiliate, which resolves:
- *   affiliates.friend_id → friends(line_user_id, line_account_id)
- *   → line_accounts.channel_access_token (fallback: env.LINE_CHANNEL_ACCESS_TOKEN)
- *   → LINE push.
- *
- * Best-effort by contract: any failure is swallowed (try/catch + console.error)
- * so it can never break the caller's primary flow (friend attribution / CV
- * approval). Callers should still `await` it — Workers keeps the isolate alive
- * for an awaited promise — but must not let a rejection escape (this never
- * rejects).
- */
+/** 友だち追加と成果承認は、成果を上げた友だちでなくリンク所有者へ通知する。本人の所属アカウントからトークンを解決する。友だち追加の失敗は帰属を止めず、承認通知の失敗は notifyApprovalOnce が実行権を解放し、承認を保ったまま再試行で補う。 */
 
-/** Minimal env surface needed to resolve the fallback push token. */
+/** 代替の送信トークン解決に必要な設定だけを受け取る。 */
 export interface AffiliateNotifierEnv {
   LINE_CHANNEL_ACCESS_TOKEN: string;
 }
 
-/**
- * Push a plain-text LINE message to the affiliate identified by `affiliateId`.
- *
- * Silently no-ops (returns without throwing) when:
- *   - the affiliate does not exist,
- *   - the affiliate has no bound friend (admin-created affiliate with no LIFF
- *     self-register — friend_id NULL),
- *   - the bound friend row is missing or has no line_user_id,
- *   - no push token can be resolved.
- *
- * Never throws. All errors are logged and swallowed.
- */
-export async function notifyAffiliate(
+/** 参加者・結び付いた友だち・LINE ID・トークンがなければ送信しない。配送エラーは上へ渡し、公開の継続可能な入口で記録する。 */
+async function pushAffiliate(
   db: D1Database,
   env: AffiliateNotifierEnv,
   affiliateId: string,
   text: string,
+  retryKey?: string,
 ): Promise<void> {
-  try {
     const affiliate = await getAffiliateById(db, affiliateId);
-    if (!affiliate?.friend_id) return; // unbound affiliate — nothing to push to
+    if (!affiliate?.friend_id) return; // 結び付いた友だちがなければ送信先がない。
 
     const friend = await getFriendById(db, affiliate.friend_id);
     if (!friend?.line_user_id) return;
 
-    // Resolve the push token from the friend's LINE account, falling back to
-    // the env default when the account row / token is absent.
+    // 友だちの所属トークンを優先し、行や値がない場合は環境の既定へ戻す。
     let accountToken: string | null = null;
     let accountId: string | null = friend.line_account_id ?? null;
     if (friend.line_account_id) {
@@ -76,15 +48,22 @@ export async function notifyAffiliate(
     if (!accessToken) return;
 
     const client = new LineClient(accessToken);
-    await client.pushMessage(friend.line_user_id, [{ type: 'text', text }]);
+    if (retryKey) await client.pushMessage(friend.line_user_id, [{ type: 'text', text }], retryKey);
+    else await client.pushMessage(friend.line_user_id, [{ type: 'text', text }]);
+}
+
+/** 友だち追加など、従来の通知は主処理を止めない。 */
+export async function notifyAffiliate(db: D1Database, env: AffiliateNotifierEnv, affiliateId: string, text: string): Promise<void> {
+  try {
+    await pushAffiliate(db, env, affiliateId, text);
   } catch (err) {
-    console.error('notifyAffiliate failed (non-blocking):', err);
+    logger.error("affiliate_notifier.notify_affiliate_failed");
   }
 }
 
-/** Format the reward line with a thousands separator, e.g. 12345 → "12,345". */
+
 function formatYen(amount: number): string {
-  return new Intl.NumberFormat('en-US').format(amount);
+  return sharedFormatYen(amount).replace(/^¥/, '');
 }
 
 /**
@@ -106,19 +85,14 @@ export async function notifyAffiliateFriendAdd(
   await notifyAffiliate(db, env, affiliateId, text);
 }
 
-/**
- * B) 成果承認通知 — a conversion attributed to this affiliate was approved.
- *
- * When `offerName` is set the message includes the fixed reward line. For an
- * offer-less attribution (offerName null) the reward line is omitted and only
- * a generic approval message is sent.
- */
+/** 案件名がある承認通知だけに固定報酬を含め、案件なしは一般的な承認文だけを送る。 */
 export async function notifyAffiliateApproval(
   db: D1Database,
   env: AffiliateNotifierEnv,
   affiliateId: string,
   offerName: string | null,
   rewardAmount: number,
+  retryKey?: string,
 ): Promise<void> {
   let text: string;
   if (offerName && offerName.trim()) {
@@ -132,5 +106,5 @@ export async function notifyAffiliateApproval(
       `✅ 成果が承認されました！\n` +
       `『アフィリ』と送るとマイページで確認できます`;
   }
-  await notifyAffiliate(db, env, affiliateId, text);
+  await pushAffiliate(db, env, affiliateId, text, retryKey);
 }

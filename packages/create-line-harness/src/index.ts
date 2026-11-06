@@ -4,6 +4,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { runSetup } from "./commands/setup.js";
 import { runUpdate } from "./commands/update.js";
 import { ensureRepo } from "./steps/clone-repo.js";
+import { isSupportedNodeVersion } from "./steps/check-deps.js";
 
 const args = process.argv.slice(2);
 
@@ -67,6 +68,11 @@ function getConfigDir(explicitRepoDir: string | null): string {
 }
 
 async function main(): Promise<void> {
+  if (!isSupportedNodeVersion(process.versions.node)) {
+    console.error(`Node.js 22.23.4 / 24.22.1 / 26.12.1 以降の各対応系列が必要です（現在: ${process.versions.node}）`);
+    process.exit(1);
+  }
+
   const {
     command,
     repoDir: explicitRepoDir,

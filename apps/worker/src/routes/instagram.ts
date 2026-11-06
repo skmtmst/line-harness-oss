@@ -1,6 +1,9 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import type {
   InstagramConnectionStatus,
   InstagramProfile,
@@ -33,12 +36,10 @@ import {
   type InstagramConfig,
 } from '../services/instagram.js';
 export const instagram = new Hono<Env>();
-instagram.onError((e, c) =>
-  inputError(c, {
-      success: false,
-      error: e instanceof InstagramError ? e.code : 'instagram_failed',
-    }, e instanceof InstagramError ? e.status : 500, e instanceof InstagramError && e.code === 'account_required' ? ['lineAccountId'] : []),
-);
+instagram.onError((e, c) => {
+  if (!(e instanceof InstagramError)) throw new UnexpectedRouteError(c, { success: false, error: 'instagram_failed' });
+  return inputError(c, { success: false, error: e.code }, e.status, e.code === 'account_required' ? ['lineAccountId'] : []);
+});
 type Connection = {
   line_account_id: string;
   page_id: string;
@@ -245,9 +246,7 @@ function instagramDiagnostic(failure: {
 }
 const INSTAGRAM_RETURN_PATH = '/settings/sns';
 /**
- * Instagram にログインするだけで接続が終わる口（2026-10-07 利用者承認）。
- * Facebook ページは一切見ない。認可コードを合鍵へ引き換え、その応答に入っている
- * Instagram の利用者IDとプロフィールをそのまま保存し、必ず設定 › SNS連携へ戻す。
+ * Instagram の認可コード応答の利用者 ID とプロフィールを保存し、SNS 連携設定へ戻す。Facebook ページ選択を不要にするため、その情報は参照しない。
  */
 instagram.get(
   '/api/instagram/oauth/callback',
@@ -370,12 +369,7 @@ instagram.get(
         detail: e instanceof InstagramError ? (e.detail ?? null) : null,
         grantedScopes,
       });
-      console.error(
-        JSON.stringify({
-          event: 'instagram_oauth_callback_failed',
-          ...diagnostic,
-        }),
-      );
+      logger.error("instagram_oauth_callback_failed");
       // 使い切りの state は必ず捨てて、やり直せる状態に戻す。
       if (hash)
         await c.env.DB.prepare(
@@ -535,7 +529,7 @@ instagram.get('/api/instagram/messages', async (c) => {
       success: true,
       data: { state: 'unconfigured', messages: [], total: null },
     });
-  const limit = Number(c.req.query('limit') ?? 50),
+  const limit = listQueryNumber(c.req.query('limit'), 50),
     before = c.req.query('beforeId');
   if (!Number.isInteger(limit) || limit < 1 || limit > 100)
     throw new InstagramError('invalid_limit', 400);
@@ -562,16 +556,15 @@ instagram.get('/api/instagram/messages', async (c) => {
   )
     .bind(id)
     .first<{ n: number }>();
-  return c.json({
-    success: true,
-    data: {
-      messages: messages.map((r) => ({
+  const responseItems = messages.map((r) => ({
         ...r,
         attachments: JSON.parse(String(r.attachments_json)),
         attachments_json: undefined,
-      })),
-      total: total!.n,
-    },
+      }));
+  return c.json({
+    success: true,
+    data: buildOffsetListResponse({ messages: responseItems,
+      total: total!.n, items: responseItems, paging: { limit }, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
   });
 });
 instagram.post('/api/instagram/messages/:id/reply', inputJsonBoundary(), async (c) => {

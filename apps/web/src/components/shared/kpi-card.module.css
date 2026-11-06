@@ -1,32 +1,48 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .card {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  min-height: 100px;
-  padding: 14px 16px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  box-shadow: var(--shadow-card);
 }
 
 .card[hidden] {
   display: none;
 }
 
-.cardV6 {
-  justify-content: flex-start;
-  min-height: 106px;
-  gap: 5px;
-  padding: 16px;
+:root .number.rollingValue {
+  position: relative;
+  display: inline-block;
+  font-variant-numeric: var(--font-numeric);
+  vertical-align: bottom;
 }
 
-.cardBroadcast {
-  justify-content: flex-start;
-  gap: 8px;
-  padding: 18px;
+.rollingValue[data-kpi-rolling] > .actualValue { opacity: 0; }
+.rollingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  white-space: pre;
+  pointer-events: none;
+}
+.digitWindow { height: 1lh; overflow: hidden; }
+.digitColumn {
+  display: flex;
+  flex-direction: column;
+  /* 撮影などでanimationだけを無効にしても最終の数字を出す。
+     始めの段も本当の数字なので、動きが進まない時も正しい値に見える。 */
+  transform: translateY(calc(-200% / 3));
+  animation: kpi-digit-roll var(--motion-kpi-roll) var(--motion-ease-out) backwards;
+}
+.digitColumn > span { height: 1lh; }
+@keyframes kpi-digit-roll {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(-200% / 3)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rollingValue[data-kpi-rolling] > .actualValue { opacity: 1; }
+  .rollingOverlay { display: none; }
+  .digitColumn { animation: none; }
 }
 
 .head {
@@ -34,12 +50,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
   /*
    * 題の行の高さは 20px にそろえる。「？」の有無で数字の位置が
    * ずれないようにする（？自体は 18px の箱で、行を伸ばさない）。
    */
-  min-height: 20px;
 }
 
 .retry {
@@ -54,51 +68,35 @@
   outline: revert;
 }
 
-.label {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-weight: 600;
-}
-
-.labelV6 {
-  color: var(--color-ink-faint);
-  font-size: var(--text-caption);
-}
-
-.labelBroadcast {
-  color: var(--color-ink-faint);
-  font-size: var(--text-label);
-}
-
 .labelSkeleton {
   display: inline-block;
   width: 80px;
   height: var(--text-caption);
-  border-radius: 4px;
+  border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
 }
 
 .badge {
   flex-shrink: 0;
-  padding: 3px 8px;
-  border-radius: var(--radius-card);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-  font-size: var(--text-nano);
+  padding: 2px 8px;
+  border-radius: var(--radius-mini);
+  background: var(--color-notice-success-bg);
+  color: var(--color-kpi-positive);
+  font-size: var(--text-caption);
   font-weight: 600;
 }
 
-.badge_neutral {
+.badgeNeutral {
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
 }
 
-.badge_warning {
+.badgeWarning {
   background: var(--color-status-warn-soft);
   color: var(--color-status-warn-deep);
 }
 
-.badge_danger {
+.badgeDanger {
   background: var(--color-danger-bg);
   color: var(--color-danger);
 }
@@ -106,7 +104,6 @@
 .link {
   flex-shrink: 0;
   color: var(--color-action);
-  font-size: var(--text-nano);
 }
 
 .link:hover {
@@ -120,17 +117,12 @@
 .value {
   color: var(--color-ink);
   font-size: var(--text-metric);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-variant-numeric: var(--font-numeric);
   /*
    * 数の行の高さは1行ぶんにそろえる。題の行（.head 20px）と合わせて、
    * 「？」の有無や補足の長さで数字の位置がずれないようにする。
    */
-  min-height: 1lh;
-}
-
-.valueWarning {
-  color: var(--color-warning);
 }
 
 .valueFaint {
@@ -138,29 +130,14 @@
 }
 
 .detail {
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
   /* 補足の行の高さは1行ぶんにそろえる。空でも潰さない。 */
-  min-height: 1lh;
-}
-
-.detailV6 {
-  font-weight: 500;
-}
-
-/* ★V7：補足は状態ではないので緑にしない（緑は「正常」の意味だけに使う）。以前は accent-deep。 */
-.detailNotice {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 500;
 }
 
 .skeleton {
   width: 96px;
-  height: var(--text-metric);
-  border-radius: 4px;
+  border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
-  animation: kpi-card-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: kpi-card-pulse var(--motion-pulse) var(--motion-ease-in-out) infinite;
 }
 
 @keyframes kpi-card-pulse {
@@ -168,4 +145,230 @@
     opacity: 0.5;
   }
 }
+
+/* Pp3nS: the strip owns the boundary; cells have no enclosing box. */
+:root .card {
+  justify-content: flex-start; min-width: 0; min-height: 0;
+  gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side); border: 0; border-radius: var(--radius-card);
+  outline: 1px solid var(--card-edge); outline-offset: -1px;
+  background: var(--color-canvas); box-shadow: var(--card-shadow);
 }
+/* 包みを使わない組み方（画面が strip＋KpiCard を直に並べる所）も、
+   数の大きさ・マスの余白は帯と同じ変数で絵どおりにする。 */
+:root .strip .card {
+  gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side);
+}
+:root .strip .number {
+  font-size: var(--tpl-band-number-size); line-height: var(--tpl-band-number-lh);
+}
+:root .head { width: 100%; gap: 8px; min-height: 24px; }
+:root .label {
+  display: flex; align-items: center; min-width: 0; gap: 8px;
+  color: var(--color-ink); font-size: var(--text-caption); font-weight: 500; line-height: 18px;
+}
+:root .labelText {
+  display: block; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 題が行の最後のとき、マスの右の余白へ 2px だけはみ出してよい（絵と書体の幅の 1px 未満の差で
+   「結びついていない注文の金額」などが絵では入るのに「…」になるのを防ぐ。長い題は今までどおり省略）。 */
+:root .labelText:last-child { margin-right: -2px; }
+/* 添え書きつきの題：本体と「（…）」を並べ、入らない添え書きは次の行へ送って隠す（1行の高さで切る）。 */
+:root .labelText:has(> .labelMain) { display: flex; flex-wrap: wrap; align-items: baseline; max-height: 1lh; text-overflow: clip; white-space: normal; }
+:root .labelMain { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .labelQualifier { flex: 0 0 auto; white-space: nowrap; }
+:root .labelHelp { display: inline-flex; flex: 1 1 auto; min-width: 0; flex-shrink: 1; }
+/* 帯の「？」は題の直後ではなく行の右端（絵のマスの右端どおり）。
+   文が伸びて「？」を右へ押し出す（「…」の扱いは G3 のまま）。 */
+:root .tip { flex-shrink: 0; display: inline-flex; height: 24px; align-items: center; }
+:root .icon {
+  display: inline-flex; width: 24px; height: 24px; flex-shrink: 0;
+  align-items: center; justify-content: center; border-radius: 9px;
+  background: var(--color-canvas); color: var(--color-ink-secondary);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+}
+:root .delta { display: flex; flex-shrink: 0; }
+:root .valueRow { display: flex; align-items: center; width: 100%; gap: 6px; }
+/* 帯の数＋単位と差の印・行き先は、それぞれを分けず、並びきらない時だけ次の行へ送る。 */
+:root .card:is([data-kpi-presentation='band'], :where(:has(> .valueRow > .valueActionSlot))) > .valueRow:has(> .value):has(> :is(.delta:not(:empty), .valueActionSlot)) {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+}
+/* 差の札か行き先がある行は、数の箱を物差しにして札のぶんも差し引く（札を次の行へ落とさない）。 */
+:root .card:is([data-kpi-presentation='band'], :where(:has(> .valueRow > .valueActionSlot))) > .valueRow:has(> :is(.delta:not(:empty), .valueActionSlot)) > .value {
+  container: kpi-value / inline-size;
+  min-width: 0;
+}
+/* 差の札か行き先がある行は、数と札の間・札の横の余白も詰めて数の縮みを抑える。 */
+:root .card:is([data-kpi-presentation='band'], :where(:has(> .valueRow > .valueActionSlot))) > .valueRow:has(> :is(.delta:not(:empty), .valueActionSlot)) {
+  gap: var(--space-4);
+}
+:root .card:is([data-kpi-presentation='band'], :where(:has(> .valueRow > .valueActionSlot))) > .valueRow:has(> :is(.delta:not(:empty), .valueActionSlot)) > .delta > * {
+  padding-inline: var(--space-6);
+}
+/* 数字と単位（人・通・件・%）は同じ下の線（ベースライン）に乗せる。箱の下端でそろえると字の大きさの差でずれる。 */
+:root .value {
+  display: flex; align-items: baseline; flex: 1; gap: 2px; min-height: 0;
+  white-space: nowrap;
+}
+:root .number {
+  display: inline; font-family: var(--font-inter), Inter, sans-serif; font-size: 28px;
+  font-weight: 600; color: inherit;
+  line-height: 32px; letter-spacing: -0.5px;
+}
+:root .unit {
+  display: inline; margin: 0; font-family: var(--font-sans);
+  color: var(--color-ink-secondary); font-size: 12px; font-weight: var(--font-weight-ui);
+  line-height: var(--tpl-band-unit-lh); letter-spacing: 0;
+}
+:root .detail {
+  display: flex; align-items: center; width: 100%; min-height: 0; gap: 0;
+  color: var(--color-ink-faint); font-size: 12px; font-weight: var(--font-weight-ui); line-height: 18px;
+}
+:root .detailText { min-width: 0; flex: 1; }
+:root .link { min-height: 0; font-size: 12px; font-weight: 500; line-height: 18px; border: 0; padding: 0; background: none; cursor: pointer; }
+:root .card[data-kpi-presentation='band'] {
+  border-radius: 0; outline-color: transparent; box-shadow: none;
+}
+:root .card[data-kpi-density='compact'] {
+  padding: 10px 16px; gap: 4px;
+}
+:root .card[data-kpi-density='compact'] .number {
+  font-size: var(--tpl-band-number-size); line-height: var(--tpl-band-number-lh);
+}
+.strip { min-width: 0; }
+.connection {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-4); color: var(--color-ink-secondary); font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* 数の帯の v8 指定は層の外（ファイル末尾）に置く。 */
+:root .link { display: inline-flex; align-items: center; gap: var(--polish-space-row); }
+:root .menu { margin-left: auto; display: inline-flex; flex-shrink: 0; }
+}
+
+/*
+ * 数の帯（Pp3nS・全画面共通）。マス3〜4個を1本の帯にまとめ、
+ * マスどうしは隙間0・1px の縦線で区切る。角丸は帯の外側だけにし、
+ * マス自体は角を持たない（2板の計測で外側の角も0）。
+ *
+ * 層の外に置く：呼び出し側が渡す並べ方（grid・gap などのユーティリティ）は
+ * ユーティリティ層に属し、部品層の中の指定より常に勝つ。帯の隙間0・
+ * 1列化を効かせるため、ここだけ層の外（どの層より強い）に置く。
+ * 管理画面 には効かない（すべて data-theme v8 限定）。
+ */
+:root .strip[data-kpi-presentation='band'] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-columns: none;
+  gap: var(--tpl-band-gap);
+  /* 絵どおり上下の線だけ（左右の枠なし）。 */
+  border-block: 1px solid var(--tpl-band-line);
+  border-radius: var(--radius-none);
+  background: var(--color-canvas);
+}
+/* 子孫まで消す：折りたたみ（KpiCollapse）は後ろのマスを包み div で囲うため。 */
+:root .strip[data-kpi-presentation='band'] .card {
+  border: 0;
+  border-radius: var(--radius-none);
+  outline-color: transparent;
+  box-shadow: none;
+}
+:root .strip[data-kpi-presentation='band'] > *:not(:last-child) {
+  border-right: 1px solid var(--tpl-band-line);
+}
+:root .strip[data-kpi-presentation='band'] .number {
+  font-size: var(--tpl-band-number-size);
+  line-height: var(--tpl-band-number-lh);
+}
+@media (max-width: 639px) {
+  :root .strip[data-kpi-presentation='band'] {
+    grid-auto-flow: row;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :root .strip[data-kpi-presentation='band'] > *:not(:last-child) {
+    border-right: 0;
+    border-bottom: 1px solid var(--tpl-band-line);
+  }
+}
+:root .card[data-kpi-presentation='cell'] { border-radius: 0; }
+
+/* 印なしの帯の横並びは kpi-band-v8.css（層なしCSS）に置く。 */
+/* ★V8 数のマスの下の段（Pp3nS「下」：高さ18・右に行き先）。行き先のボタンが押せる高さ32で段を押し広げない（司令塔 2026-10-05） */
+/* 細いグラフ（数のカードの形で右下に置く。ほかの形では出さない）。 */
+:root .sparkline { display: none; }
+:root .sparklineLine { fill: none; stroke: var(--color-success); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+:root .sparklineArea { fill: var(--color-accent-soft); stroke: none; }
+/* 数と補足のあいだのメーター（送信枠など）。太さと色は共通のメーター（progress の quota）が持つ。 */
+:root .meter { flex-shrink: 0; }
+:root .detail .retry { min-height: 0; height: auto; padding: 0; line-height: 18px; margin-left: auto; }
+
+/*
+ * 読み込み中の骨組みは、届いた数字と同じ行の高さを取る（動きの点検 8 番）。
+ * 以前は 22px で、数字（帯は --tpl-band-number-lh、それ以外は 32px）に替わると
+ * 数の帯が 4px 伸び、下の一覧がまとめて押し下げられていた。
+ */
+:root .skeleton { height: 32px; }
+:root .card[data-kpi-presentation='band'] .skeleton { height: var(--tpl-band-number-lh); }
+
+:root .valueRow[data-unit-spacing='tight'] .value { gap: var(--tpl-kpi-unit-gap-tight); }
+/* hQQlt：箱の中の小さな件数。通常のカード・数の帯は変えない。 */
+:root .card[data-kpi-presentation='inline'] { min-height: 0; justify-content: flex-start; display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; outline-color: transparent; border-radius: var(--radius-none); background: none; box-shadow: none; }
+/* 箱の中の小さな数も、数字と単位の文字の役割を分ける。 */
+:root .card[data-kpi-presentation='inline'] .head { min-height: 0; }
+:root .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 12px; font-weight: var(--font-weight-ui); line-height: 16px; }
+:root .card[data-kpi-presentation='inline'] .number { font-size: 18px; font-weight: 600; line-height: 26px; }
+:root .card[data-kpi-presentation='inline'] .unit { font-size: var(--text-caption); font-weight: var(--font-weight-ui); }
+:root .card[data-kpi-presentation='inline'] .value { gap: 4px; }
+:root .card[data-kpi-presentation='inline'] .detail { display: none; }
+:root .strip[data-kpi-presentation='band'][data-kpi-border='inset-top'] {
+  border-block-width: 0; box-shadow: var(--shadow-wh-kpi-top);
+}
+
+/* 予約の帯（・）：短い3段、詳しい説明は「？」へ。 */
+:root .strip[data-kpi-layout='booking'] .label { font-size: var(--text-caption); line-height: var(--tpl-booking-kpi-label-lh); }
+:root .strip[data-kpi-layout='booking'] .labelText { flex: 0 1 auto; }
+:root .strip[data-kpi-layout='booking'] .detailText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .strip[data-kpi-layout='booking'] .card { min-height: var(--tpl-booking-kpi-height); }
+/* 飲食の共通盤の数の帯（ / ）。 */
+:root .strip[data-restaurant-fusion] .card { padding: 14px 24px 16px; gap: 8px; }
+:root .strip[data-restaurant-fusion] .label { gap: 8px; }
+:root .strip[data-restaurant-fusion] .valueRow { padding-left: 0; }
+:root .strip[data-restaurant-fusion] .detail { padding-left: 0; }
+
+:root .strip[data-restaurant-fusion='dashboard'] { margin: 12px 24px 0; }
+
+/* 数を押して内訳を開く口。数字と単位の配置は通常の数と同じ。 */
+.valueAction { min-height: 0; display: inline-flex; align-items: inherit; gap: inherit; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.valueAction:hover { background: var(--color-canvas-sunken); border-radius: var(--radius-control); }
+.valueAction:hover .number { text-decoration: underline; text-underline-offset: var(--space-2); }
+.valueAction:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; border-radius: var(--radius-control); }
+
+/* 小さい帯の「9.8 → 9.2 kg」のような幅の要る数は1段小さく（18）し、横の余白も詰めて切れないようにする（健康日記 ）。帯の指定より後に置く。 */
+:root .strip .card[data-kpi-density='compact'][data-kpi-range] { padding-inline: 12px; }
+
+/* ラベルと値の強弱。アイコンに小箱を重ねない。 */
+:root .label { color: var(--color-ink-secondary); font-weight: var(--polish-control-weight); }
+:root .icon { width: var(--polish-icon-large); height: var(--polish-icon-large); border: 0; outline-color: transparent; border-radius: 0; background: none; }
+:root .icon svg { width: var(--polish-icon-large); height: var(--polish-icon-large); stroke-width: var(--polish-icon-stroke); }
+:root .number, :root .card[data-kpi-presentation='inline'] .number { font-weight: var(--polish-value-weight); font-variant-numeric: var(--font-numeric); }
+:root .link { color: var(--color-link); } /* 行き先「〇〇へ →」は文字のリンクの決まり（緑・500） */
+:root .link:hover, :root .valueAction:hover { text-decoration: underline; }
+
+:root .card[data-kpi-presentation='inline'] .unit { font-weight: var(--polish-control-weight); }
+
+/* 明示された名前だけを主の値にする。数値の既存の幅・書体には触れない。 */
+:root .value.textValueContainer { min-width: 0; }
+:root .textValueContainer .valueAction { min-width: 0; max-width: 100%; }
+:root .textValue {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--tpl-band-number-size);
+  line-height: var(--tpl-band-number-lh);
+  font-weight: var(--tpl-band-number-weight);
+}
+
+.valueActionSlot { display: flex; flex: none; align-items: center; margin-inline-start: auto; }

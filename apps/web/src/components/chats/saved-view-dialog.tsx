@@ -1,12 +1,17 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Checkbox from '@/components/shared/checkbox'
-import Combobox from '@/components/shared/combobox'
+
 import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Button from '@/components/shared/button'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import CloseButton from '@/components/shared/close-button'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /**
  * 受信箱の「この条件を保存」（設計 Pencil `Ln4zS` 保存した検索名入力モーダル）。
@@ -44,6 +49,7 @@ export default function SavedViewDialog({
   operators,
   existingNames,
   saving,
+  emailInboxEnabled = true,
   onSave,
   onClose,
 }: {
@@ -53,6 +59,7 @@ export default function SavedViewDialog({
   /** 同じ名前があるかを見るための一覧 */
   existingNames: string[]
   saving: boolean
+  emailInboxEnabled?: boolean
   /** 保存先が成功を返したときだけ、完了画面へ進める。 */
   onSave: (draft: SavedViewDraft) => Promise<SavedViewSaveResult>
   onClose: () => void
@@ -124,7 +131,7 @@ export default function SavedViewDialog({
       return
     }
     setError('')
-    const result = await onSave({ name: trimmed, status, quickFilter, channel, assignee, unreadOnly, favorite })
+    const result = await onSave({ name: trimmed, status, quickFilter, channel: emailInboxEnabled ? channel : 'line', assignee, unreadOnly, favorite })
     if (!result.success) {
       setError(result.error)
       return
@@ -149,14 +156,14 @@ export default function SavedViewDialog({
           フッターは固定し、条件の本文だけをスクロールさせる。
           1920×600でもタイトル・取消・保存へ届く。
         */
-        className="bg-canvas rounded-panel flex max-h-[calc(100dvh-2rem)] w-[560px] max-w-full flex-col overflow-hidden shadow-2xl"
+        className="bg-canvas rounded-panel flex max-h-[calc(100dvh-2rem)] w-[560px] max-w-full flex-col overflow-hidden shadow-overlay"
       >
         <header className="border-hairline flex items-start gap-4 border-b px-6 py-5">
           <div>
             <h2 className="text-ink text-base font-bold">保存した検索を作成</h2>
             <p className="text-ink-secondary mt-1 text-xs">検索名と絞り込み条件を変更して保存できます</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="text-ink-faint ml-auto text-lg leading-none">✕</button>
+          <CloseButton onClick={onClose} className="ml-auto" />
         </header>
 
         {done ? (
@@ -171,12 +178,12 @@ export default function SavedViewDialog({
             <div>
               <div className="flex items-baseline justify-between">
                 <label htmlFor="saved-view-name" className="text-ink-secondary text-xs font-medium">
-                  検索名 <span className="text-ink-faint font-normal">（必須）</span>
+                  検索名 <span className="text-ink-faint font-medium">（必須）</span>
                 </label>
                 {/* 残りではなく「11 / 40文字」。上限が何文字かが分かる。 */}
-                <span className="text-ink-faint text-[11px] tabular-nums">{name.length} / {NAME_LIMIT}文字</span>
+                <span className="text-ink-faint text-micro tabular-nums">{name.length} / {NAME_LIMIT}文字</span>
               </div>
-              <input
+              <SaveErrorField names={["name"]}><SharedTextField
                 id="saved-view-name"
                 value={name}
                 onChange={(event) => { setName(event.target.value); setNameTouched(true); setError('') }}
@@ -191,7 +198,7 @@ export default function SavedViewDialog({
                 aria-invalid={nameInvalid}
                 aria-describedby={error ? 'saved-view-error' : nameMissing ? 'saved-view-name-hint' : undefined}
                 className={`rounded-control text-ink mt-1.5 h-11 w-full border px-3 text-sm outline-none ${nameInvalid ? 'border-danger' : 'border-hairline'}`}
-              />
+              /></SaveErrorField>
             </div>
 
             <div>
@@ -247,7 +254,7 @@ export default function SavedViewDialog({
                     />
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                {emailInboxEnabled && <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">受信経路</dt>
                   <dd>
                     <Select
@@ -262,18 +269,18 @@ export default function SavedViewDialog({
                       className="h-9 w-40 text-xs font-medium"
                     />
                   </dd>
-                </div>
+                </div>}
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
-                  <dt className="text-ink-secondary text-xs">担当者</dt>
+                  <dt className="text-ink-secondary text-xs">担当</dt>
                   <dd className="w-40">
-                    <Combobox
+                    <EntitySelect clearable size="full"
                       aria-label="保存する担当者"
                       placeholder="すべて"
                       value={assignee === 'all' ? '' : assignee}
                       onChange={(next) => setAssignee(next || 'all')}
                       options={[
                         { value: 'unassigned', label: '未割り当て' },
-                        ...operators.map((operator) => ({ value: operator.id, label: operator.name })),
+                        ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name })),
                       ]}
                       className="w-full"
                     />
@@ -321,24 +328,17 @@ export default function SavedViewDialog({
         */}
         <footer className="border-hairline flex shrink-0 flex-wrap items-center justify-end gap-3 border-t px-6 py-4">
           {done ? (
-            <button type="button" onClick={onClose} className="rounded-control bg-accent-deep text-on-accent whitespace-nowrap px-5 py-2 text-sm font-bold">
+            <Button variant="primary" className="whitespace-nowrap px-5 py-2 font-bold border-0 h-auto" type="button" onClick={onClose}>
               閉じる
-            </button>
+            </Button>
           ) : (
             <>
-              <button type="button" onClick={onClose} className="border-hairline rounded-control text-ink-secondary whitespace-nowrap border px-4 py-2 text-sm">
+              <Button variant="secondary" className="text-ink-secondary whitespace-nowrap px-4 py-2 h-auto" type="button" onClick={onClose}>
                 キャンセル
-              </button>
-              <button
-                type="button"
-                onClick={() => void submit()}
-                disabled={saving || nameMissing}
-                title={nameMissing ? '検索名を入力してください' : undefined}
-                /* 主ボタンの緑は本流が `accent-deep` へそろえた（白文字の読みやすさ）。 */
-                className="rounded-control bg-accent-deep text-on-accent whitespace-nowrap px-5 py-2 text-sm font-bold disabled:opacity-40"
-              >
-                {saving ? '保存中' : '検索条件を保存'}
-              </button>
+              </Button>
+              <Button variant="primary" className="whitespace-nowrap px-5 py-2 font-bold border-0 h-auto" type="button" onClick={() => submit()} disabled={saving || nameMissing} title={nameMissing ? '検索名を入力してください' : undefined}  busy={saving} busyLabel="保存中" widthReserve="idle">
+                {'検索条件を保存する'}
+              </Button>
             </>
           )}
         </footer>

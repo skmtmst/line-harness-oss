@@ -1,0 +1,25 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/*
+ * 右クリックメニューの置き場所（V8「サクサク感」C③）。
+ * 中身の見た目はプルダウン（ActionMenu）と同じ。
+ * 管理画面 の画面では使わない部品のため 管理画面 側の規定は持たない。
+ */
+
+.area {
+  min-width: 0;
+  min-height: 0;
+}
+
+.area:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.layer {
+  position: fixed;
+
+  /* 窓（z-index 90）と同じ高さ。portal で後から足すので上に載る。 */
+  z-index: 90;
+}
+}

@@ -1,4 +1,4 @@
-name: 作業チケット(V6 台帳)
+name: 作業チケット
 description: 司令塔が作る作業単位。NodeTerm の Kanban と GitHub Issues の同期で使う。
 title: "[lane] 対象: 何をするか"
 labels: ["todo"]
@@ -31,7 +31,7 @@ body:
     id: paths
     attributes:
       label: 所有パス
-      description: 触るパス。docs/v6-parallel-plan.md §2 の表の範囲外なら理由を書き、司令塔の承認を待つ
+      description: 触るパス。AGENTS.md の所有の表の範囲外なら理由を書き、司令塔の承認を待つ
     validations:
       required: true
   - type: textarea

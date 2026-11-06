@@ -1,6 +1,7 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * ★V7 `xifuV`（Pencil「★V7 メニュー」）。V5 `hGpFq` から移行。
+ * Pencil ★V8 `hnuY9`「その他操作メニュー」。
  * 白地・角丸12・枠・影。項目は高さ36（補足つき52）・
  * アイコン16＋文字14・折り返さない。
  */
@@ -11,17 +12,15 @@
   z-index: 60;
   display: flex;
   width: max-content;
-  min-width: 224px;
+  min-width: 0;
   max-width: min(320px, calc(100vw - 16px));
   max-height: min(70dvh, 20rem);
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;
-  border: 1px solid var(--color-hairline);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
-  padding: 6px;
+  padding: 8px;
 }
 
 .inline {
@@ -33,14 +32,14 @@
   width: 100%;
   height: 36px;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   border: 0;
-  border-radius: var(--radius-icon);
+  border-radius: var(--radius-segment);
   background: transparent;
-  padding: 0 10px;
+  padding: 0 12px;
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
@@ -74,20 +73,26 @@
   overflow: hidden;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* 押せない理由は省略せず全文を折り返して読ませる（窓の幅 320 まで・）。行は理由の分だけ高くなる。 */
 .reason {
-  overflow: hidden;
   color: var(--color-ink-faint);
   font-size: var(--text-nano);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.itemTall:has(.reason) {
+  height: auto;
+  min-height: 52px;
+  padding-block: 8px;
 }
 
 .item:hover:not(:disabled),
@@ -101,7 +106,15 @@
 
 .item:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: var(--polish-disabled-opacity);
+}
+
+.item[data-permission-locked],
+.item[data-permission-locked]:is(:hover, :active) {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  cursor: not-allowed;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .icon {
@@ -121,7 +134,7 @@
 }
 
 .danger {
-  color: var(--color-status-danger);
+  color: var(--color-menu-danger);
 }
 
 .danger .icon,
@@ -136,7 +149,7 @@
   padding: 6px 10px 2px;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -144,7 +157,6 @@
 
 .divider {
   height: 1px;
-  margin: 4px 0;
   border: 0;
   background: var(--color-hairline);
 }
@@ -153,7 +165,7 @@
   margin: 0;
   padding: 4px 8px 2px;
   color: var(--color-ink-faint);
-  font-size: var(--text-nano);
+  font-size: var(--text-micro);
   line-height: 1.5;
 }
 
@@ -183,4 +195,65 @@
   overflow: hidden;
   vertical-align: top;
 }
+
+/* ★V8（夕13）：重なる物の外縁は border-soft（TOKENS-20261001）。 */
+:root .menu {
+  border-color: var(--color-border-soft);
 }
+
+/* ★V8：絵の行の「…」のメニューは項目の高さ 34・印と字の間 8（・・）。 */
+:root .item:not(.itemTall) {
+  height: var(--tpl-menu-item-h);
+  gap: var(--tpl-menu-item-gap);
+}
+
+/* ★V8：区切りは線1本だけで、上下の余白を足さない（項目の間 2 の並びのまま。 で「実行結果を見る」→「編集する」が 39＝36＋線と間 3）。 */
+:root .divider {
+  margin: var(--tpl-menu-divider-margin);
+}
+
+/*
+ * ★V8 動きの決まり（提案 F・採用）：「…」のメニューは押した角から
+ * 120ms（--motion-fast）・0.96→1 で開く。起点は開いた向き（器の data-placement）と
+ * 寄せ（data-align）から決める：下へ開く＝上の角、上へ開く＝下の角、
+ * 右寄せ（既定）＝右の角、左寄せ＝左の角。器の無い（inline）ときは右上。
+ * globals の lh-surface-in は 管理画面 だけに当たる（層の外の指定がこれに勝たないように）。
+ * 動きを減らす設定では globals の末尾の規定で一瞬になる。
+ */
+:root .menu {
+  animation: action-menu-v8-enter var(--motion-fast) var(--motion-ease-out);
+  transform-origin: top right;
+}
+
+:root [data-placement='up'] > .menu {
+  transform-origin: bottom right;
+}
+
+:root [data-align='start'] > .menu {
+  transform-origin: top left;
+}
+
+:root [data-placement='up'][data-align='start'] > .menu {
+  transform-origin: bottom left;
+}
+
+@keyframes action-menu-v8-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+}
+/* 提案F-5: 消える側は拡縮せず80msのフェードだけ。 */
+:root .menu[data-closing] { animation: action-menu-v8-leave var(--motion-instant) var(--motion-ease-out) forwards; pointer-events: none; }
+@keyframes action-menu-v8-leave { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { :root .menu[data-closing] { animation: none; opacity: 0; } }
+
+/* ：浮く面の影と薄い縁を共通化。 */
+:root .menu { border: 0; outline: 1px solid var(--surface-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }
+:root .section { font-size: var(--text-micro); }

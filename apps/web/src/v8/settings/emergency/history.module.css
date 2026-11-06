@@ -1,0 +1,78 @@
+/*
+ * ★V8 運用状態 更新履歴。数字は書かない（globals.css の [data-theme="v8"] の --tpl-rest3-em-*・--space-*）。
+ * 数のマスは緊急コントロールと同じ形で3つ。1回の更新は共通の Card 1枚。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rest3-em-gap);
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rest3-em-row-gap);
+  min-width: 0;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.line {
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-em-body);
+  line-height: var(--tpl-rest3-em-body-lh);
+  overflow-wrap: anywhere;
+}
+
+.kind {
+  margin-right: var(--space-8);
+  color: var(--color-ink-faint);
+  white-space: nowrap;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-rest3-em-body);
+  line-height: var(--tpl-rest3-em-body-lh);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+}
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-rest3-em-row-gap);
+}
+
+.footText {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-rest3-em-small);
+  line-height: var(--tpl-rest3-em-th-lh);
+}

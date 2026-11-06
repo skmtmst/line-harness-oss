@@ -1,4 +1,9 @@
-import { REVENUE_IMPACT_KEYS } from '@line-crm/shared';
+import { maskSensitiveString } from './ec-identity-mask.js';
+import { reverseSourceConversions } from './conversion-event-sources.js';
+import { sqlIdSet } from './id-queries.js';
+import { REVENUE_IMPACT_KEYS, type EcIdentityCandidateSummary, type EcIdentityDuplicateSignal } from '@line-crm/shared';
+
+
 
 export type EcOrderState = 'current' | 'refunded' | 'cancelled';
 export type EcActionExecutionStatus =
@@ -10,7 +15,7 @@ export type EcActionExecutionStatus =
   | 'permanent_failed';
 
 /*
- * IDEA-23: 失敗・見送りの理由を運用の言葉へ寄せる分類。
+ * 失敗・見送りの理由を運用の言葉へ寄せる分類。
  * 「未連携／権限不足／通信失敗」を別々に出す完了条件に対応する。
  * 分類コード(error_code等の安全な値)からは classifyEcErrorCode、
  * 生のエラーメッセージ(台帳の last_error 等)からは classifyEcRawError を使う。
@@ -157,24 +162,31 @@ export async function upsertEcEventReadModels(
        detail_url = COALESCE(excluded.detail_url, ec_orders.detail_url),
        last_event_id = excluded.last_event_id,
        version = ec_orders.version + CASE WHEN ec_orders.last_event_id = excluded.last_event_id THEN 0 ELSE 1 END,
-       updated_at = excluded.updated_at`,
+       updated_at = excluded.updated_at
+     WHERE ec_orders.last_event_id = excluded.last_event_id OR julianday(?) > (
+       SELECT julianday(json_extract(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.occurred_at'))
+       FROM ec_events WHERE id = ec_orders.last_event_id
+     )`,
   ).bind(
     proposedId, event.lineAccountId, event.sourceKey, orderNumber,
     event.customerId, event.friendId ?? null, orderNumber, orderState(event.eventType),
     event.eventType, event.order?.currency?.trim() || 'JPY',
     integerOrNull(event.order?.total), integerOrNull(event.refund?.amount),
     event.order?.date ?? event.occurredAt, event.order?.detail_url ?? null,
-    event.eventId, now, now,
+    event.eventId, now, now, event.occurredAt,
   ).run();
 
   const order = await db.prepare(
-    `SELECT id FROM ec_orders
+    `SELECT id, last_event_id FROM ec_orders
       WHERE line_account_id = ? AND source_key = ? AND external_order_id = ?`,
-  ).bind(event.lineAccountId, event.sourceKey, orderNumber).first<{ id: string }>();
-  if (!order || !Array.isArray(event.order?.items)) return;
+  ).bind(event.lineAccountId, event.sourceKey, orderNumber).first<{ id: string; last_event_id: string }>();
+  if (order?.last_event_id === event.eventId && orderState(event.eventType) !== 'current') {
+    await reverseSourceConversions(db, { lineAccountId: event.lineAccountId, sourceType: 'ec_order_confirmed', orderNumber, friendId: event.friendId });
+  }
+  if (!order || order.last_event_id !== event.eventId || !Array.isArray(event.order?.items)) return;
 
   const statements: D1PreparedStatement[] = [
-    db.prepare('DELETE FROM ec_order_lines WHERE order_id = ?').bind(order.id),
+    db.prepare('DELETE FROM ec_order_lines WHERE order_id = ? AND EXISTS (SELECT 1 FROM ec_orders WHERE id=? AND last_event_id=?)').bind(order.id, order.id, event.eventId),
   ];
   event.order.items.slice(0, 100).forEach((item, index) => {
     const quantity = Math.max(1, Math.round(Number(item.quantity) || 1));
@@ -183,13 +195,14 @@ export async function upsertEcEventReadModels(
       `INSERT INTO ec_order_lines
          (id, order_id, line_index, external_product_id, product_name, quantity,
           unit_amount_minor, line_amount_minor, product_url, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       WHERE EXISTS (SELECT 1 FROM ec_orders WHERE id=? AND last_event_id=?)`,
     ).bind(
       crypto.randomUUID(), order.id, index,
       item.product_id == null ? null : String(item.product_id),
       item.name.trim().slice(0, 200) || '商品', quantity, unitAmount,
       integerOrNull(item.line_amount) ?? (unitAmount === null ? null : unitAmount * quantity),
-      item.product_url ?? null, now,
+      item.product_url ?? null, now, order.id, event.eventId,
     ));
   });
   await db.batch(statements);
@@ -360,6 +373,8 @@ export async function listEcOrders(
     lineAccountId: string;
     status?: EcOrderState | null;
     query?: string;
+    from?: string | null;
+    to?: string | null;
     limit: number;
     offset: number;
   },
@@ -379,7 +394,13 @@ export async function listEcOrders(
     const escaped = input.query.replace(/[\\%_]/g, (value) => `\\${value}`);
     bindings.push(`%${escaped}%`, `%${escaped}%`);
   }
+  if (input.from) { clauses.push('julianday(o.ordered_at) >= julianday(?)'); bindings.push(input.from); }
+  if (input.to) { clauses.push('julianday(o.ordered_at) < julianday(?)'); bindings.push(input.to); }
   const where = clauses.join(' AND ');
+  const summaryClauses = ['line_account_id = ?'];
+  const summaryBindings: Array<string | number> = [input.lineAccountId];
+  if (input.from) { summaryClauses.push('julianday(ordered_at) >= julianday(?)'); summaryBindings.push(input.from); }
+  if (input.to) { summaryClauses.push('julianday(ordered_at) < julianday(?)'); summaryBindings.push(input.to); }
   const [rows, count, summary] = await Promise.all([
     db.prepare(
       `SELECT o.*, f.display_name AS customer_name
@@ -396,15 +417,15 @@ export async function listEcOrders(
               SUM(CASE WHEN normalized_status = 'refunded' THEN 1 ELSE 0 END) AS refunded_count,
               SUM(CASE WHEN normalized_status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count,
               COALESCE(SUM(total_amount_minor), 0) AS total_amount
-         FROM ec_orders WHERE line_account_id = ?`,
-    ).bind(input.lineAccountId).first<Record<string, number>>(),
+         FROM ec_orders WHERE ${summaryClauses.join(' AND ')}`,
+    ).bind(...summaryBindings).first<Record<string, number>>(),
   ]);
   const ids = rows.results.map((row) => String(row.id));
   const lineRows = ids.length
     ? await db.prepare(
-      `SELECT * FROM ec_order_lines WHERE order_id IN (${ids.map(() => '?').join(',')})
+      `SELECT * FROM ec_order_lines WHERE order_id IN (${sqlIdSet(ids).sql})
         ORDER BY order_id, line_index`,
-    ).bind(...ids).all<Record<string, unknown>>()
+    ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
   const linesByOrder = new Map<string, EcOrderReadModel['orderLines']>();
   for (const line of lineRows.results) {
@@ -624,16 +645,6 @@ export async function retryEcActionExecution(
   return { kind: 'queued', execution };
 }
 
-function maskSensitiveString(value: string): string {
-  if (/[*\u2022\u25cf\u2026]/.test(value)) return value;
-  const email = value.match(/^([^@\s]+)@([^@\s]+)$/);
-  if (email) return `${email[1]!.slice(0, 2)}***@${email[2]}`;
-  if (/^\+?[0-9 ()-]{10,20}$/.test(value) && value.replace(/\D/g, '').length >= 10) {
-    return `***${value.replace(/\D/g, '').slice(-4)}`;
-  }
-  return value;
-}
-
 function parseMaskedJson(value: unknown): unknown {
   let parsed: unknown;
   try { parsed = JSON.parse(String(value ?? 'null')) as unknown; } catch { return null; }
@@ -658,24 +669,21 @@ export async function listEcIdentityCandidates(
     offset: number;
   },
 ): Promise<{
-  items: Array<Record<string, unknown>>;
+  items: Array<Record<string, unknown> & EcIdentityDuplicateSignal>;
   total: number;
-  summary: {
-    unmatched: number;
-    candidates: number;
-    candidateExternalCustomers: number;
-    duplicateSuspicions: number;
-    linked: number;
-    potentialRevenue: number | null;
-  };
+  summary: EcIdentityCandidateSummary;
 }> {
-  const [rows, count, pendingSummary, unmatched, linked, duplicates] = await Promise.all([
+  const [rows, count, pendingSummary, unmatched, linked, duplicates, revenue, withoutCandidates] = await Promise.all([
     db.prepare(
-      `SELECT id, status, version, confidence_score, left_snapshot_json, right_snapshot_json,
-              evidence_json, impact_json, detected_at, reviewed_at
-         FROM identity_candidates
-        WHERE tenant_id = ? AND kind = 'ec_member' AND left_line_account_id = ? AND status = ?
-        ORDER BY detected_at DESC, id DESC LIMIT ? OFFSET ?`,
+      `SELECT c.id, c.status, c.version, c.confidence_score, c.left_snapshot_json, c.right_snapshot_json,
+              c.evidence_json, c.impact_json, c.detected_at, c.reviewed_at, c.external_customer_id,
+              (SELECT COUNT(*) FROM identity_candidates grouped
+                WHERE grouped.tenant_id = c.tenant_id AND grouped.kind = 'ec_member'
+                  AND grouped.left_line_account_id = c.left_line_account_id AND grouped.status = 'pending'
+                  AND grouped.external_customer_id = c.external_customer_id) AS duplicate_candidate_count
+         FROM identity_candidates c
+        WHERE c.tenant_id = ? AND c.kind = 'ec_member' AND c.left_line_account_id = ? AND c.status = ?
+        ORDER BY c.detected_at DESC, c.id DESC LIMIT ? OFFSET ?`,
     ).bind(input.tenantId, input.lineAccountId, input.status, input.limit, input.offset)
       .all<Record<string, unknown>>(),
     db.prepare(
@@ -703,32 +711,51 @@ export async function listEcIdentityCandidates(
           GROUP BY external_customer_id HAVING COUNT(*) > 1
        )`,
     ).bind(input.tenantId, input.lineAccountId).first<{ count: number }>(),
+    db.prepare(
+      `WITH per_customer AS (
+        SELECT COALESCE(c.external_customer_id, c.left_subject_id) AS customer,
+          MAX(CASE WHEN json_extract(m.value, '$.key') IN (${REVENUE_IMPACT_KEYS.map(() => '?').join(',')})
+            AND json_type(m.value, '$.value') IN ('integer','real')
+            THEN json_extract(m.value, '$.value') END) AS amount
+        FROM identity_candidates c LEFT JOIN json_each(c.impact_json) m
+        WHERE c.tenant_id = ? AND c.kind = 'ec_member' AND c.left_line_account_id = ? AND c.status = 'pending'
+        GROUP BY c.source_key, COALESCE(c.external_customer_id, c.left_subject_id)
+      ) SELECT COUNT(*) AS customers, COUNT(amount) AS measured, COALESCE(SUM(amount),0) AS amount FROM per_customer`,
+    ).bind(...REVENUE_IMPACT_KEYS, input.tenantId, input.lineAccountId)
+      .first<{customers:number;measured:number;amount:number}>(),
+    db.prepare(`SELECT COUNT(DISTINCT e.customer_id) AS count FROM ec_events e
+      WHERE e.line_account_id = ? AND e.status = 'identity_pending' AND e.customer_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM identity_candidates c
+        WHERE c.tenant_id = ? AND c.kind = 'ec_member' AND c.left_line_account_id = e.line_account_id
+          AND c.status = 'pending' AND c.external_customer_id = e.customer_id AND c.source_key = e.source)`)
+      .bind(input.lineAccountId,input.tenantId).first<{count:number}>(),
   ]);
-  const items = rows.results.map((row) => ({
+  const items = await Promise.all(rows.results.map(async (row) => ({
+    duplicateGroupKey: row.external_customer_id == null ? null : [...new Uint8Array(await crypto.subtle.digest(
+      'SHA-256', new TextEncoder().encode(JSON.stringify([input.tenantId, input.lineAccountId, String(row.external_customer_id)])),
+    ))].map((byte) => byte.toString(16).padStart(2, '0')).join(''),
+    duplicateCandidateCount: Number(row.duplicate_candidate_count ?? 0),
+    isDuplicateSuspicion: row.status === 'pending' && Number(row.duplicate_candidate_count) > 1,
     id: String(row.id), status: String(row.status), version: Number(row.version),
     confidenceScore: Number(row.confidence_score),
     left: parseMaskedJson(row.left_snapshot_json), right: parseMaskedJson(row.right_snapshot_json),
     evidence: parseMaskedJson(row.evidence_json), impact: parseMaskedJson(row.impact_json),
     detectedAt: String(row.detected_at), reviewedAt: row.reviewed_at == null ? null : String(row.reviewed_at),
-  }));
-  const revenueValues = items.flatMap((item) => Array.isArray(item.impact)
-    ? (item.impact as Array<Record<string, unknown>>)
-      .filter((metric) => REVENUE_IMPACT_KEYS.includes(String(metric.key)))
-      .map((metric) => typeof metric.value === 'number' ? metric.value : null)
-    : []).filter((value): value is number => value !== null);
+  })));
   return {
     items, total: Number(count?.count ?? 0),
     summary: {
       unmatched: Number(unmatched?.count ?? 0), candidates: Number(pendingSummary?.count ?? 0),
       candidateExternalCustomers: Number(pendingSummary?.customer_count ?? 0),
       duplicateSuspicions: Number(duplicates?.count ?? 0), linked: Number(linked?.count ?? 0),
-      potentialRevenue: revenueValues.length ? revenueValues.reduce((sum, value) => sum + value, 0) : null,
+      withoutCandidates: Number(withoutCandidates?.count ?? 0),
+      potentialRevenue: revenue && revenue.customers === revenue.measured ? Number(revenue.amount) : null,
     },
   };
 }
 
 /*
- * IDEA-23: 1注文の処理状況を説明できるように、注文1件へ紐づく受信出来事・
+ * 1注文の処理状況を説明できるように、注文1件へ紐づく受信出来事・
  * 個別処理・通知送達・発送後の案内・成果/マイル/スコアをまとめて返す。
  * 一覧用の一覧表ではなく「この注文はどこまで進み、どこで止まり、何を
  * やり直せるか」を追うための読み取り専用ビュー。生のエラーメッセージや
@@ -796,7 +823,7 @@ export interface EcOrderDetailFollowUp {
 }
 
 /**
- * IDEA-16: 注文に結びついた成果1件と、その報酬・支払いの記録。
+ * 注文に結びついた成果1件と、その報酬・支払いの記録。
  *
  * 報酬側の値はすべて「書かれた記録」をそのまま返す。承認前の成果には
  * 計算の版も支払い確定の行も無いので rewardAmount / rewardEntryStatus は
@@ -921,8 +948,6 @@ export async function getEcOrderDetail(
   const eventIds = eventRows.results.map((row) => String(row.id));
   const externalIds = eventRows.results.map((row) => String(row.external_event_id));
 
-  const placeholders = (count: number) => Array.from({ length: count }, () => '?').join(',');
-
   const actionRows = eventIds.length
     ? await db.prepare(
       `SELECT a.*, e.event_type, e.received_at, e.friend_id,
@@ -931,18 +956,18 @@ export async function getEcOrderDetail(
          FROM ec_action_executions a
          JOIN ec_events e ON e.id = a.event_id
          LEFT JOIN friends f ON f.id = e.friend_id
-        WHERE a.event_id IN (${placeholders(eventIds.length)})
+        WHERE a.event_id IN (${sqlIdSet(eventIds).sql})
         ORDER BY a.created_at ASC`,
-    ).bind(...eventIds).all<Record<string, unknown>>()
+    ).bind(...sqlIdSet(eventIds).binds).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
 
   const actionIds = actionRows.results.map((row) => String(row.id));
   const attemptRows = actionIds.length
     ? await db.prepare(
       `SELECT * FROM ec_action_execution_attempts
-        WHERE action_execution_id IN (${placeholders(actionIds.length)})
+        WHERE action_execution_id IN (${sqlIdSet(actionIds).sql})
         ORDER BY action_execution_id, attempt_number`,
-    ).bind(...actionIds).all<Record<string, unknown>>()
+    ).bind(...sqlIdSet(actionIds).binds).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
   const attemptsByAction = new Map<string, EcOrderDetailAttempt[]>();
   for (const row of attemptRows.results) {
@@ -961,8 +986,8 @@ export async function getEcOrderDetail(
 
   const dispatchRows = eventIds.length
     ? await db.prepare(
-      `SELECT * FROM ec_v6_dispatches WHERE event_id IN (${placeholders(eventIds.length)})`,
-    ).bind(...eventIds).all<Record<string, unknown>>()
+      `SELECT * FROM ec_v6_dispatches WHERE event_id IN (${sqlIdSet(eventIds).sql})`,
+    ).bind(...sqlIdSet(eventIds).binds).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
   const dispatchesByEvent = new Map<string, EcOrderDetailDispatch[]>();
   for (const row of dispatchRows.results) {
@@ -997,11 +1022,11 @@ export async function getEcOrderDetail(
          JOIN notification_instances i ON i.id = d.instance_id
         WHERE i.line_account_id = ?
           AND (
-            (i.audience_type = 'customer' AND i.dedupe_key IN (${placeholders(ecDedupeKeys.length)}))
-            OR (i.audience_type = 'operator' AND i.source_event_id IN (${placeholders(eventIds.length)}))
+            (i.audience_type = 'customer' AND i.dedupe_key IN (${sqlIdSet(ecDedupeKeys).sql}))
+            OR (i.audience_type = 'operator' AND i.source_event_id IN (${sqlIdSet(eventIds).sql}))
           )
         ORDER BY d.queued_at ASC, d.id ASC`,
-    ).bind(input.lineAccountId, ...ecDedupeKeys, ...eventIds).all<Record<string, unknown>>();
+    ).bind(input.lineAccountId, ...sqlIdSet(ecDedupeKeys).binds, ...sqlIdSet(eventIds).binds).all<Record<string, unknown>>();
     const eventIdByExternal = new Map(eventRows.results.map((row) => [String(row.external_event_id), String(row.id)]));
     for (const row of deliveryRows.results) {
       const audience = row.audience_type === 'operator' ? 'operator' : 'customer';
@@ -1090,7 +1115,7 @@ export async function getEcOrderDetail(
    * 成果・マイル・スコアは発生元の外部出来事IDか注文番号で辿る。
    * 友だち未連携の注文には付かない（記録口が友だちを要求する）。
    *
-   * IDEA-16: 成果の行から報酬の版・支払い確定・締め・支払いCSV束・支払い結果
+   * 成果の行から報酬の版・支払い確定・締め・支払いCSV束・支払い結果
    * まで同じ行で返し、注文から報酬・支払い状態へそのまま辿れるようにする。
    * 記録は友だちの所属アカウントで突き合わせる。注文番号はアカウントを
    * 越えて同じ番号が来ることがあるため、番号だけで突き合わせると別店の
@@ -1129,22 +1154,22 @@ export async function getEcOrderDetail(
         AND json_extract(ce.metadata, '$.sourceType') = 'ec_order_confirmed'
         AND (
           CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT) = ?
-          ${externalIds.length ? `OR json_extract(ce.metadata, '$.ecEventId') IN (${placeholders(externalIds.length)})` : ''}
+          ${externalIds.length ? `OR json_extract(ce.metadata, '$.ecEventId') IN (${sqlIdSet(externalIds).sql})` : ''}
         )
       ORDER BY ce.created_at ASC`,
-  ).bind(input.lineAccountId, order.orderNumber, ...externalIds).all<Record<string, unknown>>();
+  ).bind(input.lineAccountId, order.orderNumber, ...sqlIdSet(externalIds).binds).all<Record<string, unknown>>();
 
   const mileage = externalIds.length
     ? await db.prepare(
       `SELECT ml.id, ml.entry_type, ml.amount, ml.status, ml.reason, ml.occurred_at
          FROM mileage_ledger ml
-        WHERE ml.source_event_id IN (${placeholders(externalIds.length)})
+        WHERE ml.source_event_id IN (${sqlIdSet(externalIds).sql})
            OR ml.engagement_event_id IN (
              SELECT id FROM engagement_events
-              WHERE source = 'eccube' AND source_event_id IN (${placeholders(externalIds.length)})
+              WHERE source = 'eccube' AND source_event_id IN (${sqlIdSet(externalIds).sql})
            )
         ORDER BY ml.occurred_at ASC`,
-    ).bind(...externalIds, ...externalIds).all<Record<string, unknown>>()
+    ).bind(...sqlIdSet(externalIds).binds, ...sqlIdSet(externalIds).binds).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
 
   const scores = externalIds.length
@@ -1152,13 +1177,13 @@ export async function getEcOrderDetail(
       `SELECT id, score_change, reason, COALESCE(occurred_at, created_at) AS happened_at
          FROM friend_scores
         WHERE line_account_id = ? AND source = 'eccube'
-          AND source_event_id IN (${placeholders(externalIds.length)})
+          AND source_event_id IN (${sqlIdSet(externalIds).sql})
         ORDER BY happened_at ASC`,
-    ).bind(input.lineAccountId, ...externalIds).all<Record<string, unknown>>()
+    ).bind(input.lineAccountId, ...sqlIdSet(externalIds).binds).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
 
   /*
-   * IDEA-16: 同じ注文・同じ成果地点へ2件以上の成果が乗っているときは
+   * 同じ注文・同じ成果地点へ2件以上の成果が乗っているときは
    * 二重計上の候補として印を付ける。同じ出来事IDの再送は冪等キーで
    * 1件に潰れるが、別の出来事IDで同じ注文が届き直すと別の成果が立つ。
    * ここでは自動で消さず、候補として見せて人が確認する。

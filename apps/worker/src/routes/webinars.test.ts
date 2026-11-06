@@ -1,5 +1,8 @@
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
+import type { Env } from '../worker-env.js';
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 
 // 分類は純粋関数なので実物を差す。ロジックを試験側へ複写すると
@@ -13,6 +16,8 @@ const dbMocks = {
   getWebinarBySlug: vi.fn(),
   createWebinar: vi.fn(),
   updateWebinar: vi.fn(),
+  isWebinarMissedInWindow: vi.fn(async () => true),
+  getWebinarWatchedSeconds: vi.fn(async () => 0),
   archiveWebinar: vi.fn(),
   getWebinarActions: vi.fn(),
   replaceWebinarActions: vi.fn(),
@@ -84,7 +89,7 @@ const dbMocks = {
   getWebinarMonitoringSummary: vi.fn(),
   getWebinarPublicAccount: vi.fn(),
   formBelongsToLineAccount: vi.fn(),
-  // #648: 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
+  // 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
   // 呼び出し口が 500 になる。数えること自体は実DBの試験で見ている。
   recordConversionSourceEvent: vi.fn(async () => ({ matched: 0, recorded: 0, failed: 0, skipped: null })),
 };
@@ -94,7 +99,7 @@ const authMock = { verifyCallerLineUserId: vi.fn() };
 vi.mock('../services/liff-auth.js', () => authMock);
 
 const tagMock = { attachTagAndFireSideEffects: vi.fn(), detachTagAndFireSideEffects: vi.fn() };
-vi.mock('../services/friend-tag-attach.js', () => tagMock);
+vi.mock('../features/friends/friend-tag-attach.js', () => tagMock);
 
 const localProxyMock = { dispatchLineProxyLocally: vi.fn() };
 vi.mock('../services/local-line-proxy.js', () => localProxyMock);
@@ -107,7 +112,7 @@ const webinarNotificationMocks = {
   saveWebinarNotificationSettings: vi.fn(),
   sendWebinarNotificationTest: vi.fn(),
 };
-vi.mock('../services/webinar-notifications.js', () => webinarNotificationMocks);
+vi.mock('../features/webinars/webinar-notifications.js', () => webinarNotificationMocks);
 
 const accountAccessMock = {
   canAccessAllLineAccounts: vi.fn(async (
@@ -118,6 +123,11 @@ const accountAccessMock = {
   })),
 };
 vi.mock('../services/account-access.js', () => accountAccessMock);
+
+const audienceMock = vi.hoisted(() => ({ countRecentWebinarViewers: vi.fn(async () => 0) }));
+vi.mock('../features/webinars/webinar-audience.js', () => ({
+  ...audienceMock, WEBINAR_AUDIENCE_WINDOW_SECONDS: 60,
+}));
 
 const { webinarRoutes } = await import('./webinars.js');
 const { signWebinarToken } = await import('../lib/webinar-token.js');
@@ -170,13 +180,19 @@ adminApp.use('*', async (c, next) => {
   return next();
 });
 adminApp.route('/', webinarRoutes);
+adminApp.onError(unhandledWorkerError);
 
 function adminReq(path: string, init?: RequestInit) {
+  if (init?.method === 'PUT' && /^\/api\/webinars\/[^/]+$/.test(path) && typeof init.body === 'string') {
+    init = { ...init, body: JSON.stringify({ expectedVersion: 0, ...JSON.parse(init.body) }) };
+  }
   return adminApp.request(path, init, env, execCtx);
 }
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  audienceMock.countRecentWebinarViewers.mockClear();
+  audienceMock.countRecentWebinarViewers.mockResolvedValue(0);
   vi.useFakeTimers();
   // ライブ開始3分後（予約済み本人が途中参加できる5分窓内）
   vi.setSystemTime(new Date((SESSION_START + 180) * 1000));
@@ -352,6 +368,13 @@ describe('admin webinar tenant scope', () => {
     /* limit は上限200へ丸め、page は1始まりへ戻す。 */
     expect(dbMocks.getWebinarList).toHaveBeenCalledWith({}, expect.anything(), { limit: 200, offset: 0 }, expect.anything());
     expect(await res.json()).toMatchObject({ data: { limit: 200 } });
+  });
+
+  test('アーカイブの絞り込みを一覧と件数の両方へ渡す', async () => {
+    const res = await adminReq('/api/webinars?account_id=account-a&status=archived');
+    expect(res.status).toBe(200);
+    expect(dbMocks.getWebinarList).toHaveBeenCalledWith({}, expect.objectContaining({ accountId: 'account-a' }), expect.anything(), expect.objectContaining({ status: 'archived' }));
+    expect(dbMocks.countWebinarList).toHaveBeenCalledWith({}, expect.objectContaining({ accountId: 'account-a' }), expect.objectContaining({ status: 'archived' }));
   });
 
   test('一覧は固定契約の集計値と公開5状態を返す', async () => {
@@ -878,7 +901,8 @@ describe('POST /api/liff/webinars/:slug/heartbeat', () => {
     expect(await res.json()).toEqual({ ok: true, counted: false, reason: 'position_jump' });
   });
 
-  test('90%視聴で完了通知を一度だけ作る処理へ渡す', async () => {
+  test('実視聴の合計90%で完了通知を一度だけ作る処理へ渡す', async () => {
+    dbMocks.getWebinarWatchedSeconds.mockResolvedValueOnce(6480);
     const res = await postJson('/api/liff/webinars/test-webinar/heartbeat', {
       sessionStartAt: SESSION_START,
       positionSeconds: 6480,
@@ -1257,7 +1281,7 @@ describe('webinar notification settings', () => {
       });
 
       expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ success: false, error: message });
+      expect(await res.json()).toMatchObject({ success: false, code: message , fields: expect.any(Object), error: expect.any(String) });
     },
   );
 
@@ -1295,7 +1319,7 @@ describe('webinar notification settings', () => {
     const res = await adminReq('/api/webinars/w1/notifications/test', { method: 'POST' });
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ success: false, error: 'no_upcoming_session' });
+    expect(await res.json()).toMatchObject({ success: false, code: 'no_upcoming_session' , fields: expect.any(Object), error: expect.any(String) });
     expect(webinarNotificationMocks.sendWebinarNotificationTest).not.toHaveBeenCalled();
   });
 
@@ -1312,7 +1336,14 @@ describe('webinar notification settings', () => {
     const res = await adminReq('/api/webinars/w1/notifications/test', { method: 'POST' });
 
     expect(res.status).toBe(expectedStatus);
-    expect(await res.json()).toMatchObject({ success: false });
+    const body = await res.json<{ incidentId?: string }>();
+    expect(body).toMatchObject({ success: false });
+    if (expectedStatus === 500) {
+      expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({ incidentId: body.incidentId }));
+    } else {
+      expect(report).not.toHaveBeenCalled();
+    }
   });
 });
 
@@ -1346,7 +1377,7 @@ describe('admin CRUD', () => {
     ['負数', -1],
     ['数値文字列', '60'],
     ['null', null],
-  ])('POST — 視聴時間が%sなら422で保存しない', async (_label, durationSeconds) => {
+  ])('POST — 視聴時間が%sなら400/422で保存しない', async (_label, durationSeconds) => {
     dbMocks.getWebinarBySlug.mockResolvedValue(null);
 
     const res = await adminReq('/api/webinars', {
@@ -1356,8 +1387,8 @@ describe('admin CRUD', () => {
       }),
     });
 
-    expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ success: false, error: 'invalid_duration' });
+    expect(res.status).toBe(typeof durationSeconds === 'number' ? 422 : 400);
+    await expect(res.json()).resolves.toMatchObject({ success: false, fields: { durationSeconds: expect.any(String) }, error: expect.any(String) });
     expect(dbMocks.createWebinar).not.toHaveBeenCalled();
   });
 
@@ -1372,7 +1403,7 @@ describe('admin CRUD', () => {
     });
 
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ success: false, error: 'invalid_duration' });
+    await expect(res.json()).resolves.toMatchObject({ success: false, code: 'invalid_duration' , fields: expect.any(Object), error: expect.any(String) });
     expect(dbMocks.createWebinar).not.toHaveBeenCalled();
   });
 
@@ -1500,7 +1531,7 @@ describe('admin CRUD', () => {
       body: JSON.stringify({ title: '未所属', slug: 'missing-account', durationSeconds: 7200 }),
     });
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: 'account_id_required' });
+    expect(await res.json()).toMatchObject({ code: 'account_id_required' , fields: expect.any(Object), error: expect.any(String) });
     expect(dbMocks.createWebinar).not.toHaveBeenCalled();
   });
 
@@ -1533,7 +1564,7 @@ describe('admin CRUD', () => {
       body: JSON.stringify({ comments }),
     });
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: 'too_many_comments' });
+    expect(await res.json()).toMatchObject({ code: 'too_many_comments' , fields: expect.any(Object), error: expect.any(String) });
     expect(dbMocks.replaceWebinarComments).not.toHaveBeenCalled();
   });
 
@@ -1596,6 +1627,7 @@ describe('admin CRUD', () => {
     expect(body.data).toMatchObject({
       version: 4, deliveryKind: 'on_demand', publicDescription: '説明',
       ctaCount: 2,
+      updatedAt: expect.any(String) as unknown as string,
       viewingCondition: { kind: 'registered', label: '申込済みの友だち' },
       publicPage: {
         liffId: '999-test', form: {
@@ -1903,7 +1935,7 @@ describe('admin CRUD', () => {
       }),
     });
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toMatchObject({ error: 'invalid_action_reference' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'invalid_action_reference' , fields: expect.any(Object), error: expect.any(String) });
     expect(dbMocks.replaceWebinarActions).not.toHaveBeenCalled();
   });
 
@@ -1921,7 +1953,7 @@ describe('admin CRUD', () => {
     expect(res.headers.get('content-type')).toContain('text/csv');
     const text = await res.text();
     expect(text).toContain("'=HYPERLINK")
-    // 分類・ライブ/録画の列が出る（IDEA-10: 分類の根拠と区別をCSVでも確認できる）。
+    // 分類・ライブ/録画の列が出る（: 分類の根拠と区別をCSVでも確認できる）。
     expect(text).toContain('分類');
     expect(text).toContain('途中離脱');
   });
@@ -1941,7 +1973,7 @@ describe('admin CRUD', () => {
     ['負数', -1],
     ['数値文字列', '60'],
     ['null', null],
-  ])('PUT /api/webinars/:id — 視聴時間が%sなら422で更新しない', async (_label, durationSeconds) => {
+  ])('PUT /api/webinars/:id — 視聴時間が%sなら400/422で更新しない', async (_label, durationSeconds) => {
     dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
 
     const res = await adminReq('/api/webinars/w1', {
@@ -1949,8 +1981,8 @@ describe('admin CRUD', () => {
       body: JSON.stringify({ durationSeconds }),
     });
 
-    expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ success: false, error: 'invalid_duration' });
+    expect(res.status).toBe(typeof durationSeconds === 'number' ? 422 : 400);
+    await expect(res.json()).resolves.toMatchObject({ success: false, fields: { durationSeconds: expect.any(String) }, error: expect.any(String) });
     expect(dbMocks.updateWebinar).not.toHaveBeenCalled();
   });
 
@@ -1965,7 +1997,7 @@ describe('admin CRUD', () => {
 
     expect(res.status).toBe(200);
     expect(dbMocks.updateWebinar).toHaveBeenCalledWith(
-      expect.anything(), 'w1', expect.objectContaining({ durationSeconds: 1 }),
+      expect.anything(), 'w1', expect.objectContaining({ durationSeconds: 1 }), 0,
     );
   });
 
@@ -1984,7 +2016,7 @@ describe('admin CRUD', () => {
 
     expect(res.status).toBe(200);
     expect(dbMocks.updateWebinar).toHaveBeenCalledWith(
-      expect.anything(), 'w1', expect.not.objectContaining({ durationSeconds: expect.anything() }),
+      expect.anything(), 'w1', expect.not.objectContaining({ durationSeconds: expect.anything() }), 0,
     );
     await expect(res.json()).resolves.toMatchObject({
       success: true, data: { durationSeconds: 7200 },
@@ -2040,7 +2072,7 @@ describe('webinar CTA cards', () => {
     expect(dbMocks.replaceWebinarCtas).toHaveBeenCalledWith(expect.anything(), 'w1', [{
       atSeconds: 300, kind: 'form', title: '個別導入診断', body: '限定枠です',
       buttonLabel: '診断を受ける', autoOpen: true, formId: 'form-1', url: null,
-    }]);
+    }], { expectedVersion: 0, updatedBy: 'owner-1' });
   });
 
   test('PUT ctas — 存在しない form は 400 で何も書かない', async () => {
@@ -2101,8 +2133,7 @@ describe('webinar CTA cards', () => {
 });
 
 /*
- * 監査 R95・R96・R97・R99 の回帰試験。直しを戻すと赤くなることを
- * 確かめたうえで残す（赤確認は各 test の期待値が直しの分岐に依存する）。
+ * ウェビナーの入力・公開・配信条件の境界を、失敗すべき条件も含めて確かめる。
  */
 describe('R95 公開は公開専用口へ集約する', () => {
   test('PUT 基本更新で下書き→公開中は409で止まり更新しない', async () => {
@@ -2136,7 +2167,7 @@ describe('R95 公開は公開専用口へ集約する', () => {
       }),
     });
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ success: false, error: 'publish_via_publish_endpoint' });
+    await expect(res.json()).resolves.toMatchObject({ success: false, code: 'publish_via_publish_endpoint' , fields: expect.any(Object), error: expect.any(String) });
     expect(dbMocks.createWebinar).not.toHaveBeenCalled();
   });
 });
@@ -2340,6 +2371,7 @@ describe('R97 視聴後アクションを実行口へ接続する', () => {
   }
 
   test('視聴完了で完了きっかけのタグ付けが実行され記録される', async () => {
+    dbMocks.getWebinarWatchedSeconds.mockResolvedValueOnce(7200);
     dbMocks.getWebinarActions.mockResolvedValue([{
       id: 'action-1', webinar_id: 'w1', trigger: 'completed', action_type: 'add_tag',
       config_json: JSON.stringify({ tagId: 'tag-done' }), position: 0, version: 1,
@@ -2386,8 +2418,9 @@ describe('R97 視聴後アクションを実行口へ接続する', () => {
   });
 
   test('実行口のない種類は実行せず見送りとして記録する', async () => {
+    dbMocks.getWebinarWatchedSeconds.mockResolvedValueOnce(7200);
     dbMocks.getWebinarActions.mockResolvedValue([{
-      id: 'action-9', webinar_id: 'w1', trigger: 'completed', action_type: 'send_message',
+      id: 'action-9', webinar_id: 'w1', trigger: 'completed', action_type: 'unsupported_future_action',
       config_json: JSON.stringify({ templateId: 'tmpl-1' }), position: 0, version: 1,
       enabled: 1, created_at: 'x', updated_at: 'x',
     }]);
@@ -2421,5 +2454,114 @@ describe('R97 視聴後アクションを実行口へ接続する', () => {
     await flushBackground();
     expect(tagMock.attachTagAndFireSideEffects).not.toHaveBeenCalled();
     expect(dbMocks.finishWebinarActionExecution).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * D001: 公開完了画面の変更系の口（一時停止・通知テスト・複製）と作成は
+ * owner/admin のみ。画面側で staff へ出さなくなっても、口側の門は残す。
+ * staff が直接叩いても 403 で、何も書き換えない。
+ */
+describe('webinar published mutations role guard (D001)', () => {
+  test.each([
+    ['POST', '/api/webinars', {}],
+    ['POST', '/api/webinars/w1/pause', { expectedVersion: 3 }],
+    ['POST', '/api/webinars/w1/duplicate', { expectedVersion: 3 }],
+    ['POST', '/api/webinars/w1/public-page/test', {}],
+  ])('staff の %s %s は 403', async (method, path, body) => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    const staffApp = new Hono<Env>();
+    staffApp.use('*', async (c, next) => {
+      c.set('staff', { id: 'staff-1', name: 'Staff', role: 'staff', readOnly: false });
+      return next();
+    });
+    staffApp.route('/', webinarRoutes);
+
+    const res = await staffApp.request(path, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, env, execCtx);
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/liff/webinars/:slug/audience', () => {
+  test('現在回を予約した本人に視聴人数と未設定の講師名を返す', async () => {
+    audienceMock.countRecentWebinarViewers.mockResolvedValue(2);
+    const res = await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      live: true, sessionStartAt: SESSION_START, viewerCount: 2, activeWindowSeconds: 60, lecturerName: null,
+    });
+    expect(audienceMock.countRecentWebinarViewers).toHaveBeenCalledWith(env.DB, 'w1', SESSION_START, SESSION_START + 180);
+  });
+  test('開始前と終了後は未取得のnullを返す', async () => {
+    for (const offset of [-1, 7200]) {
+      vi.setSystemTime((SESSION_START + offset) * 1000);
+      const res = await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } });
+      expect(await res.json()).toMatchObject({ live: false, sessionStartAt: null, viewerCount: null });
+    }
+    expect(audienceMock.countRecentWebinarViewers).not.toHaveBeenCalled();
+  });
+  test('未予約者には配信中でも人数を返さない', async () => {
+    dbMocks.getWebinarRegistration.mockResolvedValue(null);
+    const res = await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } });
+    expect(await res.json()).toMatchObject({ live: false, viewerCount: null });
+    expect(audienceMock.countRecentWebinarViewers).not.toHaveBeenCalled();
+  });
+  test('オンデマンドは共通の回を数え、外部配信は未取得', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(makeWebinar({ created_at: new Date(SESSION_START * 1000).toISOString() }));
+    dbMocks.getWebinarEditorSettings.mockResolvedValue({ delivery_kind: 'on_demand' });
+    expect(await (await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } })).json())
+      .toMatchObject({ live: true, sessionStartAt: SESSION_START, viewerCount: 0 });
+    dbMocks.getWebinarEditorSettings.mockResolvedValue({ delivery_kind: 'external' });
+    expect(await (await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } })).json())
+      .toMatchObject({ live: false, viewerCount: null });
+  });
+  test('未認証・所属外・非公開のウェビナーを拒否する', async () => {
+    authMock.verifyCallerLineUserId.mockResolvedValue(null);
+    expect((await req('/api/liff/webinars/test-webinar/audience')).status).toBe(401);
+    authMock.verifyCallerLineUserId.mockResolvedValue('U123');
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
+    expect((await req('/api/liff/webinars/test-webinar/audience')).status).toBe(403);
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue({ id: 'friend-1' });
+    dbMocks.getWebinarBySlug.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    expect((await req('/api/liff/webinars/test-webinar/audience')).status).toBe(404);
+  });
+  test('公開期間外なら予約者にも人数を返さない', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(makeWebinar({ publication_ends_at: new Date(SESSION_START * 1000).toISOString() }));
+    expect((await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } })).status).toBe(404);
+    expect(audienceMock.countRecentWebinarViewers).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('ウェビナーの見逃し・完了・保存', () => {
+  test('期限の切れた見逃しは専用リンクでも開けない', async () => {
+    vi.setSystemTime(new Date((SESSION_START + 9 * 86400) * 1000));
+    dbMocks.isWebinarMissedInWindow.mockResolvedValueOnce(false);
+    dbMocks.getWebinarBySlug.mockResolvedValue(makeWebinar({ publication_ends_at: '2000-01-01T00:00:00Z' }));
+    const response = await req(`/api/liff/webinars/test-webinar?sessionStartAt=${SESSION_START}`, { headers: { Authorization: 'Bearer t' } });
+    expect(response.status).toBe(404);
+  });
+  test('移動中の位置だけでは完了の副作用を実行しない', async () => {
+    dbMocks.recordWebinarHeartbeat.mockResolvedValueOnce({ status: 'moved' });
+    const response = await postJson('/api/liff/webinars/test-webinar/heartbeat', { sessionStartAt: SESSION_START, positionSeconds: 6480, playerState: 'seeking' });
+    expect(response.status).toBe(200);
+    expect(webinarNotificationMocks.enqueueWebinarCompletedNotification).not.toHaveBeenCalled();
+    expect(dbMocks.recordConversionSourceEvent).not.toHaveBeenCalled();
+  });
+  test('位置が90%でも実視聴が少なければ完了しない', async () => {
+    dbMocks.getWebinarWatchedSeconds.mockResolvedValueOnce(15);
+    await postJson('/api/liff/webinars/test-webinar/heartbeat', { sessionStartAt: SESSION_START, positionSeconds: 6480 });
+    expect(webinarNotificationMocks.enqueueWebinarCompletedNotification).not.toHaveBeenCalled();
+  });
+  test('基本設定を版番号なしで保存できない', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
+    const response = await adminApp.request('/api/webinars/w1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: '上書き' }) }, env, execCtx);
+    expect(response.status).toBe(400);
+    expect(dbMocks.updateWebinar).not.toHaveBeenCalled();
   });
 });

@@ -1,9 +1,10 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * 友だちの顔。Pencil ★V7「友だちの顔」（V7 文書 `KXDhj`）。
+ * 友だちの顔。Pencil ★V8「顔/小・中・大」（`MFTlt`・`pDKi6`・`zjEbn`）。
  *
  *   丸      大きさ 24・32・40・56、真円
- *   頭文字  淡い地に同じ色の濃い字（6組、どれも 4.5:1 以上）。字は大きさの 42%・太字
+ *   頭文字  中立色の薄い地に濃い字。字は大きさの 42%・太字
  *   画像    1px の薄い縁（better-ui：oklch(0 0 0 / 0.1)）
  */
 
@@ -14,8 +15,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 9999px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
   user-select: none;
 }
@@ -36,15 +36,24 @@
   pointer-events: none;
 }
 
-.s24 { width: 24px; height: 24px; font-size: 10px; }
-.s32 { width: 32px; height: 32px; font-size: 13px; }
-.s40 { width: 40px; height: 40px; font-size: 16px; }
-.s56 { width: 56px; height: 56px; font-size: 22px; }
+.t0 { background: var(--color-surface-pearl); color: var(--color-ink-secondary); }
+.t1 { background: var(--color-surface-pearl); color: var(--color-ink-secondary); }
+.t2 { background: var(--color-surface-pearl); color: var(--color-ink-secondary); }
+.t3 { background: var(--color-surface-pearl); color: var(--color-ink-secondary); }
+.t4 { background: var(--color-surface-pearl); color: var(--color-ink-secondary); }
+.t5 { background: var(--color-surface-pearl); color: var(--color-ink-secondary); }
 
-.t0 { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-.t1 { background: var(--color-status-info-soft); color: var(--color-status-info); }
-.t2 { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
-.t3 { background: var(--color-danger-bg); color: var(--color-danger); }
-.t4 { background: var(--color-info-bg); color: var(--color-info); }
-.t5 { background: var(--color-shell); color: var(--color-ink-secondary); }
+/* 28 / 34 / 52 are the V8 small / medium / large face sizes. */
+:root .avatar { gap: 0; border-radius: var(--polish-radius-pill); font-family: var(--font-sans); }
+:root .s28, :root .s24 { width: 28px; height: 28px; font-size: 12px; line-height: 17px; }
+:root .s34, :root .s32 { width: 34px; height: 34px; font-size: 14px; line-height: 21px; }
+:root .s36 { width: 36px; height: 36px; font-size: 15px; line-height: 22px; }
+:root .s40 { width: 34px; height: 34px; font-size: 14px; line-height: 21px; }
+:root .s52, :root .s56 { width: 52px; height: 52px; font-size: 21px; line-height: 32px; }
+:root .avatar[data-avatar='initials'] { background: var(--color-surface-pearl); color: var(--color-ink-secondary); }
+/* アカウント・会社の印。画像が無いときは会社の印と同じ緑に白の1文字。 */
+:root .avatar.accountInitials { background: var(--color-accent-deep); color: var(--color-on-accent); }
+:root .avatar[data-avatar-shape='rounded'] { border-radius: var(--polish-radius-control); }
+:root .avatar[data-avatar-tone='soft'] { background: var(--color-avatar-blue-bg); color: var(--color-avatar-blue-ink); }
+
 }

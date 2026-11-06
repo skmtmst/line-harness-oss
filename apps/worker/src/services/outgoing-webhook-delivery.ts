@@ -1,3 +1,6 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
+import { parseRetryAfter } from '../lib/external-call/policy.js';
 /**
  * 送信Webhookの配送。
  *
@@ -20,12 +23,14 @@ import {
   type WebhookInteractionFailureReason,
   type WebhookKeyInput,
 } from '@line-crm/db';
+
+
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES } from './external-delivery-retry.js';
 import { signHarnessEvent } from './operations-signature.js';
 
 // ============================================================
-// 共通封筒と署名ヘッダ（要件26 §6-2 / §6-5、N-371 / N-372）
+// 共通封筒と署名ヘッダ（要件26 §6-2 / §6-5、）
 // ============================================================
 //
 // 送信Webhookへ届く本文とヘッダは、どの経路（イベント通知・自動化の
@@ -128,12 +133,7 @@ export function retryDelayMs(attempt: number): number {
 }
 
 /**
- * 1回の送信試行が相手の応答を待つ上限（ミリ秒）。要件26 §6-4 の既定10秒。
- *
- * N-373: 以前は deliverWebhook 経路の fetch に打ち切りがなく、無応答の
- * 送り先があるとその分だけ固まっていた。自動化経路だけ10秒打ち切りが
- * あり、挙動が違っていた。送る側（このファイル）で既定を付けることで、
- * 呼び出し側を変えずに全部の経路を10秒にそろえる。
+ * 無応答の宛先で処理を止め続けないよう、送信側で全経路へ既定10秒のタイムアウトを適用する。要件26 §6-4 に従う。
  */
 export const WEBHOOK_FETCH_TIMEOUT_MS = 10_000;
 
@@ -143,7 +143,7 @@ export const WEBHOOK_FETCH_TIMEOUT_MS_MAX = 30_000;
 /**
  * Retry-After の指定どおりに Worker 内で待つ上限（ミリ秒）。
  *
- * N-374: 混雑時の再送が相手の指定を無視して空振りしていた。指定どおりに
+ * 混雑時の再送が相手の指定を無視して空振りしていた。指定どおりに
  * 待つが、Worker の実行時間に限りがあるため、この上限を超える指定は
  * 上限まで待つ。短い指数待ちへ戻すと、相手の混雑中に再送を早めてしまう。
  */
@@ -163,17 +163,8 @@ export function webhookFetchTimeoutMs(value: unknown): number {
  * （リクエスト内で待つなら秒、台帳へ積む再送なら分まで許せる）。
  */
 function parseRetryAfterDelayMs(header: string | null, nowMs: number): number | null {
-  if (header == null) return null;
-  const text = header.trim();
-  if (!text) return null;
-  if (/^\d+(\.\d+)?$/.test(text)) {
-    const ms = Number(text) * 1000;
-    return Number.isFinite(ms) && ms >= 0 ? ms : null;
-  }
-  const at = Date.parse(text);
-  if (!Number.isFinite(at)) return null;
-  const ms = at - nowMs;
-  return ms < 0 ? null : ms;
+  const at = parseRetryAfter(header, nowMs);
+  return at === undefined ? null : at - nowMs;
 }
 
 /**
@@ -210,17 +201,15 @@ export function shouldRetryStatus(status: number): boolean {
 export interface WebhookRow {
   id: string;
   url: string;
-  /** 旧平文。#650 以降の新規・更新では NULL になる。 */
+  /** 旧平文。 以降の新規・更新では NULL になる。 */
   secret: string | null;
-  /** AES-GCM 暗号文。#650 以降の正本。署名はここから復号した値で付ける。 */
+  /** AES-GCM 暗号文。 以降の正本。署名はここから復号した値で付ける。 */
   secret_encrypted?: string | null;
   max_retries: number | null;
 }
 
-
-
 /**
- * 送信直前の SSRF 再検査 (N-366)。
+ * 送信直前の SSRF 再検査。
  *
  * 登録時の検査だけでは、古い設定のまま DNS が差し替わったり、
  * 転送先が内部を向いたりしたときに内部・private 宛てへ送ってしまう。
@@ -337,7 +326,7 @@ function isBlockedIpv6Groups(g: number[]): boolean {
   if (g0 === 0x2001 && g1 === 0x0db8) return true;
   if (g0 === 0x0064 && g1 === 0xff9b && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0) return true;
   const v4bytes = (hi: number, lo: number) => [(hi >> 8) & 255, hi & 255, (lo >> 8) & 255, lo & 255];
-  // ::ffff:0:0/96 の IPv4 射影は中の IPv4 で判断する。
+  // ffff:0:0/96 の IPv4 射影は中の IPv4 で判断する。
   if (g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0xffff) {
     return isBlockedIpv4Bytes(v4bytes(g6, g7));
   }
@@ -352,7 +341,7 @@ function isBlockedIpv6Groups(g: number[]): boolean {
 function isBlockedIpv6Literal(host: string): boolean {
   const h = host.toLowerCase();
   if (h.includes('.')) {
-    // ::ffff:127.0.0.1 形式だけ受け付け、中のIPv4で判断する。
+    // ffff:127.0.0.1 形式だけ受け付け、中のIPv4で判断する。
     if (!h.startsWith('::ffff:')) return true;
     const bytes = ipv4ToBytes(parseIpv4Parts(h.slice('::ffff:'.length)) ?? []);
     if (!bytes) return true;
@@ -584,7 +573,7 @@ export async function postWebhookSafely(
 ): Promise<SafePostOutcome> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const maxRedirects = opts.maxRedirects ?? 5;
-  // N-373: 呼び出し側の signal があっても内部timeoutを外さない。1つの
+  // 呼び出し側の signal があっても内部timeoutを外さない。1つの
   // 合成signalを全転送段で使うため、転送を繰り返しても試行全体が上限内で止まる。
   const timeoutSignal = AbortSignal.timeout(webhookFetchTimeoutMs(opts.timeoutMs));
   const signal = init.signal
@@ -651,12 +640,12 @@ export interface DeliveryResult {
   retryAfterMs?: number;
   blocked?: boolean;
   blockReason?: WebhookBlockReason | null;
-  /** secret を復号できず、署名を付けられないので送らなかった(#650)。 */
+  /** secret を復号できず、署名を付けられないので送らなかった。 */
   secretUnavailable?: boolean;
   /**
    * 最後の試行が応答を受け取る前に切れた（接続失敗・タイムアウト）印。
    * 届いたかどうか分からないため、履歴の理由は「結果不明」にする
-   * (d23b R410)。response_xxx・connection_failed に分類しない。
+   * (d23b )。response_xxx・connection_failed に分類しない。
    */
   outcomeUnknown?: boolean;
 }
@@ -667,11 +656,11 @@ export interface DeliveryResult {
  * 例外を投げない。呼び出し側は「送れたかどうか」を戻り値で受け取る。
  * 送信の失敗でイベント処理そのものを止めたくないため。
  *
- * 応答別の扱い（決定表。要件26 §6-4。N-373/N-374）。
+ * 応答別の扱い（決定表。要件26 §6-4。）。
  *
  * | 応答 | 扱い | 次までの待ち |
  * | 2xx | 成功 | 待たない |
- * | 429 | 送り直す。Retry-After があれば上限8秒へクランプして待つ | Retry-After／指数待ち |
+ * | 429 | 送り直す。Retry-After があれば8秒以内なら待つ。超過は次回の台帳へ返す | Retry-After／指数待ち |
  * | 5xx | 送り直す | 指数待ち（0.5→1→2→4→8秒） |
  * | タイムアウト（既定10秒）・接続失敗 | 送り直す。lastStatus=null で失敗台帳に残る | 指数待ち |
  * | その他の 4xx | 恒久失敗。残りの回数を使わずに諦める | — |
@@ -690,7 +679,7 @@ export async function deliverWebhook(
     lookupHost?: WebhookDnsLookup;
     timeoutMs?: number;
     /**
-     * secret_encrypted を復号する鍵束(#650)。省略すると Worker の bindings
+     * secret_encrypted を復号する鍵束。省略すると Worker の bindings
      * (LINE_CREDENTIAL_ENCRYPTION_KEY / LINE_CREDENTIAL_PREVIOUS_KEYS)を読む。
      */
     credentialKeys?: WebhookKeyInput | string;
@@ -700,9 +689,9 @@ export async function deliverWebhook(
   const maxRetries = Math.max(0, Math.min(5, webhook.max_retries ?? 0));
 
   // イベントIDは冪等キーと同じ値。封筒の id と X-Harness-Event-Id が
-  // 一致するので、受け手は1つの値で冪等に捌ける（N-372）。
+  // 一致するので、受け手は1つの値で冪等に捌ける。
   const eventId = opts.idempotencyKey ?? crypto.randomUUID();
-  // secret が暗号文で入っている行(#650 以降の正本)はここで復号する。
+  // secret が暗号文で入っている行( 以降の正本)はここで復号する。
   // 呼び出し側に復号を任せると、忘れた経路が黙って署名なしで送ってしまう。
   // 設定済みの secret を読めないときは送らない(fail-open 禁止)。
   let sendSecret: string | null = null;
@@ -713,10 +702,7 @@ export async function deliverWebhook(
       sendSecret = null;
     }
     if (!sendSecret) {
-      console.error(JSON.stringify({
-        event: 'outgoing_webhook_secret_unavailable',
-        webhookId: webhook.id,
-      }));
+      logger.error("outgoing_webhook.resolve_secret_failed");
       return { ok: false, attempts: 0, lastStatus: null, secretUnavailable: true };
     }
   }
@@ -739,7 +725,7 @@ export async function deliverWebhook(
       // 接続そのものの失敗と、打ち切り（タイムアウト）は同じ扱い。
       // 相手が落ちている可能性が高いので送り直す。再試行可能な失敗として
       // lastStatus=null のまま残し、呼び出し側が失敗台帳へ記録する。
-      console.error(`送信Webhook ${webhook.id} への接続失敗:`, err);
+      logger.error("outgoing_webhook_delivery.send_request_failed");
       lastStatus = null;
       waitMs = retryDelayMs(attempt);
       continue;
@@ -755,7 +741,7 @@ export async function deliverWebhook(
     if (!shouldRetryStatus(res.status)) {
       return { ok: false, attempts: attempt + 1, lastStatus };
     }
-    // N-374: 429 のときは相手の Retry-After を上限付きで尊重する。
+    // 429 のときは相手の Retry-After を上限付きで尊重する。
     // それ以外（5xx）の送り直しは従来どおり指数待ち。
     const retryAfterHeader = res.status === 429
       ? res.headers?.get?.('retry-after') ?? null
@@ -763,6 +749,9 @@ export async function deliverWebhook(
     lastRetryAfterMs = retryAfterHeader === null
       ? null
       : parseRetryAfterDelayMs(retryAfterHeader, Date.now());
+    if (lastRetryAfterMs !== null && lastRetryAfterMs > WEBHOOK_RETRY_AFTER_MAX_MS) {
+      return { ok: false, attempts: attempt + 1, lastStatus, retryAfterMs: lastRetryAfterMs };
+    }
     waitMs = retryAfterHeader === null
       ? retryDelayMs(attempt)
       : retryAfterDelayMs(retryAfterHeader, retryDelayMs(attempt));
@@ -775,12 +764,8 @@ export async function deliverWebhook(
 }
 
 /**
- * 連続失敗がこの回数に達した配送を止める（要件26 §6-4 の circuit open）。
- *
- * N-375: 以前は連続失敗数が増えるだけで、壊れたままの送り先へイベントの
- * たびに送り続けていた。閾値に達した1回だけ is_active を落とし、通知
- * センターへ残す。手動で止めた行と区別するため auto_stopped_at を立て、
- * 運用者が再有効化すると消える（updateOutgoingWebhook 側）。
+ * 壊れた宛先へ送り続けないよう、要件26 §6-4 の連続失敗上限で一度だけ is_active を落とし、通知センターへ記録する。
+ * 手動停止と区別する auto_stopped_at は、運用者の再有効化時に消す。
  */
 export const OUTGOING_WEBHOOK_AUTO_STOP_FAILURES = 5;
 
@@ -811,7 +796,7 @@ export async function recordDeliveryOutcome(
       .run();
     return;
   }
-  // d23b R411: 成功で0に戻ったあと、過去の失敗が遅れて確定した場合でも
+  // d23b : 成功で0に戻ったあと、過去の失敗が遅れて確定した場合でも
   // 数を信じられるよう、履歴の実数（最後の成功以降の失敗件数）から
   // 数え直す。履歴が1件も無い送り先だけは従来どおり +1 で進める。
   await db
@@ -867,12 +852,12 @@ export async function recordDeliveryOutcome(
     });
   } catch (error) {
     // 通知の書き込みだけが落ちても、自動停止そのものは巻き戻さない。
-    console.error(`送信Webhook ${webhookId} の自動停止を通知へ残せませんでした:`, error);
+    logger.error("outgoing_webhook_delivery.notify_auto_stop_failed");
   }
 }
 
 // ============================================================
-// durable outbox（N-369 / N-370。要件26 §6-4）
+// durable outbox（ /。要件26 §6-4）
 // ============================================================
 //
 // これまではイベント発生のたびに deliverWebhook がその場で fetch を
@@ -947,7 +932,7 @@ function deliveryJitterRatio(key: string): number {
  * 次の再送時刻を決める。上限・24時間の窓を超えるなら null（=諦める）。
  *
  * 429 で Retry-After をもらったときは、その指定を30分上限で尊重する。
- * 上限を超える指定は30分へ丸める（既定間隔へ戻すと混雑中に早めてしまう）。
+ * 上限を超える指定では自動再送を止め、相手の指定より早く送らない。
  * それ以外は指数バックオフ＋配送ID由来の jitter。
  */
 export function outgoingDeliveryNextRetryAt(input: {
@@ -964,7 +949,8 @@ export function outgoingDeliveryNextRetryAt(input: {
   const deadline = Date.parse(input.queuedAt) + OUTGOING_WEBHOOK_RETRY_WINDOW_MS;
   let waitMs: number;
   if (input.responseStatus === 429 && typeof input.retryAfterMs === 'number' && input.retryAfterMs >= 0) {
-    waitMs = Math.min(input.retryAfterMs, EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000);
+    if (input.retryAfterMs > EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000) return null;
+    waitMs = input.retryAfterMs;
   } else {
     const index = Math.min(
       Math.max(0, input.attemptsDone - 1),
@@ -1050,15 +1036,17 @@ export async function claimOutgoingDelivery(
       `UPDATE outgoing_webhook_deliveries
           SET status = 'sending', lease_token = ?, lease_until = ?, updated_at = ?
         WHERE id = ? AND status = ? AND attempts = ? AND updated_at = ?
-          AND (lease_until IS NULL OR lease_until <= ?)`,
+          AND (lease_until IS NULL OR lease_until <= ?)
+          AND (next_retry_at IS NULL OR julianday(next_retry_at) <= julianday(?))
+          AND NOT (COALESCE(error_code,'')='retry_after_exceeds_budget' AND next_retry_at IS NULL)`,
     )
-    .bind(leaseToken, leaseUntil, nowIso, delivery.id, delivery.status, delivery.attempts, delivery.updated_at, nowIso)
+    .bind(leaseToken, leaseUntil, nowIso, delivery.id, delivery.status, delivery.attempts, delivery.updated_at, nowIso, nowIso)
     .run();
   return Number(result.meta?.changes ?? 1) === 1 ? leaseToken : null;
 }
 
 /**
- * claim 後・送信前に緊急停止 (#1050) へ切り替わった配送を、送る前の状態へ
+ * claim 後・送信前に緊急停止  へ切り替わった配送を、送る前の状態へ
  * 戻す。'sending' だった行は lease が切れていた分なので pending へ戻す
  * (sending + lease 無しのまま残すと sweep の条件から外れて滞留する)。
  */
@@ -1100,6 +1088,7 @@ const OUTGOING_DELIVERY_FAILURE_TEXT: Record<string, string> = {
   secret_unavailable: '署名に使うsecretを確認できませんでした。設定を保存し直してください。',
   rejected_4xx: '送り先が内容を受け取りませんでした。URLと受け手の設定を確認してください。',
   retry_exhausted: '自動での送り直しが上限に達しました。連携先を確認して、必要なら管理画面から再送してください。',
+  retry_after_exceeds_budget: '連携先の待ち時間が自動再送の上限を超えました。連携先を確認して、必要なら管理画面から再送してください。',
   retry_window_expired: '24時間の再送期間を過ぎました。連携先を確認して、必要なら管理画面から再送してください。',
   webhook_not_found: '送信Webhookが削除されたため送りませんでした。',
   webhook_inactive: '送信Webhookが停止中のため送りませんでした。',
@@ -1186,7 +1175,13 @@ export async function finishOutgoingDelivery(
     responseStatus = attempt.responseStatus;
     if (retryAt === null) {
       status = 'failed';
-      errorCode = attemptsDone >= delivery.max_attempts ? 'retry_exhausted' : 'retry_window_expired';
+      const overWait=attempt.responseStatus===429&&typeof attempt.retryAfterMs==='number'
+        &&attempt.retryAfterMs>EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES*60_000;
+      errorCode = overWait?'retry_after_exceeds_budget':attemptsDone>=delivery.max_attempts?'retry_exhausted':'retry_window_expired';
+      if(attempt.responseStatus===429&&typeof attempt.retryAfterMs==='number'&&attempt.retryAfterMs>=0){
+        const notBefore=new Date(now.getTime()+attempt.retryAfterMs);
+        if(Number.isFinite(notBefore.getTime()))nextRetryAt=notBefore.toISOString();
+      }
       errorMessage = outgoingDeliverySafeMessage(errorCode);
     } else {
       status = 'retry_wait';
@@ -1226,18 +1221,7 @@ export function deliverOnce(
   return deliverWebhook({ ...webhook, max_retries: 0 }, body, opts);
 }
 
-/**
- * 配送結果を履歴の失敗理由へ写す共通の対応表（d23b R410/R415）。
- * 全経路（イベント発火・自動回収・手動のやり直し・試し送信）で同じ
- * 言葉を履歴に残すため、ここに集める。
- *
- *   secretUnavailable → 'secret_unavailable'  送る前にこちらで止めた
- *   outcomeUnknown    → 'unknown'             届いたか分からない
- *   blocked           → 'processing_failed'   送り先のURLが危ない
- *   429/425           → 'response_429'        混み合っている
- *   5xx               → 'response_5xx'        相手先で処理できない
- *   その他の4xx       → 'response_4xx'        内容を受け取れない
- */
+/** 全配送経路で同じ理由を残すため、結果を履歴用の固定分類へまとめる。秘密値なし・送達不明・危険な送信先・一時混雑・相手の一時失敗・恒久4xxを区別する。 */
 export function failureReasonForDelivery(result: DeliveryResult): WebhookInteractionFailureReason {
   if (result.secretUnavailable) return 'secret_unavailable';
   if (result.blocked) return 'processing_failed';
@@ -1250,7 +1234,7 @@ export function failureReasonForDelivery(result: DeliveryResult): WebhookInterac
   return 'unknown';
 }
 
-/** 同じ通知の自動配送台帳の行を引く（d23b R412 の手動↔自動の照合に使う）。 */
+/** 同じ通知の自動配送台帳の行を引く（d23b  の手動↔自動の照合に使う）。 */
 export async function findOutgoingDeliveryByKey(
   db: D1Database,
   webhookId: string,
@@ -1292,7 +1276,7 @@ async function logSweptDeliveryAttempt(
       failureReason: sendResult.ok ? null : failureReasonForDelivery(sendResult),
     });
   } catch (error) {
-    console.error(`送信Webhook配送 ${row.id} の結果記録に失敗:`, error);
+    logger.error("outgoing_webhook_delivery.record_interaction_failed");
   }
 }
 
@@ -1355,7 +1339,7 @@ export async function sweepOutgoingWebhookDeliveries(
 
   const result: OutgoingSweepResult = { swept: 0, delivered: 0, failed: 0, retryWait: 0, skipped: 0 };
   for (const row of rows.results ?? []) {
-    // 緊急停止 (#1050): webhook_outgoing が止まっている統括は claim せず
+    // 緊急停止 : webhook_outgoing が止まっている統括は claim せず
     // pending / retry_wait のまま残す。復旧後の sweep が拾う。
     if (await isOperationCapabilityStopped(db, row.line_account_id, 'webhook_outgoing')) {
       result.skipped += 1;
@@ -1367,7 +1351,7 @@ export async function sweepOutgoingWebhookDeliveries(
       continue;
     }
     // claim と送信のあいだに停止へ切り替わった分は、lease を外して
-    // 送る前の状態へ戻す (#1050)。停止を配信失敗として数えない。
+    // 送る前の状態へ戻す。停止を配信失敗として数えない。
     if (await isOperationCapabilityStopped(db, row.line_account_id, 'webhook_outgoing')) {
       await releaseOutgoingDelivery(db, row, lease, now);
       result.skipped += 1;
@@ -1395,7 +1379,7 @@ export async function sweepOutgoingWebhookDeliveries(
         errorCode: 'webhook_inactive', errorMessage: outgoingDeliverySafeMessage('webhook_inactive'),
       };
     } else if (await hasSucceededInteractionForKey(db, row.line_account_id, row.webhook_id, row.idempotency_key)) {
-      // d23b R412: 手動のやり直し（または別経路）で同じ通知がすでに届いて
+      // d23b : 手動のやり直し（または別経路）で同じ通知がすでに届いて
       // いる。自動配送は新たに送らず、台帳を「届いた」で閉じる。
       attempt = {
         kind: 'delivered', responseStatus: row.last_response_status ?? 200,
@@ -1410,29 +1394,30 @@ export async function sweepOutgoingWebhookDeliveries(
       attempt = outgoingAttemptOf(sendResult);
       await logSweptDeliveryAttempt(db, row, webhook.name, sendResult, Date.now() - started);
     }
-    const outcome = await finishOutgoingDelivery(db, row, lease, attempt, now);
+    // Retry-After の秒数は巡回開始でなく、応答到着から数える。
+    const outcome = await finishOutgoingDelivery(db, row, lease, attempt, input.now ?? new Date());
     if (outcome === 'delivered') {
       result.delivered += 1;
       try {
         await recordDeliveryOutcome(db, row.webhook_id, true);
       } catch (error) {
-        console.error(`送信Webhook ${row.webhook_id} の連続失敗数を戻せませんでした:`, error);
+        logger.error("outgoing_webhook_delivery.record_delivery_outcome_failed");
       }
-      // d23b R412: 届いた通知と同じ失敗記録が残っていれば畳む。
+      // d23b : 届いた通知と同じ失敗記録が残っていれば畳む。
       // 「やり直せる」のまま残すと届いた分をもう一度送らせてしまう。
       try {
         await markFailedInteractionsRetried(
           db, row.line_account_id, row.webhook_id, row.idempotency_key,
         );
       } catch (error) {
-        console.error(`送信Webhook ${row.webhook_id} の失敗記録の整理に失敗:`, error);
+        logger.error("outgoing_webhook_delivery.mark_interactions_retried_failed");
       }
     } else if (outcome === 'failed') {
       result.failed += 1;
       try {
         await recordDeliveryOutcome(db, row.webhook_id, false);
       } catch (error) {
-        console.error(`送信Webhook ${row.webhook_id} の連続失敗数を更新できませんでした:`, error);
+        logger.error("outgoing_webhook_delivery.record_delivery_outcome_failed");
       }
     } else if (outcome === 'retry_wait') {
       result.retryWait += 1;

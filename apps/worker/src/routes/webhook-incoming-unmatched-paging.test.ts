@@ -1,5 +1,5 @@
 /*
- * R401: 未照合51件を50件ずつ辿れる。先頭50件の処理後も残りが出て、
+ * 未照合51件を50件ずつ辿れる。先頭50件の処理後も残りが出て、
  * 未確認1件と「確認が必要な届物はありません」が矛盾しない。
  *
  * 落ち方（直前）: 一覧は既定50件で offset/limit を無視し、総数も返さない。
@@ -10,8 +10,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { webhooks } from './webhooks.js';
 
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';

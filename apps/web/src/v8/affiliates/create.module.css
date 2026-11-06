@@ -1,0 +1,73 @@
+/*
+ * ★V8 アフィリエイターを作る（Pencil ・競合の帯 ）。
+ * 枠・見出し・左右の分け・下の帯は作る型（CreatePage）が持つ。ここは段（カード）の中身だけ。
+ * 寸法は globals.css の --tpl-af-cr-*。
+ */
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-af-ops-gap);
+  min-width: 0;
+}
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-af-ops-gap);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-af-cr-label-lh);
+}
+.friendRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.inlineNote {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+.friendPicker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+}
+.friendSearch {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.choiceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-toolbar-gap);
+}
+.errorText {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+.noticeTitle { margin: 0; font-weight: 600; }
+.noticeNote { margin: 0; font-size: var(--text-caption); }
+
+/* 右の列（できる紹介リンク・気をつけること）。 */
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-af-cr-rail-gap);
+  width: 100%;
+}
+.sideList {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-af-cr-list-lh);
+}
+.friendPicker[hidden] { display: none; }

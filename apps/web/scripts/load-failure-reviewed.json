@@ -1,0 +1,429 @@
+[
+  {
+    "filename": "src/v8/ai-reply/api.ts",
+    "fingerprint": "3564c53a892dc0be",
+    "disposition": "local-parser",
+    "count": 1,
+    "reason": "保存済みの JSON 文字列を読む部品。壊れた値は質問なしとして扱い、読み込みの失敗ではない。"
+  },
+  {
+    "filename": "src/app/accounts/use-uid-migration.ts",
+    "fingerprint": "c304f9b5abadfe10",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/auto-replies/edit/wizard.tsx",
+    "fingerprint": "d44b55cb60360671",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/app/booking/bookings/detail/use-booking-detail.ts",
+    "fingerprint": "d064b6e64efaf9ff",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/app/booking/bookings/new/page.tsx",
+    "fingerprint": "aba671b74c2d8dc9",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/app/booking/bookings/use-booking-ledger.ts",
+    "fingerprint": "a595976790b05d33",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/app/booking/staff/page.tsx",
+    "fingerprint": "b21b4ac505ed53ef",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/app/health/page.tsx",
+    "fingerprint": "021d0cfb20884819",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/app/health/page.tsx",
+    "fingerprint": "e9773fbb032bd1f7",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/restaurant/google/profile-edit.tsx",
+    "fingerprint": "8d0109401574f371",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/restaurant/google/profile-edit.tsx",
+    "fingerprint": "a4654b7de5566290",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/users/use-merged-users.ts",
+    "fingerprint": "d1edbd84da78d3bf",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/affiliates/affiliators.tsx",
+    "fingerprint": "bbcc93382a3a0477",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/affiliates/create.tsx",
+    "fingerprint": "7192a33d811e15ab",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/affiliates/offers.tsx",
+    "fingerprint": "2056045527e07aff",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/affiliates/payment.tsx",
+    "fingerprint": "7fefa8007df335c9",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/automations/list.tsx",
+    "fingerprint": "c055a9be924ccbb3",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/automations/templates.tsx",
+    "fingerprint": "7bba389c32b13900",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/booking-menus/use-booking-settings.ts",
+    "fingerprint": "3f092aaea634be9b",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/booking-staff/shifts.tsx",
+    "fingerprint": "1e2d8229cf18498d",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/conversions/create.tsx",
+    "fingerprint": "c3b282a846175437",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/events/bookings.tsx",
+    "fingerprint": "b27f14eeba43e744",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/events/list.tsx",
+    "fingerprint": "831a69396fa62b42",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/form-responses/responses.tsx",
+    "fingerprint": "f546d4e99d8454fc",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/form-responses/responses.tsx",
+    "fingerprint": "ef5ae5d5ce104636",
+    "disposition": "local-parser",
+    "count": 1,
+    "reason": "ローカル保存の解析。取得APIの失敗ではない。"
+  },
+  {
+    "filename": "src/v8/friends/duplicates/use-duplicates-data.ts",
+    "fingerprint": "88fde07726bec066",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/friends/list/list.tsx",
+    "fingerprint": "e619653d1d93785d",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/friends/merged/use-merged-users.ts",
+    "fingerprint": "b127ba48c4479e04",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/friends/migrations/use-friend-migrations.ts",
+    "fingerprint": "e302697ad92dbc79",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/friends/migrations/use-uid-migration.ts",
+    "fingerprint": "c304f9b5abadfe10",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/hq-broadcasts/bubbles.ts",
+    "fingerprint": "e7b787f8d979b3f6",
+    "disposition": "local-parser",
+    "count": 1,
+    "reason": "ローカル保存の解析。取得APIの失敗ではない。"
+  },
+  {
+    "filename": "src/v8/hq-broadcasts/create-gap-parts.tsx",
+    "fingerprint": "987114d142fa1bfc",
+    "disposition": "local-parser",
+    "count": 1,
+    "reason": "ローカル保存の解析。取得APIの失敗ではない。"
+  },
+  {
+    "filename": "src/v8/hq-deliveries/console.tsx",
+    "fingerprint": "043cc8fc12a0ffbf",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/hq-deliveries/console.tsx",
+    "fingerprint": "7964f9735595ec4b",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/hq/support.tsx",
+    "fingerprint": "42501536277d6ab2",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/mileage/earning-rules.tsx",
+    "fingerprint": "c790d914ee326a55",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/mileage/rewards.tsx",
+    "fingerprint": "4477b7093251e942",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/mileage/rewards.tsx",
+    "fingerprint": "dc533ceb93b13eb2",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/nen-posts/review.tsx",
+    "fingerprint": "75ef0faf616f2223",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/nen-posts/review.tsx",
+    "fingerprint": "000be07a8031b9a5",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/nen-posts/review.tsx",
+    "fingerprint": "69337b6335303dd4",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/notifications/list.tsx",
+    "fingerprint": "0e80f6317fa8c1e0",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/reminders/detail.tsx",
+    "fingerprint": "9405b2a48347e62c",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/reminders/edit.tsx",
+    "fingerprint": "ba99ed818b88dbae",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/restaurant/front-desk/walk-in-dialog.tsx",
+    "fingerprint": "cecb5eb5dccca329",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/restaurant/inventory/stock.tsx",
+    "fingerprint": "8719274e245ed616",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/restaurant/menu/menu.tsx",
+    "fingerprint": "fa9523b99a00e426",
+    "disposition": "local-parser",
+    "count": 1,
+    "reason": "ローカル保存の解析。取得APIの失敗ではない。"
+  },
+  {
+    "filename": "src/v8/restaurant/organization/organization-forms.tsx",
+    "fingerprint": "32dbd7c759d8c097",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/settings/emergency/health.tsx",
+    "fingerprint": "defbb1e54cc37234",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/settings/line-notifications/operator-tab.tsx",
+    "fingerprint": "d4be66d8bd3aa1ce",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/settings/line-notifications/screen.tsx",
+    "fingerprint": "fedae9f3306b61d1",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/tags/field-model.ts",
+    "fingerprint": "b135da5aff5f52e7",
+    "disposition": "local-parser",
+    "count": 1,
+    "reason": "ローカル保存の解析。取得APIの失敗ではない。"
+  },
+  {
+    "filename": "src/v8/tags/use-fields-tab.tsx",
+    "fingerprint": "fc2f7c2c98d9b5d2",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/webhooks/use-api-tokens.tsx",
+    "fingerprint": "ccb27982baad7592",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/webinar-edit/cta.tsx",
+    "fingerprint": "4824e32cbdb8ad58",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。10-16 司令塔が再確認：catch 同一・error-visible"
+  },
+  {
+    "filename": "src/v8/webinar-edit/new.tsx",
+    "fingerprint": "b3d30b6430da16bb",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
+  },
+  {
+    "filename": "src/v8/events/edit-form.tsx",
+    "fingerprint": "ef5ae5d5ce104636",
+    "disposition": "local-parser",
+    "count": 3,
+    "reason": "ローカル保存の解析。取得APIの失敗ではない。"
+  },
+  {
+    "filename": "src/v8/events/create.tsx",
+    "fingerprint": "09ee99cf5334440a",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "B-246：空配列は保存済み・残りの工程の記録。入力・作成済みの枠を保ち、版を読み直して残りを保存する。失敗はSaveFeedbackと欄の理由で表示。"
+  },
+  {
+    "filename": "src/v8/mileage/reward-edit.tsx",
+    "fingerprint": "414a56a609783ec7",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "B-246：失敗は保存の知らせへ表示。空配列は完了した工程の記録で、取得データを空にしていない。"
+  },
+  {
+    "filename": "src/v8/hq-deliveries/action-resource-picker.tsx",
+    "fingerprint": "79ed278543b7c212",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "2026-10-22 独立確認：HQ候補の取得失敗はNoticeと再読込を出し、候補とcursorを破棄して確定を禁止する。空の正常結果には変換しない。検索変更・取消後の応答はrequest世代とeffectのcleanupで破棄する。auto-reply-actions.test.tsxとconsole.test.tsxで拒否・再読込・候補選択・取消時0変更・閲覧のみを確認済み。"
+  },
+  {
+    "filename": "src/v8/restaurant/google/post-media-picker-dialog.tsx",
+    "fingerprint": "060b670e3d817c47",
+    "disposition": "error-visible",
+    "count": 1,
+    "reason": "登録メディアの取得失敗は候補を空にしたうえで窓の中に失敗文を出し、件数は不明（null）にする。古い要求の応答は request の世代で捨てる。空の正常結果には見せない。"
+  }
+]

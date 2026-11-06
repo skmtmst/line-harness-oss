@@ -1,6 +1,8 @@
+import { forgetStaffIdentity } from './staff-identity-state'
 import { adminSessionHeaders, clearAdminSession } from './admin-session'
 import { resetAuthSelectionCleared } from './hq-navigation'
 import { clearCommonCaches } from './common-caches'
+import { forgetAuthCheck } from './auth-check-marker'
 
 /**
  * ログアウト。共通トップバーと、統括の左下アカウントメニューが同じものを呼ぶ。
@@ -8,7 +10,7 @@ import { clearCommonCaches } from './common-caches'
  * サーバーのセッションを消し、手元に残した名前・権限・CSRF も消してから
  * ログイン画面へ移る。通信に失敗しても手元の後始末は必ず行う。
  */
-/** `loginPath` は行き先。運営コンソール（★V6 37）からは '/ops/login' を渡す。 */
+/** `loginPath` は行き先。運営コンソール（★管理画面 37）からは '/ops/login' を渡す。 */
 export async function logoutAndGoToLogin(loginPath: string = '/login'): Promise<void> {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -33,7 +35,10 @@ export async function logoutAndGoToLogin(loginPath: string = '/login'): Promise<
   } catch {
     // ストレージが使えなくても、行き先だけは変える
   }
+  forgetStaffIdentity()
   clearAdminSession()
+  // 読み直しで中身を先に出す印も捨てる（ログアウト後に画面を出さない）。
+  forgetAuthCheck()
   // 使い回していた共通の答えを捨てる（次のログインで古い権限を見せない）。
   // ふつうはこの後の画面遷移で破棄されるが、遷移に失敗しても残さない。
   clearCommonCaches()

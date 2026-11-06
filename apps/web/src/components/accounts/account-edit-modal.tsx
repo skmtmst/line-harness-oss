@@ -1,5 +1,7 @@
 'use client'
 
+import CloseButton from '@/components/shared/close-button'
+import Notice from '@/components/shared/notice'
 import { useId, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
@@ -10,9 +12,13 @@ import {
   type AccountFormState,
 } from './account-form-fields'
 import AccountSetupUrls from './account-setup-urls'
+import Button from '@/components/shared/button'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 interface Props {
   accountId: string
+  initialTimezone?: string
   initialName: string
   initialChannelId: string
   initialLoginChannelId: string | null
@@ -51,9 +57,12 @@ export default function AccountEditModal({
   initialCapacityWarnAt = null,
   initialIconUrl = null,
   initialSection = 'basic',
+  initialTimezone,
   onClose,
   onSaved,
 }: Props) {
+  const saveErrors = useSaveFormErrors()
+
   const [state, setState] = useState<AccountFormState>({
     ...emptyAccountFormState,
     name: initialName,
@@ -74,6 +83,7 @@ export default function AccountEditModal({
     initialCapacityWarnAt == null ? '' : String(initialCapacityWarnAt),
   )
   const [iconUrl, setIconUrl] = useState(initialIconUrl ?? '')
+  const [timezone, setTimezone] = useState(initialTimezone ?? 'Asia/Tokyo')
   const [saving, setSaving] = useState(false)
   const modalTitleId = useId()
   const [error, setError] = useState('')
@@ -103,6 +113,7 @@ export default function AccountEditModal({
     // like fields means "no change", not "clear it" — there's no UI affordance
     // to clear credentials, and accidentally clearing them would break prod.
     const payload: Parameters<typeof api.lineAccounts.update>[1] = {}
+    if (initialTimezone !== undefined && timezone !== initialTimezone) payload.timezone = timezone
     if (state.name !== initialName) payload.name = state.name
     if (state.channelAccessToken.trim() !== '') {
       payload.channelAccessToken = state.channelAccessToken.trim()
@@ -170,20 +181,22 @@ export default function AccountEditModal({
         setError(res.error || '保存に失敗しました。通信を確かめて、もう一度お試しください。')
       }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
       // 接続情報の書き換えは大事な操作。本人確認を求められたら窓を立てる（V-1）。
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'line_account.credentials', action: '接続情報を変更する', retry: (token) => handleSave(e, token) })
         return
       }
-      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      { if (!fieldFailure) setError('保存に失敗しました。通信を確かめて、もう一度お試しください。') }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-2 sm:p-4"
+    <SaveErrorScope errors={saveErrors}><div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim p-2 sm:p-4"
       onClick={onClose}
     >
       <div
@@ -191,32 +204,32 @@ export default function AccountEditModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={modalTitleId}
-        className="my-2 w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl sm:my-4"
+        data-design-node={initialSection === 'credentials' ? 'Msb1j' : 'n9Z2P'}
+        className="my-2 flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-control bg-canvas shadow-float sm:my-4 sm:max-h-[calc(100dvh-2rem)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
-          <h2 id={modalTitleId} className="text-base font-bold text-gray-900">{initialSection === 'credentials' ? '資格情報を差し替える' : '登録の内容を編集する'}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
-            aria-label="閉じる"
-          >
-            ×
-          </button>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-canvas px-4 py-4 sm:px-6">
+          <h2 id={modalTitleId} className="text-base font-bold text-ink">{initialSection === 'credentials' ? '資格情報を差し替える' : '登録の内容を編集する'}</h2>
+          <CloseButton onClick={onClose} />
         </div>
 
-        <form onSubmit={handleSave} className="space-y-4 p-4 sm:p-6">
+        <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col space-y-4 overflow-y-auto p-4 sm:p-6">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">アカウント名</label>
-            <input
+            <label className="block text-xs font-medium text-ink-secondary mb-1">アカウント名</label>
+            <SaveErrorField names={["name","state.name"]}><SharedTextField
               value={state.name}
               onChange={(e) => update({ name: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
               required
-            />
+            /></SaveErrorField>
           </div>
 
+          {initialTimezone !== undefined && initialSection === 'basic' && (
+            <label className="block text-xs font-medium text-ink-secondary">
+              タイムゾーン
+              <SaveErrorField names={["timezone"]}><SharedTextField aria-label="タイムゾーン" value={timezone} onChange={(e) => setTimezone(e.target.value)} required className="mt-1 w-full rounded-control border border-hairline px-3 py-2 text-sm" /></SaveErrorField>
+            </label>
+          )}
           <AccountFormSections
             state={state}
             update={update}
@@ -233,7 +246,7 @@ export default function AccountEditModal({
           />
 
           {/* 上限とアイコン。鍵ではないので、この画面に置いても閲覧権限で困らない。 */}
-          <div className="border-hairline space-y-3 rounded-lg border p-3">
+          <div className="border-hairline space-y-3 rounded-control border p-3">
             <p className="text-ink-secondary text-sm font-semibold">友だち数とアイコン</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
@@ -241,7 +254,7 @@ export default function AccountEditModal({
                   上限
                 </label>
                 <div className="flex items-center gap-1.5">
-                  <input
+                  <SaveErrorField names={["friendCapacity","friend_capacity"]}><SharedTextField
                     id="acc-capacity"
                     type="number"
                     min={1}
@@ -249,7 +262,7 @@ export default function AccountEditModal({
                     onChange={(e) => setFriendCapacity(e.target.value)}
                     placeholder="管理しない"
                     className="border-hairline rounded-control w-full border px-3 py-2 text-sm tabular-nums"
-                  />
+                  /></SaveErrorField>
                   <span className="text-ink-faint whitespace-nowrap text-xs">人</span>
                 </div>
               </div>
@@ -258,7 +271,7 @@ export default function AccountEditModal({
                   警告を出す人数
                 </label>
                 <div className="flex items-center gap-1.5">
-                  <input
+                  <SaveErrorField names={["capacityWarnAt","capacity_warn_at"]}><SharedTextField
                     id="acc-warn"
                     type="number"
                     min={1}
@@ -266,7 +279,7 @@ export default function AccountEditModal({
                     onChange={(e) => setCapacityWarnAt(e.target.value)}
                     placeholder="警告しない"
                     className="border-hairline rounded-control w-full border px-3 py-2 text-sm tabular-nums"
-                  />
+                  /></SaveErrorField>
                   <span className="text-ink-faint whitespace-nowrap text-xs">人</span>
                 </div>
               </div>
@@ -278,16 +291,16 @@ export default function AccountEditModal({
               <label htmlFor="acc-icon" className="text-ink-faint mb-1 block text-xs font-medium">
                 アイコンのURL
               </label>
-              <input
+              <SaveErrorField names={["iconUrl","icon_url"]}><SharedTextField
                 id="acc-icon"
                 type="url"
                 value={iconUrl}
                 onChange={(e) => setIconUrl(e.target.value)}
                 placeholder="https://example.com/icon.png"
                 className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-              />
+              /></SaveErrorField>
               <p className="text-ink-faint mt-1 text-xs">
-                管理画面の一覧で使います。共有時に出る画像（OGP）とは別の欄です。
+                このURLを優先表示します。未指定ならLINE公式アカウントの画像を自動取得します。LINEログインチャネルの画像とは別です。
               </p>
             </div>
           </div>
@@ -298,31 +311,27 @@ export default function AccountEditModal({
           />
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+            <Notice tone="danger">
               {error}
-            </div>
+            </Notice>
           )}
 
-          <div className="sticky bottom-0 -mx-4 flex justify-end gap-2 border-t border-gray-100 bg-white px-4 pb-1 pt-3 sm:-mx-6 sm:px-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 hover:bg-gray-50"
-            >
+          <div className="sticky bottom-0 -mx-4 flex justify-center gap-2 border-t border-divider-soft bg-canvas px-4 pb-1 pt-3 sm:-mx-6 sm:px-6">
+            <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl h-auto whitespace-normal" type="button" onClick={onClose}>
               キャンセル
-            </button>
+            </Button>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50"
+              className="px-4 py-2 rounded-control text-on-accent text-sm font-medium"
               style={{ backgroundColor: 'var(--color-accent)' }}
             >
-              {saving ? '保存中...' : '保存'}
+              {saving ? '保存中…' : '保存する'}
             </button>
           </div>
         </form>
       </div>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-    </div>
+    </div></SaveErrorScope>
   )
 }

@@ -16,7 +16,7 @@ const fixture = vi.hoisted(() => ({
   selectedAccountId: 'acc-1' as string | null,
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -37,19 +37,23 @@ vi.mock('@/lib/api', () => ({
 }))
 
 const { default: NewStaffPage } = await import('./page')
-const labels = await import('../permission-labels')
+const labels = await import('@/v8/settings/staff/permission-labels')
 
 async function fillBasics() {
   render(<NewStaffPage />)
   await waitFor(() => {
-    expect(screen.getByLabelText('最初に表示するアカウント')).toBeTruthy()
+    expect(screen.getByLabelText(/名前/)).toBeTruthy()
+    expect(screen.queryByLabelText('最初に表示するアカウント')).toBeNull()
   })
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: /スタッフ/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /スタッフ/ }))
     fireEvent.change(screen.getByLabelText(/名前/), { target: { value: '承認担当' } })
     fireEvent.change(screen.getByLabelText(/メールアドレス/), { target: { value: 'approve@example.test' } })
-    fireEvent.click(screen.getByLabelText('最初に表示するアカウント'))
-    fireEvent.click(await screen.findByRole('button', { name: '本店' }))
+    expect(screen.getByText('担当範囲は本店のみです。')).toBeTruthy()
+    expect(screen.queryByText('専用機能')).toBeNull()
+    for (const name of ['ECデータ連携', 'LINE通知', 'フォロー配信', '投稿写真審査']) {
+      expect(screen.queryByRole('checkbox', { name })).toBeNull()
+    }
   })
 }
 
@@ -68,6 +72,7 @@ async function save() {
   await waitFor(() => {
     expect(fixture.created).toHaveLength(1)
   })
+  expect(fixture.created[0]).toMatchObject({ assignedLineAccountId: 'acc-1', accountScope: 'accounts', scopedLineAccountIds: ['acc-1'], canAccessDescendantAccounts: false })
   return fixture.created[0] as { permissionKeys: string[] }
 }
 
@@ -120,4 +125,27 @@ describe('新規スタッフの成果承認権限', () => {
     expect(labels.normalizeStaffPermissionKeys(['/conversions'])).toEqual(['/conversions'])
     expect(labels.toggleStaffPermissionKey(['/conversions', 'conversion.approval.edit'], '/conversions')).toEqual([])
   })
+})
+
+test('貼り付けたメールをチップにしても、選んだ権限と1人分の宛先で招待する', async () => {
+  await fillBasics()
+  const email = screen.getByLabelText(/メールアドレス/)
+  fireEvent.change(email, { target: { value: '' } })
+  fireEvent.paste(email, { clipboardData: { getData: () => 'invite@example.test' } })
+  expect(screen.getByRole('button', { name: 'invite@example.testを外す' })).toBeTruthy()
+  fireEvent.click(opCheckbox())
+  await save()
+  expect(fixture.created[0]).toMatchObject({ email: 'invite@example.test', role: 'staff', permissionKeys: expect.arrayContaining(['/conversions', 'conversion.approval.edit']) })
+})
+
+test('メールを複数貼った場合は1件も招待せず、入力を残して直せる', async () => {
+  await fillBasics()
+  const email = screen.getByLabelText(/メールアドレス/)
+  fireEvent.change(email, { target: { value: '' } })
+  fireEvent.paste(email, { clipboardData: { getData: () => 'one@example.test,two@example.test' } })
+  fireEvent.click(opCheckbox())
+  fireEvent.click(screen.getByRole('button', { name: '招待メールを送る' }))
+  expect(fixture.created).toHaveLength(0)
+  expect((email as HTMLInputElement).value).toBe('one@example.test,two@example.test')
+  expect(email.getAttribute('aria-invalid')).toBe('true')
 })

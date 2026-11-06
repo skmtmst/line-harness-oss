@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { buildVersionSnapshotActions, buildVersionSnapshotSteps, canonicalPayloadOfVersion, canonicalPublishPayload, getPinnedScenarioStep, getScenarioPublishedVersion, getScenarioVersionById, normalizeVersionActionSnapshot, parseScenarioVersionActions, parseScenarioVersionSteps, parseVersionStepId } from './scenarios/snapshots.js';

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index';
-import type { AuthenticatedStaff } from '../middleware/auth';
+import type { Env } from '../worker-env';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
 
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn());
@@ -132,7 +132,7 @@ function seedDelivery(
   );
 }
 
-describe('V6 LINE notification APIs', () => {
+describe('LINE notification APIs', () => {
   let testDb: SqliteD1;
 
   beforeEach(() => {
@@ -658,4 +658,8 @@ describe('V6 LINE notification APIs', () => {
       channel: 'line',
     });
   });
+it('API-02 metrics rejects February 30',async()=>{
+ expect((await app(testDb.db).request('/api/line-notifications/metrics?lineAccountId=account-1&from=2026-02-30&to=2026-03-01')).status).toBe(400);
+});
+
 });

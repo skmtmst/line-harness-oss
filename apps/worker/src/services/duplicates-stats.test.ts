@@ -10,9 +10,7 @@ function stubDB(canned: {
 }) {
   return {
     prepare(sql: string) {
-      // The pairwise raw-row query is the only one that filters via `dup_keys`;
-      // route the stub by spotting that fingerprint. Everything else with
-      // `.all()` is the per-account breakdown.
+      // dup_keys を含む問い合わせだけを組合せの取得へ対応させ、ほかの all はアカウント別の内訳として返す。
       const isPairwise = sql.includes('dup_keys');
       return {
         first: async () => canned.totals,
@@ -39,7 +37,7 @@ describe('computeDuplicatesStats', () => {
         { account_id: 'a1', account_name: 'L ①', friends: 60, dups: 20 },
         { account_id: 'a2', account_name: 'L ②', friends: 40, dups: 10 },
       ],
-      // Two duplicate groups, each spanning a1 + a2 → 2 overlap pairs each direction.
+      // 2つの重複グループが a1/a2 をまたぐため、両方向に2件ずつ重なる。
       pairwiseRaw: [
         { ident_key: 'k1', line_account_id: 'a1' },
         { ident_key: 'k1', line_account_id: 'a2' },
@@ -64,7 +62,7 @@ describe('computeDuplicatesStats', () => {
       friends: 60,
       dups: 20,
     });
-    // 2 directed pairs (a1→a2 and a2→a1), each with overlap=2 (k1 and k2).
+    // a1→a2 と逆方向をそれぞれ数え、両方で k1/k2 の2件が重なる。
     expect(stats.pairwise_overlap).toHaveLength(2);
     const a1ToA2 = stats.pairwise_overlap.find(
       (p) => p.from_account_id === 'a1' && p.to_account_id === 'a2',
@@ -99,15 +97,15 @@ describe('computeDuplicatesStats', () => {
     await computeDuplicatesStats(db, { accountIds: ['account-a'] });
 
     // 3本の問い合わせすべてに絞りが入る。
-    expect(seen).toHaveLength(3);
+    expect(seen).toHaveLength(4);
     for (const query of seen) {
-      expect(query.sql).toContain('IN (?)');
+      expect(query.sql).toContain('IN (SELECT value FROM json_each(?))');
       expect(query.sql).not.toContain('1 = 0');
     }
     // TOTALS と perAccount は絞りを2か所に持つ。
-    expect(seen[0].binds).toEqual(['account-a', 'account-a']);
-    expect(seen[1].binds).toEqual(['account-a', 'account-a']);
-    expect(seen[2].binds).toEqual(['account-a']);
+    expect(seen[0].binds).toEqual([JSON.stringify(['account-a']), JSON.stringify(['account-a'])]);
+    expect(seen[1].binds).toEqual([JSON.stringify(['account-a']), JSON.stringify(['account-a'])]);
+    expect(seen[2].binds).toEqual([JSON.stringify(['account-a'])]);
   });
 
   test('accountIds 未指定は従来どおり絞り無し、空配列は0件の集計', async () => {
@@ -127,7 +125,7 @@ describe('computeDuplicatesStats', () => {
     } as unknown as D1Database;
 
     await computeDuplicatesStats(db);
-    expect(seen.join('\n')).not.toContain('IN (?)');
+    expect(seen.join('\n')).not.toContain('json_each(?)');
 
     seen.length = 0;
     await computeDuplicatesStats(db, { accountIds: [], forceRefresh: true });
@@ -184,9 +182,9 @@ describe('computeDuplicatesStats', () => {
 
     await computeDuplicatesStats(db);
     const firstCallCount = callCount;
-    await computeDuplicatesStats(db); // hits cache, no new query
+    await computeDuplicatesStats(db); // キャッシュ命中時は問い合わせを増やさない。
     expect(callCount).toBe(firstCallCount);
-    await computeDuplicatesStats(db, { forceRefresh: true }); // bypass
+    await computeDuplicatesStats(db, { forceRefresh: true });
     expect(callCount).toBeGreaterThan(firstCallCount);
   });
 });

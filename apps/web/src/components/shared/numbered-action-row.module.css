@@ -1,0 +1,14 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.card { min-width: 0; padding: var(--tpl-cn-field-row-gap); border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); box-shadow: var(--card-shadow); }
+.row, .content, .controls { display: flex; align-items: center; gap: var(--tpl-cn-field-row-gap); min-width: 0; }
+.content { flex: 1; border: 0; padding: 0; background: transparent; color: var(--color-ink); text-align: left; cursor: pointer; }
+.content:focus-visible { outline: 2px solid var(--color-info); outline-offset: 2px; }
+.number { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--tpl-tg2-step-no); height: var(--tpl-tg2-step-no); border-radius: var(--radius-pill); background: var(--color-canvas-sunken); font-size: var(--text-caption); font-weight: 700; }
+.text { display: flex; flex-direction: column; gap: var(--tpl-tg2-card-head-gap); min-width: 0; }
+.title, .summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title { font-size: var(--text-label); font-weight: 600; }
+.summary { font-size: var(--text-caption); color: var(--color-ink-secondary); }
+.controls { flex-shrink: 0; gap: var(--tpl-tg2-option-gap); }
+.editor { display: flex; flex-direction: column; gap: var(--tpl-cn-field-row-gap); padding-top: var(--tpl-cn-field-row-gap); margin-top: var(--tpl-cn-field-row-gap); border-top: 1px solid var(--color-hairline); }
+}

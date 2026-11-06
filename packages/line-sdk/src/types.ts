@@ -218,6 +218,7 @@ export interface TemplateMessage {
 
 export interface ImageMapMessageType {
   type: 'imagemap';
+  video?: { originalContentUrl: string; previewImageUrl: string; area: { x: number; y: number; width: number; height: number }; externalLink?: { linkUri: string; label: string } };
   baseUrl: string;
   altText: string;
   baseSize: { width: number; height: number };

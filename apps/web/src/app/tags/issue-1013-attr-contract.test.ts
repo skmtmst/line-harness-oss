@@ -1,4 +1,5 @@
-import { readFileSync, existsSync } from 'node:fs'
+import { existsSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -10,10 +11,10 @@ import { describe, expect, it } from 'vitest'
 const root = resolve(process.cwd(), 'src')
 const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 
-const FIELD_LIST = read('components/friend-fields/field-list.tsx')
-const MARK_LIST = read('components/friend-fields/mark-list.tsx')
-const MARK_EDITOR = read('components/friend-fields/support-mark-editor.tsx')
-const SEARCH_LIST = read('components/friend-fields/saved-search-list.tsx')
+const FIELD_LIST = read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx')
+const MARK_LIST = read('v8/tags/marks-tab.tsx') + read('components/friend-fields/mark-list.tsx')
+const MARK_EDITOR = read('v8/tags/mark-editor.tsx')
+const SEARCH_LIST = read('v8/tags/searches-tab.tsx') + read('components/friend-fields/saved-search-list.tsx')
 const SEARCH_EDIT = read('app/tags/searches/edit/page.tsx')
 const MIGRATE = read('app/tags/fields/migrate/page.tsx')
 const CSV_DIALOG = read('components/friend-fields/tag-csv-import-dialog.tsx')
@@ -53,11 +54,12 @@ describe('ATTR-05: 既存の情報欄を編集できる入口がある', () => {
     expect(existsSync(resolve(root, 'app/tags/fields/edit/page.tsx'))).toBe(true)
     const page = read('app/tags/fields/edit/page.tsx')
     // 種類・キーの入力欄は作らない。表示だけ。
-    expect(page).toContain('差し込み名（変更できません）')
-    expect(page).toContain('種類（変更できません）')
-    expect(page).not.toMatch(/onChange=.*setFieldKey/)
+    expect(page).toContain('差し込みの名前（変えられません）')
+    expect(page).toContain('種類は変えられません')
+    expect(page).toContain("if (mode === 'create' && !keyTouched) setFieldKey")
+    expect(page).toMatch(/<AffixedTextField[^>]*readOnly[^>]*value=\{field\?\.fieldKey \?\? ''\}/)
     // 変更できる項目: 名前・選択肢・既定値・保護・使用状況
-    for (const label of ['項目名', '既定値', '個人情報として保護', 'EC側を正とする']) {
+    for (const label of ['項目名', '既定値', '個人情報として保護', 'EC側の値を正とする']) {
       expect(page).toContain(label)
     }
     // 他の人の先勝ちを黙って潰さない。読んだ版をサーバーへ送る。
@@ -72,10 +74,10 @@ describe('ATTR-06: マーク作成と自動ルールの有効化を分ける', (
     expect(MARK_EDITOR).toContain('const [createRule, setCreateRule] = useState(false)')
     expect(MARK_EDITOR).not.toContain('const [createRule, setCreateRule] = useState(true)')
     // 利用者が「＋ ルールを作る」を押したときだけルールを作る。
-    expect(MARK_EDITOR).toContain('＋ ルールを作る')
-    expect(MARK_EDITOR).toContain('ルールを外す')
+    expect(MARK_EDITOR).toContain('きまりを作る')
+    expect(MARK_EDITOR).toContain('きまりを外す')
     // 有効化も利用者が選ぶ（外せる・無効のまま登録できる）。
-    expect(MARK_EDITOR).toContain('このルールを有効にして登録する')
+    expect(MARK_EDITOR).toContain('このきまりを有効にして登録する')
     expect(MARK_EDITOR).toContain('isActive: ruleActive')
   })
 })
@@ -90,8 +92,10 @@ describe('ATTR-09/10: 移行は事前確認のあと明示実行し、古い確�
   })
 
   it('確認前・実行中は実行ボタンを出さない', () => {
-    expect(MIGRATE).toContain('confirmed && !run')
+    // R548: 実行の受け付け後は実行ボタンに戻さず、同じrunの再取得・再開へつなげる。
+    expect(MIGRATE).toContain('confirmed && !executedRunId')
     expect(MIGRATE).toContain('disabled={executing || running}')
+    expect(MIGRATE).toContain('needsPollAction')
   })
 
   it('条件変更・アカウント切替で飛んでいる確認を無効にする', () => {

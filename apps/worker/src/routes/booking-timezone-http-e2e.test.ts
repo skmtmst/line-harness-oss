@@ -5,7 +5,7 @@
 // 実DB まで通した上で、確定直前の照合が「要求 instant と、いま計算し直した
 // 候補の startUtc の完全一致」であることを確かめる。
 //
-// ここで見張る崩れ方（#651 の司令塔再現）:
+// 夏時間と店舗タイムゾーンの境界で検証する条件:
 //   - NY の壁時刻 10:00 を +09:00 で読んだ instant を送ると、営業時間外・
 //     休業例外・既存予約を迂回して予約が入る（偽装 instant）。
 //   - 夏時間の終わる日は壁時刻 01:30 が2回ある。壁時刻で照合すると、
@@ -22,11 +22,11 @@ import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { replaceBookingMenuResources } from '@line-crm/db';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // 送る側（LINE 通知・自動化）は、この試験の対象ではない。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../services/account-access.js', () => ({
@@ -134,8 +134,9 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
       INSERT INTO line_accounts
         (id, channel_id, name, channel_access_token, channel_secret, liff_id, timezone)
       VALUES ('account-ny', 'channel-ny', 'NY店', 'token-ny', 'secret-ny', 'liff-ny-1', '${NY}');
-      INSERT INTO booking_settings (id, line_account_id, timezone)
-      VALUES ('settings-ny', 'account-ny', '${NY}');
+      -- 店舗・担当・資源の定員を試すので、本人の同時予約上限は十分に取る。
+      INSERT INTO booking_settings (id, line_account_id, timezone, approval_mode, max_active_bookings_per_friend)
+      VALUES ('settings-ny', 'account-ny', '${NY}', 'manual', 10);
       INSERT INTO menus (id, line_account_id, name, duration_minutes, buffer_after_minutes, base_price)
       VALUES
         ('menu-ny', 'account-ny', '相談', 60, 0, 8000),
@@ -209,7 +210,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
         return new Response(JSON.stringify({ calendars: { 'cal-ny': { busy } } }), { status: 200 });
       }
       if (url.includes('googleapis.com/calendar/v3/calendars/')) {
-        return new Response(JSON.stringify({ id: 'gcal-event-1' }), { status: 200 });
+        return new Response(JSON.stringify(url.includes('/events?')?{items:busy.map((b,i)=>({id:`busy-${i}`,start:{dateTime:b.start},end:{dateTime:b.end}}))}:{id:'gcal-event-1'}),{status:200});
       }
       throw new Error(`想定外の外部呼び出し: ${url}`);
     }));
@@ -228,6 +229,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
       INSERT INTO google_calendar_connections
         (id, calendar_id, line_account_id, staff_id, access_token, auth_type, is_active)
       VALUES ('gcal-ny', 'cal-ny', 'account-ny', 'staff-ny', 'token-gcal', 'oauth', 1);
+      INSERT INTO booking_calendar_switches(line_account_id,scope_id,read_enabled,updated_by,updated_at) VALUES('account-ny','',1,'test',datetime('now')),('account-ny','staff-ny',1,'test',datetime('now'));
     `);
   }
 
@@ -618,7 +620,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
     for (const party_size of [0,2,1.5,-1,'1',null]) {
       const response = await create(NY_NOV2_1000,`party-${String(party_size)}`,{party_size});
       expect(response.status).toBe(422);
-      expect(await response.json()).toMatchObject({error:'unsupported_party_size'});
+      expect(await response.json()).toMatchObject({code:'unsupported_party_size', fields: expect.any(Object), error: expect.any(String) });
     }
     expect(bookingRows()).toHaveLength(0);
     expect((await create(NY_NOV2_1000,'party-one',{party_size:1})).status).toBe(201);
@@ -678,7 +680,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
 
   test('管理: 現地の夜（翌日 02:00Z）に入っている予約の枠は、空きにも出ず確定もしない', async () => {
     // NY 11/02 21:00 は 11/03 02:00Z。暦日を UTC で切ると既存予約の取得範囲
-    // から落ちて、空き枠として出ていた（#651 の夜間二重予約）。
+    // から落ちて、空き枠として出ていた（ の夜間二重予約）。
     sqlite.exec(`
       INSERT INTO bookings
         (id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at,
@@ -749,7 +751,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
 
     const blocked = await liffCreate(NY_NOV2_1400, 'ny-liff-gcal-1');
     expect(blocked.status).toBe(422);
-    await expect(blocked.json()).resolves.toEqual({ error: 'slot_not_available' });
+    await expect(blocked.json()).resolves.toMatchObject({ code: 'slot_not_available' , fields: expect.any(Object), error: expect.any(String) });
     expect(bookingRows()).toEqual([]);
 
     const ok = await liffCreate(NY_NOV2_1000, 'ny-liff-gcal-ok-1');
@@ -769,7 +771,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
 
     const fake = await liffCreate(FAKE_JST_NOV2_1000, 'ny-liff-fake-1');
     expect(fake.status).toBe(422);
-    await expect(fake.json()).resolves.toEqual({ error: 'slot_not_available' });
+    await expect(fake.json()).resolves.toMatchObject({ code: 'slot_not_available' , fields: expect.any(Object), error: expect.any(String) });
     expect(bookingRows()).toHaveLength(1);
   });
 });

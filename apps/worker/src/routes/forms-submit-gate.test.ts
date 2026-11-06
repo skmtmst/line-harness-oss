@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { emptyLayout, newBlockId, type FormLayout } from '@line-crm/shared';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 
 /**
  * 送信の入口が、レイアウトの判定に**本当につながっているか**を見る。
@@ -51,11 +52,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@line-crm/db', () => ({
+  getVersionedAccountSetting: vi.fn(async()=>null),
   getFormAccountIds: vi.fn(async () => ['account-a']),
   listLineAccountsWithTenantStatus: vi.fn(async () => [
     { id: 'account-a', tenant_status: 'active' },
   ]),
-  // #648: 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
+  // 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
   // 呼び出し口が 500 になる。数えること自体は実DBの試験で見ている。
   recordConversionSourceEvent: vi.fn(async () => ({ matched: 0, recorded: 0, failed: 0, skipped: null })),
   getForms: vi.fn(),
@@ -108,7 +110,7 @@ vi.mock('../services/liff-auth.js', () => ({
   verifyCallerLineIdentity: mocks.verifyCallerLineIdentity,
 }));
 
-vi.mock('../services/friend-tag-attach.js', () => ({
+vi.mock('../features/friends/friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: mocks.attachTag,
 }));
 
@@ -403,5 +405,29 @@ describe('送信の入口が、レイアウトの判定につながっている'
     expect(accepted.status).toBe(201);
     expect(mocks.countFormSubmissionsByFriend).not.toHaveBeenCalled();
     expect(mocks.countChoiceUsage).not.toHaveBeenCalled();
+  });
+});
+
+describe('開いた時の受付条件の配線', () => {
+  test('公開内容の期限と残り件数をGETで返す', async () => {
+    const layout = layoutWithChoice();
+    layout.options.deadline = { enabled: true, endsAt: '2020-01-01T12:00' };
+    layout.options.totalLimit = { enabled: true, max: 10 };
+    mocks.getFormById.mockResolvedValue(formRow(layout, { submit_count: 7 }));
+    const res = await app().request('/api/forms/form-1', {}, env());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { availability: { accepting: false, reason: 'このフォームの回答期限は終了しました', deadlineAt: '2020-01-01T03:00:00.000Z', totalRemaining: 3 } } });
+  });
+  test('本人確認と店の所属を照合して回答済みを返し、越境は404', async () => {
+    const layout = layoutWithChoice(); layout.options.oncePerFriend = { enabled: true };
+    mocks.getFormById.mockResolvedValue(formRow(layout));
+    mocks.countFormSubmissionsByFriend.mockResolvedValue(1);
+    const res = await app().request('/api/forms/form-1', { headers: { Authorization: 'Bearer token' } }, env());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { availability: { accepting: false, reason: 'このフォームは、お一人さま1回までです' } } });
+    expect(mocks.countFormSubmissionsByFriend).toHaveBeenCalledWith(expect.anything(), 'form-1', 'friend-1');
+    mocks.formBelongsToLineAccount.mockResolvedValue(false);
+    const denied = await app().request('/api/forms/form-1', { headers: { Authorization: 'Bearer token' } }, env());
+    expect(denied.status).toBe(404);
   });
 });

@@ -1,7 +1,14 @@
+// @vitest-environment happy-dom
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createElement } from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+afterEach(cleanup)
+import ts from 'typescript'
 import {
   EFFECTIVE_LEGEND,
   LOAD_STATE_WORDS,
@@ -17,14 +24,17 @@ import {
   responseTypeWord,
   templateWord,
   visibleAutoReplyLoadState,
-} from './auto-reply-words'
+} from '@/v8/auto-replies/auto-reply-words'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
-const PAGE = read('page.tsx')
-const WORDS = read('auto-reply-words.ts')
-const DIALOG = read('..', '..', 'components', 'shared', 'dialog.tsx')
-const CONFIRM = read('..', '..', 'components', 'shared', 'confirm-dialog.tsx')
+const readImplementation = (...parts: string[]) => readUiSource(join(HERE, ...parts), 'utf8')
+const PAGE = readImplementation('../../v8/auto-replies/list.tsx')
+// コメントは運用者に表示されない。分割先の説明文を画面の内部語と誤認しない。
+const PAGE_WITHOUT_COMMENTS = ts.createPrinter({ removeComments: true }).printFile(
+  ts.createSourceFile('list.tsx', PAGE, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX),
+)
+const WORDS = read("../../v8/auto-replies/auto-reply-words.ts")
 
 /**
  * 画面に出してはいけない、作った側の言葉と保存してある値。
@@ -120,7 +130,7 @@ describe('自動応答の一覧に出す言葉（内部語の置き換え表）'
     expect(word.linked).toBe(false)
     expect(word.label).toBe('テンプレートを確認できません')
     expect(word.note).toContain('再読み込み')
-    expect(word.note).not.toContain('削除')
+    expect(word.note).not.toContain('削除する')
     expect(word.note).not.toContain('権限')
   })
 
@@ -187,20 +197,6 @@ describe('自動応答の一覧に出す言葉（内部語の置き換え表）'
     }
   })
 
-  /**
-   * 編集画面は `auto-reply-words` の表を使う（#494 軽13で一本化）。
-   * 独自の表を持っていたら、片方だけ増えて「一覧は英語・編集は日本語」
-   * のずれが起きる。**独自表が復活したらここで落とす。**
-   */
-  it('編集画面のメッセージ種別と、一覧の言い換えがずれない', () => {
-    const EDIT = read('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
-    expect(EDIT, '編集画面に独自の種別表が復活している').not.toContain('const MESSAGE_KIND_LABELS')
-    expect(EDIT, '編集画面が共通の表を使っていない').toContain("from '@/app/auto-replies/auto-reply-words'")
-    expect(EDIT).toContain('MESSAGE_KIND_WORDS')
-    expect(EDIT).toContain('messageKindWord')
-    expect(EDIT, '古い言い換え関数が残っている').not.toContain('messageKindLabel')
-  })
-
   it('メッセージ種別も日本語で出し、知らない値は値のまま出さない', () => {
     expect(messageKindWord('text')).toBe('テキスト')
     expect(messageKindWord('postback')).toBe('ボタンのタップ')
@@ -240,9 +236,13 @@ describe('読み込みの状態を言い分ける', () => {
   })
 })
 
+/*
+ * 一覧の画面で読み込みの言い方・4指標・アカウント切替・テンプレートの言葉が
+ * どう出るかは v8/auto-replies/list.test.tsx・list-behavior.test.tsx が描いて確かめる。
+ * ここには表を画面に作り直さない・内部語を書かない禁止の見張りだけを残す。
+ */
 describe('一覧の画面が置き換え表を通す', () => {
   it('言い換えは純粋関数の側だけが持つ（画面に表を作り直さない）', () => {
-    expect(PAGE).toContain("} from './auto-reply-words'")
     expect(WORDS).not.toContain("from 'react'")
     expect(PAGE).not.toContain('const matchTypeLabel')
     expect(PAGE).not.toContain('const ACTION_SUMMARY_LABELS')
@@ -264,85 +264,33 @@ describe('一覧の画面が置き換え表を通す', () => {
       '>template<',
       '包含',
     ]) {
-      expect(PAGE, `画面に「${banned}」が残っています`).not.toContain(banned)
+      expect(PAGE_WITHOUT_COMMENTS, `画面に「${banned}」が残っています`).not.toContain(banned)
     }
-  })
-
-  it('読み込みの言い方を画面でも混ぜない', () => {
-    expect(PAGE).toContain('LOAD_STATE_WORDS[visibleLoadState]')
-    expect(PAGE).toContain('再読み込み')
-    expect(PAGE).toContain("reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error'")
-    expect(PAGE).not.toContain('読み込みに失敗しました。もう一度読み込んでください。')
-    expect(PAGE).not.toContain('読み込み中...')
-    expect(PAGE).not.toContain('自動返信ルールがありません')
-  })
-
-  it('4指標を実APIから数え、未取得を 0 と出さない', () => {
-    // #721: 指標1は visualActive（有効なルール）経由で読む。総数は
-    // 「すべて」の行とページ送りだけにし、KPIでは重ねて出さない（R12）。
-    // 2文で「呼ぶ側」と「数える元」の両方を固定する。
-    expect(PAGE).toContain('metricWord(visibleLoadState, visualActive)')
-    expect(PAGE).toContain('const visualTotal = items.length')
-    expect(PAGE).toContain('metricWord(visibleLoadState, visualMonthly)')
-    expect(PAGE).toContain('const visualMonthly = monthlyHits')
-    expect(PAGE).toContain('const actionExecutionsAllKnown = items.every')
-    expect(PAGE).toContain('api.autoReplies.summary(selectedAccountId)')
-    expect(PAGE).toContain("actionExecutionCount != null ? actionExecutionCount : '—'")
-    expect(PAGE).toContain("conflictCount != null ? conflictCount : '—'")
-  })
-
-  it('アカウント切替時は、前の取得結果を状態にも画面にも出さない', () => {
-    expect(PAGE).toContain('const requestGeneration = ++loadGenerationRef.current')
-    expect(PAGE).toContain('isCurrentAutoReplyLoad(')
-    expect(PAGE).toContain('visibleAutoReplyLoadState(')
-  })
-
-  it('開く先が無いテンプレートをリンクにしない', () => {
-    expect(PAGE).toContain('if (!word.linked)')
   })
 
   it('R11: テンプレート名から別画面へ飛ばさない（名前は黒文字）', () => {
     expect(PAGE).not.toContain('href="/templates"')
-    expect(PAGE).not.toContain('text-blue-600')
   })
 })
 
+/* 消せない状態・権限で断られた時・何が止まるかの文は list-behavior.test.tsx が削除の窓を開いて確かめる。 */
 describe('削除確認 Gy9OK の絵と、押せる形', () => {
-  it('見出しの左に警告22px、削除ボタンの中にごみ箱16pxを置く', () => {
-    // R28 で順番入れ替えの上下アイコン（ChevronUp/ChevronDown）を足したため、
-    // import 行の完全一致では見ない。使う図形と大きさが残っていることを見る。
-    expect(PAGE).toContain('TriangleAlert')
-    expect(PAGE).toContain('Trash2')
-    expect(PAGE).toContain('titleIcon={<TriangleAlert size={22} />}')
-    expect(PAGE).toContain('confirmIcon={<Trash2 size={16} />}')
-  })
 
-  it('共通ダイアログが絵の口を持つ（渡さなければ今までどおり）', () => {
-    expect(CONFIRM).toContain('titleIcon?: ReactNode')
-    expect(CONFIRM).toContain('confirmIcon?: ReactNode')
-    expect(DIALOG).toContain('titleIcon?: ReactNode')
-    expect(DIALOG).toContain('confirmIcon?: ReactNode')
-    expect(DIALOG).toContain('{titleIcon ? (')
-    expect(DIALOG).toContain('{!busy && confirmIcon ?')
-  })
-
-  /** 手本どおりの3点。ここは変えない。 */
-  it('何が止まり・何が残り・戻せないことを、これまでどおり読ませる', () => {
-    expect(PAGE).toContain('新しく届くメッセージへの自動返信')
-    expect(PAGE).toContain('タグ付けなどの後続処理が止まります')
-    expect(PAGE).toContain('過去の実行履歴は削除されません')
-    expect(PAGE).toContain('この操作は元に戻せません')
-  })
-
-  it('消せない状態では確認のボタンを出さず、理由を本文に出す', () => {
-    expect(PAGE).toContain('const deleteTargetStale =')
-    expect(PAGE).toContain('onConfirm={deleteTargetStale ? undefined : () => void handleDelete()}')
-    expect(PAGE).toContain('{deleteTargetStale && (')
-    expect(PAGE).toContain('削除する自動応答を選び直してください')
-  })
-
-  it('権限で断られたときに、読み直せとは書かない', () => {
-    expect(PAGE).toContain('reason instanceof ApiError && reason.status === 403')
-    expect(PAGE).toContain('NO_WRITE_PERMISSION.label')
+  it('確認の印を飾りとして出し、実行と取消を使える', () => {
+    const confirm = vi.fn(), cancel = vi.fn()
+    render(createElement(ConfirmDialog, {
+      open: true, title: '削除しますか？', description: '内容を確かめてください。',
+      titleIcon: createElement('svg', { 'data-testid': 'title-icon' }),
+      confirmIcon: createElement('svg', { 'data-testid': 'confirm-icon' }),
+      onConfirm: confirm, onCancel: cancel,
+    }))
+    expect(screen.getByRole('heading', { name: '削除しますか？' }).contains(screen.getByTestId('title-icon'))).toBe(true)
+    expect(screen.getByTestId('title-icon').parentElement?.getAttribute('aria-hidden')).toBe('true')
+    const action = screen.getByRole('button', { name: '実行する' })
+    expect(action.contains(screen.getByTestId('confirm-icon'))).toBe(true)
+    fireEvent.click(action)
+    expect(confirm).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    expect(cancel).toHaveBeenCalledOnce()
   })
 })

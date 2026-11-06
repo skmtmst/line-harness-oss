@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * Pencil `cBSCb`（V6s 共通トップバー）の実測値。
@@ -5,13 +6,8 @@
  */
 .root {
   display: flex;
-  height: 56px;
   min-width: 0;
   align-items: center;
-  gap: 12px;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-surface-chrome);
 }
 
 /* `cBSCb/wgtL5`。画面名とマニュアルは左。あきで右操作を押し出す。 */
@@ -29,7 +25,7 @@
   overflow: hidden;
   color: var(--color-ink);
   font-size: var(--text-title);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -46,14 +42,14 @@
   height: 36px;
   flex-shrink: 0;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: var(--color-canvas);
   /* 設計 `LoVfp` `B8gqJ` は $ink（黒）。青いリンク色にしない。 */
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
   padding: 0 12px;
   text-decoration: none;
@@ -96,7 +92,6 @@
   min-width: 0;
   flex-shrink: 0;
   align-items: center;
-  gap: 12px;
 }
 
 /* `cBSCb/VQGk7`。「LINEアカウント」の見出しと切替の札。 */
@@ -115,37 +110,25 @@
   position: relative;
   display: flex;
   min-width: 0;
-  height: 36px;
   align-items: center;
-  gap: 8px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
   background: var(--color-canvas);
-  padding: 0 10px;
+  box-shadow: var(--shadow-raised-control);
 }
 
 /* `cBSCb/KZ9W9`。22px・radius-mini・accent-soft。 */
 .accountMark {
   display: flex;
-  width: 22px;
-  height: 22px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-mini);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-  font-size: var(--text-nano);
-  font-weight: 700;
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
 }
 
 /* `cBSCb/q6d8jk`。$size-label 13 / 700。 */
 .accountName {
-  max-width: 148px;
   overflow: hidden;
   color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -163,10 +146,13 @@
   cursor: pointer;
 }
 
+.accountPill:hover {
+  background: var(--color-canvas-sunken);
+}
+
 .accountPill:focus-within {
-  border-color: var(--color-status-info);
-  outline: 2px solid var(--color-status-info);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
 }
 
 /* `cBSCb/ENVf3`。1×24 の縦線。 */
@@ -198,7 +184,7 @@
   background: var(--color-accent-soft);
   color: var(--color-accent-deep);
   font-size: var(--text-caption);
-  font-weight: 700;
+  font-weight: 600;
   padding: 0 10px;
 }
 
@@ -260,4 +246,398 @@
     max-width: 120px;
   }
 }
+
+/* ---------------------------------------------------------------------
+ * ★V8 外側（移行③・Pencil `y3gx8R` / lh-pro-ui §1）
+ *
+ * 帯は高さ 60・地の上に直接置く（枠も地色も付けない）。左は畳むボタンと
+ * パンくず（アカウント › 画面名・13px）、右は アカウント切替・通知
+ * （36 角丸10の枠ボタン）・自分・ログアウト。区切り線は出さない。
+ * 探す欄は V8 の帯から外した（オーナー決定 2026-10-01）。探すのは
+ * 各一覧の中の欄が受ける。長いアカウント名は 260px、自分の名前は
+ * 104px で「…」に収める。
+ * ------------------------------------------------------------------- */
+:root .root {
+  height: 60px;
+  gap: 8px;
+  padding: 0 16px;
+  border-bottom: 0;
+  background: transparent;
 }
+
+.v8Left {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+}
+
+.crumbs {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-label);
+}
+
+.crumbFrom {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ページが渡した手前の段。戻れるのでリンク色＋押せる形にする。 */
+.crumbFromWrap {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.crumbFromLink {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crumbFromLink:hover {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+/* 段を替えて戻るパンくず（ボタン）。見た目はリンクのパンくずと同じにする。 */
+.crumbFromButton {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.crumbSep {
+  color: var(--color-ink-faint);
+}
+
+.crumbCurrent {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 子の画面で画面名が一覧の名前のとき、その名前で一覧へ戻る（見た目は画面名のまま、触れたら下線）。 */
+.crumbCurrentLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.crumbCurrentLink:hover {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+/* 36px・角丸10・枠つきの絵ボタン（畳むボタンと通知で同じ形） */
+.iconButton {
+  position: relative;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
+}
+
+/* 未読の数。ベルの右上へ赤い丸（白い数字）。 */
+.bellBadge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: inline-flex;
+  box-sizing: border-box;
+  min-width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-shell);
+  border-radius: var(--radius-pill);
+  background: var(--color-danger);
+  color: var(--color-canvas);
+  font-size: var(--text-nano);
+  font-weight: 600;
+  font-variant-numeric: var(--font-numeric);
+  padding: 0 2px;
+}
+
+/* 自分。名まえの頭1文字を36pxの丸で出す。 */
+.avatar {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+:root .separator {
+  display: none;
+}
+
+:root .actions {
+  gap: 8px;
+}
+
+/*
+ * 帯が混まないよう名前の幅に上限を置く（最大260）。入る名前を切らずに出し、
+ * 入らない分だけ「…」。全文は title 属性で読める。
+ */
+:root .accountName {
+  max-width: 260px;
+}
+
+/*
+ * ★V8 1152 の帯（parity 1003-2106：1152 の 29/31 板で札が 20px に
+ * 潰れて見えなくなっていた）。札は縮めない（長い名前は 260px の
+ * 「…」で受ける）。代わりにパンくずと自分の名前が縮む（どちらも
+ * 「…」持ち）。互換経路は今までどおり。
+ */
+:root .accountPill {
+  flex-shrink: 0;
+}
+
+:root .crumbCurrent,
+:root .crumbFrom,
+:root .crumbFromLink,
+:root .user {
+  min-width: 0;
+}
+
+:root .user {
+  max-width: 104px;
+}
+
+/*
+ * ★V8 1152 の帯（M3 報告・parity 1003-2106：1152 の 29/31 板で札が
+ * 20px に潰れて見えなくなっていた）。札は縮めない（長い名前は
+ * 260px の「…」で受ける）。代わりにパンくずと自分の名前が縮む
+ * （どちらも「…」持ち）。互換経路は今までどおり。
+ */
+:root .accountPill {
+  flex-shrink: 0;
+}
+
+:root .crumbCurrent,
+:root .crumbFrom,
+:root .crumbFromLink,
+:root .user {
+  min-width: 0;
+}
+
+/* 1152 未満ではログアウトを印だけにする（板 NF3uI「1152 の帯」）。
+   字を消しても aria-label が残るので読み上げは変わらない。 */
+@media (max-width: 1151px) {
+  :root .logout span {
+    display: none;
+  }
+
+  :root .logout {
+    width: 36px;
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8 殻合わせ（絵の統括もふだんの画面も同じ殻）。
+ * 管理画面 の土台クラスは触らない。ここは V8 の上書きだけ。
+ * ------------------------------------------------------------------- */
+
+/* 管理画面 の中箱（名前＋役割）は素通しにする。V8 でだけ積む。 */
+
+/* ホームの格子印＋文字。手前の段の頭。 */
+.crumbHome {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.crumbHome:hover {
+  color: var(--color-ink);
+}
+
+/* 札の中の役割（統括など）。V8 で名前の上に小さい行で添える。 */
+
+:root .pillText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+
+:root .pillRole {
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* 札は2行ぶんの高さにする（役割＋名前）。幅の決めは変えない。 */
+:root .accountPill {
+  height: auto;
+  min-height: 44px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/*
+ * 自分：名前を太字・役割を下の小さい行に積む（絵どおり）。
+ * 役割の印（押せる統括ボタンも）は札の形をやめ小さい文字にする。
+ */
+:root .identityText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+
+:root .identityText .user {
+  order: -1;
+  max-width: 140px;
+  color: var(--color-ink);
+}
+
+:root .identityText .role,
+:root .identityText .roleButton {
+  height: auto;
+  border-radius: var(--radius-none);
+  background: none;
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 0;
+}
+
+:root .identityText .roleButton:hover {
+  background: none;
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+:root .root { padding: 0 8px; gap: 10px; }
+:root .iconButton:not(:focus-visible) { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+
+/* zUg8S / Yw24X: 統括の別の絵は既存の default variant に残す。 */
+/* 帯の右端は白い板の右端にそろえる（絵の のログアウトの右端 1420）。 */
+:root .root[data-v8-chrome='shell'] { padding-right: var(--tpl-hq2-topbar-pad-end); }
+:root .root[data-v8-chrome='shell'] .actions { gap: 10px; }
+:root .root[data-v8-chrome='shell'] .crumbs { gap: 6px; }
+:root .root[data-v8-chrome='shell'] .crumbHome { gap: var(--polish-space-row); font-size: 13px; font-weight: var(--font-weight-ui); line-height: 20px; color: var(--color-ink-faint); }
+:root .root[data-v8-chrome='shell'] .crumbHome > svg { display: block; width: 16px; height: 16px; }
+:root .root[data-v8-chrome='shell'] .crumbCurrent { font-size: 13px; font-weight: 500; line-height: 20px; }
+:root .root[data-v8-chrome='shell'] .v8Left > .iconButton { width: 32px; height: 32px; border-radius: var(--polish-radius-control); background: transparent; }
+/* 切替の札は箱の中に小さい字＋名前の2行（絵の指示）。外の見出しは畳む。 */
+:root .accountField > span:first-child { display: none; }
+/* 1439 以下の 管理画面 の決まり（見出しの span を画面外へ）が V8 では札そのものに当たり、幅 0 に潰れていた。札は戻す（1152 の絵にも札がある）。 */
+:root .accountField > .accountPill { position: relative; width: auto; height: 36px; overflow: visible; clip: auto; white-space: nowrap; }
+:root .accountPill { height: 36px; min-height: 36px; padding: 0 10px 0 6px; gap: 8px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+:root .accountMark { width: 24px; height: 24px; border-radius: 7px; font-size: 12px; font-weight: 700; line-height: 17px; }
+:root .pillText { gap: 0; }
+:root .pillRole { font-size: 10px; font-weight: var(--font-weight-ui); line-height: 12px; }
+:root .accountName { font-size: 13px; font-weight: 600; line-height: 17px; }
+:root .root[data-v8-chrome='shell'] .bellBadge { background: var(--color-status-danger); width: 18px; height: 18px; min-width: 18px; left: 22px; right: auto; top: -4px; padding: 0; outline: 2px solid var(--color-shell); outline-offset: -1px; font-size: 10px; font-weight: 700; line-height: 10px; }
+:root .root[data-v8-chrome='shell'] .bellBadge[data-count-unknown] { width: 8px; height: 8px; min-width: 8px; border: 0; border-radius: 50%; background: var(--color-status-warn); outline: 2px solid var(--color-shell); outline-offset: -1px; }
+:root .root[data-v8-chrome='shell'] .identity { height: 36px; padding: 0 10px 0 4px; gap: 8px; }
+:root .root[data-v8-chrome='shell'] .avatar { width: 28px; height: 28px; border-radius: var(--polish-radius-pill); background: var(--color-status-info-soft); color: var(--color-action); font-size: 12px; font-weight: 600; line-height: 17px; }
+:root .root[data-v8-chrome='shell'] .user { font-size: 13px; font-weight: 600; line-height: 17px; }
+:root .root[data-v8-chrome='shell'] .role,
+:root .root[data-v8-chrome='shell'] .roleButton { font-size: 12px; font-weight: var(--font-weight-ui); line-height: 13px; }
+/* 押せる役割（統括へ戻る）は文字の高さのまま。ボタンの最低の高さで名前が上へ押し出されていた（名前と役割の2行）。指で触る端末は今までどおり。 */
+@media (pointer: fine) { :root .root[data-v8-chrome='shell'] .identityText .roleButton { min-height: 0; } }
+:root .root[data-v8-chrome='shell'] .logout { gap: 6px; padding: 0 14px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; box-shadow: var(--shadow-board); font-size: 13px; font-weight: 600; line-height: 20px; }
+:root .root[data-v8-chrome='shell'] .logout svg { width: 16px; height: 16px; }
+:root .root[data-v8-chrome='shell'] .v8Left > .iconButton:not(:focus-visible) { outline-color: transparent; }
+/* 展開時は名前を最大260px・自分の名前を104px、畳んだ外側は内容に合わせた幅。 */
+:root .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .accountName { width: auto; max-width: 260px; height: 20px; line-height: 17px; }
+:root .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .user { width: 104px; height: 20px; line-height: 17px; }
+:root .root[data-v8-chrome='shell'] .identity { border-radius: var(--polish-radius-control); }
+:root .root[data-v8-chrome='shell'] .bellBadge { border: 0; border-radius: var(--polish-radius-pill); }
+:root .root[data-v8-chrome='shell'][data-menu-collapsed] .crumbHome { gap: 0; }
+:root .root[data-v8-chrome='shell'][data-menu-collapsed] .crumbHome > svg { display: none; }
+
+}
+
+/* 選ぶ欄と同じ「白地＋影で浮かせる」形。開いた・押した・焦点は選ぶ欄にそろえる。 */
+:root .accountPill,
+:root .iconButton[data-topbar-bell] {
+  border: 0;
+  outline: 1px solid transparent;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+}
+:root .accountPill:hover,
+:root .iconButton[data-topbar-bell]:hover {
+  background: var(--color-canvas-sunken);
+}
+:root .iconButton[data-topbar-bell]:not(:focus-visible) {
+  outline: 1px solid transparent;
+}
+:root .accountPill:focus-within,
+:root .iconButton[data-topbar-bell]:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
+}
+:root .accountPill:has(.accountSelect:active),
+:root .iconButton[data-topbar-bell]:active:not(:disabled) { filter: brightness(0.97); }
+:root .accountPill > [data-avatar] { flex: 0 0 auto; }
+:root .accountPill { transition: background-color var(--motion-fast) var(--motion-ease-out), box-shadow var(--motion-fast) var(--motion-ease-out); }
+:root .iconButton[data-topbar-bell] { transition: background-color var(--motion-fast) var(--motion-ease-out); }
+
+/* 切り替えを開いた時に ⌄ が半回転する（180ms・CSS だけ。動きを減らす設定では回さずに向きだけ変える）。 */
+.switchChevron { display: inline-flex; flex: none; align-items: center; justify-content: center; }
+.switchChevron[data-open] { rotate: 180deg; }
+@media (prefers-reduced-motion: no-preference) {
+  .switchChevron { transition: rotate var(--motion-switch-glide) var(--motion-ease-out); }
+}
+
+/* パンくずのリンクと左メニューを畳むボタンの押せる範囲（§6.5 の 7）。見た目は変えず、透明な当たりで広げる（パンくずは高さ 24、畳むボタンは 36 角）。 */
+.crumbHome, .crumbFromLink { position: relative; }
+.crumbHome::before, .crumbFromLink::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - var(--polish-hit-min)) / 2)); }
+:root .root[data-v8-chrome='shell'] .v8Left > .iconButton { position: relative; }
+:root .root[data-v8-chrome='shell'] .v8Left > .iconButton::before { content: ''; position: absolute; inset: -2px; }

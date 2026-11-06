@@ -1,9 +1,12 @@
+import { logger } from '@line-crm/shared/server';
 import {
   claimKnowledgeJob, failKnowledgeJob, finishKnowledgeJob, getSupportTicket,
   listSupportMessages, recordPlatformAiCall,
   type KnowledgeArticleInput, type KnowledgeEvidence, type SupportMessage, type SupportTicketRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { dbFor } from './db-router.js';
 
 export const KNOWLEDGE_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
@@ -15,7 +18,7 @@ type Suggestion = {
   articleKind: 'verified' | 'answer_example'; reason: string; reviewState: 'pending' | 'needs_review';
 };
 
-/** Local redaction, before inference and persistence. Never log the input or provider errors. */
+/** 推論・保存より前にローカルで伏せ、入力や外部エラーをログへ出さない。 */
 export function redactKnowledgeText(input: string, names: string[] = []): string {
   let text = input.normalize('NFKC');
   const terms = [...new Set(names.flatMap(name => [name, ...name.split(/[\s　]+/)]))]
@@ -66,7 +69,7 @@ const ACTION = /変更した|変更しました|設定した|設定しました|
 const PROPOSAL = /してください|試して|予定|見込み|かもしれ|と思い|でしょう|[?？]|please|try |might|should/i;
 const SUCCESS = /解決しました|解決した|直りました|正常に|できました|成功しました|動作を確認|works now|resolved|working now/i;
 
-/** Model output is untrusted. Quotes, roles and ordering must be grounded in this conversation. */
+/** モデル出力は信用せず、引用・役割・順序を現在の会話へ照合する。 */
 export function validateKnowledgeEvidence(value: unknown, sources: KnowledgeSource[]): KnowledgeEvidence[] | null {
   if (!Array.isArray(value) || value.length < 2 || value.length > 8) return null;
   const evidence: KnowledgeEvidence[] = [];
@@ -91,8 +94,7 @@ export function validateKnowledgeEvidence(value: unknown, sources: KnowledgeSour
     evidence.push({ messageId: source.id, createdAt: source.at, authorKind: source.author, quote: row.quote, role: row.role });
   }
   if (lastAction < 0 || firstResult === sources.length || firstResult <= lastAction) return null;
-  // created_at ties are sorted by random UUID in the conversation query, not
-  // by causal order. Unknown/equal timestamps must never prove resolution.
+  // 同時刻の会話は UUID 順で因果を示さないため、不明・同じ時刻だけで解決済みとは判断しない。
   const actionTimes = evidence.filter(item => item.role === 'action').map(item => Date.parse(item.createdAt));
   const resultTimes = evidence.filter(item => item.role === 'result').map(item => Date.parse(item.createdAt));
   if ([...actionTimes, ...resultTimes].some(time => !Number.isFinite(time))
@@ -101,7 +103,7 @@ export function validateKnowledgeEvidence(value: unknown, sources: KnowledgeSour
   return evidence;
 }
 
-/** Keep only literal, anonymised quotations that still exist in the current source. */
+/** 現在の出典に残る、匿名化した逐語引用だけを保持する。 */
 export function retainExistingKnowledgeEvidence(value: unknown, sources: KnowledgeSource[]): KnowledgeEvidence[] {
   if (!Array.isArray(value)) return [];
   const roles = new Set<KnowledgeEvidence['role']>(['action', 'result', 'condition', 'question', 'answer']);
@@ -174,7 +176,7 @@ export function parseKnowledgeSuggestion(raw: unknown, ticket: SupportTicketRow,
     action: '実施した対応', result: '確認された結果', condition: '適用条件',
     question: '質問', answer: '回答',
   };
-  // The answer is composed from verified quotations, never from invented model prose.
+  // 検証済みの引用から回答を作り、モデルの創作した説明を使わない。
   const answer = evidence.map(item => `${labels[item.role]}: ${item.quote}`).join('\n\n');
   const keywords = Array.isArray(row.keywords) ? row.keywords.filter((word): word is string => typeof word === 'string')
     .slice(0, 12).map(word => redactKnowledgeText(word, names).slice(0, 40)).filter(Boolean) : [];
@@ -197,7 +199,7 @@ export async function runKnowledgeAi(env: Env['Bindings'], messages: { role: str
   } finally { if (timer) clearTimeout(timer); }
 }
 
-/** A leased, bounded job; failures never roll back ticket resolution. No live call in local tests. */
+/** 実行権と上限を持つジョブにし、失敗しても問い合わせの解決は戻さない。ローカル試験は実通信しない。 */
 export async function processKnowledgeJob(env: Env['Bindings'], requestId?: string): Promise<void> {
   if (!env.AI) return;
   const db = dbFor(env);
@@ -215,7 +217,7 @@ export async function processKnowledgeJob(env: Env['Bindings'], requestId?: stri
     const names = knowledgeNames(ticket, messages);
     const sources = knowledgeSources(ticket, messages);
     const prompt = knowledgePrompt(redactKnowledgeText(ticket.subject, names), sources);
-    // Do not silently truncate a conversation or infer what an attachment contains.
+    // 会話を黙って切り詰めたり、添付内容を推測したりしない。
     if (JSON.stringify(prompt).length > 24_000 || ticket.attachment_keys !== '[]' || messages.some(message => message.attachment_keys !== '[]')) {
       await finishKnowledgeJob(db, job, answerExample(ticket, messages, undefined,
         '添付資料または長いやり取りがあるため、元のやり取りを確認してください。'));
@@ -227,8 +229,8 @@ export async function processKnowledgeJob(env: Env['Bindings'], requestId?: stri
     ok = raw !== null;
     await finishKnowledgeJob(db, job, parseKnowledgeSuggestion(raw, ticket, messages));
   } catch (error) {
-    // Provider error messages may echo the prompt. Persist only this fixed code.
-    console.error('[knowledge] generation failed', { name: error instanceof Error ? error.name : 'UnknownError' });
+    // 外部エラーに入力文が含まれ得るため、固定コードだけを保存する。
+    logger.error("services_platform_knowledge_failed");
     await failKnowledgeJob(db, job, 'generation_failed');
   } finally {
     if (attempted) await recordPlatformAiCall(db, { id: callId, purpose: 'article', requestId: job.request_id, model, ok, durationMs: Date.now() - started });

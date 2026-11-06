@@ -1,10 +1,14 @@
 'use client'
 
 import React from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { menuItemForPath } from './view-permission-gate'
+import { isSettingsAreaPath } from './layout/settings-inner-nav'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { useOptionalAccount } from '@/contexts/account-context'
+import { beginFeatureDisabledContext, type FeatureDisabledContext } from '@/lib/feature-disabled-context'
 import {
   FEATURE_DISABLED_EVENT,
   type FeatureDisabledEventDetail,
@@ -14,7 +18,7 @@ import {
 export function FeatureDisabledScreen({ featureId }: { featureId?: string }) {
   return (
     <section
-      className="rounded-card border border-hairline bg-canvas p-6 shadow-sm"
+      className="rounded-card border border-hairline bg-canvas p-6 shadow-card-surface"
       data-feature-disabled={featureId ?? 'unknown'}
     >
       <ListState
@@ -33,20 +37,37 @@ export function FeatureDisabledScreen({ featureId }: { featureId?: string }) {
  */
 export default function FeatureDisabledGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const selectedAccountId = useOptionalAccount()?.selectedAccountId ?? null
   const [disabledFeatureId, setDisabledFeatureId] = useState<string | undefined>()
+  const context = useRef<FeatureDisabledContext | undefined>(undefined)
 
-  useEffect(() => {
+  /*
+   * 機能のオン・オフはアカウントごと。同じ URL のままアカウントを切り替えたときも
+   * 案内を外して中身を描き直す（外さないと、オンのアカウントでも中身が読み込まれない：監査 WEB-007）。
+   * 中身がまたオフを返せば、そのときに案内が戻る。
+   */
+  useLayoutEffect(() => {
+    context.current = beginFeatureDisabledContext(pathname)
     setDisabledFeatureId(undefined)
-  }, [pathname])
+  }, [pathname, selectedAccountId])
 
   useEffect(() => {
     const onDisabled = (event: Event) => {
+      // 設定内の画面は停止中の機能をつなぎ直す入口。補助APIの停止で閉じない。
+      if (isSettingsAreaPath(pathname)) return
       const detail = (event as CustomEvent<FeatureDisabledEventDetail>).detail
+      // 必須画面の補助APIがオフでも画面全体を閉じない。
+      // 任意機能の画面では、その画面自身の機能だけを案内する。
+      const pageFeature = menuItemForPath(pathname)?.featureKey
+      if (!pageFeature || detail?.featureId !== pageFeature) return
+      if (detail?.accountId != null && detail.accountId !== selectedAccountId) return
+      if (detail?.featureContext && (detail.featureContext.generation !== context.current?.generation
+        || detail.featureContext.pathname !== pathname)) return
       setDisabledFeatureId(detail?.featureId ?? 'unknown')
     }
     window.addEventListener(FEATURE_DISABLED_EVENT, onDisabled)
     return () => window.removeEventListener(FEATURE_DISABLED_EVENT, onDisabled)
-  }, [])
+  }, [pathname, selectedAccountId])
 
   if (disabledFeatureId) return <FeatureDisabledScreen featureId={disabledFeatureId} />
   return <>{children}</>

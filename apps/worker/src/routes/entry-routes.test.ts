@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const mocks = {
   getEntryRoutes: vi.fn(),
-  // N-011: 一覧が共通境界へ委譲するため、範囲解決の口も用意する。
+  // 一覧が共通境界へ委譲するため、範囲解決の口も用意する。
   getLineAccountScopeEntries: vi.fn(async () => []),
   getStaffById: vi.fn(async () => null),
   getStaffAccountScopeIds: vi.fn(async () => []),
@@ -428,3 +428,10 @@ describe('entry route genre API', () => {
     expect(mocks.updateEntryRouteGenre).toHaveBeenCalledWith(env.DB, 'genre-1', 'A店 SNS');
   });
 });
+
+ it('returns full monthly funnel values', async () => {
+  mocks.getEntryRouteById.mockResolvedValue({id:'r',tenant_id:'tenant-a'});
+  mocks.getEntryRouteFunnel.mockResolvedValue({remainingCount:198,blockedCount:2,valuePerFriend:1200,monthly:[{month:'2026-10',friendAddCount:200}]});
+  const response=await app.request('/api/entry-routes/r/funnel',{},env);
+  expect(response.status).toBe(200);expect(await response.json()).toMatchObject({data:{remainingCount:198,monthly:[{friendAddCount:200}]}});
+ });

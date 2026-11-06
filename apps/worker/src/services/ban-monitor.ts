@@ -1,3 +1,5 @@
+import { lineWebhookSilence, jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * BAN検知モニター — cronトリガーで定期実行
  *
@@ -17,8 +19,7 @@ import {
   type LineAccount,
 } from '@line-crm/db';
 
-/** Webhook が無いまま警告を出すまでの時間（v6-33 §11-1 の既定24時間）。 */
-const WEBHOOK_SILENCE_WARNING_MS = 24 * 60 * 60 * 1000;
+
 /** 「正常」が続いたらプールへ自動で戻すまでの時間（X の確定値・24時間）。 */
 const POOL_RETURN_NORMAL_MS = 24 * 60 * 60 * 1000;
 
@@ -33,14 +34,14 @@ export async function checkAccountHealth(
     try {
       await checkSingleAccount(db, account);
     } catch (err) {
-      console.error(`ヘルスチェックエラー (account ${account.id}):`, err);
+      logger.error("ban_monitor.check_account_health_failed");
     }
   }
 
   try {
     await returnRecoveredAccountsToPools(db);
   } catch (err) {
-    console.error('プールへの自動復帰に失敗しました:', err);
+    logger.error("ban_monitor.check_account_health_failed");
   }
 }
 
@@ -86,13 +87,7 @@ async function checkSingleAccount(
 
   // Webhook 受信が想定時間（既定24時間）無いときは warning。
   // 受信しない運用のアカウントは webhook_silence_exempt で外せる。
-  const silent = !account.webhook_silence_exempt
-    && (account.last_webhook_received_at
-      ? new Date(account.last_webhook_received_at).getTime() < Date.now() - WEBHOOK_SILENCE_WARNING_MS
-      // 受信実績がまだ無いときは、作られてから24時間経ったものだけを対象にする。
-      : account.created_at
-        ? new Date(account.created_at).getTime() < Date.now() - WEBHOOK_SILENCE_WARNING_MS
-        : false);
+  const silent = lineWebhookSilence({ lastReceivedAt: account.last_webhook_received_at, createdAt: account.created_at, exempt: Boolean(account.webhook_silence_exempt) });
 
   // リスクレベル判定
   let riskLevel = 'normal';
@@ -118,10 +113,10 @@ async function checkSingleAccount(
         eventType: `account_health_${riskLevel}`,
         title: riskLevel === 'danger'
           ? 'LINE公式アカウントの接続を確認してください'
-          : 'LINE公式アカウントの送信状況を確認してください',
+          : silent ? 'Webhook が届いていません' : 'LINE公式アカウントの送信状況を確認してください',
         body: riskLevel === 'danger'
           ? 'LINEとの接続に問題が見つかりました。運用状態から確認してください。'
-          : '送信量またはLINEの応答に注意が必要です。運用状態から確認してください。',
+          : silent ? 'Webhookを24時間以上受信していません。運用状態から確認してください。' : '送信量またはLINEの応答に注意が必要です。運用状態から確認してください。',
         channel: 'dashboard',
         lineAccountId: account.id,
         category: 'error',
@@ -148,9 +143,9 @@ async function checkSingleAccount(
   }
 
   if (riskLevel === 'danger') {
-    console.error(`⚠️ BAN検知: アカウント ${account.id} で403エラー発生。即座に確認が必要。`);
+    logger.error("ban_monitor.check_single_account_failed");
     /*
-     * 自動切替（v6-33 §11-2、X-2）。トラフィックプールに入っている
+     * 自動切替（-33 §11-2、X-2）。トラフィックプールに入っている
      * アカウントが danger になったら、プールの中だけで止めて、
      * 友だち追加先を同じ組の予備へ切り替える。
      * アカウント自体の is_active は触らない（配信・受信の停止は別の決まり）。
@@ -208,7 +203,7 @@ async function returnRecoveredAccountsToPools(db: D1Database): Promise<void> {
   const switchedOut = await listAutoSwitchedOutPoolAccounts(db);
   // account_health_logs.created_at は JST(+09:00) 表記。同じ形で比べる。
   const since =
-    new Date(Date.now() - POOL_RETURN_NORMAL_MS + 9 * 60 * 60 * 1000)
+    japanCalendar(new Date(Date.now() - POOL_RETURN_NORMAL_MS))
       .toISOString()
       .slice(0, -1) + '+09:00';
 

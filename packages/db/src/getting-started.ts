@@ -1,5 +1,5 @@
 /**
- * はじめの設定の順路。設計 ★V6 34-1（`RAW35`）。台帳 #134。
+ * はじめの設定の順路。設計 ★34-1（`RAW35`）。
  *
  * **画面を開いたかではなく、実際に作られたもので判定する。**
  * だから訪問の記録は持たず、毎回いまの中身を数える（キャッシュしない）。
@@ -15,9 +15,9 @@ export const GETTING_STARTED_STEPS = [
 export type GettingStartedStep = (typeof GETTING_STARTED_STEPS)[number];
 
 export interface StepFacts {
-  /** 段1。稼働中で Webhook が合っていてシークレットが確かめ済みのアカウント数。 */
+  /** 接続状態の診断用。段1の完了判定には使わない。 */
   usableAccounts: number;
-  /** 段1。アカウントが 1 件でもあるか（「まだ」と「止まっている」を分ける）。 */
+  /** 段1。アーカイブされていないアカウントが 1 件でもあるか。 */
   totalAccounts: number;
   /** 段2。 */
   tagCount: number;
@@ -42,6 +42,10 @@ export interface StepFacts {
  * 「QRを読んで自分を友だちに追加するか、テスト受信者へ送ります」と
  * 2 経路を認めているため。
  */
+const FIRST_DELIVERED_MESSAGE_WHERE = `line_account_id = ?
+          AND direction = 'outgoing'
+          AND (source = 'friend_add_routing' OR scenario_step_id IS NOT NULL)`;
+
 export async function hasFirstDeliveredMessage(
   db: D1Database,
   accountId: string,
@@ -50,9 +54,7 @@ export async function hasFirstDeliveredMessage(
     .prepare(
       `SELECT 1 AS hit
          FROM messages_log
-        WHERE line_account_id = ?
-          AND direction = 'outgoing'
-          AND (source = 'friend_add_routing' OR scenario_step_id IS NOT NULL)
+        WHERE ${FIRST_DELIVERED_MESSAGE_WHERE}
         LIMIT 1`,
     )
     .bind(accountId)
@@ -60,7 +62,23 @@ export async function hasFirstDeliveredMessage(
   return row !== null;
 }
 
-/** 段1。3つとも揃って初めて数える。**`unknown` の Webhook を「合っている」と読まない。** */
+/** 最初の1通の時刻。`hasFirstDeliveredMessage` と同じ条件の一番早い送信。無ければ null。 */
+export async function firstDeliveredMessageAt(
+  db: D1Database,
+  accountId: string,
+): Promise<string | null> {
+  const row = await db
+    .prepare(
+      `SELECT MIN(created_at) AS at
+         FROM messages_log
+        WHERE ${FIRST_DELIVERED_MESSAGE_WHERE}`,
+    )
+    .bind(accountId)
+    .first<{ at: string | null }>();
+  return row?.at ?? null;
+}
+
+/** 接続状態の診断用。はじめの設定の完了判定には使わない。 */
 export async function countUsableAccounts(db: D1Database): Promise<{ usable: number; total: number }> {
   const total = await db
     .prepare(`SELECT COUNT(*) AS c FROM line_accounts WHERE archived_at IS NULL`)

@@ -4,10 +4,10 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
- * `GET /api/folders` の件数（#631）を、本物の `@line-crm/db`（`getFolderItemCounts`
+ * `GET /api/folders` の件数を、本物の `@line-crm/db`（`getFolderItemCounts`
  * を含む）と実スキーマ（bootstrap.sql）を使って結合で確かめる。
  *
  * `friend-attributes.test.ts` は `@line-crm/db` を丸ごとモックしており、
@@ -81,6 +81,7 @@ beforeEach(() => {
   sqlite.prepare(`INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
     VALUES ('folder-1', 'reminder', 'フォルダ1', 0, '2026-01-01', '2026-01-01')`).run();
 
+  sqlite.exec("UPDATE folders SET account_id='account-a' WHERE id='folder-1'");
   const insertReminder = sqlite.prepare(
     `INSERT INTO reminders (id, name, trigger_type, folder_id, line_account_id, created_at, updated_at)
      VALUES (?, ?, 'manual', ?, ?, '2026-01-01', '2026-01-01')`,
@@ -118,20 +119,39 @@ describe('GET /api/folders の件数(#631) — 実DB結合', () => {
     expect(body.data.find((f) => f.id === 'folder-1')?.itemCount).toBe(5);
   });
 
-  it('対応表に無い種別(event・friend_field・#730)は itemCount を返さない(0とは書かない)', async () => {
+  it('成果地点は選択中アカウントと閲覧可能な共通分を一覧と同じように分類する', async () => {
+    const insert = sqlite.prepare(`INSERT INTO conversion_points (id, name, event_type, line_account_id, status)
+      VALUES (?, ?, 'manual', ?, ?)`);
+    insert.run('point-own', '店舗', 'account-a', 'active');
+    insert.run('point-shared', '共通', null, 'draft');
+    insert.run('point-other', '別店舗', 'account-b', 'active');
+    accountAccess.getVisibleLineAccountScope.mockResolvedValue({
+      accounts: [], allowedAccountIds: ['account-a', 'account-b'], canSeeUnassigned: true,
+    });
+    const response = await req('/api/folders?kind=conversion&account_id=account-a');
+    expect(response.status).toBe(200);
+    expect((await response.json() as { unfiledCount: number }).unfiledCount).toBe(2);
+    accountAccess.getVisibleLineAccountScope.mockResolvedValue({
+      accounts: [], allowedAccountIds: ['account-a'], canSeeUnassigned: false,
+    });
+    const restricted = await req('/api/folders?kind=conversion&account_id=account-a');
+    expect((await restricted.json() as { unfiledCount: number }).unfiledCount).toBe(1);
+  });
+
+  it('イベントの分類は未使用でも0件を返す', async () => {
     accountAccess.getVisibleLineAccountScope.mockResolvedValue({
       accounts: [], allowedAccountIds: ['account-a'], canSeeUnassigned: false, ids: ['account-a'], isAccountScoped: true,
     });
-    sqlite.prepare(`INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
-      VALUES ('folder-event', 'event', 'イベント用', 0, '2026-01-01', '2026-01-01')`).run();
+    sqlite.prepare(`INSERT INTO folders (id, kind, name, display_order, created_at, updated_at, account_id)
+      VALUES ('folder-event', 'event', 'イベント用', 0, '2026-01-01', '2026-01-01', 'account-a')`).run();
 
     const res = await req('/api/folders?kind=event');
     const body = await res.json() as { data: Array<Record<string, unknown>>; unfiledCount?: number };
-    expect(body.data[0]).not.toHaveProperty('itemCount');
-    expect(body.unfiledCount).toBeUndefined();
+    expect(body.data[0]).toHaveProperty('itemCount', 0);
+    expect(body.unfiledCount).toBe(0);
   });
 
-  // #730: media / common_var / rich_menu は、選択中の1件に閉じた母集団で数える。
+  // media / common_var / rich_menu は、選択中の1件に閉じた母集団で数える。
   // account_id 指定時は未割当NULLを含めない（一覧に出ないため）。
   describe('単一アカウント種別の件数(#730) — 実DB結合', () => {
     beforeEach(() => {

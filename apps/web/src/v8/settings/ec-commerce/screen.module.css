@@ -1,0 +1,111 @@
+/*
+ * ★V8 EC連携。外側（型・中のメニュー 200）は sb-frame の narrow-nav。
+ * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-sb-*）。
+ */
+
+.btnIcon {
+  width: var(--tpl-sb-icon-m);
+  height: var(--tpl-sb-icon-m);
+  flex-shrink: 0;
+}
+
+.minor,
+.minorText {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-sb-row-sub);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-sb-ctl-gap);
+}
+
+.search {
+  width: var(--tpl-sb-search-w-wide);
+  flex-shrink: 0;
+}
+
+.spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.sortBox {
+  width: var(--tpl-sb-sort-w);
+  flex-shrink: 0;
+}
+
+.sortBox :global(*) {
+  max-width: 100%;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-sb-row-sub-gap);
+  min-width: 0;
+}
+
+.main,
+.sub,
+.text {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.main {
+  font-weight: 600;
+}
+
+.sub {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-sb-row-sub);
+  line-height: var(--tpl-sb-row-sub-lh);
+}
+
+.done {
+  min-width: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: normal;
+}
+
+.menuBox {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-pill-gap);
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-sb-row-sub);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-sb-group-gap);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

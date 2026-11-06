@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { api, type ListStats } from '@/lib/api'
-import KpiCard, { type KpiCardProps } from './kpi-card'
+import KpiCard from './kpi-card'
+import KpiBand from './kpi-band'
 
 /**
  * 一覧画面の上部に出す数値カード4枚。
@@ -21,12 +22,17 @@ export interface KpiSpec {
   value: number | null
   unit: string
   detail: string
+  /**
+   * 題から開いて読む説明。KpiCardへそのまま渡す。
+   * 「？」が描かれている題だけhelpDisplayで指定する。
+   */
+  help?: ReactNode
+  helpDisplay?: 'label' | 'question'
 }
 
 export default function ListKpis({
   build,
   titles,
-  variant = 'v5',
   accountId,
 }: {
   build: (stats: ListStats) => KpiSpec[]
@@ -38,7 +44,6 @@ export default function ListKpis({
    * `build` は数が要るので呼べない（数の無いところに嘘を入れないため）。
    */
   titles?: [string, string, string, string]
-  variant?: NonNullable<KpiCardProps['variant']>
   /** 渡した画面では、選択中のLINE公式アカウントだけを集計する。 */
   accountId?: string | null
 }) {
@@ -86,12 +91,13 @@ export default function ListKpis({
       }))
 
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+    <KpiBand gridClassName="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
       {cards.map((card, i) => (
         // key は props に混ぜない。混ぜて spread すると React が
         // 「key を spread で渡すな」と毎回警告を出す。
-        <KpiCard key={card.title || i} {...card} loading={loading} variant={variant} />
+        // 数の帯は1本にまとめる（Pp3nS）。v8 の見た目だけ変わり 互換経路は不変。
+        <KpiCard key={card.title || i} {...card} loading={loading} presentation="band" />
       ))}
-    </div>
+    </KpiBand>
   )
 }

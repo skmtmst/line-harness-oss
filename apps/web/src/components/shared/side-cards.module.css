@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 右カラム（幅390px）に置く2枚のカード。
@@ -17,15 +18,16 @@
   flex-direction: column; /* layout: vertical */
   gap: 12px; /* gap: 12 */
   padding: 16px; /* padding: 16 */
-  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border: 1px solid var(--card-edge); /* stroke: $hairline */
   border-radius: var(--radius-card); /* cornerRadius: $radius-md */
-  background: var(--color-canvas); /* fill: $canvas */
+  background: var(--color-canvas); /* fill: $canvas */;
+  box-shadow: var(--card-shadow);
 }
 
 .title {
   color: var(--color-ink); /* fill: $ink */
   font-size: var(--text-label); /* fontSize: $size-label */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 /* --- つながる先 ------------------------------------------------------- */
@@ -41,9 +43,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px; /* gap: 6 */
-  color: var(--color-status-info); /* fill: $status-info */
+  color: var(--color-action); /* fill: $status-info */
   font-size: var(--text-caption); /* fontSize: $size-caption */
-  font-weight: 700; /* fontWeight: 700 */
+  font-weight: 600; /* fontWeight: 600 */
 }
 
 .linkName:hover {
@@ -70,26 +72,9 @@
 
 /* --- 気をつけること --------------------------------------------------- */
 
-.careCard {
-  gap: 10px; /* gap: 10 */
-  border-color: var(--color-status-warn); /* stroke: $status-warn */
-  background: var(--color-status-warn-soft); /* fill: $status-warn-soft */
-}
-
-.careTitle {
-  color: var(--color-status-warn-deep); /* fill: $status-warn-deep */
-}
-
 .careRow {
   display: flex;
   gap: 8px; /* gap: 8 */
-}
-
-.careIcon {
-  width: 15px; /* width: 15 */
-  height: 15px;
-  flex: none;
-  color: var(--color-status-warn-deep);
 }
 
 .careText {
@@ -102,7 +87,7 @@
 .careHead {
   color: var(--color-status-warn-deep);
   font-size: var(--text-caption); /* fontSize: $size-caption */
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .careNote {

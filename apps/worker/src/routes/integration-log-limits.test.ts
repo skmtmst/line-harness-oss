@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const mocks = vi.hoisted(() => ({
   getStripeEvents: vi.fn(),
@@ -57,7 +57,7 @@ describe('外部連携ログの一覧上限', () => {
     expect(response.status).toBe(200);
     expect(mocks.getStripeEvents).toHaveBeenCalledWith(
       expect.anything(),
-      { friendId: undefined, eventType: undefined, limit: expected },
+      { friendId: undefined, eventType: undefined, limit: expected, lineAccountIds: [], includeUnassigned: true },
     );
   });
 

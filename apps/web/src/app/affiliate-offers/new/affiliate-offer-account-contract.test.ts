@@ -1,25 +1,15 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(import.meta.dirname, '../new-offer-v8.tsx'), 'utf8')
 
 /**
- * V6 案件作成のLINEアカウント選択の契約（#505 重大1 / #686 cross-account）。
- *
- * 「すべてのアカウント」のまま送ると口が 400 で落とす（複数アカウントの
- * 運用者は既定のまま押すと必ず失敗した）。#686 差し戻し以降は、選ばせる
- * のではなく画面上部で選んでいるLINEアカウントへ固定し、他アカウントへ
- * 誤って作成できないようにする。
+ * 管理画面 案件作成のLINEアカウント選択の禁止の見張り。
+ * 選択中アカウントへの固定と、未選択のときに送らないことは offer-account-fixed.test.tsx が押して確かめる。
  */
-describe('V6 案件作成のアカウント選択の契約', () => {
-  it('選択中のLINEアカウントが無いときは押させない', () => {
-    expect(PAGE).toContain('if (!selectedAccountId) return \'LINEアカウントを選んでください（画面上部で選べます）\'')
-  })
-
-  it('誘導するLINEアカウントは選択中アカウントへ固定し、選ばせない', () => {
-    expect(PAGE).toContain('const { selectedAccountId, selectedAccount } = useAccount()')
-    expect(PAGE).toContain('lineAccountId: selectedAccountId')
+describe("管理画面 案件作成のアカウント選択の契約", () => {
+  it('誘導するLINEアカウントを選ばせる欄に戻さない', () => {
     expect(PAGE).not.toContain("label: '選んでください'")
     expect(PAGE).not.toContain("label: 'すべてのアカウント'")
   })

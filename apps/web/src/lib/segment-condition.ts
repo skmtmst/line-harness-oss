@@ -21,16 +21,8 @@ export type FieldOperator =
   | 'lte'
   | 'lt'
 
-export interface SegmentRule {
-  type: string
-  value: unknown
-}
-
-export interface SegmentCondition {
-  operator: 'AND' | 'OR'
-  rules: SegmentRule[]
-  groups?: SegmentCondition[]
-}
+import type { SegmentCondition, SegmentRule } from '@line-crm/shared';
+export type { SegmentCondition, SegmentRule } from '@line-crm/shared';
 
 /**
  * まだ書きかけの行か。
@@ -54,8 +46,18 @@ export function isRuleComplete(rule: SegmentRule): boolean {
     case 'status_message':
     case 'ref_code':
       return typeof rule.value === 'string' && rule.value.trim() !== ''
+    case 'visit_count':
+    case 'purchase_amount': {
+      const has = (x: unknown) => x !== null && x !== undefined && x !== ''
+      if (!has(v?.min) && !has(v?.max)) return false
+      if ((has(v?.min) && !Number.isFinite(Number(v.min))) || (has(v?.max) && !Number.isFinite(Number(v.max)))) return false
+      return !(has(v?.min) && has(v?.max) && Number(v.min) > Number(v.max))
+    }
+    case 'member_tier':
+      return typeof rule.value === 'string' && rule.value !== ''
     case 'registered_at':
     case 'last_reaction_at':
+    case 'last_activity_at':
       return (
         (typeof v?.from === 'string' && v.from !== '') ||
         (typeof v?.to === 'string' && v.to !== '')
@@ -146,4 +148,47 @@ export function isEmptyCondition(condition: SegmentCondition | null): boolean {
     (g) => g.rules.length > 0 || (g.groups?.length ?? 0) > 0,
   ).length
   return condition.rules.length === 0 && groupCount === 0
+}
+
+/*
+ * S4-OR: 何も足していない素の空か。足したばかりの空のかたまりは
+ * 下書きとして残すため、実質空（isEmptyCondition）とは分けて見る。
+ * 素の空のときだけ null へ戻し、編集中の表示を消さない。
+ */
+export function isStructurallyEmpty(condition: SegmentCondition | null): boolean {
+  if (!condition) return true
+  return (condition.rules ?? []).length === 0 && (condition.groups ?? []).length === 0
+}
+
+/*
+ * R243/S4-OR: 編集中の下書きに不足があるか。保存のときに案内するために使う。
+ * 実質空（isEmptyCondition）は「絞り込みなし」として有効なので案内しない。
+ * 空の「いずれか」のかたまり・未完成の行があるときだけ文を返す。
+ * 保存側は pruneCondition で整えるので、ここでは値を変えない。
+ */
+export function findConditionDraftIssue(draft: SegmentCondition | null): string | null {
+  /*
+   * 素の空（null・行もかたまりも無し）は「絞り込みなし」として有効。
+   * 空のかたまりだけの下書きは実質空でも、足すつもりの条件が無い
+   * ままなので「広い一致」へ黙って落ちないよう案内する。
+   */
+  if (!draft || isStructurallyEmpty(draft)) return null
+  const hasIncompleteRule = (rules: SegmentRule[]) => rules.some((rule) => !isRuleComplete(rule))
+  if (hasIncompleteRule(draft.rules ?? [])) {
+    return '入力が未完成の条件があります。空欄を埋めるか、「この条件を外す」で取り除いてください。'
+  }
+  const checkGroups = (groups: SegmentCondition[]): string | null => {
+    for (const group of groups ?? []) {
+      if ((group.rules ?? []).length === 0 && (group.groups ?? []).length === 0) {
+        return '空の「いずれか」の条件のかたまりがあります。項目を足すか、かたまりを外してください。'
+      }
+      if (hasIncompleteRule(group.rules ?? [])) {
+        return '入力が未完成の条件があります。空欄を埋めるか、「この条件を外す」で取り除いてください。'
+      }
+      const nested = checkGroups(group.groups ?? [])
+      if (nested) return nested
+    }
+    return null
+  }
+  return checkGroups(draft.groups ?? [])
 }

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/db', () => ({
   getFriendByLineUserIdForAccount: vi.fn(),
+  getPublicationThirtyDayViews: vi.fn(async () => new Map()),
   // 重複と報酬の決まりは本物でなく通す（重複なし・5pt固定）。
   // 本物は nen-photo-duplicate-reward-817.test.ts で見る。
   findRewardedAdoptedDuplicate: vi.fn(async () => null),
@@ -55,6 +56,8 @@ function harness(options: {
   settledState?: Record<string, unknown> | null;
   notificationRetryKey?: string | null;
   previousDecision?: Record<string, unknown> | null;
+  /** ほかの担当者が先に決めた写真にする（版が進み pending でない）。 */
+  decidedPhoto?: boolean;
   resubmitInvite?: number;
   savedRotation?: number;
   rotationKey?: string | null;
@@ -91,7 +94,7 @@ function harness(options: {
               last_idempotency_key: null,
             };
           }
-          // 詳細口の掲載・報酬の単発取得（Issue #1040 IDEA-22）。
+          // 詳細口の掲載・報酬の単発取得。
           if (query.includes('FROM nen_photo_publications pub') && query.includes('pub.photo_id = ?')) {
             return options.detailPublication ?? null;
           }
@@ -101,7 +104,7 @@ function harness(options: {
           if (query.includes('SELECT e.notification_status')) {
             return options.settledState ?? null;
           }
-          // 再送口の写真メタ（再実行キー照合。 #931 N-313）。
+          // 再送口の写真メタ（再実行キー照合。）。
           if (query.includes('notification_retry_key')) {
             if (entry.bindings[1] !== photoAccount) return null;
             return {
@@ -110,7 +113,7 @@ function harness(options: {
               notification_retry_key: options.notificationRetryKey ?? null,
             };
           }
-          // 単票審査の再実行キー照合（#931 N-313）。同じキーの判断があれば返す。
+          // 単票審査の再実行キー照合。同じキーの判断があれば返す。
           if (query.includes('idempotency_key = ?') && query.includes('nen_photo_review_events')) {
             return options.previousDecision ?? null;
           }
@@ -126,7 +129,7 @@ function harness(options: {
               customer_id: null,
             };
           }
-          // 向き保存口の写真（#931 N-309）。
+          // 向き保存口の写真。
           if (query.includes('display_rotation') && query.includes('rotation_idempotency_key')) {
             if (entry.bindings[1] !== photoAccount) return null;
             return {
@@ -138,7 +141,9 @@ function harness(options: {
           if (query.includes('FROM nen_photo_submissions ps') && query.includes('JOIN line_accounts')) {
             if (entry.bindings[1] !== photoAccount || entry.bindings[2] !== photoAccount) return null;
             return {
-              id: 'photo-1', friend_id: 'friend-1', status: 'pending', review_version: 1,
+              id: 'photo-1', friend_id: 'friend-1',
+              status: options.decidedPhoto ? 'adopted' : 'pending',
+              review_version: options.decidedPhoto ? 2 : 1,
               customer_id: options.customerId ?? null,
               line_user_id: 'U1', line_account_id: photoAccount, is_following: 1,
               channel_access_token: 'token', channel_access_token_encrypted: null,
@@ -160,7 +165,7 @@ function harness(options: {
           if (query.includes('FROM nen_photo_risk_assessments')) {
             return { results: [{ flag: 'face', confidence: 0.78 }] };
           }
-          // 詳細口の審査履歴（Issue #1040 IDEA-22）。
+          // 詳細口の審査履歴。
           if (query.includes('FROM nen_photo_review_events')) {
             return { results: options.reviewHistory ?? [] };
           }
@@ -246,8 +251,8 @@ describe('NEN photo review', () => {
     expect((await app.request('/api/nen-members/photos?accountId=account-a')).status).toBe(200);
     const list = statements.find((entry) => entry.query.includes('ORDER BY ps.created_at'));
     expect(list?.query).toContain('ps.line_account_id = ? AND f.line_account_id = ?');
-    // 絞り込みの2値のあとは、続きを取るための枚数と開始位置（#666）。
-    // 先頭の1値はポイント手続きの「要対応」判定に使う24時間前の区切り（PHOTO-06）。
+    // 絞り込みの2値のあとは、続きを取るための枚数と開始位置。
+    // 先頭の1値はポイント手続きの「要対応」判定に使う24時間前の区切り。
     expect(list?.bindings).toEqual([expect.any(String), 'account-a', 'account-a', 200, 0]);
   });
 
@@ -359,7 +364,7 @@ describe('NEN photo review', () => {
   });
 
   it('withdraws every placement with account scope, version and idempotency', async () => {
-    // 公開の撤回は審査権限ではなく掲載管理の上位権限が要る（#931 N-311）。
+    // 公開の撤回は審査権限ではなく掲載管理の上位権限が要る。
     const { app, batches } = harness({ permissionKeys: ['photo.publication.manage'] });
     const response = await app.request('/api/nen-members/photos/publications/publication-1/withdraw', {
       method: 'PUT',
@@ -410,7 +415,7 @@ describe('NEN photo review', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { notificationStatus: 'sent' } });
     const decision = batches[0].find((entry) => entry.query.includes('INSERT INTO nen_photo_review_events'));
-    // 再実行キーと「再投稿の案内を添えるか」も判断へ残す（#931 N-312/N-313）。
+    // 再実行キーと「再投稿の案内を添えるか」も判断へ残す。
     expect(decision?.bindings).toEqual([
       expect.any(String), 'photo-1', 'account-a', 'rejected', 'privacy',
       '顔が写っていない写真をお願いします。', 0, 'staff-a', '担当者',
@@ -469,6 +474,9 @@ describe('NEN photo review', () => {
     expect(batches).toHaveLength(0);
   });
 
+  /*
+   * 失敗一覧へ LINE の応答本文を漏らさないよう、他の送信失敗と同じ安全な理由を使う。原因調査用の生の本文はログだけで扱う。
+   */
   it('keeps the review saved and records a failed LINE notification', async () => {
     mocks.push.mockRejectedValueOnce(new Error('LINE unavailable'));
     const { app, batches, runs } = harness();
@@ -479,7 +487,8 @@ describe('NEN photo review', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { notificationStatus: 'failed' } });
     expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      decisionId: expect.any(String), generation: 1, status: 'failed', error: 'LINE unavailable',
+      decisionId: expect.any(String), generation: 1, status: 'failed',
+      error: '送信に失敗しました。設定とLINE連携を確認してください。',
     }));
     const mirror = runs.find((entry) => entry.query.includes('review_notification_status'));
     expect(mirror?.bindings[0]).toBe('failed');
@@ -487,12 +496,27 @@ describe('NEN photo review', () => {
   });
 
   it('returns a conflict when another reviewer decided first', async () => {
-    const { app } = harness({ duplicate: true });
+    const { app } = harness({ decidedPhoto: true });
     const response = await app.request('/api/nen-members/photos/photo-1/review', {
       method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'reject-conflict-1' },
       body: JSON.stringify({ accountId: 'account-a', status: 'rejected', expectedVersion: 1, reasonCode: 'duplicate' }),
     });
     expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'VERSION_CONFLICT' });
+  });
+
+  it('returns 500 instead of a version conflict when saving fails (M508)', async () => {
+    // 保存のbatchが制約違反で落ちても、誰も決めていない・何も保存されて
+    // いないときは「ほかの担当者」に化けず保存失敗として返す。
+    const { app } = harness({ duplicate: true });
+    const response = await app.request('/api/nen-members/photos/photo-1/review', {
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'reject-midfail-1' },
+      body: JSON.stringify({ accountId: 'account-a', status: 'rejected', expectedVersion: 1, reasonCode: 'quality' }),
+    });
+    expect(response.status).toBe(500);
+    const body = await response.json() as { code: string; error: string };
+    expect(body.code).toBe('REVIEW_SAVE_FAILED');
+    expect(body.error).not.toContain('ほかの担当者');
   });
 
   it('commits approval and a single reward outbox entry before external EC processing', async () => {
@@ -511,7 +535,7 @@ describe('NEN photo review', () => {
     );
     expect(submissionUpdate?.bindings).toContain('adopted');
     const outbox = batches[0].find((entry) => entry.query.includes('INSERT INTO nen_photo_reward_outbox'));
-    // 版の鍵は SQL の文字から束縛へ移った (#817)。値は同じ legacy-5・5pt。
+    // 版の鍵は SQL の文字から束縛へ移った。値は同じ legacy-5・5pt。
     expect(outbox?.bindings).toEqual([
       expect.any(String), 'photo-1', 'account-a', 'friend-1', 'customer-1',
       'nen-photo:photo-1', 'legacy-5', 5,
@@ -583,7 +607,7 @@ describe('NEN photo review', () => {
     }));
     const { app } = harness();
     const body = JSON.stringify({ accountId: 'account-a' });
-    // 連打・再試行は同じ再実行キーで届く想定（#931 N-313）。
+    // 連打・再試行は同じ再実行キーで届く想定。
     const headers = { 'content-type': 'application/json', 'Idempotency-Key': 'retry-race-1' };
     const first = app.request('/api/nen-members/photos/photo-1/notification/retry', { method: 'POST', headers, body });
     const second = app.request('/api/nen-members/photos/photo-1/notification/retry', { method: 'POST', headers, body });
@@ -642,7 +666,7 @@ describe('NEN photo review', () => {
   });
 
   /*
-   * #931 N-313: 単体審査と通知再送は再実行キー必須。連打・応答ロストの
+   *  単体審査と通知再送は再実行キー必須。連打・応答ロストの
    * やり直しが「別の担当者が更新しました」に化けないようにする。
    */
   it('requires an idempotency key for the individual review', async () => {
@@ -762,7 +786,7 @@ describe('NEN photo review', () => {
   });
 
   /*
-   * #931 N-309: 詳細で直した向きを版つきで保存する。見た目だけの「回す」
+   *  詳細で直した向きを版つきで保存する。見た目だけの「回す」
    * は、通したあと元の向きへ戻ってしまうため。
    */
   it('saves the corrected rotation with version and idempotency', async () => {
@@ -810,7 +834,7 @@ describe('NEN photo review', () => {
   });
 
   /*
-   * #931 N-308: 一覧は名前・ペット名・コメントの部分一致で絞れる。
+   *  一覧は名前・ペット名・コメントの部分一致で絞れる。
    * LIKE の記号（% _ \）は逃がして、検索語そのものにだけ当てる。
    */
   it('filters the photo list by owner, pet name and caption with escaped LIKE', async () => {

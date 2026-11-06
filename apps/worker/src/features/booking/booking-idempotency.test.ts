@@ -1,0 +1,265 @@
+import { describe, expect, test } from 'vitest';
+import {
+  completeIdempotencyResponse,
+  findIdempotencyResponse,
+  purgeExpiredIdempotency,
+  releaseReservedIdempotencyResponse,
+  reserveIdempotencyResponse,
+  saveIdempotencyResponse,
+} from './booking-idempotency.js';
+
+interface Row {
+  key: string;
+  line_account_id: string;
+  friend_id: string;
+  response_status: number;
+  response_body: string;
+  expires_at: string;
+}
+
+function memDB(): { db: D1Database; rows: Map<string, Row> } {
+  const rows = new Map<string, Row>();
+  const db = {
+    prepare(sql: string) {
+      let bound: unknown[] = [];
+      const stmt = {
+        bind(...args: unknown[]) {
+          bound = args;
+          return stmt;
+        },
+        async first<T>() {
+          if (sql.startsWith('SELECT')) {
+            // SQL の引数順: key、line_account_id、friend_id。
+            const [key, accountId, friendId] = bound as [string, string, string];
+            const row = rows.get(key);
+            if (!row) return null;
+            if (row.line_account_id !== accountId || row.friend_id !== friendId) return null;
+            return row as T;
+          }
+          return null;
+        },
+        async run() {
+          if (sql.startsWith('INSERT')) {
+            const isReservation = bound.length === 5;
+            const [key, accountId, friendId] = bound as [string, string, string];
+            const status = isReservation ? 202 : Number(bound[3]);
+            const body = String(bound[isReservation ? 3 : 4]);
+            const expiresAt = String(bound[isReservation ? 4 : 5]);
+            const inserted = !rows.has(key);
+            if (!rows.has(key)) {
+              rows.set(key, {
+                key,
+                line_account_id: accountId,
+                friend_id: friendId,
+                response_status: status,
+                response_body: body,
+                expires_at: expiresAt,
+              });
+            }
+            return { success: true, meta: { changes: inserted ? 1 : 0 } };
+          }
+          if (sql.startsWith('UPDATE')) {
+            const [status, body, key, accountId, friendId] = bound as [
+              number, string, string, string, string,
+            ];
+            const row = rows.get(key);
+            if (!row || row.line_account_id !== accountId || row.friend_id !== friendId) {
+              return { success: true, meta: { changes: 0 } };
+            }
+            row.response_status = status;
+            row.response_body = body;
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (sql.startsWith('DELETE')) {
+            if (bound.length === 4) {
+              const [key, accountId, friendId, bookingId] = bound as [string, string, string, string];
+              const row = rows.get(key);
+              const matches = row?.line_account_id === accountId
+                && row.friend_id === friendId
+                && row.response_status === 202
+                && (JSON.parse(row.response_body) as { booking_id?: string }).booking_id === bookingId;
+              if (matches) rows.delete(key);
+              return { success: true, meta: { changes: matches ? 1 : 0 } };
+            }
+            const cutoff = String(bound[0]);
+            let deleted = 0;
+            for (const [key, row] of rows) {
+              if (row.expires_at <= cutoff) {
+                rows.delete(key);
+                deleted++;
+              }
+            }
+            return { success: true, meta: { changes: deleted } };
+          }
+          return { success: true, meta: {} };
+        },
+        async all() {
+          return { results: [] };
+        },
+      };
+      return stmt;
+    },
+  } as unknown as D1Database;
+  return { db, rows };
+}
+
+describe('idempotency', () => {
+  test('同時予約は最初の1件だけキーを確保し、完了応答へ置き換える', async () => {
+    const { db } = memDB();
+    const params = {
+      key: 'admin-create-1',
+      lineAccountId: 'A1',
+      friendId: 'F1',
+      body: { error: 'request_in_progress', booking_id: 'B1' },
+      ttlMinutes: 5,
+      now: new Date('2026-05-08T00:00:00Z'),
+    };
+    await expect(reserveIdempotencyResponse(db, params)).resolves.toBe(true);
+    await expect(reserveIdempotencyResponse(db, params)).resolves.toBe(false);
+
+    await completeIdempotencyResponse(db, {
+      key: params.key,
+      lineAccountId: params.lineAccountId,
+      friendId: params.friendId,
+      status: 201,
+      body: { booking_id: 'B1', status: 'confirmed' },
+    });
+    await expect(findIdempotencyResponse(db, {
+      key: params.key,
+      lineAccountId: params.lineAccountId,
+      friendId: params.friendId,
+      now: new Date('2026-05-08T00:01:00Z'),
+    })).resolves.toEqual({
+      status: 201,
+      body: { booking_id: 'B1', status: 'confirmed' },
+    });
+  });
+
+  test('失敗した予約自身の202だけを解放し、別booking/accountの行は消さない', async () => {
+    const { db, rows } = memDB();
+    await reserveIdempotencyResponse(db, {
+      key: 'admin-failed', lineAccountId: 'A1', friendId: 'F1',
+      body: { error: 'request_in_progress', booking_id: 'B1' },
+      ttlMinutes: 5, now: new Date('2026-05-08T00:00:00Z'),
+    });
+    await releaseReservedIdempotencyResponse(db, {
+      key: 'admin-failed', lineAccountId: 'A1', friendId: 'F1', bookingId: 'other',
+    });
+    expect(rows.has('admin-failed')).toBe(true);
+    await releaseReservedIdempotencyResponse(db, {
+      key: 'admin-failed', lineAccountId: 'A2', friendId: 'F1', bookingId: 'B1',
+    });
+    expect(rows.has('admin-failed')).toBe(true);
+    await releaseReservedIdempotencyResponse(db, {
+      key: 'admin-failed', lineAccountId: 'A1', friendId: 'F1', bookingId: 'B1',
+    });
+    expect(rows.has('admin-failed')).toBe(false);
+  });
+
+  test('save → find returns same response', async () => {
+    const { db } = memDB();
+    await saveIdempotencyResponse(db, {
+      key: 'k1',
+      lineAccountId: 'A1',
+      friendId: 'F1',
+      status: 201,
+      body: { booking_id: 'B1' },
+      ttlMinutes: 5,
+      now: new Date('2026-05-08T00:00:00Z'),
+    });
+    const found = await findIdempotencyResponse(db, {
+      key: 'k1',
+      lineAccountId: 'A1',
+      friendId: 'F1',
+      now: new Date('2026-05-08T00:01:00Z'),
+    });
+    expect(found).toEqual({ status: 201, body: { booking_id: 'B1' } });
+  });
+
+  test('expired keys not returned', async () => {
+    const { db } = memDB();
+    await saveIdempotencyResponse(db, {
+      key: 'k1',
+      lineAccountId: 'A1',
+      friendId: 'F1',
+      status: 201,
+      body: { booking_id: 'B1' },
+      ttlMinutes: 5,
+      now: new Date('2026-05-08T00:00:00Z'),
+    });
+    const found = await findIdempotencyResponse(db, {
+      key: 'k1',
+      lineAccountId: 'A1',
+      friendId: 'F1',
+      now: new Date('2026-05-08T00:06:00Z'),
+    });
+    expect(found).toBeNull();
+  });
+
+  test('未保存 key は null', async () => {
+    const { db } = memDB();
+    expect(
+      await findIdempotencyResponse(db, {
+        key: 'nope',
+        lineAccountId: 'A1',
+        friendId: 'F1',
+        now: new Date(),
+      }),
+    ).toBeNull();
+  });
+
+  test('save: 同一 key の二度目は黙殺（最初の値を保持）', async () => {
+    const { db } = memDB();
+    await saveIdempotencyResponse(db, {
+      key: 'k1',
+      lineAccountId: 'A1',
+      friendId: 'F1',
+      status: 201,
+      body: { booking_id: 'first' },
+      ttlMinutes: 5,
+      now: new Date('2026-05-08T00:00:00Z'),
+    });
+    await saveIdempotencyResponse(db, {
+      key: 'k1',
+      lineAccountId: 'A1',
+      friendId: 'F1',
+      status: 409,
+      body: { error: 'second' },
+      ttlMinutes: 5,
+      now: new Date('2026-05-08T00:01:00Z'),
+    });
+    const found = await findIdempotencyResponse(db, {
+      key: 'k1',
+      lineAccountId: 'A1',
+      friendId: 'F1',
+      now: new Date('2026-05-08T00:02:00Z'),
+    });
+    expect(found?.body).toEqual({ booking_id: 'first' });
+  });
+
+  test('purgeExpired: 期限切れ行を削除して件数を返す', async () => {
+    const { db, rows } = memDB();
+    await saveIdempotencyResponse(db, {
+      key: 'old',
+      lineAccountId: 'A1',
+      friendId: 'F1',
+      status: 201,
+      body: {},
+      ttlMinutes: 5,
+      now: new Date('2026-05-08T00:00:00Z'),
+    });
+    await saveIdempotencyResponse(db, {
+      key: 'new',
+      lineAccountId: 'A1',
+      friendId: 'F1',
+      status: 201,
+      body: {},
+      ttlMinutes: 5,
+      now: new Date('2026-05-08T01:00:00Z'),
+    });
+    const purged = await purgeExpiredIdempotency(db, new Date('2026-05-08T00:30:00Z'));
+    expect(purged).toBe(1);
+    expect(rows.has('old')).toBe(false);
+    expect(rows.has('new')).toBe(true);
+  });
+});

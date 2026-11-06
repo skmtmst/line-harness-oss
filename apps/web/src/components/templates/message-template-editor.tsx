@@ -1,15 +1,24 @@
 'use client'
+import type { TemplateReferenceState, TemplateReferences, TemplatePreviewResult } from './template-preview-model'
+import { EMPTY_TEMPLATE_REFERENCES, previewDateValue, buildTemplatePreview, extractMessageUrls } from './template-preview-model'
+export { EMPTY_TEMPLATE_REFERENCES, previewDateValue, buildTemplatePreview, extractMessageUrls } from './template-preview-model'
+export type { TemplateReferenceState, TemplateReferences, TemplatePreviewResult } from './template-preview-model'
 
-import Link from 'next/link'
+import HqMessageBody from '@/components/shared/hq-message-inserts'
+import EntitySelect from '@/components/shared/entity-select'
+import Link from '@/components/shared/list-navigation'
 import { useRef, type ReactNode } from 'react'
-import { listInterpolations, validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
-import FlexPreviewComponent from '@/components/flex-preview'
+import { validateFlexContent } from '@line-crm/shared'
+import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import Button from '@/components/shared/button'
 import LinePreview from '@/components/shared/line-preview'
 import { Field, TextArea } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Select from '@/components/shared/select'
+import { formatNumber } from '@/lib/format'
+
+export const LEGACY_MESSAGE_NOTICE = 'この形は新しく作れません。新しく作るときはカルーセル・リッチメッセージを使ってください。'
 
 export const MESSAGE_TEMPLATE_TYPES = [
   { value: 'text', label: 'テキスト' },
@@ -18,12 +27,12 @@ export const MESSAGE_TEMPLATE_TYPES = [
 ] as const
 
 const DATE_OPTIONS = [
-  { value: '{{date}}', label: '月日と曜日（8月20日(水)）' },
-  { value: '{{date:ymd_w}}', label: '年月日と曜日（2026年8月20日(水)）' },
+  { value: '{{date}}', label: '月日と曜日（8月20日(木)）' },
+  { value: '{{date:ymd_w}}', label: '年月日と曜日（2026年8月20日(木)）' },
   { value: '{{date:md}}', label: '月日（8月20日）' },
   { value: '{{date:ymd}}', label: '年月日（2026年8月20日）' },
-  { value: '{{date:slash_md_w}}', label: '月日と曜日（8/20(水)）' },
-  { value: '{{date:slash_ymd_w}}', label: '年月日と曜日（2026/8/20(水)）' },
+  { value: '{{date:slash_md_w}}', label: '月日と曜日（8/20(木)）' },
+  { value: '{{date:slash_ymd_w}}', label: '年月日と曜日（2026/8/20(木)）' },
   { value: '{{date:slash_md}}', label: '月日（8/20）' },
   { value: '{{date:slash_ymd}}', label: '年月日（2026/8/20）' },
 ]
@@ -36,119 +45,6 @@ const OTHER_OPTIONS = [
   { value: '{{date+14}}', label: '配信日の14日後' },
   { value: '{{date+30}}', label: '配信日の30日後' },
 ]
-
-export type TemplateReferenceState = 'idle' | 'loading' | 'ready' | 'failed'
-
-export interface TemplateReferences {
-  friendFields: FriendField[]
-  commonVars: CommonVar[]
-}
-
-export const EMPTY_TEMPLATE_REFERENCES: TemplateReferences = { friendFields: [], commonVars: [] }
-
-function jstDateParts(date: Date): { year: number; month: number; day: number; weekday: string } {
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-  }).formatToParts(date)
-  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
-  return {
-    year: Number(value('year')),
-    month: Number(value('month')),
-    day: Number(value('day')),
-    weekday: value('weekday'),
-  }
-}
-
-export function previewDateValue(name: string, deliveredAt: Date): string | null {
-  const daysUntil = /^days_until:(\d{4})-(\d{2})-(\d{2})$/.exec(name)
-  if (daysUntil) {
-    const current = jstDateParts(deliveredAt)
-    const currentDay = Date.UTC(current.year, current.month - 1, current.day)
-    const targetDay = Date.UTC(Number(daysUntil[1]), Number(daysUntil[2]) - 1, Number(daysUntil[3]))
-    return String(Math.max(0, Math.round((targetDay - currentDay) / 86_400_000)))
-  }
-
-  const dateToken = /^date(?:([+-])(\d+))?(?::([a-z_]+))?$/.exec(name)
-  if (!dateToken) return null
-  const direction = dateToken[1] === '-' ? -1 : 1
-  const offset = Number(dateToken[2] ?? 0) * direction
-  const parts = jstDateParts(new Date(deliveredAt.getTime() + offset * 86_400_000))
-  const format = dateToken[3] ?? 'md_w'
-  const ymd = `${parts.year}年${parts.month}月${parts.day}日`
-  const md = `${parts.month}月${parts.day}日`
-  const slashYmd = `${parts.year}/${parts.month}/${parts.day}`
-  const slashMd = `${parts.month}/${parts.day}`
-  switch (format) {
-    case 'ymd_w': return `${ymd}(${parts.weekday})`
-    case 'ymd': return ymd
-    case 'md': return md
-    case 'slash_ymd_w': return `${slashYmd}(${parts.weekday})`
-    case 'slash_ymd': return slashYmd
-    case 'slash_md_w': return `${slashMd}(${parts.weekday})`
-    case 'slash_md': return slashMd
-    default: return `${md}(${parts.weekday})`
-  }
-}
-
-export interface TemplatePreviewResult {
-  content: string
-  unresolved: string[]
-}
-
-export function buildTemplatePreview(
-  content: string,
-  references: TemplateReferences,
-  deliveredAt = new Date(),
-): TemplatePreviewResult {
-  const fields = new Map(references.friendFields.map((field) => [field.fieldKey, field]))
-  const commonVars = new Map(references.commonVars.map((item) => [item.varKey, item]))
-  const unresolved = new Set<string>()
-  const interpolation = /\{\{\s*([^{}]+?)\s*\}\}/g
-
-  const preview = content.replace(interpolation, (token, rawName: string) => {
-    const name = rawName.trim()
-    if (name === 'name') return '山田 太郎'
-    if (name === 'liff_id') return '［LIFF ID］'
-
-    const fieldKey = /^field\.([a-z][a-z0-9_]*)$/.exec(name)?.[1]
-    if (fieldKey) {
-      const field = fields.get(fieldKey)
-      if (!field) {
-        unresolved.add(name)
-        return token
-      }
-      return field.defaultValue?.trim() || `［${field.name}の値］`
-    }
-
-    const varKey = /^var\.([a-z][a-z0-9_]*)$/.exec(name)?.[1]
-    if (varKey) {
-      const commonVar = commonVars.get(varKey)
-      if (!commonVar) {
-        unresolved.add(name)
-        return token
-      }
-      return commonVar.value || `［${commonVar.name}は空です］`
-    }
-
-    const dateValue = previewDateValue(name, deliveredAt)
-    if (dateValue !== null) return dateValue
-    unresolved.add(name)
-    return token
-  })
-
-  for (const name of listInterpolations(content)) {
-    if (preview.includes(`{{${name}}}`)) unresolved.add(name)
-  }
-  return { content: preview, unresolved: [...unresolved] }
-}
-
-export function extractMessageUrls(content: string): string[] {
-  return [...new Set(content.match(/https?:\/\/[^\s<>"'）)]+/g) ?? [])]
-}
 
 interface InsertControlsProps extends TemplateReferences {
   accountId: string | null
@@ -185,10 +81,10 @@ export function TemplateInsertControls({
       <div className="flex flex-wrap gap-2">
         <Button size="field" disabled={disabled} onClick={() => onInsert('{{name}}')}>名前</Button>
         {fieldsEnabled && (
-          <Select aria-label="友だち情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || friendFields.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' }, ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name }))]} />
+          <EntitySelect aria-label="友だち情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || friendFields.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' }, ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name }))]} />
         )}
         {varsEnabled && (
-          <Select aria-label="共通情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || commonVars.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' }, ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name }))]} />
+          <EntitySelect aria-label="共通情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || commonVars.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' }, ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name }))]} />
         )}
         <Select aria-label="配信日を差し込む" value="" disabled={disabled} onChange={(value) => choose(value)} options={[{ value: '', label: '配信日を選ぶ' }, ...DATE_OPTIONS]} />
         <Select aria-label="その他の差し込みを選ぶ" value="" disabled={disabled} onChange={(value) => choose(value)} options={[{ value: '', label: 'その他を選ぶ' }, ...OTHER_OPTIONS]} />
@@ -196,7 +92,7 @@ export function TemplateInsertControls({
           目標日
           <DateField aria-label="日数を数える目標日" value={targetDate} disabled={disabled} onChange={onTargetDateChange} className="w-48" />
         </span>
-        <Button size="field" disabled={disabled || !targetDate} onClick={() => onInsert(`{{days_until:${targetDate}}`)}>目標日までの日数</Button>
+        <Button size="field" disabled={disabled || !targetDate} onClick={() => onInsert(`{{days_until:${targetDate}}}`)}>目標日までの日数</Button>
       </div>
       <p className="text-ink-faint text-xs">フォーム回答は直接差し込めません。回答を保存した友だち情報を選んでください。</p>
       {accountLabel && <p className="text-ink-faint text-xs">候補は「{accountLabel}」の友だち情報と共通情報です。</p>}
@@ -209,7 +105,7 @@ export function TemplateInsertControls({
 export function TemplatePreviewMessage({ preview }: { preview: TemplatePreviewResult }) {
   return (
     <>
-      <p className="text-ink rounded-2xl bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">{preview.content || '（本文がまだありません）'}</p>
+      <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">{preview.content || '（本文がまだありません）'}</p>
       {preview.unresolved.length > 0 && (
         <div role="alert" className="mt-2 rounded-control bg-canvas px-3 py-2 text-xs text-danger">
           <p className="font-semibold">値を確認できない差し込みがあります</p>
@@ -237,13 +133,16 @@ export function MessageTemplateEditor({
   referenceUnavailableHint,
   disabled = false,
   typeOptions = MESSAGE_TEMPLATE_TYPES,
+  showTypeSelector = true,
   typeNote,
   bodyLabel,
   bodyAriaLabel,
   carouselHref,
   beforeType,
   afterType,
+  editorContent,
   footer,
+  hqInserts=false,
 }: {
   value: MessageTemplateEditorValue
   onChange: (next: MessageTemplateEditorValue) => void
@@ -256,46 +155,56 @@ export function MessageTemplateEditor({
   referenceUnavailableHint?: ReactNode
   disabled?: boolean
   typeOptions?: ReadonlyArray<{ value: string; label: string }>
+  /** 既存の中身の種類を保ったまま編集するときは切り替えを出さない。 */
+  showTypeSelector?: boolean
   typeNote?: ReactNode
   bodyLabel?: string
   bodyAriaLabel?: string
   carouselHref?: string
   beforeType?: ReactNode
   afterType?: ReactNode
+  editorContent?: ReactNode
+  hqInserts?: boolean
   footer?: ReactNode
 }) {
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
+  /*
+   * D007: 形の違う詳細応答が来ると、文字列でない中身がここへ届く。
+   * 描画の途中で落ちないよう、文字列以外は空として扱う。
+   */
+  const messageContent = typeof value.messageContent === 'string' ? value.messageContent : ''
   const insert = (token: string) => {
     const element = contentRef.current
-    const start = element?.selectionStart ?? value.messageContent.length
+    const start = element?.selectionStart ?? messageContent.length
     const end = element?.selectionEnd ?? start
-    const messageContent = value.messageContent.slice(0, start) + token + value.messageContent.slice(end)
-    onChange({ ...value, messageContent })
+    const nextContent = messageContent.slice(0, start) + token + messageContent.slice(end)
+    onChange({ ...value, messageContent: nextContent })
     if (element) requestAnimationFrame(() => {
       element.focus()
       element.setSelectionRange(start + token.length, start + token.length)
     })
   }
   const splitAt = 4500
-  const preview = buildTemplatePreview(value.messageContent, references)
-  const messageUrls = extractMessageUrls(value.messageContent)
+  const preview = buildTemplatePreview(messageContent, references)
+  const messageUrls = extractMessageUrls(messageContent)
   /*
    * R249: カード型は通常文のまま保存できない。入力の最中に
    * 形式の誤りをその場で知らせる（保存口も同じ判定で断る）。
    * 空のときはここでは何も言わない（必須チェックが受け持つ）。
    */
   const flexError = value.messageType === 'flex'
-    ? validateFlexContent('flex', value.messageContent)
+    ? validateFlexContent('flex', messageContent)
     : null
   const contentLabel = bodyLabel ?? (value.messageType === 'text' ? '本文' : 'メッセージ内容')
 
   return (
     <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
-      <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
+      <div data-design="Left" className="bg-canvas rounded-card content-card min-w-0 flex-1 space-y-5 border p-6">
         {beforeType}
-        <Field label="種類" htmlFor="tp-type" note={typeNote}>
+        {editorContent ?? <>
+        {showTypeSelector ? <Field label="種類" htmlFor="tp-type" note={typeNote}>
           <Select id="tp-type" aria-label="メッセージ形式" value={value.messageType} disabled={disabled} onChange={(messageType) => onChange({ ...value, messageType })} options={[...typeOptions]} />
-        </Field>
+        </Field> : null}
         {afterType}
         {/*
           U058: 本文の欄を先に出す。差し込みの操作群を上に置くと、
@@ -314,22 +223,23 @@ export function MessageTemplateEditor({
         >
           {value.messageType === 'flex' ? (
             <>
-              <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={14} value={value.messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y font-mono text-xs" />
+              <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={14} value={messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y font-mono text-xs" />
               {flexError ? (
                 <p role="alert" className="text-danger mt-1 text-xs">{flexError}このままでは保存できません。</p>
-              ) : !value.messageContent.trim() ? (
+              ) : !messageContent.trim() ? (
                 <p className="text-ink-faint mt-1 text-xs">バブルかカルーセルの形のJSONで書きます（例：{'{"type":"bubble", …}'}）。通常文のままでは保存できません。</p>
               ) : null}
             </>
           ) : (
-            <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={6} value={value.messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y" />
+            hqInserts ? <HqMessageBody value={messageContent} label={bodyAriaLabel} readOnly={disabled} onChange={messageContent=>onChange({...value,messageContent})}/> : (<TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={6} value={messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y" />)
           )}
-          <p className="text-ink-faint mt-1 text-xs tabular-nums">{value.messageContent.length} 文字{value.messageContent.length > splitAt ? ` ・ 約${splitAt}文字を超えると複数のメッセージに分割されます` : ' ・ 分割なし'}</p>
+          <p className="text-ink-faint mt-1 text-xs tabular-nums">{formatNumber(messageContent.length)} 文字{messageContent.length > splitAt ? `・約${splitAt}文字を超えると複数のメッセージに分割されます` : '・分割なし'}</p>
         </Field>
-        <div>
+        {!hqInserts && <div>
           <p className="text-ink-secondary mb-1 text-sm font-medium">差し込む</p>
           <TemplateInsertControls accountId={referenceAccountId} state={referenceState} accountLabel={referenceAccountLabel} targetDate={targetDate} disabled={disabled} unavailableHint={referenceUnavailableHint} onTargetDateChange={onTargetDateChange} friendFields={references.friendFields} commonVars={references.commonVars} onInsert={insert} />
-        </div>
+        </div>}
+        </>}
         <section aria-label="本文内のURL" className="border-hairline rounded-card border p-4">
           <div className="flex items-center justify-between gap-3"><p className="text-ink text-sm font-semibold">本文に入れたURLの扱い</p><span className="text-ink-faint text-xs font-semibold">短縮して、クリックを数える</span></div>
           <div className="border-hairline mt-3 overflow-hidden rounded-control border text-xs">
@@ -343,7 +253,7 @@ export function MessageTemplateEditor({
       <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-96">
         <LinePreview
           note={value.messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（山田 太郎さんの場合）'}
-          accountName="然-NEN-"
+          accountName="LINE公式アカウント"
         >
           {/*
             R249: カード型は詳細と同じカード表示にする。通常文の
@@ -356,12 +266,12 @@ export function MessageTemplateEditor({
                 <p className="text-danger text-xs font-semibold">{flexError}</p>
                 <p className="text-ink-secondary mt-1 text-xs">直すとここにカードが表示されます。このままでは保存できません。</p>
               </div>
-            ) : !value.messageContent.trim() ? (
+            ) : !messageContent.trim() ? (
               <div className="bg-canvas-sunken rounded-card p-3">
                 <p className="text-ink-faint text-xs">カードの内容を入力すると、ここに表示されます。</p>
               </div>
             ) : (
-              <div className="bg-canvas-sunken rounded-card p-3"><FlexPreviewComponent content={value.messageContent} /></div>
+              <div className="bg-canvas-sunken rounded-card p-3"><FlexPreviewComponent content={messageContent} /></div>
             )
           ) : (
             <>

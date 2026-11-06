@@ -1,9 +1,5 @@
-import {
-  assertTagNameAvailable,
-  getTagDeleteImpact,
-  type Tag,
-  type TagDeleteImpactReferences,
-} from './tags.js';
+import { assertTagNameAvailable, getTagDeleteImpact, tagRetroactiveEnqueueStatements } from './tags/index.js';
+import { type Tag, type TagDeleteImpactReferences } from './tags/types/index.js';
 import { jstNow } from './utils.js';
 
 export type TagLinkedAction = {
@@ -53,7 +49,8 @@ export class TagDefinitionError extends Error {
       | 'version_conflict'
       | 'automation_conflict'
       | 'folder_not_found'
-      | 'archived_readonly',
+      | 'archived_readonly'
+      | 'idempotency_conflict',
     message: string,
   ) {
     super(message);
@@ -125,7 +122,7 @@ async function getAutomation(
 
 /**
  * 対応マーク（`getSupportMarkById`）・回答フォーム（`getFormById`）と同じ
- * 形で archived を除外する（Issue #710）。既定では見えない。編集画面
+ * 形で archived を除外する。既定では見えない。編集画面
  * ・削除影響確認など、archived でも読む必要がある呼び出し側は
  * `includeArchived: true` を明示する。
  */
@@ -186,7 +183,7 @@ export async function createTagDefinition(
           mileage_reward, referral_mileage_reward, mileage_multiplier_bps,
           mileage_multiplier_priority, status, version, created_by, updated_by,
           created_at, updated_at)
-       VALUES (?, ?, ?, '#3B82F6', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, '#94a3b8', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 1, ?, ?, ?, ?)`,
     ).bind(
       tagId,
       input.name,
@@ -279,7 +276,7 @@ export type UpdateTagDefinitionInput = {
  * 挙動を決める設定（フォルダ・スター・手動付与可否・再付与方針・連動の
  * 有効無効・マイル・連動アクションの中身）は変えられない。
  *
- * 根拠（Issue #710 司令塔裁定）: タグには archived を active へ戻す口が
+ * 根拠: タグには archived を active へ戻す口が
  * 無い（`git grep` で確認済み）。戻せないのに表示名まで凍結すると、
  * 誤字が永久に残る。かといって挙動を決める設定まで自由に変えられると、
  * 「保管したのに中身が変わる」に気づけない状態になる
@@ -287,7 +284,7 @@ export type UpdateTagDefinitionInput = {
  * 編集自体ができない。タグだけ「気づかず開けて、気づかず保存できる」
  * 状態だった）。
  *
- * `PATCH /api/tags/:id` は `expectedVersion` 必須（#715）のため、
+ * `PATCH /api/tags/:id` は `expectedVersion` 必須のため、
  * この保護の迂回経路は塞がっている。
  */
 function assertArchivedTagUpdateAllowed(current: Tag, input: UpdateTagDefinitionInput): void {
@@ -316,13 +313,82 @@ function assertArchivedTagUpdateAllowed(current: Tag, input: UpdateTagDefinition
   }
 }
 
+export type UpdateTagDefinitionResult = {
+  detail: TagDefinitionDetail;
+  /** 遡及でキューへ積んだ件数（遡及なし・再送時は0）。 */
+  queued: number;
+  /** 同じ要求キーの再送で、保存済みの結果を返した。 */
+  replayed: boolean;
+};
+
+export type UpdateTagDefinitionOptions = {
+  /** 真のとき、タグの保存と遡及キューの投入を同じD1バッチで確定する（M955）。 */
+  enqueueRetroactive?: boolean;
+  /** 応答消失後の再送を受け付ける要求キー（M956）。省略時は従来どおり版だけで守る。 */
+  idempotencyKey?: string;
+};
+
+/**
+ * M956: 保存の要求内容の指紋。版・担当者・引き換え券（previewToken）は
+ * 含めない。同じ版での再送は同じ指紋になり、保存済みとして返せる。
+ */
+function tagUpdateFingerprint(
+  input: UpdateTagDefinitionInput,
+  enqueueRetroactive: boolean,
+): string {
+  return JSON.stringify({
+    name: input.name ?? null,
+    description: input.description ?? null,
+    groupId: input.groupId ?? null,
+    isStarred: input.isStarred ?? null,
+    manualAssignmentAllowed: input.manualAssignmentAllowed ?? null,
+    reapplyPolicy: input.reapplyPolicy ?? null,
+    linkedEnabled: input.linkedEnabled ?? null,
+    mileage: input.mileage ?? null,
+    automationId: input.automationId ?? null,
+    automationDraftVersion: input.automationDraftVersion ?? null,
+    actions: input.actions ?? null,
+    enqueueRetroactive,
+  });
+}
+
+function tagUpdateRequestRow(db: D1Database, tagId: string, idempotencyKey: string) {
+  return db.prepare(
+    `SELECT request_fingerprint, resulting_version
+       FROM tag_update_requests
+      WHERE tag_id = ? AND idempotency_key = ?`,
+  ).bind(tagId, idempotencyKey).first<{
+    request_fingerprint: string;
+    resulting_version: number;
+  }>();
+}
+
 export async function updateTagDefinition(
   db: D1Database,
   input: UpdateTagDefinitionInput,
-): Promise<TagDefinitionDetail> {
+  options: UpdateTagDefinitionOptions = {},
+): Promise<UpdateTagDefinitionResult> {
   // archived タグも読めないと、名前・説明の訂正すら受け付けられない。
   const current = await getTagDefinition(db, input.tagId, input.lineAccountId, { includeArchived: true });
   if (!current) throw new TagDefinitionError('not_found', 'タグが見つかりません');
+  const enqueueRetroactive = options.enqueueRetroactive === true;
+  const fingerprint = tagUpdateFingerprint(input, enqueueRetroactive);
+  if (options.idempotencyKey) {
+    const previous = await tagUpdateRequestRow(db, input.tagId, options.idempotencyKey);
+    if (previous) {
+      if (previous.request_fingerprint !== fingerprint) {
+        // 同じ要求キーに違う内容。誰かの更新ではなく自分の再送の取り違えなので、
+        // 「別の人が先に」とは言わず、読み直しを案内する。
+        throw new TagDefinitionError(
+          'idempotency_conflict',
+          'この保存は既に受け付けられています。最新の状態を読み直してから、もう一度お試しください',
+        );
+      }
+      const replayed = await getTagDefinition(db, input.tagId, input.lineAccountId, { includeArchived: true });
+      if (!replayed) throw new TagDefinitionError('not_found', 'タグが見つかりません');
+      return { detail: replayed, queued: 0, replayed: true };
+    }
+  }
   if (current.tag.version !== input.expectedVersion) {
     throw new TagDefinitionError('version_conflict', '別の人が先にタグを更新しました');
   }
@@ -507,11 +573,71 @@ export async function updateTagDefinition(
     ));
   }
 
-  const results = await db.batch(statements);
-  if ((results[0]?.meta?.changes ?? 0) !== 1) {
+  const enqueueStart = statements.length;
+  if (enqueueRetroactive) {
+    // M955: 遡及キューの投入も同じバッチへ積む。投入だけ落ちたら
+    // タグの保存も巻き戻り、「保存は確定・遡及は消失」にならない。
+    // バッチ内の順序は保存が先なので、投入文は更新後の値を見る。
+    statements.push(...tagRetroactiveEnqueueStatements(db, input.tagId, now));
+  }
+  if (options.idempotencyKey) {
+    // M956: 要求キーの行も同じバッチで確定する。本体より後に積むため、
+    // 外部キーのある環境でも制約に当たらない。同じキーの同時実行は
+    // UNIQUE 制約で負けた側だけ巻き戻り、二重に残らない。
+    statements.push(db.prepare(
+      `INSERT INTO tag_update_requests
+         (id, tag_id, idempotency_key, request_fingerprint,
+          resulting_version, response_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      input.tagId,
+      options.idempotencyKey,
+      fingerprint,
+      input.expectedVersion + 1,
+      JSON.stringify({ tagId: input.tagId, version: input.expectedVersion + 1 }),
+      now,
+    ));
+  }
+  const batchChanges = (results: unknown[], index: number) =>
+    (results[index] as unknown as { meta?: { changes?: number } } | undefined)?.meta?.changes ?? 0;
+  let results: unknown[];
+  try {
+    results = await db.batch(statements);
+  } catch (err) {
+    // 同時に同じ要求キーが確定した可能性がある。勝った側の結果に従い、
+    // 勝者がいなければ元の失敗をそのまま返す（握りつぶさない）。
+    if (options.idempotencyKey) {
+      const raced = await tagUpdateRequestRow(db, input.tagId, options.idempotencyKey).catch(() => null);
+      if (raced?.request_fingerprint === fingerprint) {
+        const replayed = await getTagDefinition(
+          db, input.tagId, input.lineAccountId, { includeArchived: true },
+        ).catch(() => null);
+        if (replayed) return { detail: replayed, queued: 0, replayed: true };
+      }
+    }
+    throw err;
+  }
+  if (batchChanges(results, 0) !== 1) {
+    if (options.idempotencyKey) {
+      const raced = await tagUpdateRequestRow(db, input.tagId, options.idempotencyKey).catch(() => null);
+      if (raced?.request_fingerprint === fingerprint) {
+        const replayed = await getTagDefinition(
+          db, input.tagId, input.lineAccountId, { includeArchived: true },
+        ).catch(() => null);
+        if (replayed) return { detail: replayed, queued: 0, replayed: true };
+      }
+    }
     throw new TagDefinitionError('version_conflict', '別の人が先にタグを更新しました');
   }
-  return (await getTagDefinition(db, input.tagId, input.lineAccountId, { includeArchived: true }))!;
+  const queued = enqueueRetroactive
+    ? batchChanges(results, enqueueStart + 1) + batchChanges(results, enqueueStart + 2)
+    : 0;
+  return {
+    detail: (await getTagDefinition(db, input.tagId, input.lineAccountId, { includeArchived: true }))!,
+    queued,
+    replayed: false,
+  };
 }
 
 const REFERENCE_META: Record<keyof TagDeleteImpactReferences, { kind: string; name: string; href: string }> = {
@@ -653,12 +779,12 @@ export async function archiveTag(
    *
    * 止めないと version が無意味に増え、operation_audit に「保管した」記録が
    * 実際の回数より多く残る。監査ログは、あとから読む人が事実を確かめるための
-   * ものなので、そこに嘘が入るのは他と害の種類が違う（#708）。
+   * ものなので、そこに嘘が入るのは他と害の種類が違う。
    *
    * 呼び出し側はこの code を「失敗」ではなく「もう着いている」として見せる。
-   * 望んだ状態には着いているので、利用者から見れば成功と同じ（#708 の裁定）。
+   * 望んだ状態には着いているので、利用者から見れば成功と同じ。
    * なお、この API の Idempotency-Key は受け取って検査するだけで、保存も
-   * 照合もしていない（冪等ではない）。#709 で扱う。
+   * 照合もしていない（冪等ではない）。
    */
   if (tag.status !== 'active') throw new TagArchiveError('already_archived');
   if (Number(tag.version) !== input.expectedVersion) throw new TagArchiveError('version_conflict');

@@ -1,5 +1,5 @@
 /**
- * N-065追補 (#654) の回帰テスト。3点の部分失敗を本物に近い形で固定する。
+ * 追補  の回帰テスト。3点の部分失敗を本物に近い形で固定する。
  *
  * - 取消と送信claimの原子化: live確認後に別接続で実claim・最終verifyが
  *   割り込んでも、取消を成功させず送信権を守る。
@@ -24,10 +24,10 @@ import {
   verifyClaimedRunBeforeSend,
 } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
-import type { Env } from '../index.js';
-import { processPendingCalendarDeleteOperations } from '../services/booking-calendar-sync.js';
+import type { Env } from '../worker-env.js';
+import { processPendingCalendarDeleteOperations } from '../features/booking/booking-calendar-sync.js';
 import { processReminderDeliveries } from '../services/reminder-delivery.js';
-import { processDueReminders } from '../services/booking-reminders.js';
+import { processDueReminders } from '../features/booking/booking-reminders.js';
 import { processDueEventReminders } from '../services/event-booking-reminders.js';
 
 const accountAccessMocks = vi.hoisted(() => ({
@@ -54,8 +54,8 @@ vi.mock('../services/availability.js', async (importOriginal) => ({
 
 const notifierMocks = vi.hoisted(() => ({ sendBookingNotification: vi.fn() }));
 // 送る側だけ差し替える。文面の組み立て（時刻・残り時間）は本物を使う。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   ...notifierMocks,
 }));
 
@@ -68,6 +68,7 @@ vi.mock('../services/liff-auth.js', () => liffAuthMocks);
 const { default: booking } = await import('./booking.js');
 const { default: events } = await import('./events.js');
 
+// 登録は配信予定より前に済んだ固定時刻で作る。取消・送信の交差を検査する。
 const BOOTSTRAP = readFileSync(
   join(process.cwd(), '../../packages/db/bootstrap.sql'),
   'utf8',
@@ -201,9 +202,7 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
     try {
       seedAccountsAndFriends(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       const pushMessageWithRequestId = vi.fn(async (..._args: unknown[]) => ({ requestId: 'REQ-1' }));
       let finalVerifyPassed = false;
@@ -263,10 +262,8 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
     try {
       seedAccountsAndFriends(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','EV-a'),
-               ('FR-2','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','EV-b');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','EV-a','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'),
+               ('FR-2','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','EV-b','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       // 1件だけに割込みclaimが入る。旧実装は行単位の除外で割込み行だけ残し、
       // 1件止まった成功で残るactive+claimedを抱えたまま成功した。
@@ -303,9 +300,7 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
     try {
       seedAccountsAndFriends(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       // 実時間で10分live (Z)。nowは+09:00書き。TEXT比較だと 'T04'<'T13' で
       // 見逃して取消成功する欠陥だった。epoch比較では投げる。
@@ -340,9 +335,7 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
     try {
       seedAccountsAndFriends(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       // nowを渡さない (本番と同じ既定: +09:00書きの現在時刻)。
       seedDeliveryRun(dual.raw1, {
@@ -365,9 +358,7 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
     try {
       seedAccountsAndFriends(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','B1','B1','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       // 再試行待ちと、切れた貸出の残り。liveは無い。
       seedDeliveryRun(dual.raw1, {
@@ -557,9 +548,7 @@ describe('Calendar台帳の初期DB失敗の永続回復 (#654-2)', () => {
     try {
       seedBookingCancelTarget(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-9','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-9','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       // 実時間でliveなZ lease。routeは既定now (+09:00書き) で比べる。
       seedDeliveryRun(dual.raw1, {
@@ -597,9 +586,7 @@ describe('Calendar台帳の初期DB失敗の永続回復 (#654-2)', () => {
     try {
       seedBookingCancelTarget(dual.raw1);
       dual.raw1.exec(`
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-9','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-9','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       seedDeliveryRun(dual.raw1, {
         id: 'RUN-9', friend_reminder_id: 'FR-9', reminder_step_id: 'rb-step',
@@ -629,7 +616,7 @@ describe('Calendar台帳の初期DB失敗の永続回復 (#654-2)', () => {
       ).get()).toEqual({ c: 0 });
       // 残留した古い queued 行があっても、確定ずみの予定は消さない。
       const { enqueueCalendarDeleteOperation } = await import(
-        '../services/booking-calendar-sync.js'
+        '../features/booking/booking-calendar-sync.js'
       );
       await enqueueCalendarDeleteOperation(dual.db1, { bookingId: 'RB9', lineAccountId: 'acc1' });
       const removed: string[] = [];
@@ -655,9 +642,9 @@ describe('Calendar台帳の初期DB失敗の永続回復 (#654-2)', () => {
       seedBookingCancelTarget(dual.raw1);
       // fence成功後の取消ずみ予約を想定する (実行側は取消ずみだけ消す)。
       dual.raw1.prepare(`UPDATE bookings SET status = 'cancelled' WHERE id = 'RB10'`).run();
-      // route側の接続で登録 (V6 fence成功後に残る想定)。
+      // route側の接続で登録 (fence成功後に残る想定)。
       const { enqueueCalendarDeleteOperation } = await import(
-        '../services/booking-calendar-sync.js'
+        '../features/booking/booking-calendar-sync.js'
       );
       await enqueueCalendarDeleteOperation(dual.db1, { bookingId: 'RB10', lineAccountId: 'acc1' });
       // cron側の別接続が回収する。外部削除は1回だけ。
@@ -736,7 +723,7 @@ describe('event却下再送の待機者再登録 (#654-3)', () => {
           env,
         );
       };
-      // 初回の待機者ジョブ登録だけ落とすDB失敗。V6修復は通る。
+      // 初回の待機者ジョブ登録だけ落とすDB失敗。修復は通る。
       let failOnce = true;
       const faulty = dual.faultyDb1((sql) =>
         sql.includes('INSERT OR IGNORE INTO event_waitlist_promotion_jobs') && failOnce
@@ -785,14 +772,42 @@ function seedLiffCancelTarget(raw: Database.Database) {
     INSERT INTO reminder_steps
       (id, reminder_id, offset_minutes, message_type, message_content)
     VALUES ('step-rule-event-9','rule-event-9',-60,'text','お待ちしています');
-    INSERT INTO friend_reminders
-      (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-    VALUES ('FR-l1','friend-9','rule-event-9','2099-06-01T10:00:00.000Z','active','event','eb-l1','eb-l1');
+    INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-l1','friend-9','rule-event-9','2099-06-01T10:00:00.000Z','active','event','eb-l1','eb-l1','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
     INSERT INTO event_booking_reminders
       (id, booking_id, kind, scheduled_at, status, retry_count)
     VALUES ('LEG-l1','eb-l1','day_before','2099-05-31T10:00:00.000Z','pending',0);
   `);
 }
+
+function confirmLegacyEventReminder(raw: Database.Database) {
+  // 承認で確定した予約の世代に対して通知予定を作る。
+  raw.exec(`UPDATE event_bookings SET status='confirmed' WHERE id='eb-l1';
+    UPDATE event_booking_reminders SET booking_version=(SELECT lock_version FROM event_bookings WHERE id='eb-l1')
+      WHERE id='LEG-l1' AND status='pending';`);
+}
+
+it('イベント: 確定ずみでも旧版の通知は送らず、現行版の予定を回収して一度だけ送る', async () => {
+  const dual = openDualDb();
+  try {
+    seedLiffCancelTarget(dual.raw1);
+    dual.raw1.exec(`UPDATE events SET reminder_day_before_enabled=1,reminder_hours_before=NULL WHERE id='ev-9';
+      UPDATE event_booking_reminders SET scheduled_at='2099-05-31T07:00:00.000Z' WHERE id='LEG-l1';
+      UPDATE event_bookings SET status='confirmed' WHERE id='eb-l1'`);
+    const sender=vi.fn(async()=>{});
+    const params={now:new Date('2099-05-31T08:00:00.000Z'),sender};
+    expect(await processDueEventReminders(dual.db1,params)).toEqual({sent:0,failed:0});
+    expect(sender).not.toHaveBeenCalled();
+    expect(dual.raw1.prepare("SELECT booking_version,status FROM event_booking_reminders WHERE id='LEG-l1'").get())
+      .toEqual({booking_version:1,status:'pending'});
+    expect(dual.raw1.prepare("SELECT booking_version,status FROM event_booking_reminders WHERE booking_id='eb-l1' AND booking_version=2").all())
+      .toEqual([{booking_version:2,status:'pending'}]);
+    params.now=new Date('2099-05-31T12:00:00.000Z');
+    expect(await processDueEventReminders(dual.db1,params)).toEqual({sent:1,failed:0});
+    expect(sender).toHaveBeenCalledTimes(1);
+    expect(await processDueEventReminders(dual.db1,params)).toEqual({sent:0,failed:0});
+    expect(sender).toHaveBeenCalledTimes(1);
+  } finally { dual.cleanup(); }
+});
 
 describe('管理者イベント取消の待機者再登録 (再審査-3)', () => {
   it('初回のenqueue失敗を同じ取消要求の再送で復旧する', async () => {
@@ -893,7 +908,7 @@ describe('LIFF本人取消の両分岐strict fence (再審査-2)', () => {
       expect(dual.raw1.prepare(
         `SELECT COUNT(*) AS c FROM event_waitlist_promotion_jobs WHERE source_key = 'booking:eb-l1:cancelled'`,
       ).get()).toEqual({ c: 1 });
-      // 再送: V6も待機者も冪等 (二重登録なし)。
+      // 再送: も待機者も冪等 (二重登録なし)。
       const again = await cancel(dual.db1);
       expect(again.status).toBe(200);
       expect(dual.raw1.prepare(
@@ -908,7 +923,7 @@ describe('LIFF本人取消の両分岐strict fence (再審査-2)', () => {
     const dual = openDualDb();
     try {
       seedLiffCancelTarget(dual.raw1);
-      // 取消ずみ・V6未処理の残り (初回の V6 失敗相当) + 新しい貸出。
+      // 取消ずみ・未処理の残り (初回の 失敗相当) + 新しい貸出。
       dual.raw1.prepare(`UPDATE event_bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend' WHERE id = 'eb-l1'`)
         .run('2026-09-02T00:00:00.000Z');
       seedDeliveryRun(dual.raw1, {
@@ -950,7 +965,7 @@ describe('LIFF本人取消の両分岐strict fence (再審査-2)', () => {
 });
 
 // =============================================================================
-// 自主検証 (再審査の指摘): 取消後の実配信・部分失敗の再実行・送達不明の扱い
+// 取消後の配信抑止、部分失敗の再試行、送達不明時の再送禁止を確かめる。
 //
 // ここは「緑の試験を信用しない」ための独立検証。db 関数の直接呼び出しでは
 // なく、実 route と実配信ループ (processReminderDeliveries) を通し、LINE へ
@@ -973,12 +988,10 @@ function makePushRecorder(
 
 const noPause = async () => undefined;
 
-/** V6 登録 + 旧表の未送信を1件ずつ足す (予約 RB9 きっかけ)。 */
+/** 登録 + 旧表の未送信を1件ずつ足す (予約 RB9 きっかけ)。 */
 function seedBookingReminderPair(raw: Database.Database) {
   raw.exec(`
-    INSERT INTO friend_reminders
-      (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-    VALUES ('FR-d1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9');
+    INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-d1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
     INSERT INTO booking_reminders (id, booking_id, kind, scheduled_at, status, retry_count)
     VALUES ('LEG-d1','RB9','day_before','2026-09-19T01:00:00.000Z','pending',0);
   `);
@@ -1096,14 +1109,14 @@ describe('取消後に外部送信が走らない (自主検証)', () => {
 });
 
 describe('部分失敗の再実行で二重送信にならない (自主検証)', () => {
-  it('送達不明の自動再試行は同じ再送キーで送り、実行行も配信済みも1件のまま', async () => {
+  it('確認済み429の自動再試行は同じ再送キーで送り、実行行も配信済みも1件のまま', async () => {
     const dual = openDualDb();
     try {
       seedBookingCancelTarget(dual.raw1);
       seedBookingReminderPair(dual.raw1);
-      // 1回目は送達不明 (タイムアウト)。外部に届いたかは分からない。
+      // 1回目は未受理を確認できる429。待機後だけ同じキーで再試行する。
       const { pushes, client } = makePushRecorder((call) => {
-        if (call === 1) throw new Error('network timeout');
+        if (call === 1) throw Object.assign(new Error('not accepted'), { status: 429 });
         return { requestId: 'REQ-2' };
       });
 
@@ -1146,6 +1159,22 @@ describe('部分失敗の再実行で二重送信にならない (自主検証)'
     } finally {
       dual.cleanup();
     }
+  });
+
+  it('送達不明は別の実行者でも再送せず、元の行とキーを照合待ちに保つ',async()=>{
+    const dual=openDualDb();
+    try {
+      seedBookingCancelTarget(dual.raw1);seedBookingReminderPair(dual.raw1);
+      const {pushes,client}=makePushRecorder(()=>{throw new Error('network timeout');});
+      const first=await processReminderDeliveries(dual.db1,client,{now:SEND_AT_PASSED,pause:noPause,resolveClient:async()=>client});
+      expect(first).toEqual({succeeded:0,skipped:0,retrying:0,failed:1,held:0});
+      const before=dual.raw1.prepare("SELECT id,line_retry_key,attempt_count,status,last_error_code FROM reminder_delivery_runs WHERE friend_reminder_id='FR-d1'").get();
+      expect(before).toMatchObject({status:'permanent_failed',last_error_code:'delivery_unknown',attempt_count:1});
+      await processReminderDeliveries(dual.db2,client,{now:new Date(SEND_AT_PASSED.getTime()+30*60_000),pause:noPause,resolveClient:async()=>client});
+      expect(pushes).toHaveLength(1);
+      expect(dual.raw1.prepare("SELECT id,line_retry_key,attempt_count,status,last_error_code FROM reminder_delivery_runs WHERE friend_reminder_id='FR-d1'").get()).toEqual(before);
+      expect(dual.raw1.prepare("SELECT COUNT(*) AS c FROM friend_reminder_deliveries WHERE friend_reminder_id='FR-d1'").get()).toEqual({c:0});
+    }finally{dual.cleanup();}
   });
 
   it('push後・確定前の取消は成功にせず、自動再送可能な状態にも混ぜない', async () => {
@@ -1195,7 +1224,7 @@ describe('途中失敗の後の再実行で全通知が取消へそろう (自�
     try {
       seedBookingCancelTarget(dual.raw1);
       seedBookingReminderPair(dual.raw1);
-      // 旧表の取消だけ1回落とす。V6 fence は通り、予約は取消ずみになる。
+      // 旧表の取消だけ1回落とす。fence は通り、予約は取消ずみになる。
       let failOnce = true;
       const faulty = dual.faultyDb1((sql) =>
         sql.includes('UPDATE booking_reminders') && failOnce ? (failOnce = false, true) : false,
@@ -1349,10 +1378,8 @@ describe('取消チェックの各層を個別に見張る (自主検証)', () =
         INSERT INTO reminder_steps (id, reminder_id, offset_minutes, message_type, message_content)
         VALUES ('rb2-step1','rb-rule2',-120,'text','1通目'),
                ('rb2-step2','rb-rule2',-60,'text','2通目');
-        INSERT INTO friend_reminders
-          (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id)
-        VALUES ('FR-d1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9'),
-               ('FR-d2','f2','rb-rule2','2026-09-20T01:00:00.000Z','active','booking','RB10','RB10');
+        INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-d1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'),
+               ('FR-d2','f2','rb-rule2','2026-09-20T01:00:00.000Z','active','booking','RB10','RB10','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
       `);
       // 1件目の送信が済んだら武装し、2件目の claim が成立した直後に
       // 別接続の取消を割り込ませる (claim と登録確認の間の窓)。
@@ -1399,7 +1426,7 @@ describe('取消チェックの各層を個別に見張る (自主検証)', () =
       // RB10 は confirmed かつ外部予定つき。409 で巻き戻した後の残留台帳や、
       // 再確定した予約に古い行が残った状況を表す。
       const { enqueueCalendarDeleteOperation } = await import(
-        '../services/booking-calendar-sync.js'
+        '../features/booking/booking-calendar-sync.js'
       );
       await enqueueCalendarDeleteOperation(dual.db1, { bookingId: 'RB10', lineAccountId: 'acc1' });
       const removed: string[] = [];
@@ -1430,7 +1457,7 @@ describe('取消チェックの各層を個別に見張る (自主検証)', () =
 // 旧表の cron は対象行を `b.status = 'confirmed'` 付きで一括読み出しするが、
 // この条件は読み出し時にしか効かない。読み出しから各行の送信までの間
 // (最大100件ループの全区間) に取消が確定しても止まらず、取消成功後に
-// 外部送信が起きていた。V6 の verifyClaimedRunBeforeSend と同じ形で、
+// 外部送信が起きていた。の verifyClaimedRunBeforeSend と同じ形で、
 // 送る直前に1文で予約 / イベント予約の状態を確かめる。
 // =============================================================================
 
@@ -1531,9 +1558,7 @@ describe('旧表の取消後送信 (自主検証)', () => {
     try {
       seedLiffCancelTarget(dual.raw1);
       // 旧表 cron の対象は確定ずみの予約。
-      dual.raw1.prepare(
-        `UPDATE event_bookings SET status = 'confirmed' WHERE id = 'eb-l1'`,
-      ).run();
+      confirmLegacyEventReminder(dual.raw1);
       const sentTo: string[] = [];
       let cancelStatus = 0;
       const cancelEvent = (db: D1Database) => {
@@ -1574,9 +1599,7 @@ describe('旧表の取消後送信 (自主検証)', () => {
     const dual = openDualDb();
     try {
       seedLiffCancelTarget(dual.raw1);
-      dual.raw1.prepare(
-        `UPDATE event_bookings SET status = 'confirmed' WHERE id = 'eb-l1'`,
-      ).run();
+      confirmLegacyEventReminder(dual.raw1);
       const sentTo: string[] = [];
       const result = await processDueEventReminders(dual.db1, {
         now: new Date('2099-05-31T12:00:00.000Z'),
@@ -1594,51 +1617,51 @@ describe('旧表の取消後送信 (自主検証)', () => {
     }
   });
 
-  it('イベント: 送信の失敗で retry_count を二重に数えない', async () => {
+  it('イベント: 結果不明は1回だけ数え、次の巡回で再送しない', async () => {
     const dual = openDualDb();
     try {
       seedLiffCancelTarget(dual.raw1);
-      dual.raw1.prepare(
-        `UPDATE event_bookings SET status = 'confirmed' WHERE id = 'eb-l1'`,
-      ).run();
+      confirmLegacyEventReminder(dual.raw1);
+      const sender = vi.fn(async () => { throw new Error('line down'); });
       const result = await processDueEventReminders(dual.db1, {
         now: new Date('2099-05-31T12:00:00.000Z'),
-        sender: async () => {
-          throw new Error('line down');
-        },
+        sender,
       });
       expect(result).toEqual({ sent: 0, failed: 1 });
       // fence の claim で1回だけ加算する (失敗記録で二重に足さない)。
       expect(dual.raw1.prepare(
         `SELECT status, retry_count FROM event_booking_reminders WHERE id = 'LEG-l1'`,
-      ).get()).toEqual({ status: 'failed', retry_count: 1 });
+      ).get()).toEqual({ status: 'failed_permanent', retry_count: 1 });
+      expect(await processDueEventReminders(dual.db1, { now: new Date('2099-05-31T12:01:00.000Z'), sender })).toEqual({ sent: 0, failed: 0 });
+      expect(sender).toHaveBeenCalledTimes(1);
     } finally {
       dual.cleanup();
     }
   });
 
-  it('予約: 送信の失敗で retry_count を二重に数えない', async () => {
+  it('予約: 結果不明は1回だけ数え、次の巡回で再送しない', async () => {
     const dual = openDualDb();
     try {
       seedBookingCancelTarget(dual.raw1);
       seedLegacyBookingReminder(dual.raw1);
+      const sender = vi.fn(async () => { throw new Error('line down'); });
       const result = await processDueReminders(dual.db1, {
         now: LEGACY_NOW,
-        sender: async () => {
-          throw new Error('line down');
-        },
+        sender,
       });
       expect(result).toEqual({ sent: 0, failed: 1 });
       expect(dual.raw1.prepare(
         `SELECT status, retry_count FROM booking_reminders WHERE id = 'LEG-b1'`,
-      ).get()).toEqual({ status: 'failed', retry_count: 1 });
+      ).get()).toEqual({ status: 'failed_permanent', retry_count: 1 });
+      expect(await processDueReminders(dual.db1, { now: new Date(LEGACY_NOW.getTime() + 60_000), sender })).toEqual({ sent: 0, failed: 0 });
+      expect(sender).toHaveBeenCalledTimes(1);
     } finally {
       dual.cleanup();
     }
   });
 });
 
-// 取消 route は「予約の状態を先に倒し、旧表の取消は V6 fence 成功の後」に
+// 取消 route は「予約の状態を先に倒し、旧表の取消は fence 成功の後」に
 // 置いている (409 で完全 rollback するため)。その間に旧表 cron の送信が
 // 挟まると、旧表の行はまだ pending のままなので、行の状態だけでは止まらない。
 // 送信直前に予約そのものの状態を見ていることを、この2件が見張る。
@@ -1690,9 +1713,7 @@ describe('旧表の送信直前に予約状態そのものを見る (自主検�
     const dual = openDualDb();
     try {
       seedLiffCancelTarget(dual.raw1);
-      dual.raw1.prepare(
-        `UPDATE event_bookings SET status = 'confirmed' WHERE id = 'eb-l1'`,
-      ).run();
+      confirmLegacyEventReminder(dual.raw1);
       let failOnce = true;
       const faultyRoute = dual.faultyDb2((sql) =>
         sql.includes('UPDATE event_booking_reminders') && failOnce
@@ -1709,6 +1730,9 @@ describe('旧表の送信直前に予約状態そのものを見る (自主検�
           { method: 'POST' },
           env,
         )).status;
+        expect(dual.raw1.prepare(
+          `SELECT status, sent_at, retry_count FROM event_booking_reminders WHERE id='LEG-l1'`,
+        ).get()).toEqual({ status:'pending',sent_at:null,retry_count:0 });
       });
 
       const result = await processDueEventReminders(hooked, {
@@ -1723,12 +1747,12 @@ describe('旧表の送信直前に予約状態そのものを見る (自主検�
         .toEqual({ status: 'cancelled' });
       expect(dual.raw1.prepare(
         `SELECT status FROM event_booking_reminders WHERE id = 'LEG-l1'`,
-      ).get()).toEqual({ status: 'pending' });
+      ).get()).toEqual({ status: 'cancelled' });
       expect(sentTo).toEqual([]);
       expect(result).toEqual({ sent: 0, failed: 0 });
       expect(dual.raw1.prepare(
         `SELECT status, sent_at, retry_count FROM event_booking_reminders WHERE id = 'LEG-l1'`,
-      ).get()).toEqual({ status: 'pending', sent_at: null, retry_count: 0 });
+      ).get()).toEqual({ status: 'cancelled', sent_at: null, retry_count: 0 });
     } finally {
       dual.cleanup();
     }
@@ -1736,7 +1760,7 @@ describe('旧表の送信直前に予約状態そのものを見る (自主検�
 });
 
 // =============================================================================
-// 恒久失敗の打ち切り (再審査-退行)
+// 恒久失敗の打ち切り
 //
 // 旧表 cron の due SELECT は LIMIT 100 で ORDER BY が無い。直らない行を
 // failed のまま溜めると、正常なリマインダが押し出されて送られなくなる。
@@ -1792,13 +1816,12 @@ describe('旧表の恒久失敗を上限で打ち切る (自主検証)', () => {
     const dual = openDualDb();
     try {
       seedLiffCancelTarget(dual.raw1);
-      dual.raw1.prepare(
-        `UPDATE event_bookings SET status = 'confirmed' WHERE id = 'eb-l1'`,
-      ).run();
+      confirmLegacyEventReminder(dual.raw1);
       breakAccountCredential(dual.raw1, 'account-9');
       const sentTo: string[] = [];
+      let attemptTime=Date.parse('2099-05-31T12:00:00.000Z');
       const run = () => processDueEventReminders(dual.db1, {
-        now: new Date('2099-05-31T12:00:00.000Z'),
+        now: new Date((attemptTime+=60_000)),
         sender: async (p) => {
           sentTo.push(p.toLineUserId);
         },

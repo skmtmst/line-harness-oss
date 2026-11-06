@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getFormSubmissions, getFormSubmissionsPage } from '../src/forms.js';
+import { getFormSubmissions, getFormSubmissionsPage } from '../src/forms/index.js';
 import { MAX_LIST_LIMIT } from '../src/utils.js';
 
 describe('getFormSubmissionsPage', () => {
@@ -66,7 +66,7 @@ describe('getFormSubmissionsPage', () => {
   });
 
   /*
-   * #722: 天井は残す。呼び出し側が渡し忘れても、渡しすぎても、
+   * 天井は残す。呼び出し側が渡し忘れても、渡しすぎても、
    * DB ヘルパを直接呼んだ一覧が無制限にならないこと。
    */
   it('falls back to MAX_LIST_LIMIT when no limit is given, and clamps a larger one', async () => {

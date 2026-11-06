@@ -1,0 +1,41 @@
+import type { NotificationCenterItem } from '@line-crm/shared'
+import { dashboardNotificationDestination } from '@/components/dashboard/notification-summary'
+import { isLineTokenNotification } from './tabs'
+
+/** 行き先を決めるのに要る、見ている人の情報。 */
+export type NotificationDestinationContext = {
+  /** 見ている LINE アカウント。鍵の知らせはそのアカウントの設定へ送る。 */
+  accountId?: string | null
+  /** 鍵を入れ直せる人（オーナー・管理者）。権限が分からない間は false。 */
+  canManage?: boolean
+  hqOrigin?: boolean
+}
+
+/*
+ * 通知の行き先。ダッシュボードの通知パネルと同じ判定（dashboardNotificationDestination）に、
+ * EC連携の通知（`ec.` / `ec_` で始まる種類）だけ EC連携の画面へ送る分を足す。
+ * 今までは EC連携の通知も「お知らせ一覧」へ行っていた（直す場所へ1回で行けなかった）。
+ * LINE の鍵の知らせ（`line_token_`）は、そのアカウントの接続の設定（鍵の差し替え）へ送る。
+ */
+export function notificationDestination(item: NotificationCenterItem, context: NotificationDestinationContext = {}): string {
+  if (isLineTokenNotification(item)) {
+    return context.accountId ? `/accounts/detail?id=${encodeURIComponent(context.accountId)}` : '/accounts'
+  }
+  if (item.eventType.startsWith('ec.') || item.eventType.startsWith('ec_')) return '/ec-commerce'
+  const destination = dashboardNotificationDestination(item)
+  return context.hqOrigin && (destination === '/updates' || destination === '/emergency') ? `${destination}?from=hq` : destination
+}
+
+/** 行の右に出す「どこへ移るか」の言葉（「EC連携を開く →」など）。 */
+export function notificationLinkLabel(item: NotificationCenterItem, context: NotificationDestinationContext = {}): string {
+  // 鍵を入れ直せない人には「更新する」を出さない（行き先の画面に差し替えのボタンが無い）。
+  if (isLineTokenNotification(item)) return context.canManage ? '更新する' : 'アカウントを見る'
+  const to = notificationDestination(item, context)
+  if (to.startsWith('/ec-commerce')) return 'EC連携を開く'
+  if (to.startsWith('/emergency')) return '運用状態を開く'
+  if (to.startsWith('/broadcasts')) return '配信を開く'
+  if (to.startsWith('/settings/manual-links')) return 'マニュアルの表を開く'
+  // メンテナンスの予告は版の履歴ではないので「詳細を見る」（行き先は同じお知らせ一覧）。
+  if (to.startsWith('/updates') && item.category === 'update' && !item.eventType.includes('maintenance')) return '更新履歴を見る'
+  return '詳細を見る'
+}

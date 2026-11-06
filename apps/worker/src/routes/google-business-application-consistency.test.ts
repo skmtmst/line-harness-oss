@@ -4,39 +4,29 @@
  * Google Business Profile API の利用審査では、申請文・公開ページ・デモ動画・本番実装が
  * 一致している必要がある（審査のために事実と異なる説明は書かない）。
  * ここでは「文書だけ直して実装が置き去りになる」ことと、その逆を防ぐため、
- * ソースと文書を読み比べて次を固定する。
+ * 文書と実装を突き合わせて次を固定する。
  *
  * 1. 本番コードが呼ぶGoogle APIは、すべて機能対応表に載っている。
- * 2. Googleへ送信する4機能は、明示確認（confirmed）と役割（owner/admin）を必ず要求する。
- * 3. 裏側の定期再同期は読み取り関数しか読み込まない（自動書き込みが混ざらない）。
- * 4. 「提供しない」と書いた機能のコードが存在しない。
- * 5. 公開ページ（privacy/terms/トップ）の記載が実装の定数と一致している。
- * 6. Googleルートはすべてログインセッション限定（APIキーからの間接利用を遮断）。
+ * 2. 裏側の定期再同期は読み取り関数しか読み込まない（自動書き込みが混ざらない）。
+ * 3. 「提供しない」と書いた機能のコードが存在しない。
+ * 4. 公開ページ（privacy/terms/トップ）が組み立てる本文が実装の定数と一致している。
  *
- * 外部通信はしない。ソースと文書を読むだけのテスト。
+ * 書き込み4機能の明示確認と役割、ログインセッション限定、許可の確かめは、
+ * 口を実際に叩く restaurant-google*.test.ts が持つ。外部通信はしない。
  */
 import { describe, expect, it } from 'vitest';
+import { buildAuthorizeUrl, GOOGLE_BUSINESS_SCOPES } from '../services/google-business.js';
+import { GOOGLE_CONTENT_RETENTION_LIMIT_DAYS, GOOGLE_CONTENT_PURGE_AFTER_DAYS } from '../services/google-business-retention.js';
+
+const authorization = () => new URL(buildAuthorizeUrl({
+  clientId: 'fixture', redirectUri: 'https://example.test/callback', state: 'state', codeChallenge: 'challenge',
+}));
 
 const GOOGLE_SERVICE_FILES = [
   'google-business.ts',
   'google-business-profile.ts',
   'google-business-posts.ts',
   'google-business-performance.ts',
-] as const;
-
-/** Googleへ送信する4機能（ルートファイル、ルートの一部、送信時に出すエラーコード）。 */
-const WRITE_ROUTES = [
-  { file: 'restaurant-google.ts', path: "/api/restaurant-test/google/reviews/:id/reply", label: '口コミ返信' },
-  { file: 'restaurant-google-profile.ts', path: "/api/restaurant-test/google/changes/:id/send", label: '店舗情報・営業時間・写真の送信' },
-  { file: 'restaurant-google-posts.ts', path: "/api/restaurant-test/google/posts/:id/publish", label: '投稿の公開' },
-  { file: 'restaurant-google-posts.ts', path: "/api/restaurant-test/google/posts/:id/remove", label: '投稿の削除' },
-] as const;
-
-const GOOGLE_ROUTE_FILES = [
-  'restaurant-google.ts',
-  'restaurant-google-profile.ts',
-  'restaurant-google-posts.ts',
-  'restaurant-google-performance.ts',
 ] as const;
 
 async function readRepoFile(relativeToRoot: string): Promise<string> {
@@ -47,11 +37,21 @@ async function readRepoFile(relativeToRoot: string): Promise<string> {
   return readFileSync(`${here}../../../../${relativeToRoot}`, 'utf8');
 }
 
-async function readRouteFile(file: string): Promise<string> {
-  const { readFileSync } = await import('node:fs');
-  const { fileURLToPath } = await import('node:url');
-  const here = fileURLToPath(new URL('.', import.meta.url));
-  return readFileSync(`${here}${file}`, 'utf8');
+type MusuboSite = {
+  config: unknown;
+  legalBody: (kind: string, config: unknown, production: boolean) => string;
+  home: (config: unknown, production: boolean) => string;
+};
+
+/** 公開サイト（sites/musubo）の組み立て関数。別アプリなので Worker の型検査には含めない。 */
+async function loadMusuboSite(): Promise<MusuboSite> {
+  const root = new URL('../../../../sites/musubo/', import.meta.url);
+  const [{ default: config }, { legalBody }, { home }] = await Promise.all([
+    import(new URL('site.config.mjs', root).pathname),
+    import(new URL('src/legal.mjs', root).pathname),
+    import(new URL('src/home.mjs', root).pathname),
+  ]);
+  return { config, legalBody, home };
 }
 
 async function readServiceFile(file: string): Promise<string> {
@@ -85,12 +85,9 @@ describe('申請文と本番実装の一致（受入条件11）', () => {
 
   it('使用スコープは business.manage と openid / email だけ', async () => {
     const source = await readServiceFile('google-business.ts');
-    const start = source.indexOf('export const GOOGLE_BUSINESS_SCOPES');
-    expect(start).toBeGreaterThan(-1);
-    const scopeBlock = source.slice(start, source.indexOf('] as const;', start));
-    expect(scopeBlock).toContain('https://www.googleapis.com/auth/business.manage');
-    expect(scopeBlock).toContain("'openid'");
-    expect(scopeBlock).toContain("'email'");
+    const scopes = authorization().searchParams.get('scope')!.split(' ');
+    expect(scopes).toEqual([...GOOGLE_BUSINESS_SCOPES]);
+    expect(scopes).toEqual(['https://www.googleapis.com/auth/business.manage', 'openid', 'email']);
     // 読み取り専用スコープは存在しないため、ほかのGoogleスコープを増やしていないことを固定する。
     const extraScopes = [...source.matchAll(/https:\/\/www\.googleapis\.com\/auth\/[A-Za-z0-9._\-]+/g)]
       .map((match) => match[0])
@@ -99,12 +96,7 @@ describe('申請文と本番実装の一致（受入条件11）', () => {
   });
 
   it('認可URLに include_granted_scopes を付けない', async () => {
-    // Googleビジネス用とSheets用で同じOAuthクライアントを使う環境があるため、
-    // 付けると「以前そのクライアントへ許可した別のスコープ」まで含んだトークンが返り、
-    // 「business.manage / openid / email だけを使う」という申請文と実装が食い違う。
-    // 文中の説明（コメント）は残したいので、実際に付与するときの文字列リテラルだけを見る。
-    const source = await readServiceFile('google-business.ts');
-    expect(source).not.toContain("'include_granted_scopes'");
+    expect(authorization().searchParams.has('include_granted_scopes')).toBe(false);
   });
 
   it('審査対象クライアントにSheetsのコールバックURLを登録させない手順になっている', async () => {
@@ -139,36 +131,17 @@ describe('申請文と本番実装の一致（受入条件11）', () => {
     expect(todo).toContain('https://www.googleapis.com/auth/spreadsheets');
   });
 
-  it('接続と更新で business.manage の許可を検証する', async () => {
-    // 同意画面では権限ごとにチェックを外せる（granular consent）。
-    // 外したまま接続できてしまうと「連携済みなのに全部403」になるため、トークン取得時に止める。
-    const service = await readServiceFile('google-business.ts');
-    const start = service.indexOf('export const GOOGLE_BUSINESS_REQUIRED_SCOPES');
-    expect(start).toBeGreaterThan(-1);
-    const requiredBlock = service.slice(start, service.indexOf('] as const;', start));
-    expect(requiredBlock).toContain('https://www.googleapis.com/auth/business.manage');
-    expect(service).toContain('export function assertGrantedScopes');
-
-    const route = await readRouteFile('restaurant-google.ts');
-    // 認可コードの交換（接続時）と、更新トークンでの再取得（連携後）の両方で検証する。
-    const usages = [...route.matchAll(/requiredScopes: GOOGLE_BUSINESS_REQUIRED_SCOPES/g)];
-    expect(usages.length).toBeGreaterThanOrEqual(2);
-  });
+  // 接続と更新で business.manage の許可を確かめることは、口を実際に叩いて見る
+  // （restaurant-google.test.ts の「business.manage を外した同意」「business.manage だけ取り消された」）。
 });
 
-describe('書き込みは必ず明示確認と役割を要求する（受入条件5・9）', () => {
-  for (const route of WRITE_ROUTES) {
-    it(`${route.label} は confirmed と owner/admin を要求する`, async () => {
-      const source = await readRouteFile(route.file);
-      const index = source.indexOf(`'${route.path}'`);
-      expect(index, `${route.path} のルート定義が見つからない`).toBeGreaterThan(-1);
-      const block = source.slice(index, index + 1200);
-      expect(block).toContain("requireRole('owner', 'admin')");
-      expect(block).toContain('confirmed !== true');
-      expect(block).toContain('confirmation_required');
-    });
-  }
-
+/*
+ * 書き込み4つ（口コミ返信・店舗情報の送信・投稿の公開・投稿の削除）が明示確認と
+ * owner/admin を要求することは、口を実際に叩いて見る。
+ * 確認なし→400 confirmation_required：restaurant-google.test.ts・restaurant-google-posts.test.ts・
+ * restaurant-google-profile.test.ts。担当者→403：同じ3ファイルの権限の試験。
+ */
+describe('定期処理は自動で書き込まない（受入条件5・9）', () => {
   it('定期再同期は読み取り関数しか読み込まない', async () => {
     const source = await readServiceFile('google-business-resync.ts');
     const imports = source.slice(0, source.indexOf('const HOURLY_STALE_MS'));
@@ -182,10 +155,8 @@ describe('書き込みは必ず明示確認と役割を要求する（受入条�
     ]) {
       expect(imports, `${writeFn} が定期処理に読み込まれている`).not.toContain(writeFn);
     }
-    // 読み取り3種は読み込まれている（空のテストにならないよう固定）。
-    expect(imports).toContain('listAllReviews');
-    expect(imports).toContain('listLocalPosts');
-    expect(imports).toContain('fetchDailyMetrics');
+    // 読み取り3種（口コミ・投稿・指標）を実際に呼んで取り込むことは
+    // google-business-resync.test.ts が Google への通信を見て確かめる。
   });
 });
 
@@ -203,33 +174,23 @@ describe('今回提供しない機能のコードが存在しない（タスク2
 
   it('口コミ返信の削除と投稿の更新を行わない', async () => {
     const reviews = await readServiceFile('google-business.ts');
-    // 返信はPUT（作成・修正）のみ。DELETE は使わない。
-    const replyCall = reviews.slice(reviews.indexOf('export async function updateReviewReply'));
-    expect(replyCall).toContain("method: 'PUT'");
-    const replyMethods = [...reviews.matchAll(/\/reply`,\s*\{\s*\n\s*method: '([A-Z]+)'/g)].map((m) => m[1]);
-    expect(replyMethods).toEqual(['PUT']);
+    // 返信はPUT（作成・修正）のみ。PUT で送ることは google-business.test.ts が通信を見て確かめる。
+    expect(reviews).not.toMatch(/\/reply`,\s*\{\s*\n\s*method: '(?!PUT')[A-Z]+'/);
     expect(reviews).not.toContain("/reply`, { method: 'DELETE' }");
 
+    // 投稿は作成(POST)と削除(DELETE)だけ。どちらも restaurant-google-posts.test.ts が通信を見て確かめる。
     const posts = await readServiceFile('google-business-posts.ts');
-    const postMethods = [...posts.matchAll(/method: '([A-Z]+)'/g)].map((m) => m[1]).sort();
-    expect(postMethods).toEqual(['DELETE', 'POST']);
+    expect(posts).not.toMatch(/method: '(?:PATCH|PUT)'/);
   });
 
-  it('Googleルートはログインセッション限定（外部プログラムからの間接利用を遮断）', async () => {
-    for (const file of GOOGLE_ROUTE_FILES) {
-      const source = await readRouteFile(file);
-      expect(source, `${file} に googleAccessGuard がない`).toContain(
-        "use('/api/restaurant-test/google/*', googleAccessGuard)",
-      );
-    }
-  });
+  // Googleルートがログインセッション限定であることは、4ファイルを1つずつ載せて
+  // APIキーで叩いて見る（restaurant-google.test.ts の「だけを載せても、APIキーは403で止まる」）。
 });
 
 describe('保存期間の実装と公開文書が一致している（受入条件7）', () => {
   it('削除は30暦日の上限より手前で動く', async () => {
-    const source = await readServiceFile('google-business-retention.ts');
-    const limit = Number(/GOOGLE_CONTENT_RETENTION_LIMIT_DAYS = (\d+)/.exec(source)?.[1]);
-    const purge = Number(/GOOGLE_CONTENT_PURGE_AFTER_DAYS = (\d+)/.exec(source)?.[1]);
+    const limit = GOOGLE_CONTENT_RETENTION_LIMIT_DAYS;
+    const purge = GOOGLE_CONTENT_PURGE_AFTER_DAYS;
     expect(Number.isInteger(limit)).toBe(true);
     expect(Number.isInteger(purge)).toBe(true);
     expect(limit).toBeLessThanOrEqual(30);
@@ -237,7 +198,9 @@ describe('保存期間の実装と公開文書が一致している（受入条�
   });
 
   it('プライバシーポリシーと利用規約が実装どおりの説明になっている', async () => {
-    const legal = await readRepoFile('sites/musubo/src/legal.mjs');
+    // 公開サイトが実際に組み立てる2ページの本文で見る（本番の組み立て）。
+    const site = await loadMusuboSite();
+    const legal = ['privacy', 'terms'].map((kind) => site.legalBody(kind, site.config, true)).join('\n');
     for (const phrase of [
       '28日',
       '30暦日',
@@ -252,8 +215,8 @@ describe('保存期間の実装と公開文書が一致している（受入条�
   });
 
   it('トップページの連携説明が自動送信しないことを明記している', async () => {
-    const home = await readRepoFile('sites/musubo/src/home.mjs');
-    expect(home).toContain('自動で送ることはありません');
+    const site = await loadMusuboSite();
+    expect(site.home(site.config, true)).toContain('自動で送ることはありません');
   });
 
   it('保存期間の日数が機能対応表にも書かれている', async () => {

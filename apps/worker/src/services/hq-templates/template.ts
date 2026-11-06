@@ -1,3 +1,12 @@
+import type {MessageTemplateSourceMediaBinding} from './message-media-binding.js';
+export type {MessageTemplateSourceMediaBinding} from './message-media-binding.js';
+import type { MessageTemplateTargetSnapshot } from './message-target-snapshot.js';
+export type { MessageTemplateTargetSnapshot } from './message-target-snapshot.js';
+import { parseBroadcastMessageParts } from '../../features/broadcasts/broadcast-message-set/index.js';
+import { parseHqMessageCard, composeHqMessageCard, validateImagemapMessage, type HqMessageCard, isLiffActionKind, collectLiffActionLocators, replaceLiffActionLocators } from '@line-crm/shared';
+import { type MessageTemplateDefinition, type MessageTemplateMediaDefinition, validateAssetPayload, validateTapExtrasTree, tapExtrasError, isBroadcastAssetKind, convertBroadcastAsset, templateKind } from '@line-crm/shared';
+
+import { HQ_MEDIA_MAX_BYTES, type HqMediaStreamSource } from '../hq-media-stream.js';
 import type { HqTemplateBinding, HqTemplateStatement } from '@line-crm/db';
 import {
   VERSION_CONFLICT_MESSAGE,
@@ -11,8 +20,7 @@ import {
   type HqTemplateStoreAtomicCommitPlan,
 } from './contract.js';
 
-// The current commit plan retains copied bytes in memory. Keep enough headroom
-// for the Worker, SHA-256 buffers and one bounded streaming read.
+// 複製バイトを確定までメモリに持つため、Worker 本体・ハッシュ・制限付き読込の余裕を残す。
 export const MESSAGE_TEMPLATE_MEDIA_MAX_BYTES = 8 * 1024 * 1024;
 export const MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES = 16 * 1024 * 1024;
 
@@ -22,81 +30,18 @@ export class TemplateHqTemplateError extends Error {
   }
 }
 
-export type MessageTemplateMediaDefinition = Readonly<{
-  id: string;
-  kind: 'image' | 'video' | 'audio' | 'file';
-  filename: string;
-  mimeType: string;
-  sizeBytes: number;
-  width: number | null;
-  height: number | null;
-  durationMs: number | null;
-  r2Key: string;
-  publicUrl: string | null;
-  versionId: string;
-  versionNo: number;
-  contentHash: string;
-}>;
+export type { MessageTemplateDefinition, MessageTemplateMediaDefinition } from '@line-crm/shared';
 
-export type MessageTemplateDefinition = Readonly<{
-  schemaVersion: 1;
-  template: Readonly<{
-    id: string;
-    name: string;
-    category: string;
-    messageType: 'text' | 'image' | 'flex' | 'carousel';
-    messageContent: string;
-    carouselActionsJson: string | null;
-    carouselTapLimitMode: 'none' | 'once';
-    carouselTapLimitText: string | null;
-    questionJson: string | null;
-    questionStatus: 'draft' | 'published';
-  }>;
-  media: readonly MessageTemplateMediaDefinition[];
-}>;
 
-export type MessageTemplateTargetSnapshot = Readonly<{
-  tenantId: string;
-  targetAccountId: string;
-  snapshotToken: HqTemplateSnapshotToken;
-  templates: readonly Readonly<{ id: string; name: string; updatedAt: string }>[];
-  media: readonly Readonly<{
-    id: string;
-    filename: string;
-    mimeType: string;
-    sizeBytes: number;
-    r2Key: string;
-    publicUrl: string | null;
-    contentHash: string;
-    revision: string;
-    versionNo: number;
-  }>[];
-}>;
+import { parseQuestion } from '../../features/scenarios/scenario-question/index.js';
 
-/**
- * The factory is bound to this authority before it receives an adapter input.
- * A route must derive it from the authenticated tenant and source account.
- */
+/** route は認証済み統括と元アカウントから権限を導き、入力を渡す前に生成元へ固定する。 */
 export type MessageTemplateSourceAuthority = Readonly<{
   tenantId: string;
   sourceAccountId: string;
 }>;
 
-export type MessageTemplateSourceMediaBinding = Readonly<{
-  tenantId: string;
-  templateVersionId: string;
-  sourceAccountId: string;
-  mediaId: string;
-  mediaVersionId: string;
-  versionNo: number;
-  r2Key: string;
-  r2KeyPrefix: string;
-  sizeBytes: number;
-  contentHash: string;
-  etag: string | null;
-}>;
-
-/** Result of a tenant-scoped DB lookup by immutable template version id. */
+/** 不変のテンプレート版 ID を、統括内の DB で解決した結果。 */
 export type MessageTemplateSourceVersion = Readonly<{
   tenantId: string;
   templateVersionId: string;
@@ -123,21 +68,21 @@ export type MessageTemplatePreflightItem = Readonly<{
 }>;
 
 export interface MessageTemplateAdapterDependencies {
-  /** Must resolve by tenant + source account + immutable version id in one authoritative DB lookup. */
+  /** 初期投入は、実体の保存と同じトランザクションで未公開にする。 */
+  initialDraft?: boolean;
+  stageSourceObject?: (media: MessageTemplateMediaDefinition, binding: MessageTemplateSourceMediaBinding) => Promise<HqMediaStreamSource>;
+  /** 実行時のカード参照は、事前確認のスナップショットと照合する。 */
+  cardTargets?: Readonly<Record<string, string>>;
+  liffTargets?: Readonly<Record<string, string>>;
+  referenceTargets?: Readonly<Record<string,string>>;
+  /** 統括・元アカウント・不変の版 ID を1回の正規 DB 照会で解決する。 */
   resolveSourceVersion(input: Readonly<{
     authority: MessageTemplateSourceAuthority;
     templateVersionId: string;
   }>): Promise<MessageTemplateSourceVersion | null>;
-  /** Complete, tenant-checked account inventory; never return a filtered/paginated name list.
-   * Its token must be recomputed from current authoritative state, not copied from context.
-   */
+  /** 名前一覧はページや絞込で欠けさせず、統括を検査した全件を使う。確認票はコンテキストの値を写さず、現在の正本から再計算する。 */
   loadTargetSnapshot(context: HqTemplateAdapterContext): Promise<MessageTemplateTargetSnapshot>;
-  /**
-   * Must perform a conditional R2 read when binding.etag is present. Returning null means that
-   * the object no longer matches the version recorded by resolveSourceVersion.
-   * Check the R2 reported size and consume body with readMessageTemplateSourceBytes
-   * (or an equivalent bounded reader). Do not call unbounded arrayBuffer() first.
-   */
+  /** ETag があれば R2 の条件付き読込を必須とし、版と一致しなければ null を返す。報告サイズと実際の読込上限を守り、無制限の arrayBuffer を先に呼ばない。 */
   readSourceObjectIfUnchanged(input: Readonly<{
     authority: MessageTemplateSourceAuthority;
     templateVersionId: string;
@@ -212,22 +157,25 @@ function jsonText(value: unknown, max: number): string | null {
   return text;
 }
 
-function assertMediaBudget(media: readonly { sizeBytes: number }[]): void {
-  let total = 0;
+function assertMediaBudget(media: readonly { sizeBytes: number; kind: string; mimeType: string }[]): void {
+  let total = 0, bufferedTotal = 0;
   if (media.length > 50) throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
   for (const item of media) {
     if (!Number.isSafeInteger(item.sizeBytes) || item.sizeBytes < 0
-      || item.sizeBytes > MESSAGE_TEMPLATE_MEDIA_MAX_BYTES) {
+      || item.sizeBytes > (item.kind === 'video' || item.kind === 'audio' ? HQ_MEDIA_MAX_BYTES : MESSAGE_TEMPLATE_MEDIA_MAX_BYTES)) {
       throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
     }
     total += item.sizeBytes;
-    if (total > MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES) {
+    if (!['video','audio'].includes(item.kind)) bufferedTotal += item.sizeBytes;
+    if (bufferedTotal > MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES) throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
+    if ((item.kind === 'video' && item.mimeType !== 'video/mp4') || (item.kind === 'audio' && item.mimeType !== 'audio/mp4')) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+    if (total > HQ_MEDIA_MAX_BYTES + MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES) {
       throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
     }
   }
 }
 
-/** Bounded R2 body reader for the runtime dependency; cancels on actual oversize. */
+/** 実際の上限超過で中断する、R2 本文の制限付き読込。 */
 export async function readMessageTemplateSourceBytes(
   body: ReadableStream<Uint8Array>,
   maxBytes: number,
@@ -253,15 +201,15 @@ export async function readMessageTemplateSourceBytes(
   } finally { reader.releaseLock(); }
 }
 
-/** The version payload stored in hq_template_versions.definition_json. */
+/** hq_template_versions.definition_json に保存する版の内容。 */
 export function parseMessageTemplateDefinition(value: unknown): MessageTemplateDefinition {
   const root = object(value);
-  const template = object(root.template);
+  const template = { ...object(root.template) };
   if (root.schemaVersion !== 1 || !Array.isArray(root.media) || root.media.length > 50) {
     throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
   }
-  const messageType = template.messageType;
-  if (!['text', 'image', 'flex', 'carousel'].includes(String(messageType))) {
+  let messageType = template.messageType;
+  if (!['text', 'image', 'flex', 'carousel', 'imagemap'].includes(String(messageType))) {
     throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
   }
   const tapLimitMode = template.carouselTapLimitMode ?? 'none';
@@ -304,22 +252,91 @@ export function parseMessageTemplateDefinition(value: unknown): MessageTemplateD
     || new Set(media.map((item) => item.r2Key)).size !== media.length) {
     throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
   }
+  let messageBubbles: MessageTemplateDefinition['messageBubbles'];
+  if(root.messageBubbles !== undefined) {
+    if(!Array.isArray(root.messageBubbles)||root.messageBubbles.length<1||root.messageBubbles.length>5||root.card||root.asset||template.questionJson) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    try {
+      const parts=parseBroadcastMessageParts({messageType:'text',messageContent:'',messageBubbles:root.messageBubbles});
+      messageType=parts[0].messageType; template.messageType=messageType; template.messageContent=parts[0].messageContent;
+    } catch { throw new TemplateHqTemplateError('INVALID_DEFINITION',422); }
+    messageBubbles=root.messageBubbles as NonNullable<MessageTemplateDefinition['messageBubbles']>;
+    if(messageBubbles.some(b=>!['text','image','flex','carousel','imagemap'].includes(b.type)||b.content.templateId||b.content.hqTemplateId||b.content.assetId)) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    if(validateTapExtrasTree(messageBubbles)) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+  }
+  let card: HqMessageCard | undefined;
+  if (root.card !== undefined) {
+    try { card = parseHqMessageCard(root.card); }
+    catch { throw new TemplateHqTemplateError('INVALID_DEFINITION', 422); }
+    const image = card.imageMediaId ? media.find(item => item.id === card!.imageMediaId) : undefined;
+    if (card.imageMediaId && (!image || image.kind !== 'image' || !image.publicUrl)) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+    Object.assign(template, composeHqMessageCard(card, requiredText(template.id, 100), image?.publicUrl ?? undefined));
+  }
+  let asset: MessageTemplateDefinition['asset'];
+  if (root.asset !== undefined) {
+    const value=object(root.asset),payload=object(value.payload);
+    if (!isBroadcastAssetKind(value.kind) || validateAssetPayload(value.kind,payload)) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    if (card) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    // 店の保存と同じ共有型・検査を使い、配布先でIDを取り直す。
+    if(value.kind==='research' && payload.questions===undefined) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    asset={kind:value.kind,payload};
+    if (value.kind==='rich_message') {
+      const base=String(payload.baseUrl ?? '');
+      if (![240,300,460,700,1040].every(width => media.some(m=>m.kind==='image' && m.publicUrl===`${base}/${width}`))) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+      const converted=convertBroadcastAsset(value.kind,String(template.name),payload);
+      if(!converted.ok) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    }
+  }
+  const questionJson=jsonText(template.questionJson,1_000_000);
+  if (messageType === 'imagemap') {
+    if (asset || card || questionJson) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+    let payload: import('@line-crm/shared').HqRichVideoPayload;
+    try { payload = JSON.parse(requiredText(template.messageContent, 1_000_000)); }
+    catch { throw new TemplateHqTemplateError('INVALID_DEFINITION', 422); }
+    if (!payload!.video || validateImagemapMessage(payload!)) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+    const video = media.find(m => m.publicUrl === payload!.video.originalContentUrl && m.kind === 'video');
+    const preview = media.find(m => m.publicUrl === payload!.video.previewImageUrl && m.kind === 'image' && ['image/png','image/jpeg'].includes(m.mimeType));
+    if (!video || !preview || preview.sizeBytes > 1024 * 1024 || !preview.width || !preview.height
+      || payload!.baseSize.height !== Math.round(preview.height / preview.width * 1040)
+      || ![240,300,460,700,1040].every(width => media.some(m => m.kind === 'image' && m.publicUrl === `${payload!.baseUrl}/${width}` && m.width === width && m.height === Math.max(1,Math.round(payload!.baseSize.height * width/1040))))) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+  }
+  if(questionJson) {
+    const q=parseQuestion(questionJson);
+    if(!q || q.text.length>160 || q.choices.length>13 || q.choices.some(c=>!c || typeof c.label!=='string' || !c.label.trim() || c.label.length>20 || !['none','url','tel','add_friend','mail','form','scenario'].includes(c.behavior))) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+    if(asset || card) throw new TemplateHqTemplateError('INVALID_DEFINITION',422);
+  }
   const parsed: MessageTemplateDefinition = {
+    ...(messageBubbles?{messageBubbles}:{}),
+    ...(asset?{asset}:{}),
+    ...(card?{card}:{}),
     schemaVersion: 1,
     template: {
       id: requiredText(template.id, 100),
       name: requiredText(template.name, 255),
       category: requiredText(template.category ?? 'general', 100),
       messageType: messageType as MessageTemplateDefinition['template']['messageType'],
-      messageContent: requiredText(template.messageContent, 1_000_000),
+      messageContent: asset || questionJson
+        ? optionalText(template.messageContent, 1_000_000) ?? ''
+        : requiredText(template.messageContent, 1_000_000),
       carouselActionsJson: jsonText(template.carouselActionsJson, 1_000_000),
       carouselTapLimitMode: tapLimitMode,
       carouselTapLimitText: optionalText(template.carouselTapLimitText, 10_000),
-      questionJson: jsonText(template.questionJson, 1_000_000),
+      questionJson,
       questionStatus,
     },
     media,
   };
+  try {
+    collectLiffActionLocators(parsed);
+    for (const button of parsed.card?.buttons ?? []) if (button.action === 'url') collectLiffActionLocators({ uri: button.value });
+  } catch { throw new TemplateHqTemplateError('INVALID_DEFINITION', 422); }
+  const extrasError = validateTapExtrasTree(parsed.asset?.payload ?? parsed.card ?? {});
+  let contentExtras: string | null = null;
+  try { contentExtras = validateTapExtrasTree(JSON.parse(parsed.template.messageContent)); } catch { /* text */ }
+  if (extrasError || contentExtras) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+  if (parsed.template.questionJson) {
+    const q = parseQuestion(parsed.template.questionJson);
+    if (q?.choices.some(choice => tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }))) throw new TemplateHqTemplateError('INVALID_DEFINITION', 422);
+  }
   referencedMedia(parsed);
   return parsed;
 }
@@ -366,7 +383,7 @@ function assertAuthorizedSource(
   const { authority, version, definition, media: bindings } = source;
   const expectedSourcePrefix = sourceR2Prefix(authority.tenantId);
   assertMediaBudget(definition.media);
-  assertMediaBudget([...bindings.values()]);
+  assertMediaBudget([...bindings.values()].map(binding => ({...binding,kind:definition.media.find(m=>m.id===binding.mediaId)?.kind ?? 'file',mimeType:definition.media.find(m=>m.id===binding.mediaId)?.mimeType ?? ''})));
   if (authority.tenantId !== expectedTenantId
     || version.tenantId !== authority.tenantId
     || version.sourceAccountId !== authority.sourceAccountId
@@ -432,6 +449,8 @@ function templateTextFields(definition: MessageTemplateDefinition): readonly str
     template.carouselActionsJson,
     template.carouselTapLimitText,
     template.questionJson,
+    definition.asset ? JSON.stringify(definition.asset.payload) : null,
+    definition.messageBubbles ? JSON.stringify(definition.messageBubbles) : null,
   ].filter((value): value is string => value !== null);
 }
 
@@ -451,9 +470,14 @@ function exactStringValues(value: string): readonly string[] {
   }
 }
 
-/** Only media actually referenced by the template body is distributed. */
+/** テンプレート本文が実際に参照するメディアだけを配布する。 */
 export function referencedMedia(definition: MessageTemplateDefinition): readonly MessageTemplateMediaDefinition[] {
   const exactValues = new Set(templateTextFields(definition).flatMap(exactStringValues));
+  if(definition.asset?.kind==='rich_message') for(const width of [240,300,460,700,1040]) exactValues.add(`${definition.asset.payload.baseUrl}/${width}`);
+  if (definition.template.messageType === 'imagemap') {
+    const payload = JSON.parse(definition.template.messageContent);
+    for (const width of [240,300,460,700,1040]) exactValues.add(`${payload.baseUrl}/${width}`);
+  }
   const references = definition.media.filter((media) =>
     [media.id, media.r2Key, media.publicUrl].some((locator) => locator !== null && exactValues.has(locator)),
   );
@@ -476,7 +500,7 @@ function uniqueMatch<T>(items: readonly T[], errorCode: string): T | null {
   return items[0] ?? null;
 }
 
-/** Produces the template and every referenced-media choice shown during preflight. */
+/** 事前確認では、テンプレートと参照メディアの全選択を提示する。 */
 export function inspectMessageTemplateDefinition(
   definition: MessageTemplateDefinition,
   snapshot: MessageTemplateTargetSnapshot,
@@ -570,20 +594,18 @@ function requireResolution(
 }
 
 function conflictGuard(sql: string, bindings: readonly HqTemplateBinding[]): HqTemplateStatement {
-  // Malformed JSON is evaluated only on mismatch and aborts the surrounding atomic D1 batch.
+  // 不一致時にだけ不正 JSON を評価し、周囲の D1 batch 全体を中断する。
   return {
     sql: `SELECT CASE WHEN EXISTS(${sql}) THEN 1 ELSE json_extract('VERSION_CONFLICT', '$') END`,
     bindings,
   };
 }
 
-function nameInventoryGuard(kind: 'template' | 'media', accountId: string, names: readonly (readonly [string, string])[]): HqTemplateStatement {
-  const table = kind === 'template' ? 'templates' : 'media';
+function nameInventoryGuard(kind: 'template' | 'media', accountId: string, names: readonly (readonly [string, string])[], asset = false): HqTemplateStatement {
+  const table = kind === 'template' ? (asset ? 'broadcast_message_assets' : 'templates') : 'media';
   const column = kind === 'template' ? 'name' : 'filename';
   const expected = JSON.stringify(names);
-  // SQLite lower() cannot reproduce JavaScript NFKC/case folding. Prove the entire
-  // account name inventory is unchanged instead, then use the JS decision above.
-  // Compare sets, not JSON row ordering; Unicode ids and query ordering are immaterial.
+  // SQLite の lower は JS の NFKC/大小変換を再現できないため、名前の全件集合が不変か照合して JS の判断を使う。JSON の行順には依存しない。
   return conflictGuard(`SELECT 1 WHERE
     (SELECT COUNT(*) FROM ${table} WHERE line_account_id=?) = json_array_length(?)
     AND NOT EXISTS(SELECT 1 FROM ${table} t WHERE t.line_account_id=? AND NOT EXISTS(
@@ -618,7 +640,7 @@ export async function planMessageTemplateDistribution(input: {
   const stage: HqTemplateStoreAtomicCommitPlan['stage'][number][] = [];
   const compensateOnDbFailure: HqTemplateStoreAtomicCommitPlan['compensateOnDbFailure'][number][] = [];
   const reconcile: HqTemplateStoreAtomicCommitPlan['reconcile'][number][] = [];
-  const replacements = new Map<string, string>();
+  const replacements = new Map<string, string>(Object.entries(dependencies.referenceTargets ?? {}));
   const resolved: HqTemplateResolution[] = [];
   const occupiedTemplateNames = [...snapshot.templates.map((entry) => entry.name)];
   const occupiedMediaNames = [...snapshot.media.map((entry) => entry.filename)];
@@ -650,13 +672,12 @@ export async function planMessageTemplateDistribution(input: {
       }
       occupied.push(name);
     }
-    // Renaming media does not create a media_version. Overwrite needs this guard
-    // too, otherwise a concurrent rename is silently undone by the UPDATE.
+    // メディア名の変更は版を作らないため、同時の名前変更を上書きで消さないよう別に照合する。
     if (!guardedInventories.has(item.itemKind)) {
       const names: [string, string][] = item.itemKind === 'template'
         ? snapshot.templates.map(row => [row.id, row.name])
         : snapshot.media.map(row => [row.id, row.filename]);
-      dbCommit.push(nameInventoryGuard(item.itemKind, context.targetAccountId, names));
+      dbCommit.push(nameInventoryGuard(item.itemKind, context.targetAccountId, names, Boolean(definition.asset)));
       guardedInventories.add(item.itemKind);
     }
     resolved.push({
@@ -691,32 +712,28 @@ export async function planMessageTemplateDistribution(input: {
     plannedTargetR2Keys.add(targetR2Key);
     const binding = source.media.get(media.id);
     if (!binding) throw new TemplateHqTemplateError('SOURCE_MEDIA_AUTHORITY_MISMATCH', 422);
-    const maxBytes = Math.min(media.sizeBytes, MESSAGE_TEMPLATE_MEDIA_MAX_BYTES, MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES - stagedBytes);
-    const sourceObject = await dependencies.readSourceObjectIfUnchanged({
-      authority: source.authority,
-      templateVersionId: source.version.templateVersionId,
-      media,
-      binding,
-      maxBytes,
-    });
-    if (sourceObject && sourceObject.bytes.byteLength > maxBytes)
-      throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
-    const declaredHash = normalizeSha256(media.contentHash);
-    if (!sourceObject
-      || (binding.etag !== null && sourceObject.etag !== binding.etag)
-      || sourceObject.bytes.byteLength !== media.sizeBytes
-      || declaredHash === null
-      || await sha256Hex(sourceObject.bytes) !== declaredHash
-      || (media.publicUrl !== null && targetPublicUrl === null)) {
-      throw new TemplateHqTemplateError('MEDIA_COPY_INVALID', 422);
+    if (['video', 'audio'].includes(media.kind) && dependencies.stageSourceObject) {
+      const streamSource = await dependencies.stageSourceObject(media, binding);
+      if (streamSource.r2Key !== binding.r2Key || streamSource.etag !== binding.etag || streamSource.sizeBytes !== media.sizeBytes || streamSource.contentHash !== normalizeSha256(media.contentHash)) throw new TemplateHqTemplateError('MEDIA_COPY_INVALID', 422);
+      stage.push({ key: targetR2Key, ownerToken, bytes: new Uint8Array(), streamSource, contentType: media.mimeType });
+    } else {
+      const maxBytes = Math.min(media.sizeBytes, MESSAGE_TEMPLATE_MEDIA_MAX_BYTES, MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES - stagedBytes);
+      const sourceObject = await dependencies.readSourceObjectIfUnchanged({ authority: source.authority, templateVersionId: source.version.templateVersionId, media, binding, maxBytes });
+      if (sourceObject && sourceObject.bytes.byteLength > maxBytes) throw new TemplateHqTemplateError('MEDIA_SIZE_LIMIT', 422);
+      const declaredHash = normalizeSha256(media.contentHash);
+      if (!sourceObject || (binding.etag !== null && sourceObject.etag !== binding.etag) || sourceObject.bytes.byteLength !== media.sizeBytes || declaredHash === null || await sha256Hex(sourceObject.bytes) !== declaredHash || (media.publicUrl !== null && targetPublicUrl === null)) throw new TemplateHqTemplateError('MEDIA_COPY_INVALID', 422);
+      stagedBytes += sourceObject.bytes.byteLength;
+      stage.push({ key: targetR2Key, ownerToken, bytes: sourceObject.bytes, contentType: media.mimeType });
     }
-    stagedBytes += sourceObject.bytes.byteLength;
-    stage.push({ key: targetR2Key, ownerToken, bytes: sourceObject.bytes, contentType: media.mimeType });
+    if (media.publicUrl !== null && targetPublicUrl === null) throw new TemplateHqTemplateError('MEDIA_COPY_INVALID', 422);
     compensateOnDbFailure.push({ key: targetR2Key, ownerToken });
     reconcile.push({ key: targetR2Key, ownerToken });
     replacements.set(media.id, targetId);
     replacements.set(media.r2Key, targetR2Key);
-    if (media.publicUrl && targetPublicUrl) replacements.set(media.publicUrl, targetPublicUrl);
+    if (media.publicUrl && targetPublicUrl) {
+      replacements.set(media.publicUrl, targetPublicUrl);
+      if (definition.template.messageType === 'imagemap' && media.publicUrl === `${JSON.parse(definition.template.messageContent).baseUrl}/1040`) replacements.set(media.publicUrl.slice(0, -5), targetPublicUrl.slice(0, -5));
+    }
 
     if (resolution.mode === 'overwrite') {
       if (!target) throw new TemplateHqTemplateError(VERSION_CONFLICT_MESSAGE, 409);
@@ -756,11 +773,23 @@ export async function planMessageTemplateDistribution(input: {
   const rootResolution = requireResolution(rootItem, context.resolutions);
   const targetTemplateId = idMap[rootItem.sourceId]!;
   const rootName = resolved[0]?.aliasName ?? definition.template.name;
-  const template = definition.template;
-  const messageContent = replaceExactLocators(template.messageContent, replacements)!;
+  let template = definition.template;
+  if (definition.card) {
+    for (const button of definition.card.buttons) if ((isLiffActionKind(button.action) || button.action === 'scenario') && !dependencies.cardTargets?.[`${button.action}:${button.value}`]) throw new TemplateHqTemplateError('REFERENCE_UNAVAILABLE', 422);
+    const image = definition.media.find(item => item.id === definition.card!.imageMediaId);
+    template = { ...template, ...composeHqMessageCard(definition.card, targetTemplateId, image?.publicUrl ?? undefined, dependencies.cardTargets) };
+  }
+  const liffLocators = definition.card
+    ? collectLiffActionLocators(definition.card.buttons.filter(button => button.action === 'url').map(button => ({ uri: button.value })))
+    : collectLiffActionLocators(definition);
+  for (const locator of liffLocators.keys()) {
+    if (!dependencies.liffTargets?.[locator]) throw new TemplateHqTemplateError('REFERENCE_UNAVAILABLE', 422);
+  }
+  const messageContent = replaceExactLocators(replaceLiffActionLocators(template, dependencies.liffTargets ?? {}).messageContent, replacements)!;
   const carouselActionsJson = replaceExactLocators(template.carouselActionsJson, replacements);
   const carouselTapLimitText = replaceExactLocators(template.carouselTapLimitText, replacements);
   const questionJson = replaceExactLocators(template.questionJson, replacements);
+  if (!definition.asset) {
   if (rootResolution.mode === 'overwrite') {
     dbCommit.push(conflictGuard(
       'SELECT 1 FROM templates WHERE id = ? AND line_account_id = ? AND updated_at = ?',
@@ -789,6 +818,46 @@ export async function planMessageTemplateDistribution(input: {
         template.questionStatus, now, now, context.targetAccountId, now],
     });
   }
+  } else {
+    const asset=definition.asset;
+    if(asset.kind==='rich_message') {
+      const sourceBase=String(asset.payload.baseUrl);
+      const target1040=replacements.get(`${sourceBase}/1040`);
+      if(!target1040?.endsWith('/1040')) throw new TemplateHqTemplateError('MEDIA_COPY_INVALID',422);
+      replacements.set(sourceBase,target1040.slice(0,-5));
+    }
+    const payload=JSON.parse(replaceExactLocators(JSON.stringify(replaceLiffActionLocators(asset.payload, dependencies.liffTargets ?? {})),replacements)!);
+    // assetId と画像の旧所属を持ち越さない。
+    payload.assetId=targetTemplateId;
+    if(payload.imageMediaId) payload.imageMediaId=replacements.get(payload.imageMediaId) ?? null;
+    // 各サイズも使用台帳の点検で見つかるよう、配布先URLを保存する。
+    if (asset.kind === 'rich_message') {
+      payload.imagemapImages = referencedMedia(definition).map(media => replacements.get(media.publicUrl!));
+    }
+    const json=JSON.stringify(payload);
+    if(rootResolution.mode==='overwrite') {
+      dbCommit.push(conflictGuard('SELECT 1 FROM broadcast_message_assets WHERE id=? AND line_account_id=? AND updated_at=?', [targetTemplateId,context.targetAccountId,rootItem.expectedRevision]));
+      dbCommit.push({sql:`UPDATE broadcast_message_assets SET kind=?,name=?,payload_json=?,published_version=published_version+1,published_at=?,draft_payload_json=NULL,draft_revision=0,updated_at=? WHERE id=? AND line_account_id=? AND updated_at=?`,bindings:[asset.kind,rootName,json,now,now,targetTemplateId,context.targetAccountId,rootItem.expectedRevision]});
+    } else dbCommit.push({sql:`INSERT INTO broadcast_message_assets(id,line_account_id,kind,name,payload_json,published_version,published_at,draft_revision,created_at,updated_at) VALUES (?,?,?,?,?,1,?,0,?,?)`,bindings:[targetTemplateId,context.targetAccountId,asset.kind,rootName,json,now,now,now]});
+    if (!dependencies.initialDraft) dbCommit.push({sql:`INSERT INTO broadcast_asset_versions(id,asset_id,version_number,payload_json,created_at) SELECT ?,id,published_version,payload_json,? FROM broadcast_message_assets WHERE id=? AND line_account_id=?`,bindings:[crypto.randomUUID(),now,targetTemplateId,context.targetAccountId]});
+    if(asset.kind==='rich_message') for(const m of referencedMedia(definition)) dbCommit.push({sql:'INSERT OR IGNORE INTO imagemap_images(id,line_account_id,r2_key,created_at) VALUES (?,?,?,?)',bindings:[crypto.randomUUID(),context.targetAccountId,replacements.get(m.r2Key)!,now]});
+  }
+  if(!definition.asset) {
+    const bubbles=definition.messageBubbles ? replaceExactLocators(JSON.stringify(replaceLiffActionLocators(definition.messageBubbles,dependencies.liffTargets ?? {})),replacements) : null;
+    dbCommit.push({sql:'UPDATE templates SET message_bubbles_json=?,draft_message_bubbles_json=NULL WHERE id=? AND line_account_id=?',bindings:[bubbles,targetTemplateId,context.targetAccountId]});
+    if (!dependencies.initialDraft) dbCommit.push({sql:`INSERT INTO template_versions(id,template_id,version_number,message_type,message_content,carousel_actions_json,carousel_tap_limit_mode,carousel_tap_limit_text,question_json,question_status,message_bubbles_json,created_at,hq_template_version_id)
+      SELECT ?,id,published_version,message_type,message_content,carousel_actions_json,carousel_tap_limit_mode,carousel_tap_limit_text,question_json,question_status,message_bubbles_json,?,? FROM templates WHERE id=? AND line_account_id=?`,bindings:[crypto.randomUUID(),now,source.version.templateVersionId,targetTemplateId,context.targetAccountId]});
+  }
+  if (dependencies.initialDraft) {
+    if (rootResolution.mode === 'overwrite') throw new TemplateHqTemplateError('VERSION_CONFLICT', 409);
+    dbCommit.push(definition.asset
+      ? { sql: `UPDATE broadcast_message_assets SET draft_payload_json=payload_json,draft_revision=1,published_version=0,published_at=NULL WHERE id=? AND line_account_id=?`, bindings: [targetTemplateId, context.targetAccountId] }
+      : { sql: `UPDATE templates SET draft_message_type=message_type,draft_message_content=message_content,
+        draft_carousel_actions_json=carousel_actions_json,draft_carousel_tap_limit_mode=carousel_tap_limit_mode,draft_carousel_tap_limit_text=carousel_tap_limit_text,
+        draft_question_json=question_json,draft_question_status=question_status,draft_message_bubbles_json=message_bubbles_json,
+        draft_revision=1,published_version=0,published_at=NULL WHERE id=? AND line_account_id=?`, bindings: [targetTemplateId, context.targetAccountId] });
+  }
+
   for (const media of referencedMedia(definition)) {
     dbCommit.push({
       sql: `INSERT INTO media_usages(media_id,ref_kind,ref_id,scanned_at) VALUES (?,'template',?,?)
@@ -818,11 +887,7 @@ function referenceSource(reference: HqTemplateReference): AuthorizedMessageTempl
   return metadata.source;
 }
 
-/**
- * Runtime wiring binds an authenticated source authority and supplies tenant-scoped D1/R2
- * operations without expanding the shared adapter contract. input.definitionJson is deliberately
- * ignored: the immutable version selected by input.templateVersionId is the only source of truth.
- */
+/** 認証済みの元権限と統括内 D1/R2 を実行時に接続する。input.definitionJson は信用せず、templateVersionId が選んだ不変版だけを正本とする。 */
 export function createTemplateHqTemplateAdapter(
   authority: MessageTemplateSourceAuthority,
   dependencies: MessageTemplateAdapterDependencies,
@@ -921,5 +986,5 @@ export function createTemplateHqTemplateAdapter(
   };
 }
 
-/** Registry stays fail-closed until the router supplies the D1/R2 dependency factory. */
+/** route が D1/R2 の依存を渡すまで安全側で拒む。 */
 export const templateHqTemplateAdapter = unsupportedHqTemplateAdapter('template');

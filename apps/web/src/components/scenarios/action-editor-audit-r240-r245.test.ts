@@ -50,6 +50,8 @@ describe('R240 動作名と要約は実際の設定から作る', () => {
       '来店回数',
     )
     expect(describeAction(makeAction('event_booking', { eventId: 'ev-1' }), LOOKUPS)).toContain('試食会')
+    expect(describeAction(makeAction('event_booking', { eventId: 'ev-1', op: 'cancel', slotId: 'slot-1' }), LOOKUPS)).toBe('申し込みを取り消す「試食会」（選んだ回）')
+    expect(describeAction(makeAction('event_booking', { eventId: 'ev-1', op: 'register' }), LOOKUPS)).toBe('イベントに申し込む「試食会」')
   })
 
   it('未入力・未選択はその旨を出し、別種別の文言を混ぜない', () => {
@@ -67,10 +69,17 @@ describe('R240 動作名と要約は実際の設定から作る', () => {
 
   it('画面に行番号で決める分岐と固定の要約を残さない', () => {
     expect(EDITOR).not.toContain("index === 2 ? 'テキスト送信'")
-    expect(EDITOR).not.toContain('タグ「初回案内済み」を追加')
+    expect(EDITOR).not.toContain('タグ「初回案内済み」を追加する')
     expect(EDITOR).not.toContain('担当者へSlackと管理画面通知')
     expect(EDITOR).toContain('未設定')
     expect(EDITOR).toContain('describeAction(action, lookups)')
+  })
+
+  it('イベント操作の種別と任意の開催回を保存内容へ引き継ぐ', () => {
+    expect(EDITOR).toContain("type: 'event_booking', params: config")
+    expect(EDITOR).toContain('aria-label="イベント予約の操作"')
+    expect(EDITOR).toContain('aria-label="開催回"')
+    expect(EDITOR).toContain('slotId: value || null')
   })
 })
 
@@ -108,14 +117,14 @@ describe('R243 編集中の未完成行は保持し、保存時に入力不足�
   it('条件の変更で入力のたびに空値を取り除かない', () => {
     expect(EDITOR).not.toContain('pruneCondition(next)')
     expect(EDITOR).toContain('conditionDraft')
-    expect(EDITOR).toContain('条件を保存')
+    expect(EDITOR).toContain('条件を保存する')
   })
 })
 
 describe('R244 編集欄と入力を保存のたびに作り直さない', () => {
   it('開閉は画面側で持ち、読み込み中の作り直しをしない', () => {
     expect(EDITOR).toContain('expandedId')
-    expect(EDITOR).toContain('aria-expanded')
+    expect(EDITOR).toContain('open={expandedId === action.id}')
     expect(EDITOR).not.toContain('<details>')
     /* 初回だけ「読み込んでいます」。保存後の読み直しは黙って入れ替える。 */
     expect(EDITOR).toContain('const refresh = useCallback')
@@ -151,7 +160,7 @@ describe('R245 対象は名前で選ぶ', () => {
     expect(EDITOR).not.toContain('リマインダID')
     expect(EDITOR).not.toContain('イベント予約ID')
     expect(EDITOR).toContain('TargetSelector')
-    expect(EDITOR).toContain('名前で探す')
+    expect(EDITOR).toContain('EntityKindField')
   })
 
   it('リマインダ・イベント予約の候補は今のアカウントで絞る', async () => {

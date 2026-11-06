@@ -1,0 +1,449 @@
+/*
+ * ★V8 予約枠・在庫（Pencil Y8SjT2・競合 ・媒体を閉じる知らせ ・予約経路の連携 hQQlt）。
+ * 寸法は板の書き出しから読み、globals.css の --tpl-rs-* に置いた値だけを使う。
+ */
+
+.stockBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-body-gap);
+  margin-top: var(--tpl-rs-tabs-body-top);
+  min-width: 0;
+}
+
+.tabs {
+  min-width: 0;
+}
+
+/* 休業日・貸切：検証環境の帯が無いので、店のタブの下にタブを置く（切り替えの文字の高さにそろえる） */
+.tabsClosures {
+  margin-top: var(--tpl-e10-tabs-top);
+}
+
+/* 左（配分・在庫・開ける時間）と右（その時間帯の卓 320） */
+.columns {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-rs-body-gap);
+  min-width: 0;
+}
+
+.mainColumn {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-rs-body-gap);
+  min-width: 0;
+}
+
+.sideColumn {
+  display: flex;
+  flex: 0 0 var(--tpl-rs-inv-side-w);
+  flex-direction: column;
+  gap: var(--tpl-rs-body-gap);
+  width: var(--tpl-rs-inv-side-w);
+}
+
+.sectionHeadRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-rs-panel-head-gap);
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-14);
+}
+
+/* 1つの時間帯の総数 */
+.totalLine {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rs-panel-head-gap);
+  padding: var(--tpl-rs-inv-total-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+}
+
+.totalIcon {
+  flex: 0 0 auto;
+  color: var(--color-accent-deep);
+}
+
+.totalText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-rs-panel-head-text-gap);
+  min-width: 0;
+}
+
+.totalValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-14);
+}
+
+.totalSub {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rs-lh-11);
+}
+
+.allocGrid {
+  display: flex;
+  gap: var(--tpl-rs-panel-head-gap);
+}
+
+.allocField {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-rs-field-gap);
+  min-width: 0;
+}
+
+.allocLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-11);
+}
+
+.remainder {
+  padding: var(--tpl-rs-inv-remainder-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rs-lh-11);
+}
+
+.noteInvalid {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.stateBox {
+  padding: var(--tpl-rs-state-pad);
+}
+
+/* 表の密度は共通 DataTable、画面は列幅と内容だけを持つ。 */
+.colTime { width: var(--tpl-rs-inv-col-time); }
+.colUse { width: var(--tpl-rs-inv-col-use); }
+.colTables { width: auto; }
+.colSeats { width: var(--tpl-rs-inv-col-seats); }
+.colFree { width: var(--tpl-rs-inv-col-free); }
+.tablesCell { overflow: hidden; text-overflow: ellipsis; }
+.datePicker { width: var(--tpl-rs-rsv-store-w); flex: none; }
+
+.strong {
+  font-weight: 600;
+}
+
+.bold {
+  font-weight: 700;
+}
+
+.useBar {
+  display: block;
+  width: var(--tpl-rs-inv-col-use-bar);
+  height: var(--tpl-rs-inv-bar-h);
+}
+
+.useTrack {
+  fill: var(--color-surface-pearl);
+}
+
+.useFill {
+  fill: var(--color-accent-deep); /* 使っている量の棒は画面の緑（LINE の緑ではない） */
+}
+
+.useFillBusy {
+  fill: var(--color-warning);
+}
+
+.freeLow {
+  color: var(--color-danger);
+}
+
+/* 行を押したとき：その時間帯の配分だけ直す */
+
+.slotGrid {
+  display: flex;
+  gap: var(--tpl-rs-panel-head-gap);
+}
+
+.slotField {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-rs-field-gap);
+  min-width: 0;
+}
+
+.slotLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-rs-lh-14);
+}
+
+.slotActions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rs-table-row-gap);
+}
+
+.slotBase {
+  flex: 1 1 0;
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+/* 開ける時間：曜日の行（上下10・下に線） */
+.hoursError {
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+.dayRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-rs-panel-head-gap);
+  padding: var(--tpl-rs-inv-day-pad);
+  box-shadow: var(--tpl-rs-line-bottom);
+}
+
+.dayHead {
+  display: flex;
+  flex: 0 0 var(--tpl-rs-inv-day-head-w);
+  align-items: center;
+  gap: var(--tpl-rs-table-row-gap);
+}
+
+.dayName {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.dayClosed {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.dayPeriods {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-rs-field-gap);
+  min-width: 0;
+}
+
+.period {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rs-table-row-gap);
+}
+
+.timeInput {
+  display: block;
+  flex: 0 0 var(--tpl-rs-inv-time-w);
+  width: var(--tpl-rs-inv-time-w);
+}
+
+.timeInput :global(*) {
+  max-width: 100%;
+}
+
+.tilde {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+/* 右：その時間帯の卓（3列・高さ64） */
+.tablesGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-rs-table-row-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.freeInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-stat-gap);
+  padding: var(--tpl-rs-dlg-note-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-surface-pearl);
+}
+
+.freeTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.freeSub {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rs-lh-11);
+}
+
+.sideActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-rs-table-row-gap);
+}
+
+/* 窓 */
+.dialogLead {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.checkList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-table-row-gap);
+}
+
+.diffTable {
+  width: 100%;
+}
+
+/* 予約経路の連携（hQQlt） */
+.channels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-body-gap);
+  min-width: 0;
+}
+
+.channelCards {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-rs-panel-head-gap);
+}
+
+.card { flex: 1 1 0; min-width: 0; }
+/* 今日の取り込み（絵 ：幅 300・中身の高さ） */
+.todayCard { flex: 0 0 var(--tpl-rs-inv-today-card-w); min-width: 0; }
+
+.cardText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rs-lh-11);
+}
+
+.addressBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rs-table-row-gap);
+}
+
+.addressBox > :first-child { flex: 1 1 0; min-width: 0; }
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-rs-table-row-gap);
+}
+
+.todayStats {
+  display: flex;
+  gap: var(--tpl-rs-inv-today-gap);
+}
+
+.todayStat { flex: none; width: var(--tpl-rs-inv-today-w); }
+
+.chName { width: var(--tpl-rs-inv-ch-name); }
+.chMethod { width: var(--tpl-rs-inv-ch-method); }
+.chStatus { width: var(--tpl-rs-inv-ch-status); }
+.chToday { width: var(--tpl-rs-inv-ch-today); }
+.chLast { width: var(--tpl-rs-inv-ch-last); }
+.chUnread { width: var(--tpl-rs-inv-ch-unread); }
+.chOps { width: auto; }
+
+.unreadRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rs-panel-head-gap);
+}
+
+.unreadMain {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.howTo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-stat-gap);
+  margin: 0;
+  padding-left: var(--tpl-rs-cell-side);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.detailList {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--tpl-rs-stat-gap) var(--tpl-rs-panel-head-gap);
+  margin: 0;
+  font-size: var(--text-caption);
+}
+
+.detailList dt {
+  color: var(--color-ink-secondary);
+}
+
+.detailList dd {
+  margin: 0;
+  color: var(--color-ink);
+}
+
+.pair {
+  display: flex;
+  gap: var(--tpl-rs-pair-gap);
+}
+
+.manualFields { display: flex; flex-direction: column; gap: var(--tpl-rs-dlg-gap); }
+
+.hoursError, .hoursErrorNoticePlacement { margin: 0; }

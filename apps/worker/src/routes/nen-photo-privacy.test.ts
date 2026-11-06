@@ -7,7 +7,8 @@ const mocks = vi.hoisted(() => ({
   jstNow: vi.fn(() => '2026-08-28 02:00:00'),
 }));
 vi.mock('../services/liff-auth.js', () => ({ verifyCallerLineIdentity: mocks.verifyIdentity }));
-vi.mock('@line-crm/db', () => ({
+vi.mock('@line-crm/db', async original => ({
+  ...await original<typeof import('@line-crm/db')>(),
   getFriendByLineUserIdForAccount: mocks.getFriend,
   jstNow: mocks.jstNow,
   resolveLineCredential: vi.fn(),

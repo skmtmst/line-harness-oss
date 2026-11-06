@@ -1,0 +1,66 @@
+/* ★V8 枠を閉じる知らせ（E-5 ）。寸法は globals.css の --tpl-e1-* だけを使う。表・タブ・道具の段は型と共通部品が持つ。 */
+
+/* 板の頭とタブの間（絵：頭の下8＋タブの段の上8）。型の頭の下12に足りない分だけ */
+.tabsRow {
+  display: block;
+  padding-top: var(--tpl-e1-close-tabs-top);
+}
+
+.search {
+  display: block;
+  width: var(--tpl-e1-search-w);
+  max-width: 100%;
+}
+
+.colSlot {
+  width: var(--tpl-e1-col-slot);
+}
+
+.colRoute {
+  width: var(--tpl-e1-col-close-route);
+}
+
+.colMedia {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.colState {
+  width: var(--tpl-e1-col-close-state);
+}
+
+.colActions {
+  width: var(--tpl-e1-col-close-actions);
+}
+
+.none {
+  color: var(--color-ink-faint);
+}
+
+.slot {
+  display: block;
+  color: var(--color-ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.reason {
+  display: block;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-lh-18);
+  white-space: nowrap;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-e1-gap-s);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-e1-gap-s);
+}

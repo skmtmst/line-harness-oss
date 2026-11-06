@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import Database from 'better-sqlite3';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const access = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(async (_db: unknown, _staff: unknown, ids: string[]) => (
@@ -295,7 +295,7 @@ describe('予約の写し HTTP (T)', () => {
       menuSnapshot: { version: number; name: string; durationMinutes: number; basePrice: number } | null;
     } };
     expect(detailBody.booking.price).toBe(1000);
-    expect(detailBody.booking.menuName).toBe('カット');
+    expect(detailBody.booking.menuName).toBe('施術A');
     expect(detailBody.booking.menuSnapshot).toMatchObject({
       version: 1, name: '施術A', durationMinutes: 60, basePrice: 1000,
     });

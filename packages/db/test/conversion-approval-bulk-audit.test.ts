@@ -1,11 +1,11 @@
 /**
- * 監査 R356・R357・R358 の再現試験（m22u）。
+ * 承認・却下の再試行で金額が変わらないことの試験。
  *
- * - R356: 承認時のマイル設定を保存せず、同じ成果の再試行で付与額が変わる
- * - R357: 承認金額の保存に失敗すると、設定変更後の再試行で過去の報酬額が変わる
- * - R358: 締め済み成果を却下して再承認すると、円の支払対象が復活しない
+ * - 承認時のマイル設定を保存し、同じ成果の再試行で付与額が変わらない
+ * - 承認金額の保存に失敗しても、設定変更後の再試行で過去の報酬額が変わらない
+ * - 締め済み成果を却下して再承認すると、円の支払対象が復活する
  *
- * すべて「直す前は落ち・直した後は通る」ことを意図した恒久試験。
+ * 守りを外すと落ちる形にしてある。
  */
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
@@ -16,6 +16,7 @@ import {
   getApprovalNotificationState,
   getConversionApprovalNotifyInfo,
   markApprovalNotified,
+  releaseApprovalNotification,
 } from '../src/affiliate-offers.js';
 import {
   confirmAffiliateSettlement,
@@ -26,7 +27,7 @@ import { unappliedSettlementDebits } from '../src/affiliate-payouts.js';
 async function unappliedDebits() {
   return unappliedSettlementDebits(db, { tenantId: TENANT_ID, lineAccountId: 'account-1' });
 }
-import { syncAffiliateConversionMileage } from '../src/mileage.js';
+import { syncAffiliateConversionMileage } from '../src/mileage/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 const TENANT_ID = '00000000-0000-4000-8000-000000000001';
@@ -176,6 +177,52 @@ describe('R354 承認通知の送信記録', () => {
     const second = await getApprovalNotificationState(db, 'ce-1');
     expect(second.send).toBe(true);
     expect(second.approvedAt).not.toBe(first.approvedAt);
+  });
+
+  it('同じ世代の並行確保は1件だけ通り、負けた側は送らない', async () => {
+    addPendingEvent('ce-1');
+    await decideConversionApproval(db, 'ce-1', 'approved', 'pending');
+    const { approvedAt } = await getApprovalNotificationState(db, 'ce-1');
+
+    // 同じ承認判断の並行要求を模し、同時に送信権を取りに行く。
+    const [winner, loser] = await Promise.all([
+      markApprovalNotified(db, 'ce-1', approvedAt!),
+      markApprovalNotified(db, 'ce-1', approvedAt!),
+    ]);
+    // better-sqlite3 は直列だが CAS の契約（勝ち1・負け1）は変わらない。
+    expect([winner, loser].filter(Boolean)).toHaveLength(1);
+    expect(await getApprovalNotificationState(db, 'ce-1')).toMatchObject({ send: false });
+  });
+
+  it('送信の途中失敗は記録を戻し、再試行で送り直せる（欠落なし）', async () => {
+    addPendingEvent('ce-1');
+    await decideConversionApproval(db, 'ce-1', 'approved', 'pending');
+    const { approvedAt } = await getApprovalNotificationState(db, 'ce-1');
+
+    // 送信権を取ったあと送信に失敗した想定で、記録だけ戻す。
+    expect(await markApprovalNotified(db, 'ce-1', approvedAt!)).toBe(true);
+    expect(await releaseApprovalNotification(db, 'ce-1', approvedAt!)).toBe(true);
+    // 再試行ではまた送ってよい状態に戻り、送り直せる。
+    expect(await getApprovalNotificationState(db, 'ce-1')).toMatchObject({ send: true });
+    expect(await markApprovalNotified(db, 'ce-1', approvedAt!)).toBe(true);
+    expect(await getApprovalNotificationState(db, 'ce-1')).toMatchObject({ send: false });
+  });
+
+  it('古い世代の解放は新しい世代の未送信を消さない', async () => {
+    addPendingEvent('ce-1');
+    await decideConversionApproval(db, 'ce-1', 'approved', 'pending');
+    const first = await getApprovalNotificationState(db, 'ce-1');
+    expect(await markApprovalNotified(db, 'ce-1', first.approvedAt!)).toBe(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await decideConversionApproval(db, 'ce-1', 'rejected', 'approved');
+    await decideConversionApproval(db, 'ce-1', 'approved', 'rejected');
+    const second = await getApprovalNotificationState(db, 'ce-1');
+    expect(second.send).toBe(true);
+
+    // 古い世代の遅れた解放が来ても、新しい世代の未送信は残る。
+    expect(await releaseApprovalNotification(db, 'ce-1', first.approvedAt!)).toBe(false);
+    expect(await getApprovalNotificationState(db, 'ce-1')).toMatchObject({ send: true });
   });
 });
 

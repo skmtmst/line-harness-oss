@@ -14,23 +14,31 @@ import {
   featureLabel,
 } from './recipe-catalog'
 import styles from './recipes.module.css'
+import { formatNumber } from '@/lib/format'
 
 /**
- * 設計 ★V6 34-2「レシピ一覧」（`y0P0Qx`）。
+ * 設計 ★管理画面 34-2「レシピ一覧」（`y0P0Qx`）。
  *
  * レシピ・必要機能・複製回数はサーバの正本を読む。
  */
 export default function RecipesPage() {
-  /* ★V7 C7: 題はトップバーに一本化し、本文の大きな見出しを出さない（PageHeader が同じ題なら隠す）。 */
+  /* ★管理画面 C7: 題はトップバーに一本化し、本文の大きな見出しを出さない（PageHeader が同じ題なら隠す）。 */
   usePageTitle('レシピから作る')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  /*
+   * D025/M043: 捕まえた取得失敗は共通部品へ渡す。403 は権限の案内に
+   * なり再試行口は出ない。429 は待ち秒数を添えた案内になる。
+   */
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (accountLoading) return
     let alive = true
     setStatus('loading')
+    setLoadError(null)
     void api.recipes
       .list(selectedAccountId ?? undefined)
       .then((res) => {
@@ -42,24 +50,30 @@ export default function RecipesPage() {
         setRecipes(res.data)
         setStatus('ready')
       })
-      .catch(() => {
-        if (alive) setStatus('error')
+      .catch((caught) => {
+        if (!alive) return
+        setLoadError(caught)
+        setStatus('error')
       })
     return () => {
       alive = false
     }
-  }, [accountLoading, selectedAccountId])
+  }, [accountLoading, selectedAccountId, reloadKey])
 
   return (
     <div className={styles.page}>
       <PageHeader
         breadcrumb={[{ label: 'レシピ' }]}
         title="レシピから作る"
-        description="よくある組み立てを、まとめて下書きにします。作られるのは、ふつうのタグ・ルール・シナリオ・テンプレートです。レシピとはつながらないので、あとから自由に直せます。公開はひとつずつ自分で行います。"
+        help="よくある組み立てを、まとめて下書きにします。作られるのは、ふつうのタグ・ルール・シナリオ・テンプレートです。レシピとはつながらないので、あとから自由に直せます。公開はひとつずつ自分で行います。"
       />
 
       {status !== 'ready' ? (
-        <ListState kind={status === 'error' ? 'error' : 'loading'} />
+        <ListState
+          kind={status === 'error' ? 'error' : 'loading'}
+          error={loadError ?? undefined}
+          onRetry={status === 'error' ? () => setReloadKey((key) => key + 1) : undefined}
+        />
       ) : recipes.length === 0 ? (
         <ListState
           kind="empty"
@@ -104,7 +118,7 @@ export default function RecipesPage() {
                         })}
                       </span>
                     </div>
-                    <p className={styles.count}>これまで {recipe.cloneCount} 回作られました</p>
+                    <p className={styles.count}>これまで {formatNumber(recipe.cloneCount)} 回作られました</p>
                   </div>
 
                   <div className={styles.actions}>

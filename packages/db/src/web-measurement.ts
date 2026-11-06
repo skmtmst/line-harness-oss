@@ -1,7 +1,8 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow, jstDateString } from './utils.js';
 
 /**
- * Web計測の公開口 (#819)。
+ * Web計測の公開口。
  *
  * サイトごとの公開IDと許可ドメインを持ち、タグはサイトIDだけを載せる
  * (秘密の鍵はタグに含めない)。許可にないドメインからの送信は成果に
@@ -17,10 +18,11 @@ export interface MeasurementSite {
   label: string;
   created_at: string;
   updated_at: string | null;
-  /** R275: 停止した日時。NULL なら計測を受け付ける。 */
+  /** 停止した日時。NULL なら計測を受け付ける。 */
   stopped_at: string | null;
-  /** R275: 停止の理由(画面で入力)。履歴として残す。 */
+  /** 停止の理由(画面で入力)。履歴として残す。 */
   stopped_reason: string | null;
+  last_received_at: string | null;
 }
 
 export interface MeasurementSiteWithDomains extends MeasurementSite {
@@ -151,7 +153,7 @@ export async function updateMeasurementSiteDomains(
 }
 
 /**
- * R275: 計測を止める。行は消さず、サイトと許可ドメイン・これまでの
+ * 計測を止める。行は消さず、サイトと許可ドメイン・これまでの
  * 記録は残る。止めると公開口は成果を受け付けなくなる。
  * すでに止まっているサイトへの重ねがけは 'already_stopped' を返す。
  */
@@ -172,7 +174,7 @@ export async function stopMeasurementSite(
   return result.meta.changes > 0 ? 'stopped' : 'already_stopped';
 }
 
-/** R275: 止めた計測をもう一度受け付ける。止まっていなければ 'not_stopped'。 */
+/** 止めた計測をもう一度受け付ける。止まっていなければ 'not_stopped'。 */
 export async function resumeMeasurementSite(
   db: D1Database,
   siteId: string,
@@ -289,7 +291,7 @@ export async function getReversedEventIds(
   eventIds: string[],
 ): Promise<Set<string>> {
   if (eventIds.length === 0) return new Set();
-  const placeholders = eventIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(eventIds).sql;
   const rows = await db
     .prepare(
       `SELECT conversion_event_id, kind FROM conversion_event_reversals r
@@ -301,7 +303,7 @@ export async function getReversedEventIds(
                  OR (newer.created_at = r.created_at AND newer.rowid > r.rowid))
           )`,
     )
-    .bind(...eventIds)
+    .bind(...(eventIds.length ? sqlIdSet(eventIds).binds : []))
     .all<{ conversion_event_id: string; kind: string }>();
   return new Set(
     rows.results.filter((r) => r.kind === 'reverse').map((r) => r.conversion_event_id),
@@ -363,7 +365,7 @@ export async function getReversalMetricsByPoint(
   pointIds: string[],
 ): Promise<Map<string, { count: number; value: number }>> {
   if (pointIds.length === 0) return new Map();
-  const placeholders = pointIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(pointIds).sql;
   const rows = await db
     .prepare(
       `SELECT ce.conversion_point_id, COUNT(*) AS cnt,
@@ -382,9 +384,17 @@ export async function getReversalMetricsByPoint(
           )
         GROUP BY ce.conversion_point_id`,
     )
-    .bind(...pointIds)
+    .bind(...(pointIds.length ? sqlIdSet(pointIds).binds : []))
     .all<{ conversion_point_id: string; cnt: number; val: number }>();
   return new Map(
     rows.results.map((r) => [r.conversion_point_id, { count: Number(r.cnt), value: Number(r.val) }]),
   );
+}
+
+/** 許可ドメイン・同意済みの受信。URLや訪問者情報は保存しない。 */
+export async function recordMeasurementSiteReceipt(db: D1Database, siteId: string, lineAccountId: string, at = jstNow()): Promise<void> {
+  await db.prepare(`UPDATE measurement_sites SET last_received_at = ?
+    WHERE id = ? AND line_account_id = ? AND stopped_at IS NULL
+      AND (last_received_at IS NULL OR julianday(last_received_at) < julianday(?))`)
+    .bind(at, siteId, lineAccountId, at).run();
 }

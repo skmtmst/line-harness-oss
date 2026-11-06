@@ -16,7 +16,7 @@ import {
   getReminderDeliveryRunSummary,
   listReminderDeliveryRuns,
   retryReminderDeliveryRun,
-} from '../src/reminders.js'
+} from '../src/reminders/index.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -68,8 +68,8 @@ describe('リマインダ実行記録', () => {
         (id, reminder_id, offset_minutes, message_type, message_content)
       VALUES ('step-1', 'reminder-1', -60, 'text', 'ご来店をお待ちしています');
       INSERT INTO friend_reminders
-        (id, friend_id, reminder_id, target_date, status)
-      VALUES ('enrollment-1', 'friend-1', 'reminder-1', '2026-08-28T10:00:00.000Z', 'active');
+        (id, friend_id, reminder_id, target_date, status, created_at, updated_at)
+      VALUES ('enrollment-1', 'friend-1', 'reminder-1', '2026-08-28T10:00:00.000Z', 'active', '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z');
     `)
   })
 
@@ -151,7 +151,7 @@ describe('リマインダ実行記録', () => {
       message: 'LINEへの送信に一時的に失敗しました。自動で再試行します。',
       retryAt: '2026-08-28T09:05:00.000Z',
       now: '2026-08-28T09:00:01.000Z',
-      // R340: 持ち主の貸出期限が合うときだけ失敗を記録する。
+      // 持ち主の貸出期限が合うときだけ失敗を記録する。
       expectedLeaseExpiresAt: run!.lease_expires_at,
     })
 
@@ -181,7 +181,7 @@ describe('リマインダ実行記録', () => {
       now: '2026-08-28T09:06:00.000Z',
     })
     expect(scheduled?.kind).toBe('scheduled')
-    // R342: 手動再試行でも同じ通知には同じ X-Line-Retry-Key を使い回す。
+    // 手動再試行でも同じ通知には同じ X-Line-Retry-Key を使い回す。
     expect(scheduled?.run.line_retry_key).toBe(oldRetryKey)
     expect(sqlite.prepare(
       `SELECT status FROM friend_reminders WHERE id = 'enrollment-1'`,
@@ -246,6 +246,9 @@ describe('リマインダ実行記録', () => {
       errors: 0,
       targetCount: 1,
       nextScheduledAt: null,
+      sentThisMonth: 0,
+      scheduledNext24Hours: 0,
+      scheduledNext7Days: 0,
     })
     const list = await listReminderDeliveryRuns(db, {
       reminderId: 'reminder-1',

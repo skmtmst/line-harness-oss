@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { stealthChunkSize } from './broadcast.js';
+import { stealthChunkSize } from '../features/broadcasts/broadcast.js';
 
 describe('時間をかけて配る', () => {
   it('0分なら全員を1回で送る（従来どおり）', () => {

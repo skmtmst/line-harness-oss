@@ -6,12 +6,13 @@ import { describe, expect, it } from 'vitest'
 const DIR = __dirname
 const files = fs.readdirSync(DIR)
 const read = (name: string) => fs.readFileSync(path.join(DIR, name), 'utf8')
-const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
+// 共通の太さの値も同じ2pxとして検査する。実際の幅・色・重なりは実ブラウザでも確かめる。
+const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/var\(--polish-focus-width\)/g, '2px')
 
 /**
  * **押せる部品には、キーボードのフォーカスが見えること。**
  *
- * 最初の3部品はフォーカス指定が0件だった（`docs/v6-common-rules.md` §5-6）。
+ * 最初の3部品はフォーカス指定が0件だった（`docs/v8-design-rules.md` §5）。
  * キーボードだけで操作する人が、**いまどこにいるか分からなくなる。**
  *
  * これまでは部品を名指しで見ていたので、**新しく足した部品は見張られない。**
@@ -26,7 +27,7 @@ const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
 
 /** 自分で押せる要素を描いている部品（共通 Button を使うだけの部品は対象外）。 */
 function drawsOwnControl(src: string): boolean {
-  return /<button|<a\s|role="button"|tabIndex=|<summary|<details|<input|<select|<textarea/.test(src)
+  return /<button|<a\s|role="button"|<[a-z][\w-]*\b[^>]*\btabIndex=|<summary|<details|<input|<select|<textarea/.test(src)
 }
 
 const PARTS = files
@@ -48,7 +49,8 @@ describe('押せる部品のフォーカスが見える', () => {
   it('自前の CSS を持つ部品は :focus-visible を持つ', () => {
     const missing = PARTS.filter((p) => {
       const css = cssOf(p.base)
-      return css !== undefined && !/:focus-visible/.test(withoutComments(read(css)))
+      const commonInput = p.src.includes('data-input-field') && /:focus-visible/.test(withoutComments(read('input-field-ring.css')))
+      return css !== undefined && !commonInput && !/:focus-visible/.test(withoutComments(read(css)))
     }).map((p) => p.base)
     expect(missing, '押せる部品にフォーカスの輪郭が無い').toEqual([])
   })
@@ -58,32 +60,27 @@ describe('押せる部品のフォーカスが見える', () => {
     // 例外: 外側の枠が `:focus-within` で ring を出す複合部品
     // （Combobox・MultiSelect）は、中の input の輪郭を消して
     // 外枠の ring を正本にする。二重の輪郭を避けるため。
-    // SearchField は例外にしない。外枠 ring では Tab 点検が反応せず、
-    // 輪郭は中の input 自身に出す（2026-09-25）。
+    // V8 SearchField は :has(:focus-visible) で外枠に輪郭を出し、内側と重ねない。
     // 緑は「正常」の意味なので、輪郭の色は action にそろえる。
     for (const name of files.filter((n) => n.endsWith('.css'))) {
       const css = withoutComments(read(name))
-      if (/:focus-within\s*\{[^}]*outline:\s*2px solid var\(--color-action\)/.test(css)) continue
-      expect(css, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)\b/)
+      if (/:(?:focus-within|has\(:focus-visible\))\s*\{[^}]*outline:\s*2px solid var\(--color-focus-ring\)/.test(css)) continue
+      // 通常時だけ輪郭を消す指定は、キーボードの輪郭を消さない。
+      const focusCss = css.replace(/([^{}]+)\{([^{}]*)\}/g, (rule, selectors) =>
+        selectors.split(',').every((selector: string) => selector.includes(':not(:focus-visible)')) ? '' : rule,
+      )
+      expect(focusCss, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)\b/)
     }
   })
 
-  it('入力欄の輪郭は action 色で2px・外側に余白', () => {
-    // TextField・Select・DateField ほか、入力欄のフォーカスは
-    // `2px・action 色・outline-offset: 2px` にそろえる。
-    // 緑（accent 系）は「正常」の意味なので輪郭に使わない。
-    // 白地で 3:1 未満の緑枠だけの変化はやめる。
-    const targets = [
-      'text-field.module.css',
-      'form-controls.module.css',
-      'select.module.css',
-      'date-field.module.css',
-    ]
-    for (const name of targets) {
-      const css = withoutComments(read(name))
-      expect(css, `${name} の輪郭が action 色ではない`).toMatch(/:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--color-action\)/)
-      expect(css, `${name} に緑の輪郭が残っている`).not.toMatch(/:focus-visible[^{]*\{[^}]*var\(--color-accent/)
-    }
+  it('入力欄の線は共通の太さ・青と赤・枠の上で決める', () => {
+    const css = withoutComments(read('input-field-ring.css'))
+    const colors = [...css.matchAll(/--polish-input-ring-color:\s*([^;]+);/g)].map(match => match[1])
+    expect({
+      colors,
+      outline: /outline:\s*([^;]+);/.exec(css)?.[1],
+      offset: /outline-offset:\s*([^;]+);/.exec(css)?.[1],
+    }).toEqual({ colors: ['var(--polish-focus)', 'var(--color-danger)'], outline: '2px solid var(--polish-input-ring-color)', offset: 'var(--polish-focus-input-offset)' })
   })
 
   it('Tailwind でもフォーカスの輪郭を消さない', () => {

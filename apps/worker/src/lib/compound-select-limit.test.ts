@@ -1,33 +1,7 @@
 /*
- * 実行時SQLの compound SELECT（`UNION` / `UNION ALL`）が、D1 の
- * `SQLITE_MAX_COMPOUND_SELECT` を超えていないことを走査する試験（票 #717）。
- *
- * 上限5という数字の出どころ: D1 の `SQLITE_MAX_COMPOUND_SELECT` を
- * `wrangler d1 execute --local` で実測した値（手元の better-sqlite3 は
- * 既定500なので、この試験が無いと素通りする）。
- *
- * 実際に起きた不具合（N-717）は、`apps/worker/src/routes/friends.ts` の
- * 友だちタイムラインの問い合わせが8項の compound SELECT になっており、
- * better-sqlite3 を使う手元の試験ではどれも気づけなかった、というもの。
- * この試験は「次に誰かが6項以上の compound SELECT を書いた瞬間に赤くなる」
- * 蓋として置く（migration 側の同種の走査は #713 が
- * `packages/db/migrations/` に対して作る。対象がここと重ならない：
- * こちらは実行時SQL）。
- *
- * `packages/db/src` も対象に含めている理由: 独立審査（PR #1585）が同じ
- * 走査を当てたところ、`packages/db/src/templates.ts` に上限ちょうど
- * （5項）の問い合わせが実在し、`apps/worker/src` だけの走査では
- * 見張れていないと指摘された。いま違反はまだ無いが、あと1項足せば
- * D1で落ちる（この票が直したのと同じ形の事故）ため、走査対象を広げた。
- *
- * 括弧の深さごとに独立したカウンタを持たせている理由: 例えば
- *   WITH group_a AS ( SELECT ... UNION ALL SELECT ... UNION ALL SELECT ... )
- *   ...
- * のように、同じ深さに複数の独立した括弧ブロックがあるとき、
- * 深さだけでグルーピングすると別ブロックの UNION 数を合算してしまう
- * （false positive）。ネストのたびに新しいカウンタを積み、閉じ括弧で
- * そのブロックだけの項数を確定させることで、CTE で正しく割ったクエリは
- * 誤検知しない。
+ * D1 の SQLITE_MAX_COMPOUND_SELECT は実測5項で、better-sqlite3 の既定500項とは異なるため、実行時 SQL の UNION / UNION ALL の項数を走査する。
+ * Worker と packages/db/src の SQL を対象にする。マイグレーションは別の検査が担当する。
+ * 独立した CTE の UNION 数を合算しないよう、括弧へ入るたびにカウンタを積み、閉じるとそのブロックだけを確定する。
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
@@ -39,11 +13,7 @@ import { describe, expect, test } from 'vitest';
 const D1_MAX_COMPOUND_SELECT_TERMS = 5;
 
 /**
- * 走査対象のルート。`label` は違反報告の先頭に付け、どちらの配下かを
- * すぐ分かるようにする。`packages/db/src` は所有パス外だったが、
- * PR #1585 の審査で「上限ちょうどの問い合わせが実在し見張られていない」
- * と指摘され、司令塔の裁定で走査対象に加えた（`packages/db/src` の
- * 実装ファイルそのものは触っていない）。
+ * Worker と DB 共通処理の実行時 SQL をともに検査する。label は違反箇所がどちらの配下かを示す。
  */
 const SCAN_ROOTS = [
   { label: 'apps/worker/src', dir: join(process.cwd(), 'src') },

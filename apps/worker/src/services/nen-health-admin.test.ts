@@ -1,5 +1,5 @@
 /*
- * 健康日記の管理画面（★V6 37-4）：記録から「気になる変化」を出す計算を固定する。
+ * 健康日記の管理画面（★37-4）：記録から「気になる変化」を出す計算を固定する。
  */
 import { describe, expect, it } from 'vitest';
 import { lastLoggedLabel, summarizePetHealth, thirtyDaySummary, type HealthLogRow } from './nen-health-admin.js';
@@ -34,7 +34,7 @@ describe('summarizePetHealth', () => {
   it('「正常」以外の便が 3 回続くと印。2 回では付かない（監査 R61: 利用者側のケア共有と同じ基準）', () => {
     expect(summarizePetHealth([log(0, null, 'diarrhea'), log(1, null, 'bloody'), log(2, null, 'diarrhea')], today).changes.map((c) => c.key)).toEqual(['stool_abnormal']);
     expect(summarizePetHealth([log(0, null, 'diarrhea'), log(1, null, 'diarrhea'), log(2, null, 'normal')], today).changes).toEqual([]);
-    // やわらかい便だけでも3回続けば印が立つ（以前は管理側だけ下痢・血便に限っていた）。
+    // 利用者側と同じく、やわらかい便も3回続けば気になる変化として扱う。
     expect(summarizePetHealth([log(0, null, 'soft'), log(1, null, 'soft'), log(2, null, 'soft')], today).changes.map((c) => c.key)).toEqual(['stool_abnormal']);
     expect(summarizePetHealth([log(0, null, 'soft'), log(1, null, 'soft')], today).changes).toEqual([]);
   });
@@ -83,4 +83,18 @@ describe('thirtyDaySummary', () => {
     expect(s.logs[0].loggedOn).toBe('2026-09-17');
     expect(s.logs).toHaveLength(3);
   });
+});
+
+
+it.each(['2026-09-30T15:00:00Z', '2026-09-30T23:59:59Z', '2026-10-01T00:00:00Z'])('日本時間の同じ朝は日数・8週・30日の境界が変わらない: %s', (at) => {
+  const rows = [
+    { ...log(0, 4), logged_on: '2026-10-01' },
+    { ...log(0, 3), logged_on: '2026-09-02' },
+    { ...log(0, 2), logged_on: '2026-09-01' },
+  ];
+  const summary = summarizePetHealth(rows, new Date(at));
+  expect(summary.daysSinceLast).toBe(0);
+  expect(summary.weightSeries[7]).toBe(4);
+  expect(summary.count30d).toBe(2);
+  expect(thirtyDaySummary(rows, new Date(at)).logs.map(row => row.loggedOn)).toEqual(['2026-10-01', '2026-09-02']);
 });

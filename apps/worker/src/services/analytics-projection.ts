@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   rebuildAnalyticsDailyMetricsChunk,
   recentAnalyticsProjectionRange,
@@ -7,6 +8,7 @@ import {
   saveAnalyticsProjectionSchedulerCursor,
   type LineAccount,
 } from '@line-crm/db';
+
 import { featureJobCanRun } from './feature-enforcement.js';
 
 export interface AnalyticsProjectionRefreshResult {
@@ -43,13 +45,12 @@ export async function refreshRecentAnalyticsProjections(
   const schedulerCursor = await getAnalyticsProjectionSchedulerCursor(db, cutoffAt);
   const account = selectNextAnalyticsProjectionAccount(accounts, schedulerCursor);
   if (!account) return result;
-  // 機能オフ中は集計も記録もしない。巡回は進むため他アカウントは止まらず、
-  // 再オン後の巡回で再開する。
-  if (!await featureJobCanRun(db, { accountId: account.id, featureId: 'analytics', job: 'analytics projection' })) {
-    return result;
-  }
-  result.processed = 1;
   try {
+    // OFFでもfinallyで巡回は進める。集計・カバレッジの書き込みは行わない。
+    if (!await featureJobCanRun(db, { accountId: account.id, featureId: 'analytics', job: 'analytics projection' })) {
+      return result;
+    }
+    result.processed = 1;
     // 現在のWorkerが受付開始から欠けなく記録できる種類だけを「取得可能」にする。
     // 未接続のフォーム・購入などを0件として見せないため、全種類は登録しない。
     await ensureAnalyticsEventCoverage(db, {
@@ -75,11 +76,7 @@ export async function refreshRecentAnalyticsProjections(
     else result.mismatched = 1;
   } catch (error) {
     result.failed = 1;
-    console.error(JSON.stringify({
-      event: 'analytics_projection_failed',
-      line_account_id: account.id,
-      reason: error instanceof Error ? error.message : 'unknown',
-    }));
+    logger.error("analytics.refresh_projection_failed");
   } finally {
     // 成否に関係なく次のアカウントへ進め、大きい・壊れた1社が他社を塞がないようにする。
     await saveAnalyticsProjectionSchedulerCursor(db, account.id, cutoffAt);

@@ -10,8 +10,8 @@ import {
   deleteUnusedConversionDefinition,
   replaceConversionDefinitionUsages,
   stopConversionDefinition,
-} from '../src/conversion-definitions.js';
-import { updateConversionPoint } from '../src/conversions.js';
+} from '../src/conversion-definitions/index.js';
+import { updateConversionPoint } from '../src/conversions/index.js';
 
 /*
  * 置換処理の事前読込と書込みのあいだに、別接続が置換先をstop/update/deleteして

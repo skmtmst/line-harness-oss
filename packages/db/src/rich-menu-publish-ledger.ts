@@ -1,6 +1,6 @@
 import { jstNow } from './utils.js';
 
-// K(#822)・O(公開前の確認)の台帳。版・公開の実行・ページの実行・
+// K・O(公開前の確認)の台帳。版・公開の実行・ページの実行・
 // 実機の確認を残す。実行の仕組み（lease・journal）は
 // rich-menu-manual-publish.ts が担い、ここは見せるための記録だけを持つ。
 
@@ -197,7 +197,7 @@ export async function getLatestRichMenuPublishRun(
 }
 
 /**
- * K-2 照合用。アカウント内で誰かが指している LINE メニュー ID を全部集める。
+ * 照合用。アカウント内で誰かが指している LINE メニュー ID を全部集める。
  * ページの記録と、公開runが作った shell の両方を見る。LINE 側にだけある
  * メニュー（取り込み候補）を見つけるための除外表。
  */

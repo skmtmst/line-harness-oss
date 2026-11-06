@@ -1,47 +1,17 @@
-import { Hono, type Context } from 'hono';
+import { logger } from '@line-crm/shared/server';
+import { accountScopeWhere, accountScopeBindings, adminAccountScope, visibleAccountNames } from '../services/profile-refresh-scope.js';
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { Hono } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { resolveLineCredential } from '@line-crm/db';
-import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { getBroadcastById, resolveLineCredential } from '@line-crm/db';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { listLimit } from './list-pagination.js';
-
+import { parseOffsetPaging, buildOffsetListResponse, listLimit, listQueryNumber } from '../lib/list-paging.js';
+import { fail } from '../lib/fail.js';
 const profileRefresh = new Hono<Env>();
-
-function accountScopeWhere(
-  scope: { allowedAccountIds: string[]; canSeeUnassigned: boolean },
-  accountColumn: string,
-): string {
-  const where = scope.allowedAccountIds.length
-    ? `AND (${accountColumn} IN (SELECT value FROM json_each(?))${scope.canSeeUnassigned ? ` OR ${accountColumn} IS NULL` : ''})`
-    : scope.canSeeUnassigned
-      ? `AND ${accountColumn} IS NULL`
-      : 'AND 1 = 0';
-  return where;
-}
-
-function accountScopeBindings(scope: { allowedAccountIds: string[] }): unknown[] {
-  return scope.allowedAccountIds.length ? [JSON.stringify(scope.allowedAccountIds)] : [];
-}
-
-async function adminAccountScope(c: Context<Env>, accountColumn = 'f.line_account_id') {
-  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  const where = accountScopeWhere(scope, accountColumn);
-  return { scope, where };
-}
-
-async function visibleAccountNames(
-  db: D1Database,
-  allowedAccountIds: string[],
-): Promise<Map<string, string>> {
-  if (allowedAccountIds.length === 0) return new Map();
-  const result = await db.prepare(
-    `SELECT id, name FROM line_accounts
-      WHERE id IN (SELECT value FROM json_each(?))`,
-  ).bind(JSON.stringify(allowedAccountIds)).all<{ id: string; name: string }>();
-  return new Map(result.results?.map((account) => [account.id, account.name]) ?? []);
-}
 
 /**
  * 友だち全員のプロフィール (display_name / picture_url / status_message) を
@@ -51,17 +21,17 @@ async function visibleAccountNames(
  * cross-account dedup が壊れて同一人物が別人カウントされる。
  *
  * 動作: ?offset & ?limit でバッチ処理。 ?accountId で単一アカウントに絞れる。
- * 内部で account ごとに channel_access_token を選んで getProfile() を呼ぶ。
+ * 内部で account ごとに channel_access_token を選んで getProfile を呼ぶ。
  *
  * Caller (cron / curl) は hasMore=false まで offset を進めて再 POST する想定。
  */
-profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (c) => {
-  const offset = Number.parseInt(c.req.query('offset') ?? '0', 10);
+profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), inputJsonBoundary(), async (c) => {
+  const offset = listQueryNumber(c.req.query('offset'), 0, { format: 'integer-prefix' });
   const limit = listLimit(c.req.query('limit'), 100, 500);
   const accountIdFilter = c.req.query('accountId') ?? null;
 
   if (!Number.isFinite(offset) || offset < 0) {
-    return c.json({ success: false, error: 'invalid offset' }, 400);
+    return inputError(c, { success: false, error: 'invalid offset' }, 400, ["offset"]);
   }
 
   const db = c.env.DB;
@@ -153,7 +123,7 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
           notFound += 1;
         } else {
           otherErrors += 1;
-          console.error(`refresh-profile failed friend=${row.id}:`, msg);
+          logger.error("profile_refresh.admin_refresh_profiles_create_failed");
         }
       } finally {
         processed += 1;
@@ -185,16 +155,32 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
  * messages_log がゼロ件であることを安全条件に強制する (誤って配信済の
  * broadcast を reset してしまうと送信痕跡が消えて重複配信のリスクがある)。
  */
-profileRefresh.post('/api/admin/broadcasts/:id/reset-to-draft', requireRole('owner'), async (c) => {
+profileRefresh.post('/api/admin/broadcasts/:id/reset-to-draft', requireRole('owner'), inputJsonBoundary(), async (c) => {
   const id = c.req.param('id');
   const db = c.env.DB;
+
+  const broadcast = await getBroadcastById(db, id);
+  if (!broadcast) return c.json({ success: false, error: 'Not found' }, 404);
+  let accounts: Array<string | null> = [broadcast.line_account_id ?? null];
+  if (broadcast.target_type === 'multi-account-dedup') {
+    try {
+      const parsed: unknown = JSON.parse(broadcast.account_ids ?? 'null');
+      if (!Array.isArray(parsed) || !parsed.length || parsed.some(id => typeof id !== 'string' || !id)) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      accounts = [...parsed, ...(broadcast.line_account_id ? [broadcast.line_account_id] : [])];
+    } catch { return c.json({ success: false, error: 'Not found' }, 404); }
+  }
+  if (!await canAccessAllLineAccounts(db, c.get('staff'), accounts)) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
 
   const logged = await db
     .prepare('SELECT COUNT(*) AS cnt FROM messages_log WHERE broadcast_id = ?')
     .bind(id)
     .first<{ cnt: number }>();
   if (!logged) {
-    return c.json({ success: false, error: 'broadcast not found or query failed' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND_OR_QUERY_FAILED');
   }
   if (logged.cnt > 0) {
     return c.json({
@@ -234,15 +220,18 @@ profileRefresh.post('/api/admin/broadcasts/:id/reset-to-draft', requireRole('own
  * 使い方: video-launch-rest が test-100/500/2000 既送ユーザーと cross-account で
  * 重複してないか確認する用。
  */
-profileRefresh.post('/api/admin/tag-leak-check', requireRole('owner'), async (c) => {
+profileRefresh.post('/api/admin/tag-leak-check', requireRole('owner'), inputJsonBoundary({"tagsA":["array"],"tagsB":["array"]}), async (c) => {
   const body = await c.req.json<{ tagsA: string[]; tagsB: string[] }>();
   if (!Array.isArray(body.tagsA) || !Array.isArray(body.tagsB)) {
-    return c.json({ success: false, error: 'tagsA/tagsB must be string arrays' }, 400);
+    return inputError(c, { success: false, error: 'tagsA/tagsB must be string arrays' }, 400, ["tagsA","tagsB"]);
   }
   const db = c.env.DB;
+  const scope = await getVisibleLineAccountScope(db, c.get('staff'));
+  const friendScope = accountScopeWhere(scope, 'f.line_account_id');
+  const bindings = accountScopeBindings(scope);
 
   const buildIdentSql = (tagNames: string[]) => {
-    const placeholders = tagNames.map(() => '?').join(',');
+    const placeholders = sqlIdSet(tagNames).sql;
     return `
       SELECT DISTINCT COALESCE(
         CASE
@@ -254,7 +243,7 @@ profileRefresh.post('/api/admin/tag-leak-check', requireRole('owner'), async (c)
       INNER JOIN friend_tags ft ON ft.friend_id = f.id
       INNER JOIN tags t ON t.id = ft.tag_id
       WHERE t.name IN (${placeholders})
-        AND f.is_following = 1
+        AND f.is_following = 1 ${friendScope}
     `;
   };
 
@@ -267,7 +256,7 @@ profileRefresh.post('/api/admin/tag-leak-check', requireRole('owner'), async (c)
       (SELECT COUNT(*) FROM b) AS unique_b,
       (SELECT COUNT(*) FROM a WHERE ident_key IN (SELECT ident_key FROM b)) AS leaked
   `;
-  const row = await db.prepare(sql).bind(...body.tagsA, ...body.tagsB).first<{
+  const row = await db.prepare(sql).bind(...sqlIdSet(body.tagsA).binds, ...bindings, ...sqlIdSet(body.tagsB).binds, ...bindings).first<{
     unique_a: number;
     unique_b: number;
     leaked: number;
@@ -287,12 +276,16 @@ profileRefresh.post('/api/admin/tag-leak-check', requireRole('owner'), async (c)
  * cross-account 相当の人物単位検出も含めるため、tag 内 friend の ident_key と
  * 同一の ident_key を持つ別 friend が既受信なら counted (= 別アカで受信済 person)。
  */
-profileRefresh.post('/api/admin/content-leak-check', requireRole('owner'), async (c) => {
+profileRefresh.post('/api/admin/content-leak-check', requireRole('owner'), inputJsonBoundary({"tagName":["string"],"contentSubstring":["string"]}), async (c) => {
   const body = await c.req.json<{ tagName: string; contentSubstring: string }>();
   if (typeof body.tagName !== 'string' || typeof body.contentSubstring !== 'string' || !body.contentSubstring) {
-    return c.json({ success: false, error: 'tagName + contentSubstring required' }, 400);
+    return inputError(c, { success: false, error: 'tagName + contentSubstring required' }, 400, ["tagName","contentSubstring"]);
   }
   const db = c.env.DB;
+  const scope = await getVisibleLineAccountScope(db, c.get('staff'));
+  const friendScope = accountScopeWhere(scope, 'f.line_account_id');
+  const messageScope = accountScopeWhere(scope, 'COALESCE(ml.line_account_id, f.line_account_id)');
+  const bindings = accountScopeBindings(scope);
   const idCol = `COALESCE(
     CASE
       WHEN f.picture_url LIKE 'https://sprofile.line-scdn.net/%' THEN SUBSTR(f.picture_url, 42, 80)
@@ -305,14 +298,14 @@ profileRefresh.post('/api/admin/content-leak-check', requireRole('owner'), async
       FROM friends f
       INNER JOIN friend_tags ft ON ft.friend_id = f.id
       INNER JOIN tags t ON t.id = ft.tag_id
-      WHERE t.name = ? AND f.is_following = 1
+      WHERE t.name = ? AND f.is_following = 1 ${friendScope}
     ),
     received AS (
       -- 任意の friend_id (同一 + 別人物含む) で content マッチした受信者
       SELECT DISTINCT f.id AS friend_id, ${idCol} AS ident_key
       FROM friends f
       INNER JOIN messages_log ml ON ml.friend_id = f.id
-      WHERE ml.direction = 'outgoing' AND ml.content LIKE ?
+      WHERE ml.direction = 'outgoing' AND ml.content LIKE ? ${friendScope} ${messageScope}
     )
     SELECT
       (SELECT COUNT(DISTINCT ident_key) FROM tag_friends) AS unique_in_tag,
@@ -323,7 +316,7 @@ profileRefresh.post('/api/admin/content-leak-check', requireRole('owner'), async
   `;
   const row = await db
     .prepare(sql)
-    .bind(body.tagName, '%' + body.contentSubstring + '%')
+    .bind(body.tagName, ...bindings, '%' + body.contentSubstring + '%', ...bindings, ...bindings)
     .first<{
       unique_in_tag: number;
       same_friend_overlap: number;
@@ -337,9 +330,13 @@ profileRefresh.post('/api/admin/content-leak-check', requireRole('owner'), async
  * 配信状況の包括メトリクスを返す。account 別の friend 数 / 受信済人数、人物単位
  * (ident_key) の重複/未到達数、rest 配信時の重複予測などを一発で出す。
  */
-profileRefresh.post('/api/admin/broadcast-coverage', requireRole('owner'), async (c) => {
+profileRefresh.post('/api/admin/broadcast-coverage', requireRole('owner'), inputJsonBoundary({"tagName":["string"],"contentSubstring":["string"]}), async (c) => {
   const body = await c.req.json<{ tagName: string; contentSubstring: string }>();
   const db = c.env.DB;
+  const scope = await getVisibleLineAccountScope(db, c.get('staff'));
+  const friendScope = accountScopeWhere(scope, 'f.line_account_id');
+  const messageScope = accountScopeWhere(scope, 'COALESCE(ml.line_account_id, f.line_account_id)');
+  const bindings = accountScopeBindings(scope);
 
   const idCol = `COALESCE(
     CASE
@@ -361,14 +358,14 @@ profileRefresh.post('/api/admin/broadcast-coverage', requireRole('owner'), async
     LEFT JOIN messages_log ml
       ON ml.friend_id = f.id
       AND ml.direction = 'outgoing'
-      AND ml.content LIKE ?
-    WHERE la.is_active = 1
+      AND ml.content LIKE ? ${messageScope}
+    WHERE la.is_active = 1 ${accountScopeWhere(scope, 'la.id')}
     GROUP BY la.id, la.name
     ORDER BY friends_total DESC
   `;
   const perAccount = await db
     .prepare(perAccountSql)
-    .bind('%' + body.contentSubstring + '%')
+    .bind('%' + body.contentSubstring + '%', ...bindings, ...bindings)
     .all<{ account_id: string; account_name: string; friends_total: number; friends_received: number }>();
 
   // 2. 人物単位 (ident_key) の集計
@@ -377,13 +374,13 @@ profileRefresh.post('/api/admin/broadcast-coverage', requireRole('owner'), async
       SELECT f.id, f.line_account_id, ${idCol} AS ident_key
       FROM friends f
       INNER JOIN line_accounts la ON la.id = f.line_account_id
-      WHERE f.is_following = 1 AND la.is_active = 1
+      WHERE f.is_following = 1 AND la.is_active = 1 ${friendScope}
     ),
     received AS (
       SELECT DISTINCT f.id AS friend_id, ${idCol} AS ident_key
       FROM friends f
       INNER JOIN messages_log ml ON ml.friend_id = f.id
-      WHERE ml.direction = 'outgoing' AND ml.content LIKE ?
+      WHERE ml.direction = 'outgoing' AND ml.content LIKE ? ${friendScope} ${messageScope}
     )
     SELECT
       (SELECT COUNT(DISTINCT ident_key) FROM all_following) AS unique_total,
@@ -393,7 +390,7 @@ profileRefresh.post('/api/admin/broadcast-coverage', requireRole('owner'), async
   `;
   const person = await db
     .prepare(personSql)
-    .bind('%' + body.contentSubstring + '%')
+    .bind(...bindings, '%' + body.contentSubstring + '%', ...bindings, ...bindings)
     .first<{ unique_total: number; unique_received: number; unique_not_received: number }>();
 
   // 3. tag 内の重複漏れ詳細 — 「rest 配信したらどのアカで何人 leak するか」
@@ -405,13 +402,13 @@ profileRefresh.post('/api/admin/broadcast-coverage', requireRole('owner'), async
       FROM friends f
       INNER JOIN friend_tags ft ON ft.friend_id = f.id
       INNER JOIN tags t ON t.id = ft.tag_id
-      WHERE t.name = ? AND f.is_following = 1
+      WHERE t.name = ? AND f.is_following = 1 ${friendScope}
     ),
     received AS (
       SELECT DISTINCT f.id AS friend_id, ${idCol} AS ident_key
       FROM friends f
       INNER JOIN messages_log ml ON ml.friend_id = f.id
-      WHERE ml.direction = 'outgoing' AND ml.content LIKE ?
+      WHERE ml.direction = 'outgoing' AND ml.content LIKE ? ${friendScope} ${messageScope}
     )
     SELECT
       tf.line_account_id AS account_id,
@@ -426,7 +423,7 @@ profileRefresh.post('/api/admin/broadcast-coverage', requireRole('owner'), async
   `;
   const tagLeakBreakdown = await db
     .prepare(tagLeakSql)
-    .bind(body.tagName, '%' + body.contentSubstring + '%')
+    .bind(body.tagName, ...bindings, '%' + body.contentSubstring + '%', ...bindings, ...bindings)
     .all<{ account_id: string; account_name: string; rest_unique: number; same_friend_dup: number; person_dup: number }>();
 
   return c.json({
@@ -446,9 +443,13 @@ profileRefresh.post('/api/admin/broadcast-coverage', requireRole('owner'), async
  * 用途: video-launch-rest の中で、test 100/500/2000/test10/直送り 等で既に
  * 動画 URL を受け取ってる人を除外して、二重配信を防ぐ。
  */
-profileRefresh.post('/api/admin/tag-remove-content-dups', requireRole('owner'), async (c) => {
+profileRefresh.post('/api/admin/tag-remove-content-dups', requireRole('owner'), inputJsonBoundary({"tagName":["string"],"contentSubstring":["string"]}), async (c) => {
   const body = await c.req.json<{ tagName: string; contentSubstring: string }>();
   const db = c.env.DB;
+  const scope = await getVisibleLineAccountScope(db, c.get('staff'));
+  const friendScope = accountScopeWhere(scope, 'f.line_account_id');
+  const messageScope = accountScopeWhere(scope, 'COALESCE(ml.line_account_id, f.line_account_id)');
+  const bindings = accountScopeBindings(scope);
 
   const idCol = `COALESCE(
     CASE
@@ -461,21 +462,21 @@ profileRefresh.post('/api/admin/tag-remove-content-dups', requireRole('owner'), 
   // の行を削除する。received CTE は ident_key だけ持てば十分。
   const deleteSql = `
     DELETE FROM friend_tags
-    WHERE tag_id = (SELECT id FROM tags WHERE name = ?)
+    WHERE tag_id IN (SELECT id FROM tags WHERE name = ? ${accountScopeWhere(scope, 'tags.line_account_id')})
       AND friend_id IN (
         WITH received_idents AS (
           SELECT DISTINCT ${idCol} AS ident_key
           FROM friends f
           INNER JOIN messages_log ml ON ml.friend_id = f.id
-          WHERE ml.direction = 'outgoing' AND ml.content LIKE ?
+          WHERE ml.direction = 'outgoing' AND ml.content LIKE ? ${friendScope} ${messageScope}
         )
         SELECT f.id FROM friends f
-        WHERE ${idCol} IN (SELECT ident_key FROM received_idents)
+        WHERE ${idCol} IN (SELECT ident_key FROM received_idents) ${friendScope}
       )
   `;
   const result = await db
     .prepare(deleteSql)
-    .bind(body.tagName, '%' + body.contentSubstring + '%')
+    .bind(body.tagName, ...bindings, '%' + body.contentSubstring + '%', ...bindings, ...bindings, ...bindings)
     .run();
 
   return c.json({
@@ -567,7 +568,7 @@ profileRefresh.get('/api/admin/auto-reply-stats', requireRole('owner'), async (c
  * 直近 N 件の incoming + outgoing messages_log を返す。debug 用。
  */
 profileRefresh.get('/api/admin/recent-messages', requireRole('owner'), async (c) => {
-  const limit = listLimit(c.req.query('limit'), 20, 100);
+  const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, maxLimit: 100 }).limit;
   const db = c.env.DB;
   const adminScope = await adminAccountScope(c, 'COALESCE(ml.line_account_id, f.line_account_id)');
 
@@ -588,9 +589,7 @@ profileRefresh.get('/api/admin/recent-messages', requireRole('owner'), async (c)
 
   const accNameById = await visibleAccountNames(db, adminScope.scope.allowedAccountIds);
 
-  return c.json({
-    success: true,
-    data: (res.results ?? []).map((r) => {
+  const responseItems = (res.results ?? []).map((r) => {
       const row = r as Record<string, unknown>;
       const accId = row.line_account_id as string | null;
       return {
@@ -605,8 +604,8 @@ profileRefresh.get('/api/admin/recent-messages', requireRole('owner'), async (c)
         preview: row.preview,
         createdAt: row.created_at,
       };
-    }),
-  });
+    });
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [] }));
 });
 
 /**
@@ -658,7 +657,7 @@ profileRefresh.get('/api/admin/friend-debug/:id', requireRole('owner'), async (c
     .bind(id, ...accountScopeBindings(adminScope.scope))
     .first();
   if (!friend) {
-    return c.json({ success: false, error: 'Friend not found' }, 404);
+    return fail(c, 404, 'FRIEND_NOT_FOUND');
   }
   const accNameById = await visibleAccountNames(db, adminScope.scope.allowedAccountIds);
   const accId = (friend as Record<string, unknown> | null)?.line_account_id as string | null | undefined;

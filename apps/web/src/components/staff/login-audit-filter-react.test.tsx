@@ -6,10 +6,11 @@ import LoginAudit from './login-audit'
 
 const fixture = vi.hoisted(() => ({
   events: vi.fn(),
+  selectedAccountId: 'account-a' as string | null,
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
+  useAccount: () => ({ selectedAccountId: fixture.selectedAccountId, loading: false }),
 }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -39,6 +40,7 @@ let root: Root
 
 beforeEach(() => {
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+  fixture.selectedAccountId = 'account-a'
   fixture.events.mockReset()
   fixture.events.mockResolvedValueOnce({
     success: true,
@@ -62,6 +64,44 @@ async function settle() {
 }
 
 describe('login audit attention filter', () => {
+  it('does not request tenant-wide history when no LINE account is selected', async () => {
+    fixture.selectedAccountId = null
+    await act(async () => { root.render(<LoginAudit />) })
+    await settle()
+    expect(fixture.events).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('LINEアカウントを選択してください。')
+  })
+
+  it('clears the previous account history when the selected account changes', async () => {
+    fixture.events.mockReset()
+    fixture.events.mockResolvedValueOnce({
+      success: true,
+      data: {
+        items: [{
+          id: 'account-a-event', category: 'business', lineAccountId: 'account-a',
+          actor: { id: 'staff-a', name: 'A専用の担当者', role: 'admin' },
+          action: 'broadcast.send', target: null, result: 'success', before: null, after: null,
+          reason: null, requestTraceId: null, ipPrefix: null, deviceFamily: null,
+          riskLevel: 'normal', retentionClass: 'general', createdAt: '2026-10-01T00:00:00.000Z',
+        }],
+        summary: { ...summary, total: 1 }, pagination: { total: 1, limit: 20, offset: 0 },
+      },
+    })
+    await act(async () => { root.render(<LoginAudit />) })
+    await settle()
+    expect(host.textContent).toContain('A専用の担当者')
+
+    fixture.events.mockResolvedValueOnce({
+      success: true,
+      data: { items: [], summary: { ...summary, total: 0, logins: 0, suspiciousLogins: 0, attention: 0 }, pagination: { total: 0, limit: 20, offset: 0 } },
+    })
+    fixture.selectedAccountId = 'account-b'
+    await act(async () => { root.render(<LoginAudit />) })
+    await settle()
+    expect(fixture.events).toHaveBeenLastCalledWith(expect.objectContaining({ lineAccountId: 'account-b' }))
+    expect(host.textContent).not.toContain('A専用の担当者')
+  })
+
   it('requests the server-side union and keeps retrieval failures visible', async () => {
     fixture.events.mockRejectedValueOnce(new Error('database unavailable'))
     await act(async () => { root.render(<LoginAudit />) })

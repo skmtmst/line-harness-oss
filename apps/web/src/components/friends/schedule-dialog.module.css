@@ -1,0 +1,65 @@
+
+/* ★V8 予約して送るの小窓（板 ）。値は globals.css の --tpl-hb2-*。 */
+.body {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-col-gap);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-field-gap);
+}
+
+.label {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+}
+
+.row {
+  display: flex;
+  gap: var(--tpl-hb2-op-chip-gap);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-hb2-op-field-gap);
+}
+
+.chip {
+  padding: var(--tpl-hb2-sd-chip-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: normal;
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  outline-color: var(--color-focus-ring);
+  background: var(--color-accent-soft);
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+
+
+/* 送るものの欄（絵：高さ 96）。 */

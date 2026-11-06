@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import SupportMarkEditor from '@/components/friend-fields/support-mark-editor'
+import MarkEditorV8 from '@/v8/tags/mark-editor'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import FeatureGate from '@/components/feature-gate'
@@ -24,7 +24,7 @@ function EditSupportMarkPageInner() {
       />
     )
   }
-  return <SupportMarkEditor markId={id} />
+  return <MarkEditorV8 markId={id} />
 }
 
 export default function EditSupportMarkPage() {

@@ -1,3 +1,4 @@
+import { zonedWallTime } from './zoned-time.js';
 import { parseHhMm, toJstParts } from './response-window';
 
 /**
@@ -60,11 +61,16 @@ export function resolveReminderSendAt(
   targetDate: Date,
   step: ReminderStepTiming,
   mode: ReminderDeliveryMode = 'countdown',
+  timeZone = 'Asia/Tokyo',
 ): Date {
   if (mode !== 'time' || !usesDayTiming(step)) {
     return new Date(targetDate.getTime() + step.offsetMinutes * 60_000);
   }
 
+  if (timeZone !== 'Asia/Tokyo') {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(targetDate).map(item=>[item.type,item.value]));
+    return new Date(zonedWallTime(`${p.year}-${p.month}-${p.day}`,step.sendAtTime!,timeZone,step.offsetDays!));
+  }
   const minutes = parseHhMm(step.sendAtTime as string) as number;
   // ゴール日の「日本時間での暦日」を出し、そこから日数をずらす。
   // UTC のまま日を足すと、ゴールが日本時間の朝9時（UTC 前日0時）のときに

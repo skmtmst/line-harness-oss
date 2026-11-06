@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Route-level test for the approval queue endpoints:
-//   GET   /api/conversions/approvals?status=…
-//   PATCH /api/conversions/events/:id/approval
-// The db layer is mocked (real SQL is covered in packages/db/test). Here we
-// assert status validation, the injected IDENTITY_KEY_SQL wiring, duplicateFlag
-// pass-through, and the 404 for missing / non-attributed events.
+// 実 SQL は DB 側で検証し、ここでは承認状態の検証、IDENTITY_KEY_SQL の接続、重複フラグ、不存在・帰属なしの404を確かめる。
 const dbMocks = {
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
@@ -14,10 +9,11 @@ const dbMocks = {
     version: 1,
     data: { features: { affiliates: true } },
   }),
+  getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
-  // conversions route deps
+
   getConversionPoints: vi.fn(),
   getConversionPointById: vi.fn(),
   createConversionPoint: vi.fn(),
@@ -30,8 +26,9 @@ const dbMocks = {
   decideConversionApproval: vi.fn(),
   getApprovalNotificationState: vi.fn(),
   markApprovalNotified: vi.fn(),
+  releaseApprovalNotification: vi.fn(),
   getConversionApprovalNotifyInfo: vi.fn(),
-  // N-212 の案件動作はここでは対象外 — 案件なしとして通す。
+  //  の案件動作はここでは対象外 — 案件なしとして通す。
   getConversionOfferActionPlan: vi.fn().mockResolvedValue(null),
   syncAffiliateConversionMileage: vi.fn().mockResolvedValue(undefined),
   listConversionDefinitions: vi.fn(),
@@ -44,8 +41,7 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
-// Mock the affiliate notifier so the approval route's push is observable
-// without touching LINE / the DB resolution chain.
+// LINE や DB の解決経路を呼ばず通知を観測するため、参加者向け通知だけを差し替える。
 const notifyAffiliateApproval = vi.fn().mockResolvedValue(undefined);
 vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateApproval }));
 
@@ -90,7 +86,7 @@ beforeEach(() => {
     { id: 'account-1', tenant_id: '00000000-0000-4000-8000-000000000001' },
   ]);
   dbMocks.syncAffiliateConversionMileage.mockResolvedValue(undefined);
-  // R354: 承認世代の通知は未送信として扱い、初回承認の通知を通す。
+  // 承認世代の通知は未送信として扱い、初回承認の通知を通す。
   dbMocks.getApprovalNotificationState.mockResolvedValue({
     send: true,
     approvedAt: '2026-09-01T00:00:00.000+09:00',
@@ -124,7 +120,7 @@ describe('GET /api/conversions/approvals', () => {
 
     const callArgs = dbMocks.getConversionApprovalQueue.mock.calls[0][1];
     expect(callArgs.status).toBe('pending');
-    // The route injects the identity-key SQL fragment (referencing friends.*).
+    // friends を参照する本人識別の SQL が渡されることを確かめる。
     expect(String(callArgs.identityKeySql)).toContain('friends');
   });
 
@@ -223,6 +219,7 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
       'aff-1',
       '案件X',
       5000,
+      expect.stringMatching(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/),
     );
   });
 
@@ -270,9 +267,25 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
     expect(res.status).toBe(404);
   });
 
+  it('returns 422 with an operator message when the reward basis is undeterminable (F-23 unbillable)', async () => {
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'unbillable', currentStatus: 'pending' });
+    const res = await req('PATCH', '/api/conversions/events/ev-unpriced/approval', {
+      status: 'approved',
+      expectedStatus: 'pending',
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { success: boolean; error: { code: string }; data: { currentStatus: string } };
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe('approval_unbillable');
+    expect(body.data.currentStatus).toBe('pending');
+    // 承認していないので台帳同期・通知・案件動作へ進まない。
+    expect(dbMocks.syncAffiliateConversionMileage).not.toHaveBeenCalled();
+    expect(notifyAffiliateApproval).not.toHaveBeenCalled();
+  });
+
   it('returns 200 without calling notifyAffiliate when status is already_set (double-click guard)', async () => {
     dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'already_set', currentStatus: 'approved' });
-    // R354: 同じ承認世代の通知は送り済みなので送らない。
+    // 同じ承認世代の通知は送り済みなので送らない。
     dbMocks.getApprovalNotificationState.mockResolvedValue({
       send: false,
       approvedAt: '2026-09-01T00:00:00.000+09:00',
@@ -289,7 +302,7 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
       'ev-dup',
       'approved',
     );
-    // Critical: notify must NOT be called for an idempotent no-op
+    // 同じ状態への再クリックでは通知しない。
     expect(notifyAffiliateApproval).not.toHaveBeenCalled();
     expect(dbMocks.getConversionApprovalNotifyInfo).not.toHaveBeenCalled();
   });
@@ -318,6 +331,65 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
       'ev-dup',
       '2026-09-01T00:00:00.000+09:00',
     );
+  });
+
+  it('sends only once when the same decision arrives concurrently (R354)', async () => {
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'updated', currentStatus: 'approved' });
+    dbMocks.getConversionApprovalNotifyInfo.mockResolvedValue({
+      affiliateId: 'aff-1',
+      offerName: '案件X',
+      rewardAmount: 5000,
+      notifyOnConversion: true,
+    });
+    // 両方の要求が send=true を見る（読み直しの前に両方が到達）。
+    // CAS は勝った1件だけ通す — 実DBの markApprovalNotified と同じ契約。
+    dbMocks.markApprovalNotified.mockResolvedValue(false);
+    dbMocks.markApprovalNotified.mockResolvedValueOnce(true);
+
+    const [first, second] = await Promise.all([
+      req('PATCH', '/api/conversions/events/ev-1/approval', { status: 'approved', expectedStatus: 'pending' }),
+      req('PATCH', '/api/conversions/events/ev-1/approval', { status: 'approved', expectedStatus: 'pending' }),
+    ]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    // 同じ承認判断の通知は1件だけ。送信権の確保が送信より先。
+    expect(notifyAffiliateApproval).toHaveBeenCalledTimes(1);
+    expect(dbMocks.markApprovalNotified.mock.invocationCallOrder[0]).toBeLessThan(
+      notifyAffiliateApproval.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('releases the claim on send failure so a retry resends without loss (R354)', async () => {
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'updated', currentStatus: 'approved' });
+    dbMocks.getConversionApprovalNotifyInfo.mockResolvedValue({
+      affiliateId: 'aff-1',
+      offerName: '案件X',
+      rewardAmount: 5000,
+      notifyOnConversion: true,
+    });
+    // 通知の失敗だけを1回注入し、承認の成功と通知権の解放を確認する。
+    notifyAffiliateApproval.mockRejectedValueOnce(new Error('push down'));
+
+    const failed = await req('PATCH', '/api/conversions/events/ev-1/approval', {
+      status: 'approved',
+      expectedStatus: 'pending',
+    });
+    // 通知の失敗は承認を巻き添えにしない。
+    expect(failed.status).toBe(200);
+    expect(dbMocks.releaseApprovalNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      'ev-1',
+      '2026-09-01T00:00:00.000+09:00',
+    );
+
+    // 再試行では送り直す（欠落なし）。試行は失敗1＋成功1の2回。
+    const retried = await req('PATCH', '/api/conversions/events/ev-1/approval', {
+      status: 'approved',
+      expectedStatus: 'pending',
+    });
+    expect(retried.status).toBe(200);
+    expect(notifyAffiliateApproval).toHaveBeenCalledTimes(2);
+    expect(notifyAffiliateApproval.mock.calls[1][5]).toBe(notifyAffiliateApproval.mock.calls[0][5]);
   });
 
   it('returns 500 when the mileage projection fails so a retry can repair it', async () => {

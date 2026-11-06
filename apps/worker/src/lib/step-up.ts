@@ -1,10 +1,10 @@
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { consumeStepUpGrant, getAdminSessionByTokenHash } from '@line-crm/db';
-import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth.js';
+import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth/credentials/auth.js';
 
 /**
- * 大事な操作の直前再確認（V：v6-26 §16・v6-30 §14・v6-33 §16）。
+ * 大事な操作の直前再確認（V：-26 §16・-30 §14・-33 §16）。
  *
  * 対象：鍵・トークンの操作、権限の変更、LINE の接続の変更、一斉配信の承認、
  * アカウントの停止・削除。二者承認など後続の高危険操作もここへ乗せる。
@@ -21,6 +21,16 @@ export const STEP_UP_WINDOW_MS = 10 * 60 * 1000;
 
 /** POST /api/auth/step-up が受け付ける目的。ここに無い文字列は発行しない。 */
 export const STEP_UP_PURPOSES = [
+  'privacy.retention',
+  'data.export',
+  'broadcast.send',
+  'ops.impersonation',
+  'secrets.reveal',
+  'auth.api_key',
+  'auth.mfa.policy',
+  'auth.mfa.reenroll',
+  'auth.passkey.register',
+  'auth.passkey.remove',
   'operations.control',
   'affiliate.payout.export',
   'photo.original.download',
@@ -33,6 +43,8 @@ export const STEP_UP_PURPOSES = [
   'broadcast.approval',
   'webhook.api_token',
   'webhook.secret',
+  'ai.settings',
+  'mcp.connection',
 ] as const;
 export type StepUpPurpose = (typeof STEP_UP_PURPOSES)[number];
 
@@ -49,10 +61,13 @@ export async function consumeStepUpToken(
   const token = c.req.header('X-Step-Up-Token')?.trim();
   if (!staff || !token) return false;
   try {
+    // 確認票は発行したセッションに結び付いている。別セッション・終了済み
+    // セッションからの使い回しはここで止まる（fail closed）。
     return await consumeStepUpGrant(c.env.DB, {
       tokenHash: await sha256Hex(token),
       staffId: staff.id,
       purpose,
+      sessionTokenHash: await adminSessionTokenHashFromRequest(c),
     });
   } catch {
     // grant 台帳が読めないときも止める側に倒す（fail closed）。
@@ -64,7 +79,7 @@ export async function consumeStepUpToken(
  * このリクエストが再確認済みか。通せるなら true、止めるなら false。
  * 止める側は 401 + code 'STEP_UP_REQUIRED' で応答を返す。
  */
-export async function sensitiveStepUpSatisfied(
+async function checkSensitiveStepUp(
   c: Context<Env>,
   purpose: StepUpPurpose,
 ): Promise<boolean> {
@@ -92,4 +107,23 @@ export async function sensitiveStepUpSatisfied(
 /** 再確認が要るときの統一応答。 */
 export function stepUpRequiredResponse(c: Context<Env>, detail: string): Response {
   return c.json({ success: false, error: detail, code: 'STEP_UP_REQUIRED' }, 401);
+}
+
+// 同じ要求・目的では実行中の確認を共有する。別要求は D1 上の一度限りの確認票を取り合う。
+const verifiedInRequest = new WeakMap<Context<Env>, Map<StepUpPurpose, Promise<boolean>>>();
+export async function sensitiveStepUpSatisfied(c: Context<Env>, purpose: StepUpPurpose): Promise<boolean> {
+  const purposes = verifiedInRequest.get(c) ?? new Map<StepUpPurpose, Promise<boolean>>();
+  const existing = purposes.get(purpose);
+  if (existing) return existing;
+  const verification = checkSensitiveStepUp(c, purpose);
+  purposes.set(purpose, verification);
+  verifiedInRequest.set(c, purposes);
+  let verified = false;
+  try {
+    verified = await verification;
+    return verified;
+  } finally {
+    // 同じ要求内でも失敗した確認を後続の許可に使わない。
+    if (!verified) purposes.delete(purpose);
+  }
 }

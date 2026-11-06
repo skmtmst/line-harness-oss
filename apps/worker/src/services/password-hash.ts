@@ -1,5 +1,5 @@
 /**
- * パスワードのハッシュ（★V6 36-4 会員登録・メールログイン）。
+ * パスワードのハッシュ（★36-4 会員登録・メールログイン）。
  *
  * Workers 標準の WebCrypto だけで動く PBKDF2-SHA256 を使う（依存を増やさない）。
  * Cloudflare Workers は PBKDF2 の繰り返し回数を 100,000 までに制限しているので、その上限で固定する。
@@ -12,8 +12,8 @@ const ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const HASH_BITS = 256;
 
-/** 8 文字以上・128 文字以内・英字と数字を両方含む（設計 36-4「8文字以上・英数」）。 */
-export const PASSWORD_MIN_LENGTH = 8;
+/** 新規設定と再設定に適用する条件。既存ハッシュのログイン検証には適用しない。 */
+export const PASSWORD_MIN_LENGTH = 13;
 export const PASSWORD_MAX_LENGTH = 128;
 
 export function validatePasswordPolicy(password: string): string | null {
@@ -21,7 +21,10 @@ export function validatePasswordPolicy(password: string): string | null {
   if (password.length < PASSWORD_MIN_LENGTH) return `パスワードは${PASSWORD_MIN_LENGTH}文字以上で入力してください`;
   if (password.length > PASSWORD_MAX_LENGTH) return `パスワードは${PASSWORD_MAX_LENGTH}文字以内で入力してください`;
   if (/\s/.test(password)) return 'パスワードに空白は使えません';
-  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) return 'パスワードは英字と数字の両方を含めてください';
+  if (!/[A-Z]/.test(password)) return 'パスワードは英大文字を1文字以上含めてください';
+  if (!/[a-z]/.test(password)) return 'パスワードは英小文字を1文字以上含めてください';
+  if (!/[0-9]/.test(password)) return 'パスワードは数字を1文字以上含めてください';
+  if (!/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(password)) return 'パスワードは特殊記号を1文字以上含めてください';
   return null;
 }
 
@@ -64,7 +67,9 @@ function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
 
 /** 保存形式が壊れていても例外を出さず false を返す。 */
 export async function verifyPassword(password: string, stored: string | null | undefined): Promise<boolean> {
-  if (!stored || typeof password !== 'string') return false;
+  if (typeof password !== 'string') return false;
+  const missing = !stored;
+  stored ||= `${ALGORITHM}$${ITERATIONS}$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`;
   const [algorithm, iterationsText, saltText, hashText] = stored.split('$');
   if (algorithm !== ALGORITHM || !iterationsText || !saltText || !hashText) return false;
   const iterations = Number.parseInt(iterationsText, 10);
@@ -72,7 +77,7 @@ export async function verifyPassword(password: string, stored: string | null | u
   try {
     const expected = fromBase64(hashText);
     const actual = await derive(password, fromBase64(saltText), iterations);
-    return constantTimeEqual(actual, expected);
+    return constantTimeEqual(actual, expected) && !missing;
   } catch {
     return false;
   }

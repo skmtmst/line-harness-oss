@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 印（チップ）。Pencil V5 の一覧・カードの中で、状態や区分を1語で示す小さな札。
@@ -9,22 +10,13 @@
  */
 
 .chip {
-  display: inline-flex;
-  align-items: center; /* alignItems: center */
-  height: 17px; /* height: 17 */
-  padding: 0 7px; /* padding: [0, 7] */
-  border: 1px solid;
-  border-radius: var(--radius-pill); /* cornerRadius: $radius-full */
-  font-size: var(--text-nano); /* fontSize: $size-nano */
-  font-weight: 700; /* fontWeight: 700 */
+  display: inline-flex; /* alignItems: center */ /* height: 17 */ /* padding: [0, 7] */ /* cornerRadius: $radius-full */ /* fontSize: $size-nano */ /* fontWeight: 500 */
   white-space: nowrap;
 }
 
 /* 落ち着いた印。「同じスイッチ」など、注意ではない補足。 */
 .neutral {
   border-color: var(--color-hairline);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-faint);
 }
 
 /* 数や行き先を示す印。 */
@@ -58,4 +50,61 @@
   background: var(--color-status-danger-soft);
   color: var(--color-danger);
 }
+
+/*
+ * ★V8「タグ」（h7Ch3y）：文字 12px・余白 2/8。中立のタグは
+ * 白地・細い枠・ink-secondary（意味の色を持つ札は状態の札の役目）。
+ */
+:root .chip {
+  height: auto;
+  padding: 2px 8px;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-ui);
 }
+
+:root .neutral {
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+}
+
+:root .chip {
+  flex-shrink: 0;
+  align-items: flex-start;
+  gap: 0;
+  border: 0;
+  border-radius: var(--polish-radius-small);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  font-family: var(--font-sans);
+  line-height: 18px;
+}
+
+}
+:root .chip[data-kind='channel'] {
+  align-items: center;
+  gap: var(--tpl-e1-gap-s);
+  padding: var(--tpl-e1-gap-xxs) var(--tpl-e49-gap-s);
+  border-radius: var(--radius-pill);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-e1-lh-20);
+}
+:root .chip[data-kind='channel']::before {
+  content: '';
+  flex-shrink: 0;
+  width: var(--tpl-e49-gap-s);
+  height: var(--tpl-e49-gap-s);
+  border-radius: var(--radius-pill);
+  background: var(--color-status-info);
+}
+
+/* 色の意味を持つ札だけを状態の札（地の色＋点＋色の字）へ寄せ、分類の中立タグは保つ。warn は要確認の黄。 */
+:root .chip:not(.neutral) { align-items: center; gap: var(--polish-status-gap); outline-color: transparent; border-radius: var(--polish-status-radius); background: var(--status-bg); color: var(--status-ink); font-weight: var(--polish-status-weight); }
+:root .chip:not(.neutral)::before { content: ''; width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex: 0 0 var(--polish-status-dot-size); border-radius: var(--radius-pill); background: var(--status-dot); }
+:root .chip.info { --status-dot: var(--polish-status-info-dot); --status-bg: var(--polish-status-info-bg); --status-ink: var(--polish-status-info-ink); }
+:root .chip.ok { --status-dot: var(--polish-status-success-dot); --status-bg: var(--polish-status-success-bg); --status-ink: var(--polish-status-success-ink); }
+:root .chip.warn { --status-dot: var(--polish-status-caution-dot); --status-bg: var(--polish-status-caution-bg); --status-ink: var(--polish-status-caution-ink); }
+:root .chip.danger { --status-dot: var(--polish-status-danger-dot); --status-bg: var(--polish-status-danger-bg); --status-ink: var(--polish-status-danger-ink); }
+
+:root .chip:not(.neutral):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }

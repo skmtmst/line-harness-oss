@@ -57,6 +57,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
   vi.stubGlobal('fetch', (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return Promise.resolve(response({ success: true, data: { role: 'owner' } }))
     const accountId = new URL(path, 'http://localhost').searchParams.get('account_id') ?? 'account-a'
     if (path.includes('/api/analytics/usage')) return Promise.resolve(response({ success: true, data: { categories: [] } }))
     if (path.includes('/api/settings/features/impact')) {
@@ -112,7 +113,7 @@ function button(label: string, occurrence = 0): HTMLButtonElement {
 }
 
 function mutableSwitch(): HTMLButtonElement {
-  const found = [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]')].find((item) => !item.disabled)
+  const found = [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]:not([aria-label*="まとめて"])')].find((item) => !item.disabled)
   if (!found) throw new Error('切替可能な機能がありません')
   return found
 }
@@ -132,16 +133,16 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
   it('変更を取り消すは保存失敗後も、最後に取得したaccount別snapshotへ戻し、APIは呼ばない', async () => {
     await render()
     const toggle = mutableSwitch()
-    const savedChecked = toggle.getAttribute('aria-checked')
+    const savedChecked = String((toggle as HTMLElement).getAttribute('aria-checked') === 'true')
     await act(async () => { toggle.click() })
-    expect(toggle.getAttribute('aria-checked')).not.toBe(savedChecked)
+    expect(String((toggle as HTMLElement).getAttribute('aria-checked') === 'true')).not.toBe(savedChecked)
 
     await fillReason()
     network.saveFails = true
     await act(async () => { button('機能設定を保存').click(); await settle() })
     expect(network.puts).toBe(1)
-    await act(async () => { button('変更を取り消す').click() })
-    expect(toggle.getAttribute('aria-checked')).toBe(savedChecked)
+    await act(async () => { button('キャンセル').click() })
+    expect(String((toggle as HTMLElement).getAttribute('aria-checked') === 'true')).toBe(savedChecked)
     expect(network.puts).toBe(1)
     expect(document.body.textContent).toContain('保存済みの機能設定に戻しました。')
   })
@@ -149,10 +150,12 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
   it('初期値は確認後だけ下書きへ入り、二重操作しても保存前にサーバーを変更しない', async () => {
     await render()
     const toggle = mutableSwitch()
-    const savedChecked = toggle.getAttribute('aria-checked')
-    await act(async () => { button('初期値に戻す').click(); button('初期値に戻す').click() })
+    const savedChecked = String((toggle as HTMLElement).getAttribute('aria-checked') === 'true')
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="機能設定のほかの操作"]')!.click() })
+    const resetItem = button('初期値に戻す')
+    await act(async () => { resetItem.click(); resetItem.click() })
     expect(document.body.textContent).toContain('初期値に戻しますか？')
-    expect(toggle.getAttribute('aria-checked')).toBe(savedChecked)
+    expect(String((toggle as HTMLElement).getAttribute('aria-checked') === 'true')).toBe(savedChecked)
     expect(network.puts).toBe(0)
     await act(async () => { button('初期値を下書きに入れる').click(); button('初期値を下書きに入れる').click() })
     expect(network.puts).toBe(0)
@@ -162,6 +165,7 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
 
   it('account切替と遅延した旧応答では、旧snapshotや確認窓を新accountへ混ぜない', async () => {
     await render()
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="機能設定のほかの操作"]')!.click() })
     await act(async () => { button('初期値に戻す').click() })
     expect(document.body.textContent).toContain('初期値に戻しますか？')
 
@@ -169,7 +173,7 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
     await render()
     await settle()
     expect(document.body.textContent).not.toContain('初期値に戻しますか？')
-    expect(mutableSwitch().getAttribute('aria-checked')).toBe('true')
+    expect(String((mutableSwitch() as HTMLElement).getAttribute('aria-checked') === 'true')).toBe('true')
 
     // Aへ戻る読込を遅らせたあとBへ戻す。遅延A応答が最後に届いても、Bの
     // snapshot/表示を上書きできない。
@@ -184,7 +188,7 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
       network.resolveAccountA?.(response(settingsResponse('account-a')))
       await settle()
     })
-    expect(mutableSwitch().getAttribute('aria-checked')).toBe('true')
-    expect(button('変更を取り消す').disabled).toBe(true)
+    expect(String((mutableSwitch() as HTMLElement).getAttribute('aria-checked') === 'true')).toBe('true')
+    expect([...document.body.querySelectorAll('button')].some(button => button.textContent?.trim() === 'キャンセル')).toBe(false)
   })
 })

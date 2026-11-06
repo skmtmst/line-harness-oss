@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { featureEnforcementMiddleware } from '../middleware/feature-enforcement.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { siteTracking } from './site-tracking.js';
@@ -40,6 +40,8 @@ function seedAccounts(testDb: SqliteD1): void {
         (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
       VALUES (?, ?, ?, 'fixture', 'fixture', ?)
     `).run(id, `channel-${id}`, `店舗${id}`, DEFAULT_TENANT_ID);
+    testDb.raw.prepare(`INSERT INTO measurement_sites (id,line_account_id,label) VALUES (?, ?, '試験')`).run('site-'+id,id);
+    testDb.raw.prepare(`INSERT INTO measurement_site_domains (site_id,host) VALUES (?, 'example.com')`).run('site-'+id);
     testDb.raw.prepare(`
       INSERT INTO site_tracking_keys (id, line_account_id, tracking_key)
       VALUES (?, ?, ?)
@@ -58,11 +60,13 @@ function seedAccounts(testDb: SqliteD1): void {
 function collectBody(account: 'account-1' | 'account-2') {
   return {
     visitorId: 'visitor-0001',
+    siteId: 'site-'+account,
+    sourceEventId: crypto.randomUUID(),
     trackingKey: `hk_${account === 'account-1' ? 'a'.repeat(32) : 'b'.repeat(32)}`,
     eventType: 'page_view',
     host: 'example.com',
     path: '/',
-    // #818: 同意済みの閲覧として送る。未同意は収集口が何も書かない。
+    // 同意済みの閲覧として送る。未同意は収集口が何も書かない。
     consent: 'granted',
   };
 }
@@ -77,7 +81,7 @@ function eventCount(testDb: SqliteD1, accountId: string): number {
 async function postCollect(app: ReturnType<typeof routeApp>, env: Env['Bindings'], account: 'account-1' | 'account-2') {
   return app.request('/api/site/collect', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Origin: 'https://example.com' },
     body: JSON.stringify(collectBody(account)),
   }, env);
 }

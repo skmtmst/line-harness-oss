@@ -2,10 +2,12 @@ import { describe, expect, test, beforeEach, vi } from 'vitest';
 
 const dbMocks = {
   getOrCreateAutoTrackedLink: vi.fn(),
+  getTrackedLinkByIdOrShortCode: vi.fn(async (_db, id) => ({ id })),
   getTrackedLinkBaseUrl: vi.fn(),
   getLinkBaseUrl: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
+vi.mock('./tracked-link-identity.js', () => ({ issueTrackedLinkIdentity: async (_db: unknown, _link: unknown, friend: string) => `proof-${friend}` }));
 
 const { appendFriendToTrackedLinks, autoTrackContent, decorateForFriendPush } = await import(
   './auto-track.js'
@@ -24,36 +26,41 @@ beforeEach(() => {
 });
 
 describe('appendFriendToTrackedLinks', () => {
-  test('appends f= to short-domain /t links in flex JSON', async () => {
+  test('appends signed identity to short-domain /t links in flex JSON', async () => {
     const content = `{"type":"uri","uri":"${SHORT}/t/Ab3xY9k"}`;
     const out = await appendFriendToTrackedLinks(DB, content, WORKER, FRIEND);
-    expect(out).toBe(`{"type":"uri","uri":"${SHORT}/t/Ab3xY9k?f=${FRIEND}"}`);
+    expect(out).toBe(`{"type":"uri","uri":"${SHORT}/t/Ab3xY9k?identity=proof-${FRIEND}"}`);
   });
 
   test('appends with & when the link already has a query', async () => {
     const content = `${SHORT}/t/Ab3xY9k?openExternalBrowser=1`;
     const out = await appendFriendToTrackedLinks(DB, content, WORKER, FRIEND);
-    expect(out).toBe(`${SHORT}/t/Ab3xY9k?openExternalBrowser=1&f=${FRIEND}`);
+    expect(out).toBe(`${SHORT}/t/Ab3xY9k?openExternalBrowser=1&identity=proof-${FRIEND}`);
   });
 
   test('appends to worker-domain legacy UUID links too', async () => {
     const content = `${WORKER}/t/415bbb13-97bc-4a3c-a5bb-e5138af42737`;
     const out = await appendFriendToTrackedLinks(DB, content, WORKER, FRIEND);
-    expect(out).toBe(`${WORKER}/t/415bbb13-97bc-4a3c-a5bb-e5138af42737?f=${FRIEND}`);
+    expect(out).toBe(`${WORKER}/t/415bbb13-97bc-4a3c-a5bb-e5138af42737?identity=proof-${FRIEND}`);
   });
 
-  test('does not touch non-tracked URLs or existing f= params', async () => {
+  test('replaces legacy f= params with the current recipient signed identity', async () => {
     const content = `https://example.com/lp と ${SHORT}/t/abc1234?f=other`;
     const out = await appendFriendToTrackedLinks(DB, content, WORKER, FRIEND);
-    expect(out).toBe(content);
+    expect(out).toBe(`https://example.com/lp と ${SHORT}/t/abc1234?identity=proof-${FRIEND}`);
   });
 
   test('keeps sentence punctuation outside the appended query', async () => {
     const content = `詳しくはこちら ${SHORT}/t/Ab3xY9k。続きは ${SHORT}/t/xYz9876.`;
     const out = await appendFriendToTrackedLinks(DB, content, WORKER, FRIEND);
     expect(out).toBe(
-      `詳しくはこちら ${SHORT}/t/Ab3xY9k?f=${FRIEND}。続きは ${SHORT}/t/xYz9876?f=${FRIEND}.`,
+      `詳しくはこちら ${SHORT}/t/Ab3xY9k?identity=proof-${FRIEND}。続きは ${SHORT}/t/xYz9876?identity=proof-${FRIEND}.`,
     );
+  });
+
+  test('keeps malformed tracked paths usable without failing the message send', async () => {
+    const content = `${SHORT}/t/%broken`;
+    expect(await appendFriendToTrackedLinks(DB, content, WORKER, FRIEND)).toBe(content);
   });
 
   test('no-op when friendId is missing', async () => {
@@ -72,7 +79,7 @@ describe('appendFriendToTrackedLinks', () => {
     dbMocks.getTrackedLinkBaseUrl.mockResolvedValue(null);
     const content = `${WORKER}/t/Ab3xY9k`;
     const out = await appendFriendToTrackedLinks(DB, content, WORKER, FRIEND);
-    expect(out).toBe(`${WORKER}/t/Ab3xY9k?f=${FRIEND}`);
+    expect(out).toBe(`${WORKER}/t/Ab3xY9k?identity=proof-${FRIEND}`);
   });
 });
 
@@ -208,33 +215,47 @@ describe('decorateForFriendPush — shared cron/instant pipeline', () => {
     const out = await decorateForFriendPush(DB, 'text', content, undefined, {
       lineAccountId: 'acc-1',
       friendId: FRIEND,
+      sourceContent: content,
     });
     expect(out).toEqual({ messageType: 'text', content });
     expect(dbMocks.getOrCreateAutoTrackedLink).not.toHaveBeenCalled();
     expect(dbMocks.getTrackedLinkBaseUrl).not.toHaveBeenCalled();
   });
 
-  test('wraps raw URLs into tracked links owned by lineAccountId, then bakes f=<friendId>', async () => {
+  test('wraps raw URLs into tracked links owned by lineAccountId, then signs the recipient identity', async () => {
     dbMocks.getOrCreateAutoTrackedLink.mockResolvedValue({ id: 'tl-1', short_code: 'Ab3xY9k' });
-    const out = await decorateForFriendPush(DB, 'text', '詳細は https://example.com/lp へ', WORKER, {
+    const content = '詳細は https://example.com/lp へ';
+    const out = await decorateForFriendPush(DB, 'text', content, WORKER, {
       lineAccountId: 'acc-1',
       friendId: FRIEND,
+      sourceContent: content,
     });
     expect(dbMocks.getOrCreateAutoTrackedLink).toHaveBeenCalledWith(
       DB,
       expect.objectContaining({ originalUrl: 'https://example.com/lp', lineAccountId: 'acc-1' }),
     );
     expect(out.messageType).toBe('text');
-    expect(out.content).toBe(`詳細は ${SHORT}/t/Ab3xY9k?f=${FRIEND} へ`);
+    expect(out.content).toBe(`詳細は ${SHORT}/t/Ab3xY9k?identity=proof-${FRIEND} へ`);
   });
 
-  test('appends f= to pre-existing /t links even when nothing needs auto-tracking', async () => {
+  test('appends signed identity to pre-existing /t links even when nothing needs auto-tracking', async () => {
     const content = `${SHORT}/t/xYz9876`;
     const out = await decorateForFriendPush(DB, 'text', content, WORKER, {
       lineAccountId: null,
       friendId: FRIEND,
+      sourceContent: content,
     });
     expect(dbMocks.getOrCreateAutoTrackedLink).not.toHaveBeenCalled();
-    expect(out.content).toBe(`${SHORT}/t/xYz9876?f=${FRIEND}`);
+    expect(out.content).toBe(`${SHORT}/t/xYz9876?identity=proof-${FRIEND}`);
   });
+});
+
+
+test('F27: customer-inserted URLs never become first-party tracked links', async () => {
+  dbMocks.getOrCreateAutoTrackedLink.mockResolvedValue({ id: 'injected', short_code: 'BAD' });
+  const result = await decorateForFriendPush(DB, 'text', 'https://evil.example/ さん、ようこそ', WORKER, {
+    lineAccountId: 'a', friendId: FRIEND, sourceContent: '{{name}} さん、ようこそ',
+  });
+  expect(result.content).toBe('https://evil.example/ さん、ようこそ');
+  expect(dbMocks.getOrCreateAutoTrackedLink).not.toHaveBeenCalled();
 });

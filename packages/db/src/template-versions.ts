@@ -1,11 +1,11 @@
+import { extractBroadcastTemplateIds } from './template-reference-ids.js';
+export { extractBroadcastTemplateIds } from './template-reference-ids.js';
+import type { TemplateVersionRow } from './template-version-types.js';
+export type { TemplateVersionRow } from './template-version-types.js';
 import { jstNow } from './utils.js';
-import {
-  getTemplateById,
-  publishTemplate,
-  saveTemplateDraft,
-} from './templates.js';
+import { getTemplateById, publishTemplate, saveTemplateDraft } from './templates.js';
 
-// テンプレートの版履歴と参照表 (#820)。
+// テンプレートの版履歴と参照表。
 //
 // 版 (template_versions) は公開のたびに1行足す。前の版は変えない。
 // 「この版に戻す」は過去の行を書き換えず、その中身で新しい版を作る。
@@ -15,24 +15,9 @@ import {
 
 export type TemplateVersionStatus = 'in_use' | 'reserved' | 'past';
 
-export interface TemplateVersionRow {
-  id: string;
-  template_id: string;
-  version_number: number;
-  message_type: string;
-  message_content: string;
-  carousel_actions_json: string | null;
-  carousel_tap_limit_mode: string | null;
-  carousel_tap_limit_text: string | null;
-  question_json: string | null;
-  question_status: string | null;
-  /** 使い始めの日時。空は「公開と同時」。 */
-  effective_from: string | null;
-  created_by_staff_id: string | null;
-  created_at: string;
-}
-
+/** 名前は同じ組織の現在の名簿から取得。保存時の名前の写しではない。 */
 export interface TemplateVersionView extends TemplateVersionRow {
+  creator_name: string | null;
   status: TemplateVersionStatus;
 }
 
@@ -69,12 +54,17 @@ export async function listTemplateVersions(
 ): Promise<TemplateVersionView[]> {
   const result = await db
     .prepare(
-      `SELECT * FROM template_versions
-        WHERE template_id = ?
-        ORDER BY version_number DESC`,
+      `SELECT v.*, s.name AS creator_name
+         FROM template_versions v
+         JOIN templates t ON t.id = v.template_id
+         LEFT JOIN line_accounts a ON a.id = t.line_account_id
+         LEFT JOIN staff_members s ON s.id = v.created_by_staff_id
+           AND s.tenant_id = a.tenant_id
+        WHERE v.template_id = ?
+        ORDER BY v.version_number DESC`,
     )
     .bind(templateId)
-    .all<TemplateVersionRow>();
+    .all<TemplateVersionRow & { creator_name: string | null }>();
   const rows = (result.results ?? []).map((row) => ({
     ...row,
     version_number: Number(row.version_number),
@@ -141,6 +131,7 @@ export async function revertTemplateToVersion(
   const saved = await saveTemplateDraft(db, templateId, {
     messageType: version.message_type,
     messageContent: version.message_content,
+    messageBubblesJson: version.message_bubbles_json ?? null,
     carouselActions: carouselActions ?? null,
     carouselTapLimitMode: tapLimitMode,
     carouselTapLimitText: version.carousel_tap_limit_text,
@@ -172,20 +163,22 @@ async function pinnedVersionNumber(
 /**
  * 利用先の参照を書き換える（全消し→全入れ）。保存のたびに呼ぶ。
  * 存在しないテンプレートは書かない。本文の写しは残るので送りは壊れない。
+ *
+ * 参照の書込文だけを組み立てて返す。呼び出し側が
+ * ルール行・版と1回の batch に束ね、途中失敗で食い違わないようにする。
  */
-export async function syncTemplateReferences(
+export async function planSyncTemplateReferenceStatements(
   db: D1Database,
   consumerKind: TemplateReferenceConsumerKind,
   consumerId: string,
   templateIds: string[],
-): Promise<void> {
+): Promise<D1PreparedStatement[]> {
   const unique = [...new Set(templateIds.filter(Boolean))];
-  await db
-    .prepare(
+  const statements: D1PreparedStatement[] = [
+    db.prepare(
       `DELETE FROM template_references WHERE consumer_kind = ? AND consumer_id = ?`,
-    )
-    .bind(consumerKind, consumerId)
-    .run();
+    ).bind(consumerKind, consumerId),
+  ];
   for (const templateId of unique) {
     const versionNumber = await pinnedVersionNumber(db, templateId);
     if (versionNumber === null) {
@@ -195,15 +188,24 @@ export async function syncTemplateReferences(
         .first<{ id: string }>();
       if (!exists) continue;
     }
-    await db
-      .prepare(
+    statements.push(
+      db.prepare(
         `INSERT OR IGNORE INTO template_references
            (id, template_id, template_version_number, consumer_kind, consumer_id, reference_mode, created_at)
          VALUES (?, ?, ?, ?, ?, 'fixed', ?)`,
-      )
-      .bind(crypto.randomUUID(), templateId, versionNumber, consumerKind, consumerId, jstNow())
-      .run();
+      ).bind(crypto.randomUUID(), templateId, versionNumber, consumerKind, consumerId, jstNow()),
+    );
   }
+  return statements;
+}
+
+export async function syncTemplateReferences(
+  db: D1Database,
+  consumerKind: TemplateReferenceConsumerKind,
+  consumerId: string,
+  templateIds: string[],
+): Promise<void> {
+  await db.batch(await planSyncTemplateReferenceStatements(db, consumerKind, consumerId, templateIds));
 }
 
 /** テンプレートを使う利用先の参照を全部返す。版の表示に使う。 */
@@ -246,38 +248,17 @@ export async function refreshScenarioReferences(
 ): Promise<void> {
   const result = await db
     .prepare(
-      `SELECT DISTINCT template_id FROM scenario_steps
-        WHERE scenario_id = ? AND template_id IS NOT NULL`,
+      `SELECT template_id,message_bubbles_json FROM scenario_steps
+        WHERE scenario_id = ?`,
     )
     .bind(scenarioId)
-    .all<{ template_id: string }>();
+    .all<{ template_id: string | null; message_bubbles_json: string | null }>();
   await syncTemplateReferences(
     db,
     'scenario',
     scenarioId,
-    (result.results ?? []).map((row) => row.template_id),
+    [...new Set((result.results ?? []).flatMap(row => [...(row.template_id ? [row.template_id] : []), ...extractBroadcastTemplateIds(row.message_bubbles_json)]))],
   );
-}
-
-/**
- * 一斉配信の保存から、使ったテンプレートを数え直す。
- * 吹き出し (message_bubbles_json) が持つ templateId を読む。本文の写しは
- * 別に残るので、読めない形でも送りは壊れない（参照だけ残さない）。
- */
-export function extractBroadcastTemplateIds(bubblesJson: string | null): string[] {
-  if (!bubblesJson) return [];
-  try {
-    const bubbles = JSON.parse(bubblesJson) as Array<{
-      content?: { templateId?: unknown };
-    }>;
-    if (!Array.isArray(bubbles)) return [];
-    const ids = bubbles
-      .map((bubble) => bubble?.content?.templateId)
-      .filter((value): value is string => typeof value === 'string' && value.length > 0);
-    return [...new Set(ids)];
-  } catch {
-    return [];
-  }
 }
 
 export async function refreshBroadcastReferences(
@@ -350,7 +331,7 @@ export interface PinnedReminderTemplateReference {
 }
 
 /**
- * R347: 旧公開版に固定された登録から、テンプレートを使うものを返す。
+ * 旧公開版に固定された登録から、テンプレートを使うものを返す。
  * 現行の reminder_steps だけ見ると、版を切り替えた途端に使用先が0件に
  * 見える。登録は reminder_version_id で版に固定され、その版の手順が持つ
  * template_id で送るため、こちらの参照が消えたことにならない。
@@ -358,7 +339,7 @@ export interface PinnedReminderTemplateReference {
  * （一覧の数と使用先の件数をずらさない）。
  *
  * templateAccountId を渡すと、getTemplateUsage と同じく「同じアカウント
- * or 未設定」の使用先だけに絞る（#891）。
+ * or 未設定」の使用先だけに絞る。
  */
 export async function listPinnedReminderTemplateReferences(
   db: D1Database,
@@ -398,7 +379,7 @@ export async function listPinnedReminderTemplateReferences(
 }
 
 /**
- * R347: 削除を止める登録。送信待ち（active）と取消ずみ（cancelled）だけ。
+ * 削除を止める登録。送信待ち（active）と取消ずみ（cancelled）だけ。
  * 取消ずみは再開すると固定した版で送り直すため、止める側に入れる。
  * 送り終わった（completed）登録はもう送らないので止めない。
  */

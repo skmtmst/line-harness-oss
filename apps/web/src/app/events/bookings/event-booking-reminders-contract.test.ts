@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../../scripts/test-api-source.mjs'
 /*
  * IDEA-07: イベントの予約ごとの通知予定を、予約そのもののそばで見せる。
  *
@@ -12,12 +13,9 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const API = readFileSync(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
-const WORKER = readFileSync(
-  join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'events.ts'),
-  'utf8',
-)
+const PAGE = readFileSync(join(HERE, '../../../v8/events/booking-records.tsx'), 'utf8')
+const API = readApiSource(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
+// 取得範囲・1回の取得・応答内容はWorker events.test.tsの実HTTP試験で確認する。
 
 /** 説明の文だけで通ってしまわないよう、判定の前にコメントを落とす。 */
 function code(source: string): string {
@@ -26,19 +24,14 @@ function code(source: string): string {
 
 describe('IDEA-07 イベント予約の通知予定', () => {
   it('一覧APIが予約ごとの通知予定を同じ応答で返す', () => {
-    const worker = code(WORKER)
-    // 表示中のページ分だけを1回で取る。1行ずつ取る形にはしない。
-    expect(worker).toContain('FROM event_booking_reminders')
-    expect(worker).toContain('booking_id IN (')
-    expect(worker).toContain('reminders: remindersByBooking.get(row.id)')
-    // 画面の型にも予定と状態が載る。
+    // 応答の動作はWorker側で確認し、ここでは画面の型を保つ。
     expect(code(API)).toContain('reminders?:')
     expect(code(API)).toContain("'pending' | 'sent' | 'failed' | 'failed_permanent' | 'cancelled'")
   })
 
   it('予約枠のそばに通知の種類・日時・状態を出す', () => {
     const page = code(PAGE)
-    expect(page).toContain('b.reminders')
+    expect(page).toContain('booking.reminders')
     expect(page).toContain('data-booking-reminders')
     expect(page).toContain('REMINDER_KIND_LABELS[reminder.kind]')
     expect(page).toContain('REMINDER_STATUS_LABELS[reminder.status]')

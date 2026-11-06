@@ -27,8 +27,8 @@ const scope = { allowedAccountIds: ['account-a', 'account-b'], includeUnassigned
 function expectScoped(queries: Query[], fragment: string): void {
   const matches = queries.filter(({ sql }) => sql.includes(fragment));
   expect(matches.length).toBeGreaterThan(0);
-  expect(matches.every(({ sql }) => sql.includes('IN (?, ?)'))).toBe(true);
-  expect(matches.every(({ binds }) => binds.includes('account-a') && binds.includes('account-b'))).toBe(true);
+  expect(matches.every(({ sql }) => sql.includes('IN (SELECT value FROM json_each(?))'))).toBe(true);
+  expect(matches.every(({ binds }) => binds.includes(JSON.stringify(scope.allowedAccountIds)))).toBe(true);
 }
 
 describe('tenant-scoped dashboard aggregations', () => {
@@ -38,20 +38,19 @@ describe('tenant-scoped dashboard aggregations', () => {
 
     expect(queries.length).toBeGreaterThanOrEqual(17);
     const accountQueries = queries.filter(({ sql }) => !sql.includes('friend_daily_snapshots'));
-    expect(accountQueries.every(({ sql }) => sql.includes('IN (?, ?)'))).toBe(true);
+    expect(accountQueries.every(({ sql }) => sql.includes('IN (SELECT value FROM json_each(?))'))).toBe(true);
     expect(accountQueries.every(({ binds }) => {
-      const a = binds.indexOf('account-a');
-      return a >= 0 && binds[a + 1] === 'account-b';
+      return binds.includes(JSON.stringify(scope.allowedAccountIds));
     })).toBe(true);
 
     /*
-     * 「UID移行状況」カードの数は uid_migration_runs から取る（DASH-07）。
+     * 「UID移行状況」カードの数は uid_migration_runs から取る。
      * 旧アカウント移行(account_migrations)の件数と混ぜない。
      */
     const migrations = queries.find(({ sql }) => sql.includes('FROM uid_migration_runs'));
-    expect(migrations?.binds).toEqual(['account-a', 'account-b', 'account-a', 'account-b']);
+    expect(migrations?.binds).toEqual([JSON.stringify(scope.allowedAccountIds), JSON.stringify(scope.allowedAccountIds)]);
     const broadcasts = queries.find(({ sql }) => sql.includes('FROM broadcasts b'));
-    expect(broadcasts?.binds.slice(-4)).toEqual(['account-a', 'account-b', 'account-a', 'account-b']);
+    expect(broadcasts?.binds.slice(-2)).toEqual([JSON.stringify(scope.allowedAccountIds), JSON.stringify(scope.allowedAccountIds)]);
   });
 
   test('getFriendStats scopes friend totals, monthly additions, unanswered and resolved chats', async () => {
@@ -60,8 +59,8 @@ describe('tenant-scoped dashboard aggregations', () => {
 
     expectScoped(queries, 'FROM friends WHERE');
     const inbox = queries.find(({ sql }) => sql.includes('FROM chats c') && sql.includes('AS unanswered'));
-    expect(inbox?.sql).toContain('f.line_account_id IN (?, ?)');
-    expect(inbox?.binds).toEqual(['account-a', 'account-b']);
+    expect(inbox?.sql).toContain('f.line_account_id IN (SELECT value FROM json_each(?))');
+    expect(inbox?.binds).toEqual([JSON.stringify(scope.allowedAccountIds)]);
   });
 
   test('getInboxStats scopes waiting, assigned, incoming and first-reply aggregations', async () => {
@@ -70,7 +69,10 @@ describe('tenant-scoped dashboard aggregations', () => {
 
     expectScoped(queries, "c.status = 'unread'");
     expectScoped(queries, "c.status = 'in_progress'");
-    expectScoped(queries, 'GROUP BY c.operator_id');
+    expectScoped(queries, 'GROUP BY COALESCE(');
+    const unread = queries.find(({ sql }) => sql.includes('GROUP BY COALESCE('));
+    expect(unread?.sql).toContain('c.assignee_staff_id');
+    expect(unread?.sql).toContain('c.operator_id');
     expectScoped(queries, "direction = 'incoming'");
     expectScoped(queries, 'first_replied_at IS NOT NULL');
   });
@@ -83,11 +85,12 @@ describe('tenant-scoped dashboard aggregations', () => {
       const statement = originalPrepare(sql) as D1PreparedStatement & {
         all: <T>() => Promise<D1Result<T>>;
       };
-      if (sql.includes('GROUP BY c.operator_id')) {
+      if (sql.includes('GROUP BY COALESCE(') && sql.includes('AS unread')) {
         statement.all = async <T>() => ({
           results: [
             { operator_id: null, operator_name: null, unread: 2 },
             { operator_id: 'operator-1', operator_name: 'Kenta', unread: 3 },
+            { operator_id: 'staff:staff-2', operator_name: '担当', unread: 4 },
           ] as T[],
           success: true,
           meta: {},
@@ -101,6 +104,7 @@ describe('tenant-scoped dashboard aggregations', () => {
     expect(stats.assigneeUnread).toEqual([
       { operatorId: null, operatorName: null, unread: 2 },
       { operatorId: 'operator-1', operatorName: 'Kenta', unread: 3 },
+      { operatorId: 'staff:staff-2', operatorName: '担当', unread: 4 },
     ]);
   });
 

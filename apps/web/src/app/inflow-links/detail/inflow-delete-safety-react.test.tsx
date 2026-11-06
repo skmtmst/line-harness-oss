@@ -31,12 +31,18 @@ const route: EntryRoute = {
   updatedAt: '2026-09-01T09:00:00.000+09:00',
 }
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: fixture.replace }),
   useSearchParams: () => new URLSearchParams('id=route-1'),
 }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/contexts/account-context', () => ({
+  // 詳細の「入ったLINEアカウント」欄だけに使う。試験では空のまま。
+  useAccount: () => ({ accounts: [], selectedAccountId: 'acc-1' }),
+}))
+
+vi.mock('@/lib/api', async importOriginal => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
   ApiError: fixture.ApiError,
   fetchApi: fixture.fetchApi,
   api: {
@@ -63,10 +69,11 @@ const { default: InflowLinkDetailPage } = await import('./page')
 
 async function mountAndOpen() {
   render(<InflowLinkDetailPage />)
-  const opener = await screen.findByRole('button', { name: '店頭QRの削除を確認' })
+  // 板  では青い帯の「止める」から削除の窓を開く。
+  const opener = await screen.findByRole('button', { name: '止める' })
   opener.focus()
   await act(async () => { fireEvent.click(opener) })
-  const dialog = await screen.findByRole('dialog')
+  const dialog = await screen.findByRole('alertdialog')
   return { opener, dialog }
 }
 
@@ -88,10 +95,13 @@ afterEach(() => cleanup())
 describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
   it('既定は受付停止で、Escapeで閉じて起点ボタンへfocusを戻す', async () => {
     const { opener, dialog } = await mountAndOpen()
+    expect(within(dialog).getByText('受付先アカウント')).toBeTruthy()
+    expect(within(dialog).getByText('受付先の全アカウントは確認できません。')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
     expect(within(dialog).getByRole('button', { name: '受けるのをやめる' })).toBeTruthy()
 
     fireEvent.keyDown(document, { key: 'Escape' })
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
     expect(document.activeElement).toBe(opener)
   })
 
@@ -111,8 +121,8 @@ describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
 
   it('完全削除は現在の経路名が正確に一致するまで実行できない', async () => {
     const { dialog } = await mountAndOpen()
-    fireEvent.click(within(dialog).getByRole('button', { name: /このまま削除する/ }))
-    const confirm = within(dialog).getByRole('button', { name: 'この経路を削除' }) as HTMLButtonElement
+    fireEvent.click(within(dialog).getByRole('radio', { name: /このまま削除する/ }))
+    const confirm = within(dialog).getByRole('button', { name: '削除する' }) as HTMLButtonElement
     const input = within(dialog).getByLabelText('完全削除するには「店頭QR」と入力')
 
     expect(confirm.disabled).toBe(true)
@@ -138,16 +148,32 @@ describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
       )
     })
     const { dialog } = await mountAndOpen()
-    fireEvent.click(within(dialog).getByRole('button', { name: /このまま削除する/ }))
+    fireEvent.click(within(dialog).getByRole('radio', { name: /このまま削除する/ }))
     fireEvent.change(within(dialog).getByLabelText('完全削除するには「店頭QR」と入力'), {
       target: { value: '店頭QR' },
     })
     await act(async () => {
-      fireEvent.click(within(dialog).getByRole('button', { name: 'この経路を削除' }))
+      fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
     })
 
     expect(await within(dialog).findByText(/利用履歴がある経路は完全削除できません/)).toBeTruthy()
-    expect(screen.getByRole('dialog')).toBe(dialog)
+    expect(screen.getByRole('alertdialog')).toBe(dialog)
+    expect(fixture.replace).not.toHaveBeenCalled()
+  })
+
+  it('名前が変わった422は入力の修正ではなく読み直しを案内する', async () => {
+    const text = '経路名が変更されています。画面を読み直してから、もう一度確認してください。'
+    fixture.fetchApi.mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/analytics/ref/')) return { success: true, data: { friends: [] } }
+      throw new fixture.ApiError(422, text, 'ENTRY_ROUTE_NAME_CONFIRMATION_MISMATCH')
+    })
+    const { dialog } = await mountAndOpen()
+    fireEvent.click(within(dialog).getByRole('radio', { name: /このまま削除する/ }))
+    fireEvent.change(within(dialog).getByLabelText('完全削除するには「店頭QR」と入力'), { target: { value: '店頭QR' } })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '削除する' })) })
+    expect(await within(dialog).findByText(text)).toBeTruthy()
+    expect(within(dialog).queryByText(/入力を直してください/)).toBeNull()
+    expect(screen.getByRole('alertdialog')).toBe(dialog)
     expect(fixture.replace).not.toHaveBeenCalled()
   })
 
@@ -163,11 +189,11 @@ describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
     expect((within(dialog).getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.keyDown(document, { key: 'Escape' })
     fireEvent.click(apply)
-    expect(screen.getByRole('dialog')).toBe(dialog)
+    expect(screen.getByRole('alertdialog')).toBe(dialog)
     expect(fixture.update).toHaveBeenCalledTimes(1)
 
     await act(async () => { release?.() })
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   })
 
   it('staffは編集と受付停止を使えるが、完全削除は表示しない', async () => {
@@ -177,12 +203,13 @@ describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
     })
     render(<InflowLinkDetailPage />)
 
-    expect(await screen.findByRole('button', { name: 'この経路を編集' })).toBeTruthy()
-    const opener = await screen.findByRole('button', { name: '店頭QRの受付停止を確認' })
+    expect(await screen.findByRole('button', { name: 'リンクを編集' })).toBeTruthy()
+    // 板  では青い帯の「止める」から削除の窓を開く。
+    const opener = await screen.findByRole('button', { name: '止める' })
     await act(async () => { fireEvent.click(opener) })
-    const dialog = await screen.findByRole('dialog')
+    const dialog = await screen.findByRole('alertdialog')
 
-    expect(within(dialog).queryByRole('button', { name: /このまま削除する/ })).toBeNull()
+    expect(within(dialog).queryByRole('radio', { name: /このまま削除する/ })).toBeNull()
     await act(async () => {
       fireEvent.click(within(dialog).getByRole('button', { name: '受けるのをやめる' }))
     })

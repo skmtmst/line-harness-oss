@@ -1,4 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -8,6 +11,38 @@ const workflow = readFileSync(
 );
 
 describe('Deploy Cloudflare Staging workflow', () => {
+  it.each([false, true])('passes source metadata to the actual Worker deploy command (replay=%s)', (replay) => {
+    const sandbox = mkdtempSync(resolve(tmpdir(), 'staging-metadata-'));
+    try {
+      const sha = (replay ? 'b' : 'a').repeat(40);
+      const values: Record<string, string> = {
+        'steps.worker_source.outputs.root': sandbox,
+        'steps.build_metadata.outputs.worker_sha': sha,
+        'steps.build_metadata.outputs.worker_version': '0.24.0',
+        'steps.build_metadata.outputs.released_at': '2026-10-09T00:00:00Z',
+      };
+      const step = workflow.split('- name: Deploy Worker to staging')[1].split('- name: Verify the deployed Worker')[0];
+      const script = step.split('run: |\n')[1].replace(/\$\{\{\s*([^}]+?)\s*\}\}/g, (_all, key: string) => {
+        if (!values[key]) throw new Error(`Unexpected expression: ${key}`);
+        return values[key];
+      });
+      writeFileSync(resolve(sandbox, 'npx'), '#!/bin/sh\nprintf "%s\\n" "$@" > "$RUNNER_TEMP/args.txt"\necho "Current Version ID: 11111111-1111-1111-1111-111111111111"\n', { mode: 0o755 });
+      const result = spawnSync('bash', ['-e', '-c', script], {
+        encoding: 'utf8', env: { ...process.env, PATH: `${sandbox}:${process.env.PATH}`, RUNNER_TEMP: sandbox,
+          GITHUB_OUTPUT: resolve(sandbox, 'outputs'), WORKER_CONFIG_REPLAY: String(replay), WORKER_SOURCE_SHA: sha },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      const args = readFileSync(resolve(sandbox, 'args.txt'), 'utf8');
+      expect(args).toContain(`BUILD_GIT_COMMIT:${sha}`);
+      expect(args).toContain('BUILD_VERSION:0.24.0');
+      expect(args).toContain('BUILD_RELEASED_AT:2026-10-09T00:00:00Z');
+      expect(workflow).toContain('APP_COMMIT_SHA: ${{ steps.build_metadata.outputs.admin_sha }}');
+      expect(workflow).toContain('node scripts/deploy/verify-public-build.mjs');
+      expect(workflow.indexOf('Verify public source revisions')).toBeLessThan(workflow.indexOf('Release the staging lock'));
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
   it('supports a gated development push and still defaults manual runs to dry-run', () => {
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toMatch(/^\s+push:/m);
@@ -18,29 +53,89 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).toContain('default: all');
   });
 
-  it('can only run from codex/development against staging', () => {
+  it('allows only development or the manual fixed release branch against staging', () => {
     expect(workflow).toContain("github.ref == 'refs/heads/codex/development'");
+    expect(workflow).toContain("github.ref == 'refs/heads/codex/masato-production-release-20261104'");
+    expect(workflow).toContain('test "$GITHUB_EVENT_NAME" = "workflow_dispatch"');
+    expect(workflow).toContain('- name: Verify isolated release ancestry');
+    expect(workflow).toContain('git merge-base --is-ancestor "$release_base" "$GITHUB_SHA"');
+    expect(workflow).toContain('git merge-base --is-ancestor "$excluded_merge" "$GITHUB_SHA"');
+    expect(workflow.indexOf('Verify isolated release ancestry')).toBeLessThan(workflow.indexOf('Acquire the shared staging lock'));
     expect(workflow).toContain('environment: staging');
     expect(workflow).toContain('apps/worker/wrangler.staging.toml');
     expect(workflow).toContain('nen-line-stg-admin');
     expect(workflow).not.toContain('apps/worker/wrangler.toml');
   });
 
-  it('acquires an exact deploy lock for apply and releases only after success', () => {
+  it.each([
+    { branch: 'codex/development', event: 'push', allowed: true },
+    { branch: 'codex/masato-production-release-20261104', event: 'workflow_dispatch', allowed: true },
+    { branch: 'codex/masato-production-release-20261104', event: 'push', allowed: false },
+    { branch: 'codex/other-release', event: 'workflow_dispatch', allowed: false },
+  ])('checks the actual staging branch boundary: $branch / $event', ({ branch, event, allowed }) => {
+    const step = workflow.split('- name: Verify staging boundary and deploy lock')[1]
+      .split('- name: Verify isolated release ancestry')[0];
+    const script = step.split('run: |\n')[1];
+    const result = spawnSync('bash', ['-e', '-c', script], {
+      encoding: 'utf8', env: { ...process.env, GITHUB_REF: `refs/heads/${branch}`,
+        GITHUB_EVENT_NAME: event, DELIVERY_MODE: 'dry-run', DELIVERY_TARGET: 'all',
+        WORKER_CONFIG_REPLAY: 'false', PAGES_CONFIG_REPLAY: 'false',
+        CLOUDFLARE_ACCOUNT_ID: 'synthetic-account', WORKER_API_TOKEN: 'synthetic-token',
+        PAGES_API_TOKEN: 'synthetic-token' },
+    });
+    expect(result.status === 0, result.stderr).toBe(allowed);
+  });
+
+  it('acquires an exact deploy lock for apply and releases it however the run ends', () => {
     expect(workflow).toContain('id: staging_lock');
     expect(workflow).toContain("if: env.DELIVERY_MODE == 'apply'");
     expect(workflow).toContain('pnpm deploy:lock acquire staging');
     expect(workflow).toContain(
       'pnpm deploy:lock verify staging --sha "$GITHUB_SHA" --remote origin',
     );
-    expect(workflow).toContain("if: success() && steps.staging_lock.outcome == 'success'");
+    // 途中の段が落ちても解放する。success() に戻すと、取得後の失敗でロックが残る。
+    expect(workflow).toContain("if: always() && steps.staging_lock.outcome == 'success'");
+    expect(workflow).not.toContain("if: success() && steps.staging_lock.outcome == 'success'");
+    // 取得していない run は他担当のロックを解放しない。
+    expect(workflow).not.toMatch(/if: always\(\)\n\s+run: pnpm deploy:lock release staging/);
     expect(workflow).toContain('pnpm deploy:lock release staging --remote origin');
     expect(workflow.indexOf('pnpm deploy:lock acquire staging')).toBeLessThan(
-      workflow.indexOf('npx wrangler deploy --config apps/worker/wrangler.staging.toml'),
+      workflow.indexOf('Require latest deployment branch after acquiring the staging lock'),
+    );
+    expect(workflow.indexOf('Require latest deployment branch after acquiring the staging lock')).toBeLessThan(
+      workflow.indexOf('Bind the staging Cloudflare account'),
     );
     expect(workflow.indexOf('pnpm deploy:lock release staging')).toBeGreaterThan(
       workflow.indexOf('npx wrangler pages deploy apps/web/out'),
     );
+  });
+
+  it.each([
+    { name: 'matching development', remoteSha: 'a'.repeat(40), gitExit: 0, succeeds: true },
+    { name: 'development advanced', remoteSha: 'b'.repeat(40), gitExit: 0, succeeds: false },
+    { name: 'empty remote result', remoteSha: '', gitExit: 0, succeeds: false },
+    { name: 'remote lookup failed', remoteSha: 'a'.repeat(40), gitExit: 128, succeeds: false },
+  ])('checks the live branch after locking: $name', ({ remoteSha, gitExit, succeeds }) => {
+    const sandbox = mkdtempSync(resolve(tmpdir(), 'staging-latest-'));
+    try {
+      const step = workflow.split('- name: Require latest deployment branch after acquiring the staging lock')[1]
+        .split('- name: Bind the staging Cloudflare account')[0];
+      const script = step.split('run: |\n')[1];
+      writeFileSync(resolve(sandbox, 'git'), [
+        '#!/bin/sh',
+        '[ "$*" = "ls-remote --exit-code origin $GITHUB_REF" ] || exit 99',
+        '[ -z "$STAGING_TEST_REMOTE_SHA" ] || printf "%s\\trefs/heads/codex/development\\n" "$STAGING_TEST_REMOTE_SHA"',
+        'exit "$STAGING_TEST_GIT_EXIT"',
+        '',
+      ].join('\n'), { mode: 0o755 });
+      const result = spawnSync('bash', ['-e', '-c', script], {
+        encoding: 'utf8', env: { ...process.env, PATH: `${sandbox}:${process.env.PATH}`,
+          GITHUB_SHA: 'a'.repeat(40), GITHUB_REF: 'refs/heads/codex/development', STAGING_TEST_REMOTE_SHA: remoteSha, STAGING_TEST_GIT_EXIT: String(gitExit) },
+      });
+      expect(result.status === 0, result.stderr).toBe(succeeds);
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
   });
 
   it('binds the ephemeral config to the staging Environment account', () => {
@@ -109,6 +204,21 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).toContain('[ "$WORKER_CONFIG_REPLAY" != "true" ]');
   });
 
+  it('rebuilds only the verified live Admin source when unrelated D1 migrations are pending', () => {
+    expect(workflow).toContain('pages_config_replay:');
+    expect(workflow).toContain('pages_source_sha:');
+    expect(workflow).toContain('expected_pages_deployment_id:');
+    expect(workflow).toContain('test "$DELIVERY_TARGET" = "admin"');
+    expect(workflow).toContain('test "$active_id" = "$EXPECTED_PAGES_DEPLOYMENT_ID"');
+    expect(workflow).toContain('test "$active_sha" = "$PAGES_SOURCE_SHA"');
+    expect(workflow).toContain('git merge-base --is-ancestor "$PAGES_SOURCE_SHA" "$GITHUB_SHA"');
+    expect(workflow).toContain('git worktree add --detach "$admin_root" "$PAGES_SOURCE_SHA"');
+    expect(workflow).toContain('[ "$PAGES_CONFIG_REPLAY" != "true" ]');
+    expect(workflow).toContain('test "$deployed_sha" = "$source_sha"');
+    expect(workflow).toContain('test "$deployed_id" != "$EXPECTED_PAGES_DEPLOYMENT_ID"');
+    expect(workflow).not.toContain('pnpm d1 migrations apply');
+  });
+
   it('verifies the active Version ID and Google write setting after Worker deploy', () => {
     expect(workflow).toContain('id: worker_deploy');
     expect(workflow).toContain('Current Version ID:');
@@ -119,4 +229,12 @@ describe('Deploy Cloudflare Staging workflow', () => {
       'test "$actual" = "$EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED"',
     );
   });
+  it('stamps the source HEAD before build and checks public metadata after deploy', () => {
+    expect(workflow).toContain('stamp-staging-version.ts "$worker_root"');
+    expect(workflow.indexOf('stamp-staging-version.ts')).toBeLessThan(workflow.indexOf('pnpm --filter worker build'));
+    expect(workflow).toContain('$STAGING_API_URL/admin/version');
+    expect(workflow).toContain('.git_commit == $commit and .version == $version');
+    expect(workflow).toContain('test "$matched" = true');
+  });
+
 });

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /* eslint-disable @typescript-eslint/no-explicit-any -- ページのread model表示を実DOMで確認するための最小mock */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -66,10 +67,10 @@ describe('N-106 友だち追加時配信のstaff read model', () => {
     expect(host.querySelector('a[href^="/friends/detail"]')).toBeNull()
   })
 
-  it('admin read modelだけが顧客詳細へ進める', async () => {
+  it('admin read modelは顧客名を表示し、その追加記録へ進める', async () => {
     state.redacted = false
     await render()
     expect(host.textContent).toContain('山田 太郎')
-    expect(host.querySelector('a[href="/friends/detail?id=friend-1"]')).not.toBeNull()
+    expect(host.querySelector('a[href="/friend-add-settings/runs/detail?id=run-1"]')).not.toBeNull()
   })
 })

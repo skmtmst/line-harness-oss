@@ -1,5 +1,5 @@
 /*
- * P0-3 外部連携の秘密を平文で保存しない＋検証してから「つながった」。
+ * 外部連携の秘密を平文で保存しない＋検証してから「つながった」。
  * 実 SQLite（createTestD1）に本物のルータを通す。
  *
  * - 秘密（access_token 等）は AES-GCM で暗号化して別カラムへ。config JSON に残さない。
@@ -8,7 +8,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 vi.mock('../services/account-access.js', () => ({

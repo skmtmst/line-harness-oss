@@ -1,0 +1,8 @@
+> 文書：飲食の入口（restaurant/dashboard）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
+# 飲食の入口（restaurant/dashboard）
+
+- 前の「今日のお店」（提案 E-1 hKRRF）は B-319 で飲食の業種ダッシュボード（NqAvL）に置き換えた。画面と動きは `../../style-dashboard/BEHAVIOR.md`。
+- ここに残るのは入口（`entry.tsx`）、全店の一覧（`?view=stores`・CHz31・`stores.tsx`）、ほかの飲食の画面も使う口と集計（`use-store-today.ts`・`summarize.ts`）。
+## 全店の一覧（`?view=stores`・`CHz31`）
+- 前の店舗ダッシュボードのまま：数5（予約数・ご来店予定・空席率・売上予測・未返信口コミ）→ 店舗一覧 → 全店アクション／同期方針。

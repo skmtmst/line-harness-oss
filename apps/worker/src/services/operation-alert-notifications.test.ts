@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn(async () => ({})));
-const fetchQuota = vi.hoisted(() => vi.fn(async (): Promise<{
+const fetchQuotaDetails = vi.hoisted(() => vi.fn(async (): Promise<{
   used: number | null;
   limit: number | null;
-}> => ({ used: 0, limit: 200 })));
+  unlimited: boolean;
+  failures: Array<{ endpoint: 'quota' | 'consumption'; code: 'unavailable' }>;
+  reason: string | null;
+}> => ({ used: 0, limit: 200, unlimited: false, failures: [], reason: null })));
 const sendViaXServerRelay = vi.hoisted(() => vi.fn(async () => {
   throw new Error('email provider unavailable');
 }));
@@ -12,7 +15,7 @@ const sendViaXServerRelay = vi.hoisted(() => vi.fn(async () => {
 vi.mock('@line-crm/line-sdk', () => ({
   LineClient: class { pushMessageWithRequestId = pushMessageWithRequestId; },
 }));
-vi.mock('./broadcast-quota-guard.js', () => ({ fetchQuota }));
+vi.mock('../features/broadcasts/broadcast-quota-guard/index.js', () => ({ fetchQuotaDetails }));
 vi.mock('./support-relay.js', () => ({ sendViaXServerRelay }));
 
 import {
@@ -20,7 +23,7 @@ import {
   enqueuePendingOperationAlertNotifications,
   reconcileOperationHealthAlerts,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { processOperationAlertNotificationOutbox } from './operation-alert-notifications.js';
 
@@ -29,8 +32,8 @@ describe('operation alert notification outbox', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-16T00:00:00.000Z'));
     pushMessageWithRequestId.mockClear();
-    fetchQuota.mockReset();
-    fetchQuota.mockResolvedValue({ used: 0, limit: 200 });
+    fetchQuotaDetails.mockReset();
+    fetchQuotaDetails.mockResolvedValue({ used: 0, limit: 200, unlimited: false, failures: [], reason: null });
     sendViaXServerRelay.mockClear();
   });
 
@@ -203,11 +206,12 @@ describe('operation alert notification outbox', () => {
     const testDb = createTestD1();
     await seedLineNotifications(testDb, [{ id: 'fresh', createdAt: '2026-09-16T00:00:00.000Z' }]);
     const env = { DB: testDb.db } as Env['Bindings'];
-    fetchQuota.mockResolvedValue({ used: null, limit: null });
+    fetchQuotaDetails.mockResolvedValue({ used: null, limit: null, unlimited: false, failures: [], reason: null });
     await expect(processOperationAlertNotificationOutbox(env)).resolves.toEqual({ sent: 0, failed: 0 });
-    fetchQuota.mockResolvedValue({ used: 10, limit: null });
+    fetchQuotaDetails.mockResolvedValue({ used: 10, limit: null, unlimited: false,
+      failures: [{ endpoint: 'quota', code: 'unavailable' }], reason: 'unavailable' });
     await expect(processOperationAlertNotificationOutbox(env)).resolves.toEqual({ sent: 0, failed: 0 });
-    fetchQuota.mockResolvedValue({ used: 180, limit: 200 });
+    fetchQuotaDetails.mockResolvedValue({ used: 180, limit: 200, unlimited: false, failures: [], reason: null });
     await expect(processOperationAlertNotificationOutbox(env)).resolves.toEqual({ sent: 0, failed: 0 });
     expect(pushMessageWithRequestId).not.toHaveBeenCalled();
     expect(testDb.raw.prepare("SELECT status, attempt_count FROM operation_alert_notification_outbox WHERE id = 'fresh'").get())
@@ -240,7 +244,7 @@ describe('operation alert notification outbox', () => {
     await expect(processOperationAlertNotificationOutbox({ DB: testDb.db } as Env['Bindings']))
       .resolves.toEqual({ sent: 20, failed: 0 });
     expect(pushMessageWithRequestId).toHaveBeenCalledTimes(20);
-    expect(fetchQuota).toHaveBeenCalledOnce();
+    expect(fetchQuotaDetails).toHaveBeenCalledOnce();
     expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM operation_alert_notification_outbox WHERE status = 'sent'").get())
       .toEqual({ count: 20 });
   });
@@ -478,4 +482,21 @@ describe('operation alert notification outbox', () => {
       "SELECT status, attempt_count FROM operation_alert_notification_outbox WHERE id = 'outbox-stale'",
     ).get()).toEqual({ status: 'sent', attempt_count: 2 });
   });
+  it('W8: 停止した店の通知を同じtickや再オンで送らず、明示再送でだけ再開する', async () => {
+    const testDb = createTestD1(); await seedResolvedFlap(testDb);
+    testDb.raw.exec(`DELETE FROM operation_alert_notification_outbox WHERE channel='email';
+      UPDATE operation_alert_notification_outbox SET status='queued', attempt_count=0, next_attempt_at='2026-09-16T00:00:00.000Z';
+      UPDATE line_accounts SET is_active=0 WHERE id='account-1'`);
+    const env = { DB: testDb.db } as Env['Bindings'];
+    expect(await processOperationAlertNotificationOutbox(env)).toEqual({ sent: 0, failed: 0 });
+    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare('SELECT status,last_error,attempt_count FROM operation_alert_notification_outbox').get())
+      .toEqual({ status: 'failed', last_error: 'account_inactive', attempt_count: 0 });
+    testDb.raw.exec("UPDATE line_accounts SET is_active=1 WHERE id='account-1'");
+    expect(await processOperationAlertNotificationOutbox(env)).toEqual({ sent: 0, failed: 0 });
+    testDb.raw.exec("UPDATE operation_alert_notification_outbox SET status='queued',last_error=NULL");
+    expect(await processOperationAlertNotificationOutbox(env)).toEqual({ sent: 1, failed: 0 });
+    testDb.raw.close();
+  });
+
 });

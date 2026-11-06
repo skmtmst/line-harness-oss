@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { getFriendAddBreakdown } from '../src/friends.js';
+import { getFriendAddBreakdown } from '../src/friends/index.js';
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 

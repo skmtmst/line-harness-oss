@@ -2,7 +2,8 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import DashboardPage from './page'
+// 共通ダッシュボード本体の境界/既存カードを検査する。業種の入口分岐はhome.test.tsxが検査する。
+import DashboardPage from '@/v8/dashboard/dashboard'
 import PhotoReviewsPage from './nen-members/page'
 
 /*
@@ -143,13 +144,13 @@ async function remount(node: React.ReactElement, url: string) {
 
 /** ダッシュボードの写真審査カード。件数とリンク先をそのまま読む。 */
 function photoCard(): { count: number; detail: string; href: string } {
-  const heading = Array.from(host.querySelectorAll('h3')).find(
+  const heading = Array.from(host.querySelectorAll('[data-kpi-presentation] p[title]')).find(
     (node) => node.textContent?.trim() === '写真審査',
   )
   if (!heading) throw new Error('写真審査のカードが見つかりません')
-  const card = heading.parentElement?.parentElement as HTMLElement
-  const value = card.querySelector('p')?.textContent?.replace(/[^0-9]/g, '') ?? ''
-  const detail = card.querySelector('span[title]')?.getAttribute('title') ?? ''
+  const card = heading.closest('[data-kpi-presentation]') as HTMLElement
+  const value = card.querySelector('[data-kpi-number]')?.textContent?.replace(/[^0-9]/g, '') ?? ''
+  const detail = card.querySelector('[data-kpi-detail] span[title]')?.getAttribute('title') ?? ''
   const href = (card.querySelector('a[href]') as HTMLAnchorElement).getAttribute('href') ?? ''
   return { count: Number(value), detail, href }
 }

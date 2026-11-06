@@ -1,21 +1,25 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CalendarCheck2, Copy, Eye, List, Send } from 'lucide-react'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
+import TargetMissing from '@/components/shared/target-missing'
 import { notifyToast } from '@/components/shared/toast'
-import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { useAccount } from '@/contexts/account-context'
-import { api, type ApiBroadcast } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { audienceSummary } from '@/lib/broadcast-summary'
+import { formatDateTime, formatNumber } from '@/lib/format'
+import { useStaffRole } from '@/lib/staff-role'
+import ReservedV8 from '@/v8/broadcast-detail/reserved'
 
 type AudienceEstimate = {
   audienceCount: number
@@ -34,30 +38,14 @@ function formatJst(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function formatJstSentence(value: string | null): string {
   if (!value) return '日時未設定'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '日時未設定'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function belongsToAccount(broadcast: ApiBroadcast, selectedAccountId: string | null): boolean {
@@ -69,10 +57,18 @@ function belongsToAccount(broadcast: ApiBroadcast, selectedAccountId: string | n
 }
 
 function ReservedBroadcastContent() {
-  usePageTitle('一斉配信・予約完了')
+  /*
+   * ★V8：上の帯のパンくずは「一斉配信 › 予約しました」。
+   * 互換経路ではパンくずが描かれないので、渡しても見た目は変わらない。
+   */
+  usePageCrumbs([{ label: '一斉配信', href: '/broadcasts' }])
+  usePageTitle('予約しました')
   const router = useRouter()
   const id = useSearchParams().get('id')
-  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
+  // 閲覧のみ（夕18）：V8 の右の欄の操作を押せない形にする。
+  const staffRole = useStaffRole()
+  const canEdit = useFeatureAccess('broadcasts')
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
   const [estimate, setEstimate] = useState<AudienceEstimate | null>(null)
   // BROADCAST-15: 宛先の条件に出すタグ名・シナリオ名。一覧・詳細と同じ
@@ -82,8 +78,14 @@ function ReservedBroadcastContent() {
     scenarios: Array<{ id: string; name: string }>
   } | null>(null)
   const [notificationText, setNotificationText] = useState('')
+  const [approverName, setApproverName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  /*
+   * 存在しない予約（404）と通信の失敗（503など）は別の案内にする（R582）。
+   * 存在しないものに「もう一度読み込む」だけ出しても直らないし、
+   * 通信の失敗に一覧へ戻る口だけ出しても続けられない。
+   */
+  const [notFound, setNotFound] = useState(false)
   /*
     予約の取消。**送信が始まったあとは戻せない**ので、押す前に何が起きるかを
     読ませ、押している間は受け付けない。取り消しても中身は消えず、下書きに
@@ -111,14 +113,15 @@ function ReservedBroadcastContent() {
     }
 
     setLoading(true)
-    setError('')
+    setNotFound(false)
     setEstimate(null)
+    setApproverName(null)
     try {
       const result = await api.broadcasts.get(id)
       if (!isCurrent()) return
       if (!result.success) {
         setBroadcast(null)
-        setError('予約した配信を表示できませんでした。')
+        setNotFound(true)
         return
       }
 
@@ -139,6 +142,21 @@ function ReservedBroadcastContent() {
             if (!tags && !scenarios) return
             setAudienceNames({ tags: tags ?? [], scenarios: scenarios ?? [] })
           })
+      }
+      // 絵 : 承認待ちの予約は状態行に「承認：名前」を出す。
+      // 名前が取れなくても予約の表示は出し続ける（「承認待ち」の表記に残る）。
+      if (result.data.approvalStatus === 'pending' && result.data.lineAccountId) {
+        void Promise.allSettled([
+          api.broadcasts.approval.get(id),
+          api.broadcasts.approval.candidates(result.data.lineAccountId),
+        ]).then(([stateRes, candidatesRes]) => {
+          if (!isCurrent()) return
+          if (stateRes.status !== 'fulfilled' || !stateRes.value.success) return
+          if (candidatesRes.status !== 'fulfilled' || !candidatesRes.value.success) return
+          const approverId = stateRes.value.data.approval.approverStaffId
+          const name = candidatesRes.value.data.find((c) => c.id === approverId)?.name
+          if (name) setApproverName(name)
+        })
       }
       /*
        * 通知設定と人数の再集計は互いに待たない。直列に待つと予約完了の
@@ -170,10 +188,15 @@ function ReservedBroadcastContent() {
           if (isCurrent()) setEstimate(null)
         })
       await Promise.all([notifyTask, estimateTask])
-    } catch {
+    } catch (err) {
       if (!isCurrent()) return
       setBroadcast(null)
-      setError('予約した配信を表示できませんでした。通信を確認して、もう一度お試しください。')
+      // 実Workerは存在しない予約を404で返す。汎用の通信失敗と混ぜない。
+      if (err instanceof ApiError && err.status === 404) {
+        setNotFound(true)
+      } else {
+        setNotFound(false)
+      }
     } finally {
       if (isCurrent()) setLoading(false)
     }
@@ -192,11 +215,12 @@ function ReservedBroadcastContent() {
    */
   if (!id) {
     return (
-      <ListState
-        kind="empty"
-        title="予約した配信が指定されていません"
+      <TargetMissing
+        kind="unspecified"
+        title="予約中の配信が指定されていません"
         description="配信予定から、確認する予約を選び直してください。"
-        action={<Button href="/broadcasts">配信予定へ戻る</Button>}
+        backHref="/broadcasts"
+        backLabel="配信予定へ戻る"
       />
     )
   }
@@ -204,13 +228,29 @@ function ReservedBroadcastContent() {
     return <ListState kind="loading" title="予約結果を確認しています" />
   }
 
-  if (error || !broadcast) {
+  /*
+   * R582: 対象なしは存在しない旨と配信予定への戻り口だけ。
+   * 通信の失敗（503など）は同画面での再試行だけ。混ぜない。
+   */
+  if (notFound) {
     return (
-      <ListState
+      <TargetMissing
+        kind="not-found"
+        title="予約した配信が見つかりません"
+        description="削除されたか、配信予定から選び直してください。"
+        backHref="/broadcasts"
+        backLabel="配信予定へ戻る"
+      />
+    )
+  }
+
+  if (!broadcast) {
+    return (
+      <TargetMissing
         kind="error"
         title="予約結果を表示できませんでした"
-        description={error || '予約した配信が見つかりませんでした。'}
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        description="通信が切れたか、サーバーが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
       />
     )
   }
@@ -226,7 +266,8 @@ function ReservedBroadcastContent() {
     )
   }
 
-  if (broadcast.status !== 'scheduled' || !broadcast.scheduledAt) {
+  // WEB317：この画面で取り消した直後は下書きに戻っている。取消の成功を「予約待ちではない」に戻さない。
+  if ((broadcast.status !== 'scheduled' || !broadcast.scheduledAt) && !cancelled) {
     return (
       <ListState
         kind="error"
@@ -248,7 +289,7 @@ function ReservedBroadcastContent() {
         (scenarioId) => audienceNames.scenarios.find((s) => s.id === scenarioId)?.name ?? null,
       )
     : TARGET_LABELS[broadcast.targetType]
-  const audienceLabel = `${audienceTarget}${audienceCount === null ? '' : ` ${audienceCount.toLocaleString('ja-JP')}人`}`
+  const audienceLabel = `${audienceTarget}${audienceCount === null ? '' : ` ${formatNumber(audienceCount)}人`}`
   const scheduledLabel = formatJst(broadcast.scheduledAt)
   const scheduledSentenceLabel = formatJstSentence(broadcast.scheduledAt)
 
@@ -297,151 +338,52 @@ function ReservedBroadcastContent() {
     }
   }
 
+  /*
+   * 予約の取消の確定。口の返事をそのまま出さない——409（もう予約中ではない）も
+   * 通信の失敗も、運用者にできることは同じ（読み直して確かめる）。
+   * 管理画面・V8 どちらの確認ダイアログからもここを呼ぶ。
+   */
+  const confirmCancel = async () => {
+    if (cancelling) return
+    setCancelling(true)
+    setCancelError('')
+    try {
+      const res = await api.broadcasts.cancelReservation(broadcast.id)
+      if (!res.success) throw new Error(res.error)
+      setBroadcast(res.data)
+      setCancelled(true)
+      setCancelOpen(false)
+    } catch {
+      setCancelError('予約を取り消せませんでした。すでに送信が始まっているかもしれません。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setCancelling(false)
+    }
+  }
+
+  /* ★V8：見せ方は別の部品へ。読み込み・取消・複製・テスト送信は同じものを渡す。 */
   return (
-    <div data-design-node="bPF0s" className="space-y-4 pb-10">
-      <Link href="/broadcasts" className="text-action hover:text-action-hover inline-flex text-sm font-semibold hover:underline">
-        ← 一斉配信一覧
-      </Link>
-
-      <BroadcastStepRail steps={[
-        { key: 'basic', order: 1, label: '基本設定', anchor: 'reservation-summary', state: 'done' },
-        { key: 'audience', order: 2, label: '対象者', anchor: 'reservation-summary', state: 'done' },
-        { key: 'message', order: 3, label: 'メッセージ', anchor: 'reservation-summary', state: 'done' },
-        { key: 'schedule', order: 4, label: '送信設定', anchor: 'reservation-summary', state: 'done' },
-        { key: 'confirm', order: 5, label: '確認', anchor: 'reservation-summary', state: 'done' },
-      ]} />
-
-      {/*
-        #985 CHK-03: 右の390pxは「次にできること」欄。狭い幅では
-        固定の右列で本文が潰れるので、1列に畳んで下へ並べる。
-      */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <section id="reservation-summary" style={{ minHeight: 760 }} className="bg-canvas border-hairline rounded-card min-w-0 flex-1 border px-6 py-8 text-center shadow-sm">
-          <span className="bg-accent-soft text-accent-deep mx-auto flex h-14 w-14 items-center justify-center rounded-full">
-            <CalendarCheck2 size={28} aria-hidden="true" />
-          </span>
-          <h2 className="text-ink mt-5 text-xl font-bold">一斉配信を予約しました</h2>
-          <p className="text-ink-secondary mt-3 text-sm font-semibold">
-            {audienceCount === null
-              ? `${scheduledSentenceLabel}に配信します。対象人数は現在確認できません。`
-              : `${scheduledSentenceLabel}に、${audienceCount.toLocaleString('ja-JP')}人へ配信します。`}
-          </p>
-
-          <dl className="bg-canvas-sunken border-hairline mx-auto mt-5 max-w-3xl rounded-card border px-5 text-sm">
-            {[
-              ['管理名', broadcast.title],
-              ['配信対象', audienceLabel],
-              ['送信予定', scheduledLabel],
-              ['状態', '予約中'],
-            ].map(([label, value]) => (
-              <div key={label} className="border-hairline flex items-center justify-between gap-6 border-b py-4 text-left last:border-b-0">
-                <dt className="text-ink-faint shrink-0 font-semibold">{label}</dt>
-                <dd className="text-ink min-w-0 truncate font-bold" title={value}>{value}</dd>
-              </div>
-            ))}
-          </dl>
-
-          <NoteBar className="mx-auto mt-4 max-w-3xl">
-            {notificationText || '配信対象は送信開始直前に再集計します。現在の見込みは、友だちやタグの変化で予約時刻までに増減します。'}
-          </NoteBar>
-
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <Button href="/broadcasts"><List size={16} aria-hidden="true" />一覧へ戻る</Button>
-            <Button variant="primary" href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`}>
-              <Eye size={16} aria-hidden="true" />予約内容を確認
-            </Button>
-          </div>
-        </section>
-
-        <aside className="bg-canvas border-hairline rounded-card shrink-0 border p-4 shadow-sm lg:w-97.5">
-          <h2 className="text-ink text-base font-bold">次にできること</h2>
-          <p className="text-ink-faint mt-1 text-xs">予約後も開始前まで確認・取消できます。</p>
-          <div className="mt-4 grid gap-2">
-            <Button href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`} className="w-full">
-              <Eye size={16} aria-hidden="true" />予約の内容を見る
-            </Button>
-            <Button onClick={() => void testSend()} disabled={actionBusy !== null} className="w-full">
-              <Send size={16} aria-hidden="true" />{actionBusy === 'test' ? 'テスト送信中…' : 'テスト送信する'}
-            </Button>
-            <Button onClick={() => void duplicateBroadcast()} disabled={actionBusy !== null} className="w-full">
-              <Copy size={16} aria-hidden="true" />{actionBusy === 'duplicate' ? '複製中…' : '複製して別配信を作る'}
-            </Button>
-            {broadcast.status === 'scheduled' && !cancelled && (
-              <Button onClick={() => { setCancelError(''); setCancelOpen(true) }} disabled={actionBusy !== null} className="w-full">
-                予約を取り消す
-              </Button>
-            )}
-          </div>
-          <p className="text-ink-faint mt-4 text-xs">配信内容: {bubbleCount}通</p>
-          {estimate ? <p className="text-ink-faint mt-1 text-xs">除外見込み: {estimate.hiddenExcluded.toLocaleString('ja-JP')}人</p> : null}
-          {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} className="mt-3" /> : null}
-        </aside>
-      </div>
-
-      {estimate?.warnings.length ? (
-        <Notice tone="warn">
-          <p className="font-bold">配信前に確認すること</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            {estimate.warnings.map((warning, index) => <li key={`${warning.level}-${index}`}>{warning.message}</li>)}
-          </ul>
-        </Notice>
-      ) : null}
-
-      {cancelled && (
-        <Notice tone="success" message="予約を取り消しました。内容は下書きとして残っています。" />
-      )}
-
-      <ConfirmDialog
-        open={cancelOpen}
-        title={`「${broadcast.title}」の予約を取り消しますか？`}
-        description="予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。送信が始まったあとは取り消せません。"
-        confirmLabel="予約を取り消す"
-        destructive
-        busy={cancelling}
-        error={cancelError || undefined}
-        onCancel={() => {
-          if (cancelling) return
-          setCancelOpen(false)
-        }}
-        onConfirm={async () => {
-          if (cancelling) return
-          setCancelling(true)
-          setCancelError('')
-          try {
-            const res = await api.broadcasts.cancelReservation(broadcast.id)
-            if (!res.success) throw new Error(res.error)
-            setBroadcast(res.data)
-            setCancelled(true)
-            setCancelOpen(false)
-          } catch {
-            /*
-              **口の返事をそのまま出さない。** 409（もう予約中ではない）も
-              通信の失敗も、運用者にできることは同じ——読み直して確かめる。
-            */
-            setCancelError('予約を取り消せませんでした。すでに送信が始まっているかもしれません。状態を読み直してから、もう一度お試しください。')
-          } finally {
-            setCancelling(false)
-          }
-        }}
-      >
-        <dl className="text-ink-secondary space-y-1 text-xs">
-          <div className="flex gap-2">
-            <dt className="text-ink-faint shrink-0">配信日時</dt>
-            <dd className="min-w-0">{formatJst(broadcast.scheduledAt)}</dd>
-          </div>
-        </dl>
-      </ConfirmDialog>
-      <style jsx global>{`
-        [data-design-node='bPF0s'] > nav[aria-label='配信作成の進み'] {
-          margin-bottom: 1.5rem;
-          border: 0;
-          border-radius: 0;
-          background: transparent;
-          padding: 0;
-        }
-      `}</style>
-    </div>
-  )
+      <ReservedV8
+        broadcast={broadcast}
+        estimate={estimate}
+        audienceLabel={audienceTarget}
+        approverName={approverName}
+        accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
+        notificationText={notificationText}
+        canEdit={canEdit}
+        testSend={() => void testSend()}
+        duplicate={() => void duplicateBroadcast()}
+        actionBusy={actionBusy}
+        actionError={actionError}
+        clearActionError={() => setActionError('')}
+        cancelOpen={cancelOpen}
+        openCancel={() => { setCancelError(''); setCancelOpen(true) }}
+        closeCancel={() => { if (!cancelling) setCancelOpen(false) }}
+        confirmCancel={() => void confirmCancel()}
+        cancelling={cancelling}
+        cancelError={cancelError}
+        cancelled={cancelled}
+      />
+    )
 }
 
 export default function ReservedBroadcastPage() {

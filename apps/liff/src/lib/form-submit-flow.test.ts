@@ -6,7 +6,7 @@ import {
 } from './form-submit-flow.js';
 
 /**
- * フォーム送信の再送判定表(#646)の直接テスト。
+ * フォーム送信の再送判定表の直接テスト。
  *
  * 命題は1つ: 内容違い・期限切れの 409 を新しい回答として自動で送り直す
  * 経路は存在しない。付け替えは利用者の明示の操作だけが行う。
@@ -64,3 +64,8 @@ describe('decideFormSubmitStep', () => {
     expect(decideFormSubmitStep({ status: 500, body: null }).action).toBe('fail');
   });
 });
+
+  test('書類を付けられない時は選び直す案内を画面へ渡す', () => {
+    const message = '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください';
+    expect(decideFormSubmitStep({ status: 409, body: { success: false, code: 'document_attachment_failed', error: message } })).toEqual({ action: 'fail', message });
+  });

@@ -17,7 +17,7 @@ const preview = await build({ output: join(dir, "preview") });
 const page = (route, output = preview.output) =>
   readFile(join(output, route, "index.html"), "utf8");
 
-test("all five pages have a Japanese title, heading, landmark, registration and login", async () => {
+test("5ページに日本語の題・主領域・登録とログインの入口を出す", async () => {
   assert.deepEqual(preview.paths, [
     "/",
     "/terms/",
@@ -37,7 +37,7 @@ test("all five pages have a Japanese title, heading, landmark, registration and 
   }
 });
 
-test("internal links, assets and fragment targets resolve on every page", async () => {
+test("生成した全ページの内部リンク・画像・ページ内リンクに行き止まりを作らない", async () => {
   for (const route of preview.paths) {
     const html = await page(route);
     const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
@@ -45,7 +45,8 @@ test("internal links, assets and fragment targets resolve on every page", async 
     for (const [, link] of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
       if (link.startsWith("https://")) {
         assert.ok(
-          link.startsWith(config.stagingAppOrigin),
+          link.startsWith(config.stagingAppOrigin) ||
+            link === config.operator.supportLineUrl,
           `Unexpected network destination: ${link}`,
         );
         continue;
@@ -67,7 +68,7 @@ test("internal links, assets and fragment targets resolve on every page", async 
   }
 });
 
-test("preview is unmistakably a review site, non-indexable and cannot be used as production", async () => {
+test("確認用サイトを検索対象にせず、未承認の本番出力を拒む", async () => {
   for (const route of preview.paths) {
     const html = await page(route);
     assert.match(html, /確認用サイト/);
@@ -83,13 +84,17 @@ test("preview is unmistakably a review site, non-indexable and cannot be used as
     /Disallow: \//,
   );
   await assert.rejects(
-    build({ production: true, output: join(dir, "blocked") }),
+    build({
+      production: true,
+      settings: { ...config, legal: { ...config.legal, approved: false } },
+      output: join(dir, "blocked"),
+    }),
     /正式公開を停止/,
   );
   await assert.rejects(stat(join(dir, "blocked")), { code: "ENOENT" });
 });
 
-test("review hostname is separated and the alternate apex path is denied", async () => {
+test("確認用の住所を本番と分け、本番側の別経路を拒む", async () => {
   assert.equal(config.previewOrigin, "https://stg.musubo.jp");
   assert.equal(config.origin, "https://musubo.jp");
   const htaccess = await readFile(join(preview.output, ".htaccess"), "utf8");
@@ -116,33 +121,41 @@ test("review hostname is separated and the alternate apex path is denied", async
   }
 });
 
-test("company identity is user-supplied, missing contacts and unapproved prices are not invented", async () => {
+test("会社情報は設定から出し、決まっていない料金を作らない", async () => {
   const commerce = await page("/legal/");
-  for (const field of ["name", "representative", "address"])
-    assert.ok(commerce.includes(config.operator[field]));
-  assert.match(commerce, /電話番号を取得中/);
-  assert.match(commerce, /公式LINE窓口は準備中/);
+  for (const field of [
+    "name",
+    "representative",
+    "address",
+    "phone",
+    "supportHours",
+  ])
+    assert.ok(commerce.includes(escapeHtml(config.operator[field])), field);
+  assert.ok(commerce.includes(escapeHtml(config.operator.supportLineUrl)));
+  assert.doesNotMatch(commerce, /電話番号を取得中|公式LINE窓口は準備中/);
   assert.doesNotMatch(commerce, /mailto:|href="tel:|9,800|29,800|59,800/);
   assert.match(await page("/terms/"), /正式な契約条件ではありません/);
   assert.match(await page("/privacy/"), /AI画像生成では/);
 });
 
-test("publication gate checks every commercial and legal requirement", () => {
-  const issues = publicationIssues(config);
-  for (const term of [
-    "本番登録",
-    "電話番号",
-    "公式LINE",
-    "受付時間",
-    "税込料金",
-    "支払時期",
-    "解約",
-    "返金",
-    "承認",
-    "施行日",
-    "保存",
-    "国外",
-  ]) {
+test("公開前に商取引・法律上の必須条件をすべて確かめる", () => {
+  assert.deepEqual(publicationIssues(config), []);
+  const cases = {
+    本番登録: { productionAppOrigin: "" },
+    電話番号: { operator: { ...config.operator, phone: "" } },
+    公式LINE: { operator: { ...config.operator, supportLineUrl: "" } },
+    受付時間: { operator: { ...config.operator, supportHours: "" } },
+    税込料金: { commercial: { ...config.commercial, prices: "" } },
+    支払時期: { commercial: { ...config.commercial, paymentTiming: "" } },
+    解約: { commercial: { ...config.commercial, cancellation: "" } },
+    返金: { commercial: { ...config.commercial, refunds: "" } },
+    承認: { legal: { ...config.legal, approved: false } },
+    施行日: { legal: { ...config.legal, effectiveDate: "2026-9-13" } },
+    保存: { legal: { ...config.legal, retention: "" } },
+    国外: { legal: { ...config.legal, overseasProcessing: "" } },
+  };
+  for (const [term, patch] of Object.entries(cases)) {
+    const issues = publicationIssues({ ...config, ...patch });
     assert.ok(
       issues.some((issue) => issue.includes(term)),
       `missing gate: ${term}`,
@@ -150,7 +163,7 @@ test("publication gate checks every commercial and legal requirement", () => {
   }
 });
 
-test("origins and official LINE URLs reject insecure, credential-bearing and spoofed values", () => {
+test("危険なURL・認証情報付きURL・公式LINEに似せた住所を拒む", () => {
   for (const url of [
     "",
     "http://example.com",
@@ -172,7 +185,7 @@ test("origins and official LINE URLs reject insecure, credential-bearing and spo
   assert.equal(isSupportLine("https://lin.ee/test-fixture"), true);
 });
 
-test("configuration content is escaped before rendering", async () => {
+test("設定に含まれるHTMLを実行せず文字として出す", async () => {
   const settings = structuredClone(config);
   settings.operator.name = '<script>alert("x")</script>';
   const escaped = await build({ settings, output: join(dir, "escaped") });
@@ -182,7 +195,7 @@ test("configuration content is escaped before rendering", async () => {
   assert.equal(escapeHtml("&<>\"'"), "&amp;&lt;&gt;&quot;&#39;");
 });
 
-test("approved fixture builds production with correct URLs and without draft copy", async () => {
+test("承認済みの設定で本番用URLを出し、草案を残さない", async () => {
   // Synthetic fixture ONLY. It is never written back to site.config.mjs or deployed.
   const settings = structuredClone(config);
   settings.productionAppOrigin = "https://app.example.com";
@@ -233,7 +246,7 @@ test("approved fixture builds production with correct URLs and without draft cop
   );
 });
 
-test("static site does not collect information, install trackers, or embed external scripts", async () => {
+test("情報収集・追跡・外部スクリプトを静的サイトへ持ち込まない", async () => {
   const js = await readFile(
     new URL("../public/assets/site.js", import.meta.url),
     "utf8",
@@ -255,12 +268,17 @@ test("static site does not collect information, install trackers, or embed exter
   assert.match(htaccess, /frame-ancestors 'none'/);
 });
 
-test("mobile controls, native FAQ, reduced motion and sample disclosures are present", async () => {
+test("スマホの入口・標準FAQ・動きを減らす指定・サンプルの説明を保つ", async () => {
   const html = await page("/");
   assert.match(html, /aria-controls="mobile-nav"/);
-  assert.equal([...html.matchAll(/data-demo="/g)].length, 3);
-  assert.equal([...html.matchAll(/<details>/g)].length, 5);
-  assert.match(html, /表示はサンプル/);
+  assert.match(html, /id="mobile-nav"[^>]*hidden/);
+  // The admin tour is drawn from inert JSON; every screen is a labelled sample.
+  const tour = JSON.parse(html.match(/<script type="application\/json" id="tourData">([^<]*)<\/script>/)[1]);
+  assert.equal(tour.length, 10);
+  assert.ok(tour.some((t) => t.name === "Instagram"));
+  // FAQ is native <details>, so it works without JavaScript.
+  assert.equal([...html.matchAll(/<details class="faq-item">/g)].length, 5);
+  assert.match(html, /画面はいずれも説明用のサンプルです/);
   assert.match(html, /実際の管理画面の表示とは異なります/);
   const css = await readFile(
     new URL("../public/assets/site.css", import.meta.url),
@@ -271,10 +289,11 @@ test("mobile controls, native FAQ, reduced motion and sample disclosures are pre
   assert.match(css, /\[hidden\]/);
 });
 
-test("package contains only static public output, not source or configuration", async () => {
+test("配布物に公開用の静的出力以外のソースと設定を含めない", async () => {
   const files = await readdir(preview.output);
   assert.deepEqual(files.sort(), [
     ".htaccess",
+    "404.html",
     "assets",
     "contact",
     "index.html",
@@ -284,4 +303,79 @@ test("package contains only static public output, not source or configuration", 
     "sitemap.xml",
     "terms",
   ]);
+});
+
+test("保存期間の案内を削除処理と同じ日数にする", async () => {
+  // 案内文の日数は packages/shared/src/data-retention.json が唯一の出どころ。
+  // Workerの削除処理も同じファイルを読むので、ここが一致していれば案内と運用がずれない。
+  const spec = JSON.parse(
+    await readFile(
+      new URL("../../../packages/shared/src/data-retention.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.equal(config.legal.retentionDays, spec.dataRetentionDays);
+  assert.match(config.legal.retention, new RegExp(`${spec.dataRetentionDays}日`));
+  // 保存期間を書いているのは利用規約とプライバシーポリシーの2ページ。
+  for (const route of ["terms", "privacy"]) {
+    const html = await page(route);
+    assert.match(html, new RegExp(`${spec.dataRetentionDays}日`));
+  }
+});
+
+test("厳しい配信制限で消えるインライン指定と外部フォントを入れない", async () => {
+  const css = await readFile(join(preview.output, "assets", "site.css"), "utf8");
+  for (const route of preview.paths) {
+    const html = await page(route);
+    assert.doesNotMatch(html, /\sstyle="/, `${route}: style attribute is blocked by style-src 'self'`);
+    assert.doesNotMatch(html, /fonts\.googleapis|fonts\.gstatic/);
+    assert.doesNotMatch(html, /<script(?![^>]*(?:src="\/assets\/site\.js"|type="application\/(?:ld\+)?json"))[^>]*>/);
+    for (const [, name] of html.matchAll(/class="[^"]*\b(s-[0-9a-f]{10})\b/g))
+      assert.ok(css.includes(`.${name}{`), `${route}: missing generated rule ${name}`);
+  }
+  const js = await readFile(new URL("../public/assets/site.js", import.meta.url), "utf8");
+  assert.doesNotMatch(js, /setAttribute\(\s*["']style/);
+});
+
+test("GoogleとInstagramへの投稿は内容を確かめて実行すると案内する", async () => {
+  const html = await page("/");
+  assert.match(html, /GoogleとInstagramへ同時に投稿/);
+  assert.match(html, /あなたが内容を確かめて実行したときだけ/);
+  assert.match(html, /自動で送ることはありません/);
+});
+
+test("正式公開の題・説明・共有画像・アイコン・構造化データと404をそろえる", async () => {
+  const production = await build({ production: true, output: join(dir, "production-meta") });
+  for (const route of production.paths) {
+    const html = await page(route, production.output);
+    const title = html.match(/<title>([^<]+)<\/title>/)[1];
+    assert.match(title, / \| musubo$/, `${route}: title is "内容 | サイト名"`);
+    const description = html.match(/<meta name="description" content="([^"]+)">/)[1];
+    assert.ok(description.length >= 140 && description.length <= 300, `${route}: description ${description.length}字`);
+    const url = `${config.origin}${route}`;
+    assert.ok(html.includes(`<link rel="canonical" href="${url}">`));
+    assert.ok(html.includes(`<meta property="og:url" content="${url}">`));
+    assert.ok(html.includes(`<meta property="og:image" content="${config.origin}/assets/og.png">`));
+    assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
+    assert.match(html, /rel="apple-touch-icon"/);
+    assert.match(html, /rel="manifest" href="\/assets\/site\.webmanifest"/);
+    assert.match(html, /<meta name="theme-color" content="#143e34">/);
+    const ld = JSON.parse(html.match(/<script type="application\/ld\+json">([^<]+)<\/script>/)[1]);
+    const types = ld["@graph"].map((node) => node["@type"]);
+    assert.ok(types.includes("Organization") && types.includes("WebSite"));
+    assert.equal(types.includes("BreadcrumbList"), route !== "/");
+    assert.match(html, new RegExp(`© \\d{4} ${config.operator.name}`));
+  }
+  const manifest = JSON.parse(await readFile(join(production.output, "assets", "site.webmanifest"), "utf8"));
+  for (const icon of manifest.icons) await stat(join(production.output, icon.src));
+  for (const file of ["og.png", "favicon-16.png", "favicon-32.png", "apple-touch-icon.png", "icon-512.png"])
+    await stat(join(production.output, "assets", file));
+  const htaccess = await readFile(join(production.output, ".htaccess"), "utf8");
+  assert.match(htaccess, /RewriteCond %\{HTTPS\} !on\nRewriteRule \^ https:\/\/musubo\.jp%\{REQUEST_URI\} \[R=301,L\]/);
+  assert.match(htaccess, /ErrorDocument 404 \/404\.html/);
+  const notFound = await readFile(join(production.output, "404.html"), "utf8");
+  assert.match(notFound, /content="noindex,nofollow"/);
+  assert.match(notFound, /<h1>ページが見つかりません<\/h1>/);
+  assert.match(notFound, /href="\/"/);
+  assert.doesNotMatch(await readFile(join(production.output, "sitemap.xml"), "utf8"), /404/);
 });

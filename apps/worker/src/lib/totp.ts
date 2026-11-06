@@ -121,7 +121,7 @@ export async function encryptTotpSecret(secret: string, masterKey: string): Prom
   return `v1.${bytesToBase64Url(iv)}.${bytesToBase64Url(encrypted)}`;
 }
 
-export async function decryptTotpSecret(payload: string, masterKey: string): Promise<string> {
+async function decryptTotpPayload(payload: string, masterKey: string): Promise<string> {
   const [version, rawIv, rawEncrypted] = payload.split('.');
   if (version !== 'v1' || !rawIv || !rawEncrypted) throw new Error('Invalid encrypted TOTP secret');
   const decrypted = await crypto.subtle.decrypt(
@@ -132,7 +132,20 @@ export async function decryptTotpSecret(payload: string, masterKey: string): Pro
   return new TextDecoder().decode(decrypted);
 }
 
-export function buildTotpUri(secret: string, accountName: string, issuer = '然-NEN-公式'): string {
+/** 以前の JSON 形式に保存された認証アプリの秘密値も読める。 */
+export async function decryptTotpSecret(payload: string, masterKey: string): Promise<string> {
+  const plain = await decryptTotpPayload(payload, masterKey);
+  const secret = plain.startsWith('{') ? (JSON.parse(plain) as { secret?: unknown }).secret : plain;
+  if (typeof secret !== 'string' || !/^[A-Z2-7]+$/.test(secret)) throw new Error('Invalid TOTP secret');
+  return secret;
+}
+
+/*
+ * 認証アプリに出る発行元名は製品の名前にする（musubo）。特定の利用者の
+ * 名前を出すと、他の利用者の管理者にもその名前が見えてしまう。
+ * 既に登録済みの認証アプリの表示は変わらない（登録時に決まるため）。
+ */
+export function buildTotpUri(secret: string, accountName: string, issuer = 'musubo'): string {
   const label = `${issuer}:${accountName}`;
   const params = new URLSearchParams({ secret, issuer, algorithm: 'SHA1', digits: String(DIGITS), period: String(STEP_SECONDS) });
   return `otpauth://totp/${encodeURIComponent(label)}?${params.toString()}`;

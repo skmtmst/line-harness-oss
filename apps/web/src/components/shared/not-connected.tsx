@@ -1,7 +1,7 @@
 /**
  * まだ口が無いところの書き方を1つにそろえる。
  *
- * V6の画面は、設計にある節をぜんぶ出したうえで、**取れないものを
+ * 管理画面の画面は、設計にある節をぜんぶ出したうえで、**取れないものを
  * 取れないと書く**方針で作っている。書き方が画面ごとに違うと、
  * 運用者は「これは0なのか、壊れているのか、まだなのか」を毎回
  * 読み解くことになる。ここで形を決めて、契約試験で守る。
@@ -17,6 +17,7 @@
 import type { ReactNode } from 'react'
 import Button from './button'
 import styles from './not-connected.module.css'
+import { formatNumber } from '@/lib/format'
 
 /** 取れていない数字の代わりに出す字。**0 とは別物。** */
 export const NOT_AVAILABLE = '—'
@@ -47,14 +48,24 @@ export const STATE_TEXT = {
 } as const
 
 /**
+ * 数として出せる値か（D021）。
+ *
+ * 未取得（null・undefined）・数でない値・NaN・無限大は出せない。
+ * **0 は出せる。** 数えて0だったことは、取れなかったことと違う。
+ */
+export function isCountableValue(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+/**
  * 数字を出すか、`—` と理由を出すかを決める。
  *
  * `value` が数でないとき（未取得・null・NaN）は `—`。
  * **0 は 0 のまま出す。** 数えて0だったことは、取れなかったことと違う。
  */
 export function countOrDash(value: number | null | undefined, unit = ''): string {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? `${value.toLocaleString('ja-JP')}${unit}`
+  return isCountableValue(value)
+    ? `${formatNumber(value)}${unit}`
     : NOT_AVAILABLE
 }
 

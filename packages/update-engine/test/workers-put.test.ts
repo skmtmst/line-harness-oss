@@ -23,7 +23,7 @@ describe('putWorkerScript metadata', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    fetchMock = vi.fn(async () => ({ ok: true, status: 200, text: async () => '' }) as unknown as Response);
+    fetchMock = vi.fn(async () => ({ ok: true, status: 200, text: async () => '', json: async () => ({success:true}) }) as unknown as Response);
     globalThis.fetch = fetchMock as unknown as typeof fetch;
   });
 

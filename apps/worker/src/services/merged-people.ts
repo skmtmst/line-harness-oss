@@ -176,7 +176,7 @@ async function findUser(db: D1Database, tenantId: string, id: string): Promise<U
   ).bind(id, tenantId, tenantId, tenantId).first<UserRow>();
   if (row) return row;
   /*
-   * R391: 結び付きが0件の本人は上の条件では見つからない。解除は正常な
+   * 結び付きが0件の本人は上の条件では見つからない。解除は正常な
    * 終わり方なので、解除履歴がこの統括に残っている本人は保管状態として開く。
    * 行そのものは users に残っていることが条件。権限の可否は呼び手
    * （canAccessPerson）が別に見る。
@@ -198,7 +198,7 @@ async function findUser(db: D1Database, tenantId: string, id: string): Promise<U
   return archived;
 }
 
-/** R391: この統括に本人の操作履歴が残っているか（保管状態の判定用）。 */
+/** この統括に本人の操作履歴が残っているか（保管状態の判定用）。 */
 export async function hasMergedPersonHistory(
   db: D1Database,
   tenantId: string,
@@ -240,7 +240,7 @@ async function profileRows(
   userId: string,
 ): Promise<ProfileRow[]> {
   /*
-   * R390: 解除済みの友だちを採用元にする値は返さない。解除時に無効化するが、
+   * 解除済みの友だちを採用元にする値は返さない。解除時に無効化するが、
    * それ以前の行が残っていても、結び付いていない友だち由来は隠す。
    * 採用元を持たない値（手入力など）はそのまま返す。
    */
@@ -265,7 +265,7 @@ async function priorityRows(
   userId: string,
 ): Promise<PriorityRow[]> {
   /*
-   * R390: 解除済みの友だちを有効な配信先として返さない。解除時に引退させるが、
+   * 解除済みの友だちを有効な配信先として返さない。解除時に引退させるが、
    * それ以前の行が残っていても、現在結び付いていない友だちの行は隠す。
    */
   const result = await db.prepare(
@@ -694,7 +694,7 @@ export async function unlinkMergedPersonFriend(
     throw new MergedPersonError(404, 'PERSON_LINK_NOT_FOUND', '解除する友だちの結び付けが見つかりません');
   }
   /*
-   * R390: 解除と一緒に、解除した友だち由来の設定を整理する。採用値の情報源を
+   * 解除と一緒に、解除した友だち由来の設定を整理する。採用値の情報源を
    * 失う値は無効化し、配信先は利用対象外（引退）へ移す。行自体は消さず、
    * identity_events に件数を残すので履歴は追える。
    */
@@ -710,7 +710,7 @@ export async function unlinkMergedPersonFriend(
   ]);
   const now = nowIso();
   /*
-   * R389: 版の確保を書き込みより先に行うのではなく、各文に版の条件を付ける。
+   * 版の確保を書き込みより先に行うのではなく、各文に版の条件を付ける。
    * 版が進んでいると全ての文が0件更新になり、409側は friend・link・履歴の
    * どれも変えない。最後の users 更新の件数で 200/409 を決める。
    */

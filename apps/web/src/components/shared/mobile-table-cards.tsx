@@ -32,7 +32,7 @@ function nameText(name: ReactNode): string | undefined {
 }
 
 /**
- * ★V7 監査の直し A（`LD96g`）：スマホ（〜767px）の一覧カード。
+ * ★管理画面 監査の直し A（`LD96g`）：スマホ（〜767px）の一覧カード。
  *
  * 共通の表に「スマホではカード」の形を持たせたもの。各画面は表の列から
  * 名前・状態・要点・主な数字を写すだけで、見た目の決まりはここが持つ。
@@ -57,7 +57,7 @@ export default function MobileTableCards({ items }: { items: MobileTableCard[] }
           if (!item.onSelect || event.target !== event.currentTarget) return
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
-            item.onSelect()
+            item.onSelect?.()
           }
         }
         return (
@@ -68,7 +68,7 @@ export default function MobileTableCards({ items }: { items: MobileTableCard[] }
             aria-label={item.onSelect ? (title ? `${title}の詳細を開く` : item.onSelectLabel ?? '詳細を開く') : undefined}
             onClick={item.onSelect}
             onKeyDown={item.onSelect ? openOnKey : undefined}
-            className="flex min-w-0 flex-col gap-2 rounded-card border border-hairline bg-canvas p-3.5"
+            className="flex min-w-0 flex-col gap-2 rounded-card border content-card bg-canvas p-3.5"
             style={item.onSelect ? { cursor: 'pointer' } : undefined}
           >
             <div className="flex min-w-0 items-start gap-2">

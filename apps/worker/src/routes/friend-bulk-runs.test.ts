@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { friendBulkRuns } from './friend-bulk-runs.js';
 
-vi.mock('../services/friend-bulk-runs.js', () => ({
+vi.mock('../features/friends/friend-bulk-runs.js', () => ({
   createFriendBulkUndoRun: vi.fn(),
   FriendBulkRunError: class FriendBulkRunError extends Error {
     constructor(
@@ -57,7 +57,7 @@ describe('友だち一括操作の入口', () => {
     });
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ code: 'invalid_json' });
+    expect(await response.json()).toMatchObject({ code: 'INVALID_JSON' });
   });
 
   it('巨大な指定は読み口で止める', async () => {

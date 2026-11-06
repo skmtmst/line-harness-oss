@@ -1,4 +1,5 @@
-import { describe, expect, test, vi } from 'vitest';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import {
@@ -12,15 +13,21 @@ import { resolveCorsOrigin } from './admin-auth-config.js';
 import { requirePlatformAdmin } from './platform-admin.js';
 import { adminAuth } from '../routes/admin-auth.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
-vi.mock('@line-crm/db', () => ({
-  // 代理ログイン（★V6 37-5）。ここでは常に「無し」。
+vi.mock('@line-crm/db', async original => ({
+  ...await original<typeof import('@line-crm/db')>(),
+  // 代理ログイン（★37-5）。ここでは常に「無し」。
   getActiveImpersonation: vi.fn(async () => null),
   getPlatformAdminByStaffId: vi.fn(async (_db: unknown, staffId: string) => staffId === 'ops-staff-1'
     ? { staff_id: staffId, is_active: 1, activation_state: 'active' }
     : null),
   getPlatformAdminRecord: vi.fn(async () => null),
+  getPlatformSetting: vi.fn(async () => 'false'),
+  recordAuditEvent: vi.fn(async () => undefined),
+  readAuthThrottle: vi.fn(async () => 0),
+  bumpAuthThrottle: vi.fn(async () => 1),
+  clearAuthThrottle: vi.fn(async () => undefined),
   getStaffByApiKey: vi.fn(async (_db: unknown, token: string) => {
     if (token === 'suspended-key') return { id: 'suspended-owner', name: 'Stopped Owner', role: 'owner', tenant_id: 'tenant-stopped', tenant_status: 'suspended' };
     if (token === 'archived-key') return { id: 'archived-owner', name: 'Archived Owner', role: 'owner', tenant_id: 'tenant-archived', tenant_status: 'archived' };
@@ -32,7 +39,7 @@ vi.mock('@line-crm/db', () => ({
     if (token === 'auto-replies-key') return { id: 'auto-replies-1', name: 'Auto Replies Staff', role: 'staff', permission_keys: '["/auto-replies"]' };
     if (token === 'automations-key') return { id: 'automations-1', name: 'Automations Staff', role: 'staff', permission_keys: '["/automations"]' };
     if (token === 'booking-key') return { id: 'booking-1', name: 'Booking Staff', role: 'staff', permission_keys: '["/booking/bookings"]' };
-    // N-411: 予約の細かい権限。管理(booking)・メニュー・設定・本人勤務は別キー。
+    // 予約の細かい権限。管理(booking)・メニュー・設定・本人勤務は別キー。
     if (token === 'booking-menus-key') return { id: 'bm-1', name: 'Menus Staff', role: 'staff', permission_keys: '["/booking/menus"]' };
     if (token === 'booking-settings-key') return { id: 'bs-1', name: 'Settings Staff', role: 'staff', permission_keys: '["booking.settings"]' };
     if (token === 'booking-own-key') return { id: 'bo-1', name: 'Own Shift Staff', role: 'staff', permission_keys: '["booking.staff.own"]' };
@@ -61,19 +68,19 @@ vi.mock('@line-crm/db', () => ({
   }),
   getStaffByLineUserId: vi.fn(async (_db: unknown, lineUserId: string) => {
     if (lineUserId !== 'authorized-line-user') return null;
-    // 管理者束はTOTP必須のため、セッション発行の確認は必須でない役割で行う（N-426）。
+    // 管理者束はTOTP必須のため、セッション発行の確認は必須でない役割で行う。
     return { id: 'staff-1', name: 'Staff One', role: 'staff', is_active: 1 };
   }),
   createAdminSession: vi.fn(async () => undefined),
   createTwoFactorChallenge: vi.fn(async () => undefined),
-  // N-426: 実装と同じ判定（owner/admin かつ閲覧専用でない人はMFA必須）。
+  // 実装と同じ判定（owner/admin かつ閲覧専用でない人はMFA必須）。
   staffRequiresMfa: vi.fn((row: { role: string; access_level?: string }) =>
     (row.role === 'owner' || row.role === 'admin') && row.access_level !== 'read_only'),
   activatePlatformAdminIfAwaitingTotp: vi.fn(async () => false),
   deleteExpiredTwoFactorChallenges: vi.fn(async () => undefined),
   getTwoFactorChallenge: vi.fn(async () => null),
-  getStaffById: vi.fn(async () => null),
-  // V: セッション行の再確認・見なれない判定。既定は「行なし・履歴なし」。
+  getStaffById: vi.fn(async (_db: unknown, id: string) => id === 'staff-1' ? { id, name: 'Staff One', role: 'admin', is_active: 1, totp_enabled_at: null, totp_secret_enc: null } : null),
+  // セッション行の再確認・見なれない判定。既定は「行なし・履歴なし」。
   getAdminSessionByTokenHash: vi.fn(async () => null),
   adminSessionFamiliarity: vi.fn(async () => ({
     hasBaseline: false, deviceKnown: false, ipKnown: false,
@@ -114,7 +121,18 @@ function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
   };
 }
 
-// Cross-site production topology with explicit opt-in (the supported case).
+const sessionDatabases: ReturnType<typeof createTestD1>[] = [];
+afterEach(() => { for (const db of sessionDatabases.splice(0)) db.raw.close(); });
+
+// セッション発行は既知端末も記録するため、成功するログインの fixture には実スキーマと外部キー先の staff 行を用意する。
+function sessionEnv(bindings: Env['Bindings']): Env['Bindings'] {
+  const db = createTestD1();
+  sessionDatabases.push(db);
+  db.raw.prepare("INSERT INTO staff_members(id,name,role,api_key) VALUES ('staff-1','Fixture','admin','fixture-key')").run();
+  return { ...bindings, DB: db.db };
+}
+
+// 明示的に許可した本番の別サイト構成を試す。
 function crossSiteEnv(): Env['Bindings'] {
   return env({ ADMIN_ORIGIN: PAGES, ADMIN_ALLOW_CROSS_SITE: 'true' });
 }
@@ -127,15 +145,23 @@ function app() {
   }));
   a.use('*', authMiddleware);
   a.route('/', adminAuth);
+  a.get('/api/restaurant-test/setup-progress', (c) => c.json({ success: true }));
+  a.put('/api/dashboard/style',(c)=>c.json({success:true}));
+  a.post('/api/restaurant-test/setup-progress', (c) => c.json({ success: true }));
   a.get('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
   a.post('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
+  a.all('/api/line-accounts/:id/follower-import', (c) => c.json({ success: true }));
+  a.post('/api/line-accounts/:id/follower-import/:action', (c) => c.json({ success: true }));
   a.get('/api/friends', (c) => c.json({ success: true }));
   a.post('/api/broadcasts/:id/send', (c) => c.json({ success: true }));
   a.post('/api/hq/support/requests', (c) => c.json({ success: true }));
   a.get('/api/hq/support/requests', (c) => c.json({ success: true }));
+  a.get('/api/hq/support/summary', (c) => c.json({ success: true }));
   a.get('/api/hq/notices', (c) => c.json({ success: true }));
   a.post('/api/hq/notices/:id/read', (c) => c.json({ success: true }));
   a.get('/api/tenants/me', (c) => c.json({ success: true }));
+  a.get('/api/settings/company', (c) => c.json({ success: true }));
+  a.put('/api/settings/company', (c) => c.json({ success: true }));
   a.get('/api/ops/me', requirePlatformAdmin(), (c) => c.json({ success: true, data: c.get('staff') }));
   a.get('/api/auto-reply-runs', (c) => c.json({ success: true }));
   a.get('/api/automation-runs', (c) => c.json({ success: true }));
@@ -166,7 +192,7 @@ function app() {
   a.get('/api/booking/admin/customers', (c) => c.json({ success: true }));
   a.post('/api/booking/admin/customers', (c) => c.json({ success: true }));
   a.patch('/api/booking/admin/requests/:id', (c) => c.json({ success: true }));
-  // N-411: 細かい権限の検証用スタブ（route 側ガードは別試験で担保）。
+  // 細かい権限の検証用スタブ（route 側ガードは別試験で担保）。
   a.get('/api/booking/admin/menus', (c) => c.json({ success: true }));
   a.post('/api/booking/admin/menus', (c) => c.json({ success: true }));
   a.put('/api/booking/admin/settings', (c) => c.json({ success: true }));
@@ -197,7 +223,7 @@ function app() {
   a.patch('/api/staff/friends-1', (c) => c.json({ success: true }));
   a.get('/api/staff/export', (c) => c.json({ success: true }));
   a.patch('/api/staff/policy', (c) => c.json({ success: true }));
-  // N-423 の未登録経路。permissionForApiPath が null を返す口。
+  //  の未登録経路。permissionForApiPath が null を返す口。
   a.get('/api/coverage-unmapped-demo', (c) => c.json({ success: true }));
   a.post('/api/coverage-unmapped-demo', (c) => c.json({ success: true }));
   return a;
@@ -220,7 +246,7 @@ describe('admin login cookie attributes', () => {
       method: 'POST',
       body: JSON.stringify({ apiKey: 'staff-key' }),
       headers: { 'Content-Type': 'application/json' },
-    }, crossSiteEnv());
+    }, sessionEnv(crossSiteEnv()));
 
     expect(res.status).toBe(200);
     const body = await res.json() as { success: boolean; data: { id: string }; csrfToken: string };
@@ -235,12 +261,12 @@ describe('admin login cookie attributes', () => {
     expect(session).toContain('HttpOnly');
     expect(session).toContain('Secure');
     expect(session).toContain('SameSite=None');
-    // 既定は8時間（N-434）。「記憶する」選択時だけ7日。
+    // 既定は8時間。「記憶する」選択時だけ7日。
     expect(session).toContain('Max-Age=28800');
 
     const csrf = cookieFor(res, 'lh_csrf') ?? '';
     expect(csrf).toContain(`lh_csrf=${body.csrfToken}`);
-    expect(csrf).not.toContain('HttpOnly'); // SPA-readable (double-submit)
+    expect(csrf).not.toContain('HttpOnly'); // double-submit 用に管理画面から読める Cookie とする。
     expect(csrf).toContain('SameSite=None');
   });
 
@@ -249,7 +275,7 @@ describe('admin login cookie attributes', () => {
       method: 'POST',
       body: JSON.stringify({ apiKey: 'staff-key' }),
       headers: { 'Content-Type': 'application/json' },
-    }, env({ ADMIN_ORIGIN: 'https://admin.example.com', WORKER_URL: 'https://api.example.com' }));
+    }, sessionEnv(env({ ADMIN_ORIGIN: 'https://admin.example.com', WORKER_URL: 'https://api.example.com' })));
 
     expect(res.status).toBe(200);
     expect(cookieFor(res, 'lh_admin_session') ?? '').toContain('SameSite=Lax');
@@ -299,13 +325,15 @@ describe('LINE admin login', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ sub: 'authorized-line-user' }), { status: 200 }));
     const res = await app().request('/api/auth/line/callback?code=abc&state=expected', {
       headers: { Cookie: 'lh_line_state=expected; lh_line_nonce=nonce; lh_line_verifier=verifier' },
-    }, crossSiteEnv());
+    }, sessionEnv(crossSiteEnv()));
     expect(res.status).toBe(302);
     const redirect = new URL(res.headers.get('Location')!);
     expect(redirect.origin).toBe(PAGES);
     expect(new URLSearchParams(redirect.hash.slice(1)).get('lh_session')).toBeTruthy();
     expect(new URLSearchParams(redirect.hash.slice(1)).get('lh_csrf')).toBeTruthy();
     expect(cookieFor(res, 'lh_admin_session')).toBeTruthy();
+    expect(cookieFor(res, 'lh_login_device')).toContain('HttpOnly; Secure; SameSite=None');
+    expect(sessionDatabases[0].raw.prepare('SELECT COUNT(*) AS count FROM auth_known_devices WHERE staff_id=?').get('staff-1')).toEqual({ count: 1 });
     fetchSpy.mockRestore();
   });
 
@@ -340,10 +368,15 @@ describe('Authenticator verification', () => {
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     });
     const step = Math.floor(Date.now() / 30_000);
+    const testDb = createTestD1();
+    const { sha256Hex } = await import('./auth.js');
+    testDb.raw.prepare("INSERT INTO staff_members(id,name,role,api_key) VALUES ('staff-1','Fixture','admin','fixture-key')").run();
+    testDb.raw.prepare('INSERT INTO admin_two_factor_challenges(token_hash,staff_id,expires_at,purpose) VALUES (?,?,?,?)')
+      .run(await sha256Hex('challenge'), 'staff-1', new Date(Date.now()+60000).toISOString(), 'verify');
     const response = await app().request('/api/auth/two-factor/verify', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ challengeToken: 'challenge', code: await totpAtStep(secret, step) }),
-    }, { ...crossSiteEnv(), TOTP_ENCRYPTION_KEY: masterKey });
+    }, { ...crossSiteEnv(), DB: testDb.db, TOTP_ENCRYPTION_KEY: masterKey });
     expect(response.status).toBe(200);
     const body = await response.json() as { success: boolean; data: { sessionToken?: string }; csrfToken: string };
     expect(body.success).toBe(true);
@@ -351,6 +384,7 @@ describe('Authenticator verification', () => {
     expect(body.csrfToken).toBeTruthy();
     expect(cookieFor(response, 'lh_admin_session')).toBeTruthy();
     expect(db.claimStaffTotpStep).toHaveBeenCalledWith(expect.anything(), 'staff-1', expect.any(Number));
+    testDb.raw.close();
   });
 
   test.each(['operations.control', 'photo.original.download'])(
@@ -392,7 +426,7 @@ describe('topology guard', () => {
       method: 'POST',
       body: JSON.stringify({ apiKey: 'staff-key' }),
       headers: { 'Content-Type': 'application/json' },
-    }, env({ ADMIN_ORIGIN: PAGES })); // no ADMIN_ALLOW_CROSS_SITE
+    }, env({ ADMIN_ORIGIN: PAGES })); // 別サイト Cookie の明示許可がない構成を試す。
 
     expect(res.status).toBe(500);
     const body = await res.json() as { success: boolean; error: string };
@@ -492,7 +526,7 @@ describe('protected API access', () => {
   });
 
   test('a malformed cookie value yields 401, not a 500', async () => {
-    // `%` is an invalid percent escape — decoding must not throw.
+    // 不正な % の復号で例外を投げないことを確かめる。
     const res = await app().request('/api/protected', {
       headers: { Cookie: 'lh_admin_session=%; other=%E0%A4%A' },
     }, crossSiteEnv());
@@ -500,10 +534,44 @@ describe('protected API access', () => {
   });
 });
 
+describe('staff follower-import gate access', () => {
+  test('staff with chat permission can read the visible store import state', async () => {
+    const response = await app().request('/api/line-accounts/acc-1/follower-import', {
+      headers: { Authorization: 'Bearer chats-key' },
+    }, crossSiteEnv());
+    expect(response.status).toBe(200);
+  });
+
+  test.each(['POST', 'PUT', 'PATCH', 'DELETE'])('%s cannot write import state', async method => {
+    const response = await app().request('/api/line-accounts/acc-1/follower-import', {
+      method, headers: { Authorization: 'Bearer chats-key' },
+    }, crossSiteEnv());
+    expect(response.status).toBe(403);
+  });
+
+  test.each(['detect', 'start', 'step'])('staff cannot run %s', async action => {
+    const response = await app().request(`/api/line-accounts/acc-1/follower-import/${action}`, {
+      method: 'POST', headers: { Authorization: 'Bearer chats-key' },
+    }, crossSiteEnv());
+    expect(response.status).toBe(403);
+  });
+
+  test.each(['/api/line-accounts/acc-1/follower-import/extra', '/api/line-accounts/acc-1/extra/follower-import'])(
+    'the read exception does not allow %s', path => {
+      expect(isStaffExplicitAllow('GET', path)).toBe(false);
+    },
+  );
+});
+
 describe('staff feature permissions', () => {
   const bearer = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
+  test.each(['/api/friends/friend-1/%6Dessages', '/api/friends/friend-1/me%73sages'])(
+    'F16: encoded chat path %s cannot use friend-only permission', async path => {
+      expect((await app().request(path, bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+    },
+  );
 
-  test.each(['/api/support', '/api/operators', '/api/friends/friend-1/messages'])(
+  test.each(['/api/support', '/api/operators', '/api/friends/friend-1/messages', '/api/friends/friend-1/%6Dessages', '/api/friends/friend-1/me%73sages'])(
     'chat permission protects %s',
     async (path) => {
       expect((await app().request(path, bearer('chats-key'), crossSiteEnv())).status).toBe(200);
@@ -614,7 +682,7 @@ describe('staff feature permissions', () => {
     expect(permissionForApiPath('/api/events/admin/events/ev-1/bookings/bk-1/cancel')).toBe('/events');
     // 公開コールバックは権限の対象外。
     expect(permissionForApiPath('/api/meet-callback')).toBeNull();
-    // N-411: 細かい権限のマッピング。広い /api/booking → /booking/bookings より先に解決する。
+    // 細かい権限のマッピング。広い /api/booking → /booking/bookings より先に解決する。
     expect(permissionForApiPath('/api/booking/admin/menus')).toBe('/booking/menus');
     expect(permissionForApiPath('/api/booking/admin/menus/m-1')).toBe('/booking/menus');
     expect(permissionForApiPath('/api/booking/admin/staff-menus')).toBe('/booking/menus');
@@ -890,6 +958,14 @@ describe('CORS allowed / blocked origins', () => {
 describe('N-423 staff deny-by-default (#670)', () => {
   const staffBearer = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
 
+  test('所属統括の問い合わせ集計はスタッフと閲覧のみも読め、認証なしと更新は通さない',async()=>{
+    for(const token of ['no-permissions-key','viewer-key']) {
+      expect((await app().request('/api/hq/support/summary',staffBearer(token),crossSiteEnv())).status).toBe(200);
+      expect((await app().request('/api/hq/support/summary',{...staffBearer(token),method:'POST'},crossSiteEnv())).status).toBe(403);
+    }
+    expect((await app().request('/api/hq/support/summary',{},crossSiteEnv())).status).toBe(401);
+  });
+
   test.each(['GET', 'POST'] as const)('%s 未登録の管理APIは staff に 403', async (method) => {
     for (const token of ['friends-key', 'no-permissions-key']) {
       const res = await app().request('/api/coverage-unmapped-demo', { ...staffBearer(token), method }, crossSiteEnv());
@@ -973,6 +1049,7 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ['POST', '/api/staff/abc/two-factor/confirm'],
       ['DELETE', '/api/staff/abc/two-factor'],
       ['GET', '/api/tenants/me'],
+      ['GET', '/api/settings/company'],
       ['POST', '/api/client-errors'],
       ['GET', '/api/capabilities'],
       ['GET', '/api/line-accounts'],
@@ -995,6 +1072,8 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ['GET', '/api/staff'],
       ['POST', '/api/staff'],
       ['PATCH', '/api/tenants/me'],
+      ['PUT', '/api/settings/company'],
+      ['GET', '/api/settings/company/other'],
       ['GET', '/api/client-errors'],
       ['POST', '/api/capabilities'],
       ['POST', '/api/line-accounts'],
@@ -1041,6 +1120,7 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ['POST', '/api/restaurant-test/stores/abc/select'],
       ['GET', '/api/restaurant-test/snapshot'],
       ['POST', '/api/restaurant-test/reservations/manual'],
+      ['POST', '/api/restaurant-test/channel-close-tasks/task/opened'],
     ] as const) {
       expect(isStaffExplicitAllow(method, path)).toBe(true);
     }
@@ -1064,6 +1144,9 @@ describe('N-423 staff deny-by-default (#670)', () => {
     expect(isPublicApiBoundary('POST', '/api/forms/f1/submit')).toBe(true);
     expect(isPublicApiBoundary('POST', '/api/forms/f1/opened')).toBe(true);
     expect(isPublicApiBoundary('POST', '/api/forms/f1/partial')).toBe(true);
+    expect(isPublicApiBoundary('POST', '/api/forms/f1/files')).toBe(true);
+    expect(isPublicApiBoundary('GET', '/api/form-files/id/content')).toBe(false);
+    expect(isPublicApiBoundary('PUT', '/api/forms/document-settings/account')).toBe(false);
     expect(isPublicApiBoundary('DELETE', '/api/forms/f1/submit')).toBe(false);
     expect(isPublicApiBoundary('POST', '/api/integrations/slack/events')).toBe(true);
     expect(isPublicApiBoundary('GET', '/api/webhooks/incoming/abc/receive')).toBe(true);
@@ -1141,7 +1224,34 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ended_at: null,
       reason: null,
     } as never);
-    const res = await app().request('/api/friends', staffBearer('ops-staff-key'), crossSiteEnv());
+    vi.mocked(db.getStaffByAdminSession).mockResolvedValueOnce({ id: 'ops-staff-1', name: 'Fixture operator', role: 'staff', is_active: 1 } as never);
+    const res = await app().request('/api/friends', staffBearer('lh_session:ops-session-fixture'), crossSiteEnv());
     expect(res.status).toBe(200);
   });
+});
+
+describe('SEC-02 管理フォームの下書き権限', () => {
+ test('フォーム権限のない担当者はaccount_idを付けても管理定義を読めない', async()=>{
+  const res=await app().request('/api/forms/form-1?account_id=a',{headers:{Authorization:'Bearer no-permissions-key'}},crossSiteEnv());
+  expect(res.status).toBe(403);
+ });
+ test('停止した統括の管理者は下書きを読めない',async()=>{
+  expect((await app().request('/api/forms/form-1?account_id=a',{headers:{Authorization:'Bearer suspended-key'}},crossSiteEnv())).status).toBe(403);
+ });
+ test('管理者の下書き取得と認証なしの公開取得を保つ',async()=>{
+  expect((await app().request('/api/forms/form-1?account_id=a',{headers:{Authorization:'Bearer env-key'}},crossSiteEnv())).status).toBe(200);
+  expect((await app().request('/api/forms/form-1',{},crossSiteEnv())).status).toBe(200);
+ });
+});
+
+test.each(['no-permissions-key', 'viewer-key'])('店舗の設定状況は %s でもGETだけ読める', async token => {
+ const headers = { Authorization: `Bearer ${token}` };
+ expect((await app().request('/api/restaurant-test/setup-progress', { headers }, crossSiteEnv())).status).toBe(200);
+ expect((await app().request('/api/restaurant-test/setup-progress', { method: 'POST', headers }, crossSiteEnv())).status).toBe(403);
+});
+
+
+test('閲覧のみは明示保存の印があっても初期メニューの保存へ入れない',async()=>{
+ const response=await app().request('/api/dashboard/style',{method:'PUT',headers:{Authorization:'Bearer viewer-key','Content-Type':'application/json'},body:JSON.stringify({expectedVersion:1,confirmInitialMenu:true,answers:{image:{mode:'configured',value:'simple'}}})},crossSiteEnv());
+ expect(response.status).toBe(403);
 });

@@ -4,8 +4,6 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const SRC = path.join(__dirname, '..', '..')
-const BAR = fs.readFileSync(path.join(__dirname, 'sticky-bar.tsx'), 'utf8')
-const CSS = fs.readFileSync(path.join(__dirname, 'sticky-bar.module.css'), 'utf8')
 
 /**
  * **作成・編集画面の下の帯を、部品で1つにそろえる。**
@@ -30,15 +28,15 @@ function pages(dir: string, out: string[] = []): string[] {
 }
 
 /**
- * 画面が読み込んでいるものも一緒に見る。
+ * 画面が読み込んでいるものも一緒に見る（親フォルダの相対importも含む）。
  *
  * **帯は部品の中にあることがある。** `tags/edit` は
- * `components/friend-fields/edit-tag-page-v4.tsx` に、
- * `tags/marks/new` は `support-mark-editor.tsx` に本体がある。
+ * `v8/tag-edit/edit-form.tsx` に、
+ * `tags/marks/new` は `v8/tags/mark-editor.tsx` に本体がある。
  * `page.tsx` だけを読むと「帯が無い」ことになり、直しようがない。
  */
 function readWithParts(file: string, depth = 0, seen = new Set<string>()): string {
-  if (depth > 2 || seen.has(file)) return ''
+  if (depth > 8 || seen.has(file)) return ''
   seen.add(file)
   let source: string
   try {
@@ -47,7 +45,8 @@ function readWithParts(file: string, depth = 0, seen = new Set<string>()): strin
     return ''
   }
   let combined = source
-  for (const m of source.matchAll(/from '@\/(components|app|lib)\/([^']+)'/g)) {
+  // ★V8 の画面は src/v8 に一から書く（入口は @/v8 から読む）。そこも辿る。
+  for (const m of source.matchAll(/from '@\/(components|app|lib|v8)\/([^']+)'/g)) {
     const base = path.join(SRC, m[1], m[2])
     for (const ext of ['.tsx', '.ts', '/index.tsx']) {
       if (fs.existsSync(base + ext)) {
@@ -56,8 +55,8 @@ function readWithParts(file: string, depth = 0, seen = new Set<string>()): strin
       }
     }
   }
-  for (const m of source.matchAll(/from '\.\/([^']+)'/g)) {
-    const base = path.join(path.dirname(file), m[1])
+  for (const m of source.matchAll(/from '(\.\/|\.\.\/)([^']+)'/g)) {
+    const base = path.join(path.dirname(file), m[1], m[2])
     for (const ext of ['.tsx', '.ts']) {
       if (fs.existsSync(base + ext)) {
         combined += readWithParts(base + ext, depth + 1, seen)
@@ -91,8 +90,7 @@ const EDIT_PAGES = pages(path.join(SRC, 'app'))
 /**
  * **まだ帯を使っていない作成・編集画面。減る一方の表。**
  *
- * 帯へ寄せるのは画面ごとの作業で、担当は S1〜S3（`docs/v6-parallel-plan.md`
- * §4「守ること」で S0 は機能の画面を触らない）。ここは**増やせないこと**
+ * 帯へ寄せるのは画面ごとの作業（共通部品の作業では機能の画面を触らない）。ここは**増やせないこと**
  * だけを見張る。使い始めたら行ごと消す——消し忘れるとこの試験が落ちる。
  *
  * 2026-09-04: 24 画面と数えていたが、**数え方が2つ間違っていた**（台帳 #109）。
@@ -105,6 +103,8 @@ const EDIT_PAGES = pages(path.join(SRC, 'app'))
  */
 const NOT_YET: string[] = []
 
+// アカウント登録はウィザード、V8のフォルダ作成は共通窓の確定操作を使う。
+const NON_FORM_PAGES = new Set(['accounts/new/page.tsx', 'tags/folders/new/page.tsx'])
 const uses = (s: string) => /StickyBar|CreatePage/.test(s)
 
 describe('下部追従バーの並びを部品で固定する', () => {
@@ -113,33 +113,26 @@ describe('下部追従バーの並びを部品で固定する', () => {
   })
 
   it('帯を使っていない画面を増やさない', () => {
-    const found = EDIT_PAGES.filter((f) => !uses(f.s)).map((f) => f.p).sort()
+    const found = EDIT_PAGES.filter((f) => !NON_FORM_PAGES.has(f.p) && !uses(f.s)).map((f) => f.p).sort()
     expect(found, '作成・編集画面が自前で帯を書いている').toEqual([...NOT_YET].sort())
   })
 
-  it('削除は左端、ほかは中央、右端は空ける', () => {
-    // 3列にして真ん中を auto にする。`space-between` だと、削除が無い画面で
-    // 操作が左へ寄ってしまう。
-    expect(CSS).toMatch(/grid-template-columns:\s*1fr auto 1fr/)
-    expect(CSS).not.toMatch(/justify-content:\s*space-between/)
-    expect(CSS).toMatch(/\.actions\s*\{[^}]*justify-content:\s*center/s)
-    // 削除は専用の口で受ける。状態の文字と同じ口に入れない。
-    expect(BAR).toMatch(/destructive\?:\s*ReactNode/)
-    expect(BAR).toMatch(/\{destructive\}/)
+  it('登録ウィザードの進む操作と接続確認の保存制限を残す', () => {
+    const wizard = readWithParts(path.join(SRC, 'app/accounts/new/page.tsx'))
+    expect(wizard).toContain('V8_STEPS')
+    expect(wizard).toContain('type="submit"')
+    /* 接続確認の保存制限は v06 で手動チェックから5行の確認へ変わった。
+       文字で見張らず、描いた画面で見張る：
+       register-v8.react.test.tsx「5行が通ってから登録でき、登録すると③Step2へ進む」。 */
+    expect(wizard).toContain('api.lineAccounts.connect(')
   })
 
-  it('状態の文字は無くてよい', () => {
-    // 設計の2画面（bV5Vs・XBkiQ）はどちらも状態の文字を持たない。
-    expect(BAR).toMatch(/status\?:\s*ReactNode/)
-    expect(BAR).toMatch(/status \? </)
+  it('フォルダ作成は共通窓の確定とキャンセルへ接続する', () => {
+    const source = readWithParts(path.join(SRC, 'app/tags/folders/new/page.tsx'))
+    expect(source).toContain('<FolderEditorDialog')
+    expect(source).toMatch(/onConfirm=\{(?:save|\(\) => save\(\))\}/)
+    expect(source).toContain('onCancel={close}')
   })
 
-  it('1440 で横スクロールさせずに折り返す', () => {
-    expect(CSS).toMatch(/@media \(max-width: 1100px\)/)
-  })
-
-  it('画面の下に追従する', () => {
-    expect(CSS).toMatch(/position:\s*sticky/)
-    expect(CSS).toMatch(/bottom:\s*0/)
-  })
+  // 操作の位置・影・追従は shared-surface-layout.test.mjs の実描画と故障対照で検査する。
 })

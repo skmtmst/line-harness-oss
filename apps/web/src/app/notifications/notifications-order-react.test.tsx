@@ -29,7 +29,7 @@ const items: NotificationCenterItem[] = [
   },
 ]
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
@@ -38,7 +38,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -68,7 +68,7 @@ describe('通知一覧の並び順（R16）', () => {
     const rendered = render(<NotificationsPage />)
     const list = await rendered.findByRole('list')
     const titles = within(list)
-      .getAllByRole('button')
+      .getAllByRole('link')
       .map((button) => button.textContent ?? '')
     expect(titles.map((text) => /未読の新しい通知|未読の古い通知|既読の新しい通知|既読の古い通知/.exec(text)?.[0])).toEqual([
       '未読の新しい通知',

@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 export type WebhookEndpointState = {
   expectedUrl: string;
   actualUrl: string | null;
@@ -12,6 +13,7 @@ export type WebhookEndpointState = {
 export async function fetchWebhookEndpointState(
   channelAccessToken: string,
   expectedUrl: string,
+  acceptedUrls: readonly string[] = [expectedUrl],
 ): Promise<WebhookEndpointState> {
   try {
     const response = await fetch('https://api.line.me/v2/bot/channel/webhook/endpoint', {
@@ -26,7 +28,7 @@ export async function fetchWebhookEndpointState(
     const active = endpoint.active === true;
     const status: WebhookEndpointState['status'] = !actualUrl
       ? 'unconfigured'
-      : actualUrl === expectedUrl && active
+      : acceptedUrls.some(url => url.replace(/\/+$/, '') === actualUrl.replace(/\/+$/, '')) && active
         ? 'matched'
         : 'mismatched';
     return { expectedUrl, actualUrl, active, status };

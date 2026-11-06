@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createTagsBulk } from '../src/tags.js';
+import { createTagsBulk } from '../src/tags/index.js';
 
 type PreparedCall = {
   sql: string;

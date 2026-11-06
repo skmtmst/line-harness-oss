@@ -1,6 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
+class ApiResponseError extends Error {
+  constructor(readonly data: unknown) {
+    super("API request failed");
+  }
+}
+
 function getApiConfig() {
   const apiUrl = process.env.LINE_HARNESS_API_URL;
   const apiKey = process.env.LINE_HARNESS_API_KEY;
@@ -18,7 +24,9 @@ async function apiCall(path: string, method = "GET", body?: unknown) {
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  return res.json();
+  const data: unknown = await res.json();
+  if (!res.ok) throw new ApiResponseError(data);
+  return data;
 }
 
 export function registerManageTrafficPools(server: McpServer): void {
@@ -93,7 +101,7 @@ export function registerManageTrafficPools(server: McpServer): void {
         throw new Error(`Unknown action: ${action}`);
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: JSON.stringify({ success: false, error: String(error) }, null, 2) }],
+          content: [{ type: "text" as const, text: JSON.stringify(error instanceof ApiResponseError ? error.data : { success: false, error: String(error) }, null, 2) }],
           isError: true,
         };
       }

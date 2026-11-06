@@ -1,5 +1,5 @@
 /*
- * タグ付与の工程別台帳(#699 / migration 376)。
+ * タグ付与の工程別台帳(migration 376)。
  *
  * friend_tags への付与は INSERT OR IGNORE で先に確定する。そのあとに走る
  * 副作用が落ちると、次回同じ経路へ来ても changes=0 で早期 return するため、
@@ -151,29 +151,28 @@ export function isFriendTagSideEffectStuck(run: FriendTagSideEffectRun): boolean
  * 差し替えて pending に戻す(新しい出来事なので全工程をやり直す)。
  * 前回の失敗理由と試行回数もここで消す。
  */
+export function friendTagSideEffectOpenStatements(
+  db: D1Database,
+  input: { friendId: string; tagId: string; assignedAt: string },
+  onlyAfterNewTag = false,
+): D1PreparedStatement[] {
+  const now = jstNow();
+  // 新規付与の直後は changes=1 の鎖で3工程を開く。既存タグの台帳は開き直さない。
+  return FRIEND_TAG_SIDE_EFFECT_STEPS.map(step => db.prepare(
+    `INSERT INTO friend_tag_side_effect_runs
+       (friend_id,tag_id,step_key,assigned_at,status,attempt_count,last_error,last_attempt_at,created_at,updated_at)
+     SELECT ?,?,?,?,'pending',0,NULL,NULL,?,? WHERE ${onlyAfterNewTag ? 'changes()=1' : '1'}
+     ON CONFLICT(friend_id,tag_id,step_key) DO UPDATE SET
+       assigned_at=excluded.assigned_at,status='pending',attempt_count=0,last_error=NULL,
+       last_attempt_at=NULL,updated_at=excluded.updated_at`,
+  ).bind(input.friendId,input.tagId,step,input.assignedAt,now,now));
+}
+
 export async function openFriendTagSideEffectRuns(
   db: D1Database,
   input: { friendId: string; tagId: string; assignedAt: string },
 ): Promise<void> {
-  const now = jstNow();
-  for (const step of FRIEND_TAG_SIDE_EFFECT_STEPS) {
-    await db
-      .prepare(
-        `INSERT INTO friend_tag_side_effect_runs
-           (friend_id, tag_id, step_key, assigned_at, status, attempt_count,
-            last_error, last_attempt_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'pending', 0, NULL, NULL, ?, ?)
-         ON CONFLICT (friend_id, tag_id, step_key) DO UPDATE SET
-           assigned_at = excluded.assigned_at,
-           status = 'pending',
-           attempt_count = 0,
-           last_error = NULL,
-           last_attempt_at = NULL,
-           updated_at = excluded.updated_at`,
-      )
-      .bind(input.friendId, input.tagId, step, input.assignedAt, now, now)
-      .run();
-  }
+  await db.batch(friendTagSideEffectOpenStatements(db, input));
 }
 
 /**
@@ -193,6 +192,7 @@ export async function claimFriendTagSideEffectRun(
   friendId: string,
   tagId: string,
   stepKey: FriendTagSideEffectStep,
+  assignedAt: string,
 ): Promise<FriendTagSideEffectClaim> {
   const now = jstNow();
   const from = FRIEND_TAG_SIDE_EFFECT_RETRYABLE_FROM[stepKey];
@@ -203,7 +203,7 @@ export async function claimFriendTagSideEffectRun(
               attempt_count = attempt_count + 1,
               last_attempt_at = ?,
               updated_at = ?
-        WHERE friend_id = ? AND tag_id = ? AND step_key = ?
+        WHERE friend_id = ? AND tag_id = ? AND step_key = ? AND assigned_at = ?
           AND status IN (${from.map(() => '?').join(', ')})
           AND attempt_count < ?`,
     )
@@ -213,6 +213,7 @@ export async function claimFriendTagSideEffectRun(
       friendId,
       tagId,
       stepKey,
+      assignedAt,
       ...from,
       FRIEND_TAG_SIDE_EFFECT_MAX_ATTEMPTS,
     )
@@ -267,15 +268,16 @@ export async function markFriendTagSideEffectCompleted(
   friendId: string,
   tagId: string,
   stepKey: FriendTagSideEffectStep,
+  assignedAt: string,
 ): Promise<void> {
   const now = jstNow();
   await db
     .prepare(
       `UPDATE friend_tag_side_effect_runs
           SET status = 'completed', last_error = NULL, updated_at = ?
-        WHERE friend_id = ? AND tag_id = ? AND step_key = ?`,
+        WHERE friend_id = ? AND tag_id = ? AND step_key = ? AND assigned_at = ?`,
     )
-    .bind(now, friendId, tagId, stepKey)
+    .bind(now, friendId, tagId, stepKey, assignedAt)
     .run();
 }
 
@@ -291,15 +293,16 @@ export async function markFriendTagSideEffectFailed(
   tagId: string,
   stepKey: FriendTagSideEffectStep,
   error: unknown,
+  assignedAt: string,
 ): Promise<void> {
   const now = jstNow();
   await db
     .prepare(
       `UPDATE friend_tag_side_effect_runs
           SET status = 'failed', last_error = ?, updated_at = ?
-        WHERE friend_id = ? AND tag_id = ? AND step_key = ?`,
+        WHERE friend_id = ? AND tag_id = ? AND step_key = ? AND assigned_at = ?`,
     )
-    .bind(describeError(error), now, friendId, tagId, stepKey)
+    .bind(describeError(error), now, friendId, tagId, stepKey, assignedAt)
     .run();
 }
 

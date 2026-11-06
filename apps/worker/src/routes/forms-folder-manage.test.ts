@@ -9,7 +9,7 @@ const { authMiddleware } = await import('../middleware/auth.js');
 const { DEFAULT_TENANT_ID } = await import('@line-crm/shared');
 
 function setup() {
-  const t = createTestD1({ foreignKeys: true });
+  const t = createTestD1({ loginPolicy: 'off', foreignKeys: true });
   const raw = t.raw;
   for (const id of ['acc-a', 'acc-b']) {
     raw.prepare(

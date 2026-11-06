@@ -1,4 +1,7 @@
-import { Hono, type Context } from 'hono';
+import { jstDate as japanDate, jstDateOffset as japanDateOffset } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
+import { visibleAccountId } from './site-tracking-scope.js';
+import { consumePublicIngressReceipt, getMeasurementSite, siteAllowsHost, normalizeSiteHost } from '@line-crm/db';
 import {
   recordSiteEvent,
   linkVisitorToFriend,
@@ -13,7 +16,12 @@ import {
   getSiteConsentSummary,
   recordSiteConsentDecision,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { Hono, type Context } from 'hono';
+
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
@@ -33,25 +41,6 @@ const siteTracking = new Hono<Env>();
 const VISITOR_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 const TRACKING_KEY_PATTERN = /^hk_(?:[a-f0-9]{32}|9f3a2c81b4)$/;
 
-async function visibleAccountId(c: Context<Env>): Promise<string | Response> {
-  /*
-   * 管理画面は `account_id` で送る（rangeQuery の約束）。
-   * 旧い呼び出し（`accountId`）も当面は受ける。どちらも無ければ
-   * 可視アカウントが1つだけのときだけ補う。
-   */
-  const accountId = (c.req.query('account_id') ?? c.req.query('accountId'))?.trim();
-  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  if (!accountId) {
-    return scope.allowedAccountIds.length === 1
-      ? scope.allowedAccountIds[0]
-      : c.json({ success: false, error: 'accountId required' }, 400);
-  }
-  if (!scope.allowedAccountIds.includes(accountId)) {
-    return c.json({ success: false, error: '対象が見つかりません' }, 404);
-  }
-  return accountId;
-}
-
 /**
  * CORS。
  *
@@ -62,20 +51,20 @@ async function visibleAccountId(c: Context<Env>): Promise<string | Response> {
  */
 function corsHeaders(): Record<string, string> {
   return {
-    'Access-Control-Allow-Origin': '*',
+    'Vary': 'Origin',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
   };
 }
 
-siteTracking.options('/api/site/collect', (c) => c.body(null, 204, corsHeaders()));
+siteTracking.options('/api/site/collect', (c) => c.body(null, 204, { ...corsHeaders(), ...(c.req.header('Origin') ? { 'Access-Control-Allow-Origin': c.req.header('Origin')! } : {}) }));
 
 // POST /api/site/collect — 訪問と操作の記録
 //
 // 認証しない。成功も失敗も 204 で返し、中身は何も返さない。
 // エラーの形を返すと、外から叩いて内部の様子を探れてしまう。
-siteTracking.post('/api/site/collect', async (c) => {
+siteTracking.post('/api/site/collect', inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{
       visitorId?: unknown;
@@ -86,6 +75,8 @@ siteTracking.post('/api/site/collect', async (c) => {
       valueNum?: unknown;
       referrer?: unknown;
       trackingKey?: unknown;
+      siteId?: unknown;
+      sourceEventId?: unknown;
       consent?: unknown;
       consentDecision?: unknown;
     }>();
@@ -97,14 +88,25 @@ siteTracking.post('/api/site/collect', async (c) => {
     }
     const lineAccountId = await getSiteTrackingAccountId(c.env.DB, trackingKey);
     if (!lineAccountId) return c.body(null, 204, corsHeaders());
+    const siteId = typeof body.siteId === 'string' ? body.siteId : '';
+    const sourceEventId = typeof body.sourceEventId === 'string' ? body.sourceEventId : '';
+    if (!/^[A-Za-z0-9_-]{8,128}$/.test(sourceEventId)) return c.body(null, 204, corsHeaders());
+    const site = siteId ? await getMeasurementSite(c.env.DB, siteId) : null;
+    if (!site || site.stopped_at !== null || site.line_account_id !== lineAccountId) return c.body(null, 204, corsHeaders());
+    const origin = c.req.header('Origin');
+    let host: string | null = null;
+    try { if (origin && ['https:', 'http:'].includes(new URL(origin).protocol)) host = normalizeSiteHost(new URL(origin).hostname); } catch { /* 不正な送信元は記録しない。 */ }
+    if (!host || !await siteAllowsHost(c.env.DB, siteId, host)) return c.body(null, 204, corsHeaders());
+    c.header('Access-Control-Allow-Origin', origin!);
 
-    // 計測がオフのaccountへは書かない（#859 site_tracking）。それでも204を
+
+    // 計測がオフのaccountへは書かない（ site_tracking）。それでも204を
     // 返すのは、埋め込み先の公開サイトから設定状態を推測させないため。
     if (!(await accountFeatureIsEnabled(c.env.DB, lineAccountId, 'site_tracking'))) {
       return c.body(null, 204, corsHeaders());
     }
 
-    // 同意 (#818)。granted のときだけ行動を記録する。
+    // 同意。granted のときだけ行動を記録する。
     // declined/unset は件数だけ数えて、閲覧そのものは1件も残さない。
     const consent = (['granted', 'declined', 'unset'] as const)
       .includes(body.consent as SiteConsent)
@@ -119,12 +121,13 @@ siteTracking.post('/api/site/collect', async (c) => {
       return c.body(null, 204, corsHeaders());
     }
 
+    if (!await consumePublicIngressReceipt(c.env.DB, { kind: 'site_event', scopeId: siteId, key: sourceEventId })) return c.body(null, 204, corsHeaders());
     await recordSiteEvent(c.env.DB, {
       visitorId,
       lineAccountId,
       eventType: eventType as SiteEventType,
       consent,
-      host: body.host,
+      host,
       // クエリ文字列の除去は recordSiteEvent の中で行う。
       // 受け口ごとに書くと、必ずどこかで忘れる。
       path: body.path,
@@ -139,7 +142,7 @@ siteTracking.post('/api/site/collect', async (c) => {
   } catch (err) {
     // 記録に失敗しても 204。外のサイトの画面が、こちらの都合で
     // エラーを出すべきではない。
-    console.error('POST /api/site/collect error:', err);
+    logger.error("site_tracking.site_collect_create_failed");
     return c.body(null, 204, corsHeaders());
   }
 });
@@ -187,9 +190,11 @@ siteTracking.get('/api/site/script.js', (c) => {
     return id;
   }
   function send(payload) {
-    if (!TRACKING_KEY) return;
+    if (!TRACKING_KEY || !SITE_ID) return;
     payload.visitorId = visitorId();
     payload.trackingKey = TRACKING_KEY;
+    payload.siteId = SITE_ID;
+    payload.sourceEventId = payload.sourceEventId || makeId();
     // 同意の状態 (#818)。granted 以外はサーバー側で記録せず件数だけ数える。
     payload.consent = readConsent() || 'unset';
     var body = JSON.stringify(payload);
@@ -212,7 +217,7 @@ siteTracking.get('/api/site/script.js', (c) => {
       host: location.hostname,
       path: path,
       consent: 'granted',
-      sourceEventId: null,
+      sourceEventId: makeId(),
     };
     var body = JSON.stringify(payload);
     if (navigator.sendBeacon) {
@@ -296,13 +301,13 @@ siteTracking.get('/api/site/script.js', (c) => {
 //
 // LIFF やフォームの中から呼ぶ。ここは認証済みの経路から呼ばれる前提だが、
 // 友だちIDを当てられても「その人の行動が紐づく」だけで、情報は返さない。
-siteTracking.post('/api/site/link', requireRole('owner', 'admin', 'staff'), async (c) => {
+siteTracking.post('/api/site/link', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ visitorId?: unknown; friendId?: unknown; via?: unknown }>();
     const visitorId = String(body.visitorId ?? '');
     const friendId = String(body.friendId ?? '');
     if (!VISITOR_ID_PATTERN.test(visitorId) || !friendId) {
-      return c.json({ success: false, error: 'visitorId と friendId が必要です' }, 400);
+      return inputError(c, { success: false, error: 'visitorId と friendId が必要です' }, 400, ["visitorId","friendId"]);
     }
     const friend = await c.env.DB.prepare(
       'SELECT line_account_id FROM friends WHERE id = ?',
@@ -319,8 +324,7 @@ siteTracking.post('/api/site/link', requireRole('owner', 'admin', 'staff'), asyn
     // 「結びつかなかった」ことだけ伝える。
     return c.json({ success: true, data: { linked } });
   } catch (err) {
-    console.error('POST /api/site/link error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -332,8 +336,7 @@ siteTracking.get('/api/site/tracking-key', requireRole('owner', 'admin', 'staff'
     const trackingKey = await getOrCreateSiteTrackingKey(c.env.DB, accountId);
     return c.json({ success: true, data: { accountId, trackingKey } });
   } catch (err) {
-    console.error('GET /api/site/tracking-key error:', err);
-    return c.json({ success: false, error: '計測鍵を取得できませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -347,8 +350,7 @@ siteTracking.get('/api/site/summary', requireRole('owner', 'admin', 'staff'), as
     ]);
     return c.json({ success: true, data: { ...summary, consent } });
   } catch (err) {
-    console.error('GET /api/site/summary error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -357,12 +359,12 @@ siteTracking.get('/api/site/pages', requireRole('owner', 'admin', 'staff'), asyn
   const accountId = await visibleAccountId(c);
   if (typeof accountId !== 'string') return accountId;
   try {
-    const jstNow = new Date(Date.now() + 9 * 3600_000);
-    const to = c.req.query('to') ?? jstNow.toISOString().slice(0, 10);
+    const now = new Date();
+    const to = c.req.query('to') ?? japanDate(now);
     const from =
       c.req.query('from') ??
-      new Date(jstNow.getTime() - 30 * 24 * 3600_000).toISOString().slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      japanDateOffset(-30, now);
+    if (!isExistingCalendarDate(from) || !isExistingCalendarDate(to)) {
       return c.json({ success: false, error: '期間は 2026-08-01 の形で指定してください' }, 400);
     }
     const items = await getPageViewSummary(c.env.DB, {
@@ -370,8 +372,7 @@ siteTracking.get('/api/site/pages', requireRole('owner', 'admin', 'staff'), asyn
     });
     return c.json({ success: true, data: items });
   } catch (err) {
-    console.error('GET /api/site/pages error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -399,8 +400,7 @@ siteTracking.get('/api/friends/:id/site-events', requireRole('owner', 'admin', '
       })),
     });
   } catch (err) {
-    console.error('GET /api/friends/:id/site-events error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

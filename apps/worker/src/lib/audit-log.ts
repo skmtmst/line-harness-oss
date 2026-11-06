@@ -1,6 +1,7 @@
+import { logger } from '@line-crm/shared/server';
 import type { Context } from 'hono';
 import { auditDeviceFamily, maskAuditIp, recordAuditEvent } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
  * お金が動く操作の記録。
@@ -8,14 +9,26 @@ import type { Env } from '../index.js';
  * マイルとアフィリエイトは残高や報酬に直結するため、
  * 「誰がいつ何を変更したか」を残す。
  *
- * 構造化ログと共通監査台帳の両方へ残す。ログ集約側と管理画面のどちらでも
- * actor と action で絞れるよう、キーは固定にしている。
+ * 誰が・何を・いつは共通監査台帳へ残す。consoleは固定コードとroute型だけ。
  *
  * 値そのものは残さない。金額やマイル数は変更後の状態を見れば分かるし、
  * 個人情報をログへ流さないため。残すのは「誰が・いつ・何に対して・何をしたか」だけ。
  */
 
 export type AuditAction =
+  | 'restaurant.table.delete'
+  | 'restaurant.menu.delete'
+  | 'restaurant.reservation_form.repair'
+  | 'form.submission.export'
+  | 'ad_conversion.retry'
+  | 'line_account_folder.create'
+  | 'line_account_folder.update'
+  | 'line_account_folder.delete'
+  | 'line_account_folder.move'
+  | 'line_account_tag.create'
+  | 'line_account_tag.update'
+  | 'line_account_tag.delete'
+  | 'line_account_tag.replace'
   | 'line_account.deactivate'
   | 'line_account.activate'
   | 'line_account.pool_switch'
@@ -87,6 +100,14 @@ export type AuditAction =
   | 'analytics.export'
   | 'nen.column.duplicate'
   | 'nen.column.import'
+  | 'nen.campaign.save'
+  | 'nen.campaign.enable'
+  | 'nen.campaign.stop'
+  | 'nen.birthday_coupon.save'
+  | 'nen.column.create'
+  | 'nen.column.save'
+  | 'nen.pet.archive'
+  | 'nen.column.schedule'
   | 'nen.delivery.pending_now'
   | 'operator_notification.rule.publish'
   | 'operator_notification.rule.stop'
@@ -121,6 +142,7 @@ export type AuditAction =
   | 'webhook.incoming.deactivate'
   | 'webhook.incoming.secret.rotate'
   | 'webhook.incoming.delete'
+  | 'webhook.incoming.restore'
   | 'webhook.incoming.unmatched.resolve'
   | 'webhook.incoming.test'
   | 'webhook.outgoing.create'
@@ -129,12 +151,14 @@ export type AuditAction =
   | 'webhook.outgoing.deactivate'
   | 'webhook.outgoing.secret.rotate'
   | 'webhook.outgoing.delete'
+  | 'webhook.outgoing.restore'
   | 'webhook.outgoing.test'
   | 'webhook.interaction.retry'
   | 'webhook.interaction.retry_failed'
   | 'webhook.api_token.create'
   | 'webhook.api_token.revoke'
   | 'webhook.api_token.rotate'
+  | 'webhook.api_token.reactivate'
   // #838 第2段: Google Sheets 連携の接続・切断・出力先変更・手動同期。
   | 'google.sheets.connect.start'
   | 'google.sheets.connect'
@@ -154,6 +178,25 @@ export type AuditAction =
   | 'restaurant.google.post.publish'
   | 'restaurant.google.post.instagram_retry'
   | 'restaurant.google.post.remove'
+  // デリバリー受注（Uber Eats・出前館・ロケットナウ）。店舗の操作は各サービスへ送るため必ず残す。
+  | 'restaurant.delivery.order.accept'
+  | 'restaurant.delivery.order.reject'
+  | 'restaurant.delivery.order.ready'
+  | 'restaurant.delivery.order.handed_over'
+  | 'restaurant.delivery.order.cancel'
+  | 'restaurant.delivery.menu.sold_out'
+  | 'restaurant.delivery.menu.resume'
+  | 'restaurant.delivery.intake.stop'
+  | 'restaurant.delivery.intake.resume'
+  // 履歴CSVの書き出し（注文番号・金額が店舗の外へ出るため、他の出力と同じく残す）。
+  | 'restaurant.delivery.history.export'
+  // Uber Eats のログイン連携。店舗の代理で使えるトークンを得る操作なので必ず残す。
+  | 'restaurant.delivery.ubereats.connect.start'
+  | 'restaurant.delivery.ubereats.connect'
+  // つなぐお店の確定。Uber 側で連携が有効になる取り消しにくい操作なので必ず残す。
+  | 'restaurant.delivery.ubereats.store.select'
+  | 'restaurant.delivery.ubereats.connection.check'
+  | 'restaurant.delivery.ubereats.connection.disconnect'
   // #818: 広告費の手入力と、管理画面からの取り直し
   | 'ad_cost.manual_entry'
   | 'ad_cost.import'
@@ -216,20 +259,9 @@ export function auditLog(
 ): void {
   const staff = c.get('staff');
   // 認証前に呼ばれることはない想定だが、ログのために例外を投げたくない。
-  const actorId = staff?.id ?? 'unknown';
   const actorRole = staff?.role ?? 'unknown';
   c.set('auditRecorded', true);
-  console.log(
-    JSON.stringify({
-      tag: 'audit',
-      action,
-      actorId,
-      actorRole,
-      targetKind: target?.kind ?? null,
-      targetId: target?.id ?? null,
-      at: new Date().toISOString(),
-    }),
-  );
+  logger.log("audit.recorded");
 
   const db = c.env?.DB;
   const writer = commonAuditWriter();
@@ -250,7 +282,7 @@ export function auditLog(
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
   }).catch((error: unknown) => {
-    console.error('audit_events insert failed:', error instanceof Error ? error.name : 'unknown');
+    logger.error("audit_log.write_failed");
   });
   try {
     c.executionCtx.waitUntil(task);

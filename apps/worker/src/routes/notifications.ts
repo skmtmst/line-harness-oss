@@ -1,13 +1,18 @@
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
+import { jstDate as japanDate } from '@line-crm/shared';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   getNotificationRules,
+  getOperatorNotificationTeam,
+  operatorRuleRecipientIds,
   getNotificationRuleById,
   createNotificationRule,
   updateNotificationRule,
   deleteNotificationRule,
   getNotifications,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -26,9 +31,11 @@ import {
   listOperatorEventTypes,
 } from '../services/operator-notification-registry.js';
 
+import { notificationTeams } from './notification-teams.js';
 const notifications = new Hono<Env>();
+notifications.route('/', notificationTeams);
 
-const OPERATOR_NOTIFICATION_CHANNELS = new Set(['dashboard', 'email', 'line']);
+const OPERATOR_NOTIFICATION_CHANNELS = new Set(['dashboard', 'email', 'line','push']);
 
 function serializeRule(item: Awaited<ReturnType<typeof getNotificationRuleById>> extends infer T
   ? Exclude<T, null>
@@ -69,20 +76,19 @@ notifications.get('/api/notifications/rules', requireRole('owner', 'admin'), asy
       data: items.map((item) => serializeRule(item)),
     });
   } catch (err) {
-    console.error('GET /api/notifications/rules error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 const listOperatorRules = async (c: Context<Env>) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
     const rules = await getNotificationRules(c.env.DB, lineAccountId);
-    const today = new Date(Date.now() + 9 * 60 * 60_000).toISOString().slice(0, 10);
+    const today = japanDate();
     const activity = await c.env.DB.prepare(`
       SELECT i.definition_id AS rule_id,
              COUNT(DISTINCT i.id) AS occurred_today,
@@ -103,7 +109,7 @@ const listOperatorRules = async (c: Context<Env>) => {
     const resolvedRecipientIds = new Set<string>();
     const items = await Promise.all(rules.map(async (rule) => {
       const conditions = ruleConditions(rule);
-      const recipients = await operatorRecipients(c.env.DB, lineAccountId, conditions.recipientIds);
+      const recipients = await operatorRecipients(c.env.DB, lineAccountId, await operatorRuleRecipientIds(c.env.DB, lineAccountId, conditions));
       const preview = recipients.map((recipient) => recipientPreview(recipient, ruleChannels(rule)));
       for (const recipient of preview) {
         if (recipient.canReceive) resolvedRecipientIds.add(recipient.id);
@@ -136,13 +142,12 @@ const listOperatorRules = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    console.error('GET operator-rules error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
 notifications.get('/api/notifications/operator-rules', requireRole('owner', 'admin'), listOperatorRules);
-// N-342 (#943): 要件の正本名は /api/line-notifications。旧パスも残す。
+//  要件の正本名は /api/line-notifications。旧パスも残す。
 notifications.get('/api/line-notifications/operator-rules', requireRole('owner', 'admin'), listOperatorRules);
 
 const previewOperatorRecipients = async (c: Context<Env>) => {
@@ -153,7 +158,7 @@ const previewOperatorRecipients = async (c: Context<Env>) => {
     const lineAccountId = body.lineAccountId?.trim();
     const channels = normalizeChannels(body.channels);
     if (!lineAccountId || !channels) {
-      return c.json({ success: false, error: 'LINEアカウントと通知方法を確認してください' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントと通知方法を確認してください' }, 400, ["lineAccountId","channels"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
@@ -175,16 +180,15 @@ const previewOperatorRecipients = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    console.error('POST operator-rules/recipients-preview error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
-notifications.post('/api/notifications/operator-rules/recipients-preview', requireRole('owner', 'admin'), previewOperatorRecipients);
-notifications.post('/api/line-notifications/operator-rules/recipients-preview', requireRole('owner', 'admin'), previewOperatorRecipients);
+notifications.post('/api/notifications/operator-rules/recipients-preview', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"recipientIds":["array"],"channels":["array"]}), previewOperatorRecipients);
+notifications.post('/api/line-notifications/operator-rules/recipients-preview', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"recipientIds":["array"],"channels":["array"]}), previewOperatorRecipients);
 
 /**
- * N-342: ルール1件を指定するプレビュー。保存済みルールの受け取る人・
+ * ルール1件を指定するプレビュー。保存済みルールの受け取る人・
  * 通知方法を既定にし、本文で上書きもできる。作る前のプレビューは
  * 上の集合口(recipients-preview)を使う。
  */
@@ -195,7 +199,7 @@ const previewOperatorRuleRecipients = async (c: Context<Env>) => {
     }>().catch((): { lineAccountId?: string; recipientIds?: string[]; channels?: string[] } => ({}));
     const lineAccountId = body.lineAccountId?.trim();
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
@@ -204,9 +208,9 @@ const previewOperatorRuleRecipients = async (c: Context<Env>) => {
     if (!rule) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
     const channels = body.channels === undefined ? ruleChannels(rule) : normalizeChannels(body.channels);
     if (!channels) {
-      return c.json({ success: false, error: '利用できない通知方法が含まれています' }, 400);
+      return inputError(c, { success: false, error: '利用できない通知方法が含まれています' }, 400, ["channels","lineAccountId"]);
     }
-    const recipientIds = body.recipientIds ?? ruleConditions(rule).recipientIds;
+    const recipientIds = body.recipientIds ?? await operatorRuleRecipientIds(c.env.DB, lineAccountId, ruleConditions(rule));
     const recipients = await operatorRecipients(c.env.DB, lineAccountId, recipientIds);
     const items = recipients.map((recipient) => recipientPreview(recipient, channels));
     return c.json({
@@ -224,18 +228,17 @@ const previewOperatorRuleRecipients = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    console.error('POST operator-rules/:id/recipients-preview error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
-notifications.post('/api/line-notifications/operator-rules/:id/recipients-preview', requireRole('owner', 'admin'), previewOperatorRuleRecipients);
+notifications.post('/api/line-notifications/operator-rules/:id/recipients-preview', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"recipientIds":["array"],"channels":["array"]}), previewOperatorRuleRecipients);
 
 const publishOperatorRule = async (c: Context<Env>) => {
   try {
     const body = await c.req.json<{ lineAccountId?: string }>();
     const lineAccountId = body.lineAccountId?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -244,7 +247,7 @@ const publishOperatorRule = async (c: Context<Env>) => {
     /*
      * 登録簿に無いきっかけは、公開できても自動発火しない(dispatch が
      * unknown_event_type で断る)。公開の時点で断らないと「公開したのに
-     * 届かない」を静かに作る。N-327 の芯はそこなので、ここで閉じる。
+     * 届かない」を静かに作る。 の芯はそこなので、ここで閉じる。
      *
      * 画面の選択肢も登録簿に合わせてあるが、この口は API を直接叩いても
      * 通るので、入口の数だけ塞いでおく。
@@ -257,10 +260,11 @@ const publishOperatorRule = async (c: Context<Env>) => {
       }, 409);
     }
     const conditions = ruleConditions(rule);
-    if (!conditions.recipientIds?.length) {
+    const recipientIds = await operatorRuleRecipientIds(c.env.DB, lineAccountId, conditions);
+    if (!recipientIds?.length) {
       return c.json({ success: false, code: 'recipient_required', error: '受け取るスタッフを1人以上選んでください' }, 409);
     }
-    const recipients = await operatorRecipients(c.env.DB, lineAccountId, conditions.recipientIds);
+    const recipients = await operatorRecipients(c.env.DB, lineAccountId, await operatorRuleRecipientIds(c.env.DB, lineAccountId, conditions));
     const deliverable = recipients.map((recipient) => recipientPreview(recipient, ruleChannels(rule)))
       .filter((recipient) => recipient.canReceive);
     if (deliverable.length === 0) {
@@ -271,23 +275,22 @@ const publishOperatorRule = async (c: Context<Env>) => {
     auditLog(c, 'operator_notification.rule.publish', { kind: 'notification_rule', id: rule.id });
     return c.json({ success: true, data: updated ? serializeRule(updated) : null });
   } catch (err) {
-    console.error('POST operator-rules/:id/publish error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
-notifications.post('/api/notifications/operator-rules/:id/publish', requireRole('owner', 'admin'), publishOperatorRule);
-notifications.post('/api/line-notifications/operator-rules/:id/publish', requireRole('owner', 'admin'), publishOperatorRule);
+notifications.post('/api/notifications/operator-rules/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"]}), publishOperatorRule);
+notifications.post('/api/line-notifications/operator-rules/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"]}), publishOperatorRule);
 
 /**
- * N-342: 公開の反対。停止は新規受付を止めるだけで、送信中のものは
+ * 公開の反対。停止は新規受付を止めるだけで、送信中のものは
  * 無断で取り消さない(要件 §5-1)。
  */
 const stopOperatorRule = async (c: Context<Env>) => {
   try {
     const body = await c.req.json<{ lineAccountId?: string }>();
     const lineAccountId = body.lineAccountId?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -298,18 +301,17 @@ const stopOperatorRule = async (c: Context<Env>) => {
     auditLog(c, 'operator_notification.rule.stop', { kind: 'notification_rule', id: rule.id });
     return c.json({ success: true, data: updated ? serializeRule(updated) : null });
   } catch (err) {
-    console.error('POST operator-rules/:id/stop error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
-notifications.post('/api/line-notifications/operator-rules/:id/stop', requireRole('owner', 'admin'), stopOperatorRule);
+notifications.post('/api/line-notifications/operator-rules/:id/stop', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"]}), stopOperatorRule);
 
 const testOperatorRule = async (c: Context<Env>) => {
   try {
     const body = await c.req.json<{ lineAccountId?: string; message?: string }>();
     const lineAccountId = body.lineAccountId?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -327,13 +329,12 @@ const testOperatorRule = async (c: Context<Env>) => {
     auditLog(c, 'operator_notification.rule.test', { kind: 'notification_rule', id: rule.id });
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error('POST operator-rules/:id/test error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
-notifications.post('/api/notifications/operator-rules/:id/test', requireRole('owner', 'admin'), testOperatorRule);
-notifications.post('/api/line-notifications/operator-rules/:id/test', requireRole('owner', 'admin'), testOperatorRule);
+notifications.post('/api/notifications/operator-rules/:id/test', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"message":["string"]}), testOperatorRule);
+notifications.post('/api/line-notifications/operator-rules/:id/test', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"message":["string"]}), testOperatorRule);
 
 const dispatchOperatorEventRoute = async (c: Context<Env>) => {
   try {
@@ -344,7 +345,7 @@ const dispatchOperatorEventRoute = async (c: Context<Env>) => {
     const eventType = body.eventType?.trim();
     const sourceEventId = body.sourceEventId?.trim();
     if (!lineAccountId || !eventType || !sourceEventId) {
-      return c.json({ success: false, error: 'LINEアカウント、きっかけ、発生元IDは必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウント、きっかけ、発生元IDは必須です' }, 400, ["lineAccountId","eventType","sourceEventId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
@@ -356,23 +357,22 @@ const dispatchOperatorEventRoute = async (c: Context<Env>) => {
       return c.json({ success: true, data: { rules: dispatched } });
     } catch (err) {
       if (err instanceof OperatorEventError && err.code === 'unknown_event_type') {
-        return c.json({ success: false, code: err.code, error: err.message }, 400);
+        return inputError(c, { success: false, code: err.code, error: err.message }, 400, ["eventType"]);
       }
       throw err;
     }
   } catch (err) {
-    console.error('POST operator-events error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
-notifications.post('/api/notifications/operator-events', requireRole('owner', 'admin'), dispatchOperatorEventRoute);
-notifications.post('/api/line-notifications/operator-events', requireRole('owner', 'admin'), dispatchOperatorEventRoute);
+notifications.post('/api/notifications/operator-events', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"eventType":["string"],"sourceEventId":["string"],"message":["string"]}), dispatchOperatorEventRoute);
+notifications.post('/api/line-notifications/operator-events', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"eventType":["string"],"sourceEventId":["string"],"message":["string"]}), dispatchOperatorEventRoute);
 
 const listOperatorEventTypesRoute = async (c: Context<Env>) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
@@ -397,8 +397,7 @@ const listOperatorEventTypesRoute = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    console.error('GET operator-event-types error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -419,13 +418,12 @@ const sweepOperatorOutbox = async (c: Context<Env>) => {
     });
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error('POST operator-outbox/sweep error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
-notifications.post('/api/notifications/operator-outbox/sweep', requireRole('owner', 'admin'), sweepOperatorOutbox);
-notifications.post('/api/line-notifications/operator-outbox/sweep', requireRole('owner', 'admin'), sweepOperatorOutbox);
+notifications.post('/api/notifications/operator-outbox/sweep', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"limit":["number"]}), sweepOperatorOutbox);
+notifications.post('/api/line-notifications/operator-outbox/sweep', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"limit":["number"]}), sweepOperatorOutbox);
 
 function csvCell(value: unknown): string {
   const text = value == null ? '' : String(value);
@@ -437,7 +435,7 @@ const exportOperatorDeliveriesCsv = async (c: Context<Env>) => {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     const reason = c.req.query('reason')?.trim();
     if (!lineAccountId || !reason) {
-      return c.json({ success: false, error: 'LINEアカウントと出力理由は必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウントと出力理由は必須です' }, 400, ["lineAccountId","reason"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを出力する権限がありません' }, 403);
@@ -459,6 +457,7 @@ const exportOperatorDeliveriesCsv = async (c: Context<Env>) => {
       return '自動';
     };
     const headings = ['お知らせ', 'きっかけ', '受け取る人', '通知方法', '状態', '試行回数', '実行区分', '受付日時', 'LINE API受付日時', '理由'];
+    c.set('outputAudit', { count: rows.results?.length ?? 0, accountId: lineAccountId });
     const lines = [headings, ...(rows.results ?? []).map((row) => [
       row.rule_name, row.source_event_type, row.recipient_name, row.channel,
       row.status, row.attempts, modeLabel(row.execution_mode),
@@ -479,12 +478,11 @@ const exportOperatorDeliveriesCsv = async (c: Context<Env>) => {
     return new Response(`\uFEFF${lines.join('\r\n')}\r\n`, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="operator-notifications-${new Date().toISOString().slice(0, 10)}.csv"`,
+        'Content-Disposition': `attachment; filename="operator-notifications-${japanDate()}.csv"`,
       },
     });
   } catch (err) {
-    console.error('GET operator-deliveries.csv error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -494,7 +492,7 @@ notifications.get('/api/line-notifications/operator-deliveries.csv', requireRole
 const getOperatorRule = async (c: Context<Env>) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
@@ -505,8 +503,7 @@ const getOperatorRule = async (c: Context<Env>) => {
       data: serializeRule(item),
     });
   } catch (err) {
-    console.error('GET operator-rules/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -521,11 +518,14 @@ const createOperatorRule = async (c: Context<Env>) => {
     const eventType = body.eventType?.trim();
     const channels = normalizeChannels(body.channels);
     if (!lineAccountId || !name || !eventType) {
-      return c.json({ success: false, error: 'LINEアカウント、名前、きっかけは必須です' }, 400);
+      return inputError(c, { success: false, error: 'LINEアカウント、名前、きっかけは必須です' }, 400, ["lineAccountId","name","eventType"]);
     }
-    if (!channels) return c.json({ success: false, error: '利用できない通知方法が含まれています' }, 400);
+    if (!channels) return inputError(c, { success: false, error: '利用できない通知方法が含まれています' }, 400, ["channels"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    if (body.conditions?.teamId !== undefined && (typeof body.conditions.teamId !== 'string' || !body.conditions.teamId || !await getOperatorNotificationTeam(c.env.DB, body.conditions.teamId, lineAccountId))) {
+      return inputError(c, { success: false, error: '選んだチームが見つかりません。読み直してください' }, 422, ["conditions","lineAccountId"]);
     }
     const item = await createNotificationRule(c.env.DB, {
       lineAccountId,
@@ -539,13 +539,12 @@ const createOperatorRule = async (c: Context<Env>) => {
       data: serializeRule(item),
     }, 201);
   } catch (err) {
-    console.error('POST operator-rules error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
-notifications.post('/api/notifications/rules', requireRole('owner', 'admin'), createOperatorRule);
-notifications.post('/api/line-notifications/operator-rules', requireRole('owner', 'admin'), createOperatorRule);
+notifications.post('/api/notifications/rules', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"name":["string"],"eventType":["string"],"conditions":["object"],"channels":["array"]}), createOperatorRule);
+notifications.post('/api/line-notifications/operator-rules', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"name":["string"],"eventType":["string"],"conditions":["object"],"channels":["array"]}), createOperatorRule);
 
 const updateOperatorRule = async (c: Context<Env>) => {
   try {
@@ -559,7 +558,7 @@ const updateOperatorRule = async (c: Context<Env>) => {
       isActive?: boolean;
     }>();
     const lineAccountId = body.lineAccountId?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     if (body.isActive === true) {
       return c.json({
         success: false,
@@ -567,12 +566,15 @@ const updateOperatorRule = async (c: Context<Env>) => {
       }, 409);
     }
     const channels = body.channels === undefined ? undefined : normalizeChannels(body.channels);
-    if (channels === null) return c.json({ success: false, error: '利用できない通知方法が含まれています' }, 400);
+    if (channels === null) return inputError(c, { success: false, error: '利用できない通知方法が含まれています' }, 400, ["channels"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
     const current = await getNotificationRuleById(c.env.DB, id, lineAccountId);
     if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+    if (body.conditions?.teamId !== undefined && (typeof body.conditions.teamId !== 'string' || !body.conditions.teamId || !await getOperatorNotificationTeam(c.env.DB, body.conditions.teamId, lineAccountId))) {
+      return inputError(c, { success: false, error: '選んだチームが見つかりません。読み直してください' }, 422, ["conditions","lineAccountId"]);
+    }
     await updateNotificationRule(c.env.DB, id, lineAccountId, {
       name: body.name,
       eventType: body.eventType,
@@ -587,15 +589,14 @@ const updateOperatorRule = async (c: Context<Env>) => {
       data: serializeRule(updated),
     });
   } catch (err) {
-    console.error('PUT operator-rules/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
-notifications.put('/api/notifications/rules/:id', requireRole('owner', 'admin'), updateOperatorRule);
+notifications.put('/api/notifications/rules/:id', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"name":["string"],"eventType":["string"],"conditions":["object"],"channels":["array"],"isActive":["boolean"]}), updateOperatorRule);
 
 /*
- * N-342: 要件の正本名は PATCH .../operator-rules/:id/draft。下書きの
+ * 要件の正本名は PATCH .../operator-rules/:id/draft。下書きの
  * 編集だけを受け、公開・停止はそれぞれの口へ分ける(ここで isActive を
  * 触らせない)。内容は PUT /api/notifications/rules/:id と同じ検証。
  */
@@ -604,6 +605,7 @@ const updateOperatorRuleDraft = async (c: Context<Env>) => {
     const id = c.req.param('id') ?? '';
     const body = await c.req.json<{
       lineAccountId: string;
+      expectedVersion?: unknown;
       name?: string;
       eventType?: string;
       conditions?: Record<string, unknown>;
@@ -611,7 +613,16 @@ const updateOperatorRuleDraft = async (c: Context<Env>) => {
       isActive?: boolean;
     }>();
     const lineAccountId = body.lineAccountId?.trim();
-    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
+    // 顧客通知の下書きとそろえ、読んだ版を必須にする。版なしの保存は
+    // 古い画面からの上書きを許すので受け付けない。
+    const expectedVersion = typeof body.expectedVersion === 'number'
+      && Number.isInteger(body.expectedVersion) && body.expectedVersion > 0
+      ? body.expectedVersion
+      : null;
+    if (!expectedVersion) {
+      return inputError(c, { success: false, error: 'LINEアカウントと現在の版は必須です' }, 400, ["expectedVersion"]);
+    }
     if (body.isActive !== undefined) {
       return c.json({
         success: false,
@@ -620,28 +631,42 @@ const updateOperatorRuleDraft = async (c: Context<Env>) => {
       }, 409);
     }
     const channels = body.channels === undefined ? undefined : normalizeChannels(body.channels);
-    if (channels === null) return c.json({ success: false, error: '利用できない通知方法が含まれています' }, 400);
+    if (channels === null) return inputError(c, { success: false, error: '利用できない通知方法が含まれています' }, 400, ["channels"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
     const current = await getNotificationRuleById(c.env.DB, id, lineAccountId);
     if (!current) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
-    await updateNotificationRule(c.env.DB, id, lineAccountId, {
+    if (body.conditions?.teamId !== undefined && (typeof body.conditions.teamId !== 'string' || !body.conditions.teamId || !await getOperatorNotificationTeam(c.env.DB, body.conditions.teamId, lineAccountId))) {
+      return inputError(c, { success: false, error: '選んだチームが見つかりません。読み直してください' }, 422, ["conditions","lineAccountId"]);
+    }
+    const saved = await updateNotificationRule(c.env.DB, id, lineAccountId, {
       name: body.name,
       eventType: body.eventType,
       conditions: body.conditions,
       channels,
-    });
+    }, { expectedVersion });
+    if (!saved) {
+      // 読んだ後にほかの担当者が保存した。先行内容は保たれたまま、
+      // 比較と開き直しのために現在値を返す。
+      const latest = await getNotificationRuleById(c.env.DB, id, lineAccountId);
+      if (!latest) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
+      return c.json({
+        success: false,
+        code: 'version_conflict',
+        error: 'ほかの担当者が先に保存しました。開き直して内容を確認してください',
+        data: { current: serializeRule(latest) },
+      }, 409);
+    }
     const updated = await getNotificationRuleById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
     return c.json({ success: true, data: serializeRule(updated) });
   } catch (err) {
-    console.error('PATCH operator-rules/:id/draft error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
-notifications.patch('/api/line-notifications/operator-rules/:id/draft', requireRole('owner', 'admin'), updateOperatorRuleDraft);
+notifications.patch('/api/line-notifications/operator-rules/:id/draft', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"name":["string"],"eventType":["string"],"conditions":["object"],"channels":["array"],"isActive":["boolean"]}), updateOperatorRuleDraft);
 
 notifications.delete('/api/notifications/rules/:id', requireRole('owner', 'admin'), async (c) => {
   try {
@@ -655,8 +680,7 @@ notifications.delete('/api/notifications/rules/:id', requireRole('owner', 'admin
     await deleteNotificationRule(c.env.DB, c.req.param('id') ?? '', lineAccountId);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/notifications/rules/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -665,19 +689,14 @@ notifications.delete('/api/notifications/rules/:id', requireRole('owner', 'admin
 notifications.get('/api/notifications', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const status = c.req.query('status') ?? undefined;
-    const requestedLimit = Number(c.req.query('limit') ?? '100');
-    const limit = Number.isInteger(requestedLimit)
-      ? Math.min(Math.max(requestedLimit, 1), 100)
-      : 100;
+    const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 100, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 100 } }).limit;
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
     const items = await getNotifications(c.env.DB, { lineAccountId, status, limit });
-    return c.json({
-      success: true,
-      data: items.map((n) => ({
+    const responseItems = items.map((n) => ({
         id: n.id,
         ruleId: n.rule_id,
         eventType: n.event_type,
@@ -687,11 +706,10 @@ notifications.get('/api/notifications', requireRole('owner', 'admin', 'staff'), 
         status: n.status,
         metadata: n.metadata ? JSON.parse(n.metadata) : null,
         createdAt: n.created_at,
-      })),
-    });
+      }));
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [] }));
   } catch (err) {
-    console.error('GET /api/notifications error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

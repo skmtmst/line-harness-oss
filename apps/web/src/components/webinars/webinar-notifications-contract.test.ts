@@ -1,12 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PART = readFileSync(join(HERE, 'webinar-notifications.tsx'), 'utf8')
-const EDIT = readFileSync(join(HERE, '..', '..', 'app', 'webinars', 'edit', 'page.tsx'), 'utf8')
-const STEPS = readFileSync(join(HERE, '..', '..', 'app', 'webinars', 'edit', 'edit-steps.ts'), 'utf8')
+const PART = readFileSync(join(HERE, '../../v8/webinar-edit/notifications.tsx'), 'utf8')
 
 /**
  * ウェビナーの通知・リマインド（設計 `Ho8z4` 10-1-D）。
@@ -28,11 +26,6 @@ describe('通知の設定', () => {
     }
   })
 
-  it('切っている通知の細かい設定を出さない', () => {
-    /* 押しても効かない欄を並べると、設定したつもりで送られない。 */
-    expect(PART).toContain('{row.on && row.extra ? <div className="shrink-0">{row.extra}</div> : null}')
-  })
-
   it('素の選び口を使わない', () => {
     /* 設計の選び口（`rpot9` / `Gfsb4`）にそろえる。 */
     expect(PART).toContain("import Select from '@/components/shared/select'")
@@ -44,21 +37,22 @@ describe('通知の設定', () => {
  */
 describe('送った結果の数', () => {
   it('待ち・送信済み・失敗・見送り・取消を分けて出す', () => {
-    for (const label of ['予定', '送信済み', '失敗', '見送り', '取消', '合計']) {
-      expect(PART, `${label} が無い`).toContain(`'${label}'`)
+    for (const label of ['予定', '送った', '届かなかった', '見送り', '取消', '合計']) {
+      expect(PART, `${label} が無い`).toContain(label)
     }
   })
 
   it('読めていないときに 0 件と書かない', () => {
     /* 「失敗 0 件」と「まだ数えていない」を混ぜない。 */
     expect(PART).toContain('const available = overview !== null')
-    expect(PART).toContain("countText(value as number | undefined, available)")
-    expect(PART).toContain('送った結果はまだ読めていません。—（未取得）')
+    expect(PART).toContain("available && typeof value === 'number' ? formatNumber(value) : emptyValue('unknown')")
+    expect(PART).toContain('{count(value)}')
   })
 
   it('数が無いときは単位も出さない', () => {
     /* `—件` は数に見える。 */
-    expect(PART).toContain('{available && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}')
+    expect(PART).toContain("available && typeof value === 'number' ? `${count(value)}件` : count(value)")
+    for (const field of ['pending', 'cancelled', 'total']) expect(PART).toContain(`countWithUnit(overview?.${field})`)
   })
 
   it('保存したとき、何が起きたかを数で言う', () => {
@@ -68,10 +62,11 @@ describe('送った結果の数', () => {
   })
 
   it('通知対象は実人数と延べ予約を分けて表示する', () => {
-    expect(PART).toContain('audienceText(overview?.audience)')
     expect(PART).toContain('通知の対象')
-    expect(PART).toContain('{audience.people}')
-    expect(PART).toContain('{audience.note}')
+    expect(PART).toContain('audienceText(overview?.audience)')
+    expect(PART).toContain('formatNumber(audience.people)')
+    expect(PART).toContain('取消を除いた有効な申込。延べ予約は')
+    expect(PART).toContain('formatNumber(audience.bookings)')
   })
 })
 
@@ -92,16 +87,4 @@ describe('読めなかったとき', () => {
   })
 })
 
-describe('編集画面の STEP 4', () => {
-  it('段の中身が「まだ繋がっていません」から実物へ変わった', () => {
-    /* 段は畳まず隠すので、未保存の印と保存操作を親の固定バーへ渡す口がある。 */
-    expect(EDIT).toContain('<NotificationDesignStep webinarId={webinar.id}')
-    expect(EDIT).toContain('onDirtyChange={dirtyReporterFor')
-    expect(EDIT).toContain('registerSave={saveRegistrarFor')
-    /* 取得は子の編集タブに一本化し、親は報告を受ける。同じ口を2回叩かない。 */
-    expect(EDIT).toContain('onLoaded={handleNotificationsLoaded}')
-    expect(EDIT).toContain('<WebinarNotifications key={notifAttempt} webinarId={webinarId}')
-    expect(EDIT).not.toContain('webinarApi.notifications(webinarId)')
-    expect(STEPS, '未接続の印が残っている').not.toContain("notConnected: '通知・リマインドの設定'")
-  })
-})
+// STEP 4の取得/段移動/未保存/親の保存は v8/webinar-edit/edit.test.tsx の実操作へ移した。

@@ -1,3 +1,4 @@
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
   getUsersForAccess,
@@ -15,10 +16,10 @@ import {
 } from '@line-crm/db';
 import type { User as DbUser, UserAccessScope } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-
+import { fail } from '../lib/fail.js';
 const users = new Hono<Env>();
 
 function serializeUser(row: DbUser) {
@@ -55,8 +56,7 @@ users.get('/api/users', requireRole('owner', 'admin', 'staff'), async (c) => {
     const items = await getUsersForAccess(c.env.DB, await userAccessScope(c));
     return c.json({ success: true, data: items.map(serializeUser) });
   } catch (err) {
-    console.error('GET /api/users error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -66,17 +66,16 @@ users.get('/api/users/:id', requireRole('owner', 'admin', 'staff'), async (c) =>
     const id = c.req.param('id');
     const user = await visibleUser(c, id);
     if (!user) {
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeUser(user) });
   } catch (err) {
-    console.error('GET /api/users/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/users - create
-users.post('/api/users', requireRole('owner', 'admin'), async (c) => {
+users.post('/api/users', requireRole('owner', 'admin'), inputJsonBoundary({"email":["null","string"],"phone":["null","string"],"externalId":["null","string"],"displayName":["null","string"]}), async (c) => {
   try {
     const body = await c.req.json<{
       email?: string | null;
@@ -97,17 +96,16 @@ users.post('/api/users', requireRole('owner', 'admin'), async (c) => {
     });
     return c.json({ success: true, data: serializeUser(user) }, 201);
   } catch (err) {
-    console.error('POST /api/users error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // PUT /api/users/:id - update
-users.put('/api/users/:id', requireRole('owner', 'admin'), async (c) => {
+users.put('/api/users/:id', requireRole('owner', 'admin'), inputJsonBoundary({"email":["null","string"],"phone":["null","string"],"externalId":["null","string"],"displayName":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
     if (!await visibleUser(c, id)) {
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     const body = await c.req.json<{
       email?: string | null;
@@ -124,20 +122,15 @@ users.put('/api/users/:id', requireRole('owner', 'admin'), async (c) => {
     });
 
     if (!updated) {
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeUser(updated) });
   } catch (err) {
-    console.error('PUT /api/users/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// DELETE /api/users/:id - archive (never physically delete)
-//
-// 結びついた友だち・名寄せがある利用者を消すと、履歴・監査・支払の記録が
-// 誰のものか分からなくなる。関連があるときは 409 で止め、通常は行を残した
-// まま退避（archive）にする。退避済みは一覧・詳細に出さない。
+// 結び付いた友だちや本人統合があると記録の所有者を失うため409で止める。通常も物理削除せず保管し、一覧と詳細からだけ外す。
 users.delete('/api/users/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -150,7 +143,7 @@ users.delete('/api/users/:id', requireRole('owner'), async (c) => {
         && (gone.tenant_id ?? DEFAULT_TENANT_ID) === (staff?.tenantId ?? DEFAULT_TENANT_ID)) {
         return c.json({ success: true, data: null });
       }
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     if (user.status === 'archived') {
       return c.json({ success: true, data: null });
@@ -166,23 +159,22 @@ users.delete('/api/users/:id', requireRole('owner'), async (c) => {
     await archiveUser(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/users/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// POST /api/users/:id/link - link friend to user UUID
-users.post('/api/users/:id/link', requireRole('owner', 'admin'), async (c) => {
+
+users.post('/api/users/:id/link', requireRole('owner', 'admin'), inputJsonBoundary({"friendId":["string"]}), async (c) => {
   try {
     const userId = c.req.param('id');
     const body = await c.req.json<{ friendId: string }>();
 
     if (!body.friendId) {
-      return c.json({ success: false, error: 'friendId is required' }, 400);
+      return inputError(c, { success: false, error: 'friendId is required' }, 400, ["friendId"]);
     }
 
     if (!await visibleUser(c, userId)) {
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     const friend = await getFriendById(c.env.DB, body.friendId);
     if (!friend || !await canAccessAllLineAccounts(
@@ -190,11 +182,11 @@ users.post('/api/users/:id/link', requireRole('owner', 'admin'), async (c) => {
       c.get('staff'),
       [friend.line_account_id],
     )) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     /*
-     * R394: 同時に別の人が動かしたときは上書きせず409にする（変更0）。
+     * 同時に別の人が動かしたときは上書きせず409にする（変更0）。
      * 最新の結び付きを読み直してからやり直す。
      */
     const linked = await linkFriendToUser(
@@ -208,8 +200,7 @@ users.post('/api/users/:id/link', requireRole('owner', 'admin'), async (c) => {
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('POST /api/users/:id/link error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -218,7 +209,7 @@ users.get('/api/users/:id/accounts', requireRole('owner', 'admin', 'staff'), asy
   try {
     const userId = c.req.param('id');
     if (!await visibleUser(c, userId)) {
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     const friends = await getUserFriends(c.env.DB, userId);
     return c.json({
@@ -231,13 +222,12 @@ users.get('/api/users/:id/accounts', requireRole('owner', 'admin', 'staff'), asy
       })),
     });
   } catch (err) {
-    console.error('GET /api/users/:id/accounts error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/users/match - find user by email or phone
-users.post('/api/users/match', requireRole('owner', 'admin'), async (c) => {
+users.post('/api/users/match', requireRole('owner', 'admin'), inputJsonBoundary({"email":["string"],"phone":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ email?: string; phone?: string }>();
     const scope = await userAccessScope(c);
@@ -251,12 +241,11 @@ users.post('/api/users/match', requireRole('owner', 'admin'), async (c) => {
     }
 
     if (!user) {
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeUser(user) });
   } catch (err) {
-    console.error('POST /api/users/match error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

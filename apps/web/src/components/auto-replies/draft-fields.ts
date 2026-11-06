@@ -153,7 +153,7 @@ export function toKeywordPayload(rule: KeywordRuleDraft): Record<string, unknown
 export interface InlineAction {
   /** 画面で並べ替えるための一時的な id。保存しない。 */
   key: string
-  actionType: ScenarioActionType
+  actionType: ScenarioActionType | 'notify_staff'
   config: unknown
   /** 失敗したら止めるか続けるか。無指定は続ける（いまの動き）。 */
   onFailure: 'stop' | 'continue'
@@ -187,7 +187,7 @@ export function readInlineActions(stored: unknown[] | null | undefined): InlineA
         config = {}
       }
     }
-    return [{ key: newActionKey(), actionType: actionType as ScenarioActionType, config, onFailure: readOnFailure(r) }]
+    return [{ key: newActionKey(), actionType: actionType as InlineAction['actionType'], config, onFailure: readOnFailure(r) }]
   })
 }
 

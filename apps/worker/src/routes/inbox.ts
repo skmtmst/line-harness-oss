@@ -1,5 +1,6 @@
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import {
   computeUnansweredInbox,
   countUnanswered,
@@ -14,7 +15,7 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 export const inbox = new Hono<Env>();
 
 // GET /api/inbox/activity-digest?hours=3
-// Codex の定期レポートなど、読み取り専用の外部クライアント向け集約 API。
+// 読み取り専用の外部クライアントが、受信箱をまとめて取得できるようにする。
 // グローバル authMiddleware 配下なので Bearer API key / admin session が必須。
 inbox.get('/api/inbox/activity-digest', async (c) => {
   const hours = parseActivityDigestHours(c.req.query('hours'));
@@ -34,8 +35,7 @@ inbox.get('/api/inbox/activity-digest', async (c) => {
     });
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/inbox/activity-digest error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -52,17 +52,16 @@ inbox.get('/api/inbox/unanswered', async (c) => {
       q: q || undefined,
       account,
       minWaitMinutes: minWaitMinutesStr ? Number.parseInt(minWaitMinutesStr, 10) : undefined,
-      page: pageStr ? Number.parseInt(pageStr, 10) : undefined,
-      pageSize: pageSizeStr ? Number.parseInt(pageSizeStr, 10) : undefined,
+      page: pageStr ? parseOffsetPaging({ page: pageStr }, { pagePolicy: { format: 'integer-prefix' } }).page : undefined,
+      pageSize: pageSizeStr ? parseOffsetPaging({ limit: pageSizeStr }, { defaultLimit: Number.NaN, limitPolicy: { format: 'integer-prefix' } }).limit : undefined,
       allowedAccountIds: scope.allowedAccountIds,
       canSeeUnassigned: scope.canSeeUnassigned,
     };
 
     const result = await computeUnansweredInbox(c.env.DB, opts);
-    return c.json({ success: true, data: result });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...result, items: result.rows, paging: { limit: result.pageSize, offset: (result.page - 1) * result.pageSize }, sort: [{ field: 'lastIncomingAt', direction: 'desc' }, { field: 'friendId', direction: 'desc' }] }) });
   } catch (err) {
-    console.error('GET /api/inbox/unanswered error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -75,7 +74,6 @@ inbox.get('/api/inbox/unanswered/count', async (c) => {
     });
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error('GET /api/inbox/unanswered/count error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });

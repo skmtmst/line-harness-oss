@@ -1,0 +1,40 @@
+/*
+ * ★V8 共通情報を作る（Pencil ）。
+ * 頭・左右の列・下の帯の余白は型（CreatePage）が持つ。ここはカードの中身と右の列の箱だけ。
+ */
+
+.field { display: flex; flex-direction: column; gap: var(--tpl-field-gap-basic); min-width: 0; }
+.nameRow { display: flex; gap: var(--tpl-rule-row-gap); }
+.nameRow > .field:first-child { flex: 1 1 0; }
+.folderField { width: var(--tpl-ar-cv-folder-w); flex-shrink: 0; }
+.folderError { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-sub-gap); }
+.fieldHint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-text-sm-lh); }
+.fieldError { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
+.selectBox { min-width: 0; }
+.selectBox :global(*) { max-width: 100%; }
+.selectBox :global(button) { width: 100%; }
+
+/* 差し込み名：{{var. と }} を欄の中に置く（等幅 13）。右に文字だけのコピー。 */
+.keyRow { display: flex; align-items: center; gap: var(--tpl-body-gap); }
+/* 種別：4つずつ2段。選択カードの形は共通 RadioCard が持つ。 */
+.typeGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-body-gap); }
+
+/* 使える期間：見出しの段と欄の段（始まり・終わり・期間の外では 220）。 */
+.periodGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--tpl-ar-cv-expiry-w);
+  column-gap: var(--tpl-body-gap);
+  /* 日付の欄（共通部品）は高さ40、絵は36。見出しとの間を 4 詰めて、欄の中心を絵にそろえる。 */
+  row-gap: var(--tpl-ar-cv-period-row-gap);
+  align-items: center;
+}
+
+.formError { color: var(--color-danger); font-size: var(--text-label); font-weight: 600; }
+.secretConfirmTitle { margin: 0; color: var(--color-danger); font-size: var(--tpl-card-title-size); font-weight: 700; }
+.secretConfirmText { margin: var(--tpl-body-gap) 0 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-body-lh); }
+.secretConfirmActions { display: flex; flex-wrap: wrap; gap: var(--tpl-body-gap); margin-top: var(--tpl-rule-row-gap); }
+
+/* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
+
+.formError, .formErrorNoticePlacement { margin: 0; }
+.roBand { }

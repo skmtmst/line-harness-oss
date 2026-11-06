@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 友だち属性3機能のタブ閉塞(#861)を本物のReactで動かす試験。
+ * タグ3機能のタブ閉塞(#861)を本物のReactで動かす試験。
  *
  * 見るのは4つだけ: offのタブが出ないこと、直URL（?tab=）でも無効画面に
  * なること、機能が残っているタブはそのまま出ること、読み込み失敗は
@@ -63,7 +63,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(state.search),
 }))
@@ -72,7 +72,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1', selectedAccount: null }),
 }))
 
-import TagsPageV4 from './tags-page-v4'
+import TagsList from '@/v8/tags/list'
 import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -82,7 +82,7 @@ let root: Root
 
 async function render() {
   await act(async () => {
-    root.render(React.createElement(TagsPageV4, { accountId: 'account-1' }))
+    root.render(React.createElement(TagsList, { accountId: 'account-1' }))
   })
   // visibility 応答まで待つ
   await act(async () => {})
@@ -94,7 +94,7 @@ function tabLabels(): string[] {
     .map((el) => el.textContent?.trim() ?? '')
 }
 
-describe('/tags のタブが機能設定に従う(#861)', () => {
+describe('tags のタブが機能設定に従う(#861)', () => {
   beforeEach(() => {
     // 表示可否は画面間で共有される（V6R-S0-b）。試験ごとに応答を替えるので毎回捨てる。
     clearFeatureVisibilityCache()

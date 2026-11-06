@@ -1,6 +1,5 @@
-// Cron handler: expire 24h-old `requested` event bookings + purge
-// idempotency rows. Mirrors booking-expirer.ts but without a friend
-// notification — spec §7.1 lists no expired-kind notification for events.
+import { logger } from '@line-crm/shared/server';
+// 24時間経過した申込と冪等行を失効させる。要件にイベントの期限切れ通知がないため、サロンと異なり通知はしない。
 
 import { purgeExpiredEventIdempotency } from './event-booking-idempotency.js';
 import { featureJobCanRun } from './feature-enforcement.js';
@@ -49,7 +48,7 @@ export async function runEventBookingExpirer(
     if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'events', job: 'event booking expirer' })) {
       continue;
     }
-    // Conditional UPDATE to avoid racing with concurrent admin decide.
+    // 同時の担当者判断を上書きしないよう、元の状態を更新条件へ含める。
     const upd = await db
       .prepare(
         `UPDATE event_bookings
@@ -67,7 +66,7 @@ export async function runEventBookingExpirer(
       )
       .bind(row.id)
       .run();
-    // N-065: 期限切れも取消と同じく V6 の未送信予定だけを止める。送信済み履歴は残す。
+    // 期限切れも取消と同じく の未送信予定だけを止める。送信済み履歴は残す。
     // 1件の失敗で残りを止めないよう行単位で握る。失敗行は末尾の修復走査で拾い直す。
     try {
       await cancelByTrigger(db, {
@@ -80,7 +79,7 @@ export async function runEventBookingExpirer(
         cancelReason: `event_expired:${row.id}:by:system`,
       });
     } catch (error) {
-      console.error('reminder cancel (event expired) failed:', error);
+      logger.error("event_booking.cancel_reminders_failed");
     }
     await enqueueEventWaitlistPromotion(db, {
       lineAccountId: row.line_account_id,
@@ -92,8 +91,8 @@ export async function runEventBookingExpirer(
     expired++;
   }
 
-  // 部分失敗の回復: 業務は終わっているのに V6 が active のまま残った行を止める。
-  // V6 取消が投げた行は次回 cron で拾い直す。手動取消・落選の取りこぼしも
+  // 部分失敗の回復: 業務は終わっているのに が active のまま残った行を止める。
+  // 取消が投げた行は次回 cron で拾い直す。手動取消・落選の取りこぼしも
   // source 連動に限って拾う。legacy・手動登録には触れない。
   // 修復自体の失敗で期限切れを壊さないよう外側でも握る。
   try {
@@ -124,11 +123,11 @@ export async function runEventBookingExpirer(
           allowLegacyFallback: false,
         });
       } catch (error) {
-        console.error('reminder repair (event leftover) failed:', error);
+        logger.error("event_booking.repair_reminders_failed");
       }
     }
   } catch (error) {
-    console.error('reminder repair (event leftover scan) failed:', error);
+    logger.error("event_booking.scan_stale_reminders_failed");
   }
 
   const idempotencyPurged = await purgeExpiredEventIdempotency(db, params.now);

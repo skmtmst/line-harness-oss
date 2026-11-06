@@ -74,8 +74,8 @@ describe('自動応答の書込台帳', () => {
     });
     expect(records).toHaveLength(2);
     for (const record of records) {
-      expect(record.sql).toContain('are.line_account_id IN (?, ?)');
-      expect(record.bindings.slice(0, 2)).toEqual(['account-a', 'account-b']);
+      expect(record.sql).toContain('are.line_account_id IN (SELECT value FROM json_each(?))');
+      expect(record.bindings.slice(0, 1)).toEqual([JSON.stringify(['account-a', 'account-b'])]);
     }
   });
 
@@ -110,7 +110,7 @@ describe('自動応答の書込台帳', () => {
     expect(select?.bindings).toEqual([
       'rule-a',
       'rule-a',
-      'account-a',
+      JSON.stringify(['account-a']),
       'rule-a',
       'rule-a',
       20,
@@ -149,7 +149,7 @@ describe('自動応答の書込台帳', () => {
 });
 
 /*
- * N-081: permanent_failed の処理行だけを運用者が再実行する。
+ * permanent_failed の処理行だけを運用者が再実行する。
  * 確保の競合・集計の再計算・返信記録の保持は SQL が仕様なので、
  * モックではなく本物の SQLite に当てる。
  */

@@ -1,0 +1,151 @@
+/*
+ * ★V8 LINE来店フォロー（融合 ・絵 ）。値は globals.css の共通の値。
+ * 行：高さ約60・左右12・間12・印の箱32・名前13/600・説明12・タイミング12/600・札・右端の開閉印。
+ * 118: 開いた行は白のまま、左の緑の線と右端の ⌃ で開いている印を示す（灰の地にしない）。
+ */
+
+.flowList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.flowItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+
+
+.flowCardOpen {
+  position: relative;
+}
+
+.flowCardOpen::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--tpl-rt-flow-open-w);
+  border-radius: var(--radius-card) 0 0 var(--radius-card);
+  background: var(--color-accent-deep);
+}
+
+.flowButton {
+  display: grid;
+  grid-template-columns: var(--space-32) minmax(0, 1fr) var(--tpl-rt-flow-timing-w) auto auto;
+  align-items: center;
+  gap: var(--space-12);
+  width: 100%;
+  min-height: var(--tpl-rt-flow-row-h);
+  padding: var(--space-10) var(--space-12);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-card);
+}
+
+.flowButton:focus-visible {
+  outline: var(--tpl-rt-focus-ring);
+  outline-offset: -2px;
+}
+
+.flowIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-32);
+  height: var(--space-32);
+  border-radius: var(--polish-radius-control);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+}
+
+.flowText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.flowName,
+.flowNote,
+.flowTiming {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.flowName {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--tpl-rt-flow-name-lh);
+}
+
+.flowNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rt-flow-note-lh);
+}
+
+.flowTiming {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.flowStatus {
+  display: inline-flex;
+  justify-content: flex-end;
+}
+
+.flowChevron {
+  color: var(--color-ink-faint);
+  transition: transform var(--motion-base) var(--motion-ease-out);
+}
+
+.flowChevron[data-open] {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flowChevron {
+    transition: none;
+  }
+}
+
+.contentHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.contentTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-section);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.contentNote {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 送りの見え方の吹き出しは共通の LinePreviewMessage を使う（専用の形は作らない）。 */
+
+/* LINE ミニアプリ連携：中身は2列・間16・余白20。カードは余白18・間6。 */

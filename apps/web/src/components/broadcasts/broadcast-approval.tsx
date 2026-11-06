@@ -1,78 +1,22 @@
 'use client'
 
-/*
- * 一斉配信の二者承認の見た目（m12a / 設計 A）。
- *
- * A-1 送る前の確認（承認する人の選択・ひとこと）
- * A-2 承認待ちの札・帯（依頼の取り消し・もう一度知らせる）
- * A-3 承認する人の操作（承認する人にだけ出す）
- * A-4 1人運用の人数の確認
- *
- * 既存の共有部品だけを使う。新しい見た目の決まりは作らない。
- * 緑の塗りボタンは置かない（押すボタンは呼び出し側の確認ダイアログが持つ）。
- */
-import { useState } from 'react'
-import Button from '@/components/shared/button'
-import Chip from '@/components/shared/chip'
-import HelpTip from '@/components/shared/help-tip'
-import Select from '@/components/shared/select'
-import { TextArea, TextField } from '@/components/shared/text-field'
-import type {
-  ApiBroadcast,
-  BroadcastApprovalCandidate,
-  BroadcastApprovalState,
-} from '@/lib/api'
-
-export type ApprovalStatus = NonNullable<ApiBroadcast['approvalStatus']>
-
+import { useState } from 'react';
+import Button from '@/components/shared/button';
+import Chip from '@/components/shared/chip';
+import HelpTip from '@/components/shared/help-tip';
+import { TextArea, TextField } from '@/components/shared/text-field';
+import type { BroadcastApprovalCandidate, BroadcastApprovalState } from '@/lib/api';
+import { formatNumber } from '@/lib/format';
+import { SaveErrorField } from '@/components/shared/save-form-errors';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import { formatApprovalDateTime } from "./broadcast-approval-gap-parts"
+export { type ApprovalStatus, formatApprovalDateTime, ApprovalBadge } from "./broadcast-approval-gap-parts"
 function formatCount(n: number): string {
-  return `${n.toLocaleString('ja-JP')}人`
+  return `${formatNumber(n)}人`
 }
 
 function formatThreshold(n: number): string {
-  return `${n.toLocaleString('ja-JP')}通`
-}
-
-/**
- * 承認まわりの日時（例：8月24日（月）10:00）。
- * 配信の確認で使う書き方にそろえる。壊れた値は「—」にする。
- */
-export function formatApprovalDateTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}月${get('day')}日（${get('weekday')}）${get('hour')}:${get('minute')}`
-}
-
-/** A-2 一覧の札。承認待ちと期限切れだけ出す。 */
-export function ApprovalBadge({ status }: { status: ApprovalStatus | undefined }) {
-  if (status === 'pending') {
-    return (
-      <>
-        <Chip tone="info">承認待ち</Chip>
-        <HelpTip label="承認待ちの説明">承認する人が中身を見て決めるのを待っています。</HelpTip>
-      </>
-    )
-  }
-  if (status === 'expired') {
-    return (
-      <>
-        <Chip tone="neutral">期限切れ</Chip>
-        <HelpTip label="期限切れの説明">承認の期限が過ぎました。頼み直してください。</HelpTip>
-      </>
-    )
-  }
-  return null
+  return `${formatNumber(n)}通`
 }
 
 /**
@@ -88,7 +32,10 @@ export function ApprovalRequestFields({
   onApproverChange,
   note,
   onNoteChange,
+  bare = false,
 }: {
+  /** 共通の「送る前の確かめ」の窓の中に置くとき：警告の箱と文を出さず、欄だけにする。 */
+  bare?: boolean
   recipientCount: number
   threshold: number
   candidates: BroadcastApprovalCandidate[]
@@ -99,25 +46,27 @@ export function ApprovalRequestFields({
   onNoteChange: (note: string) => void
 }) {
   return (
-    <div className="bg-warning-bg rounded-control mt-3 p-3 text-xs leading-5">
-      <p className="text-warning font-semibold">
-        {formatThreshold(threshold)}以上なので、もう1人の承認が要ります。承認されるまで送られません。
-      </p>
-      <div className="mt-3 space-y-3">
+    <div className={bare ? 'text-xs leading-5' : 'bg-warning-bg rounded-control mt-3 p-3 text-xs leading-5'}>
+      {bare ? null : (
+        <p className="text-warning font-semibold">
+          {formatThreshold(threshold)}以上なので、もう1人の承認が要ります。承認されるまで送られません。
+        </p>
+      )}
+      <div className={bare ? 'space-y-3' : 'mt-3 space-y-3'}>
         <div>
           {/* ？は label の外に置く。中に入れるとラベルがボタンを指して入力欄との結びつきが壊れる。 */}
           <div className="mb-1 flex items-center gap-1">
             <label htmlFor="approval-approver" className="text-ink text-xs font-semibold">
               承認をお願いする人
             </label>
-            <HelpTip label="承認をお願いする人の説明">送る人とは別の人。</HelpTip>
+            {bare ? null : <HelpTip label="承認をお願いする人の説明">送る人とは別の人。</HelpTip>}
           </div>
           {candidatesState === 'loading' ? (
             <p className="text-ink-faint text-xs">読み込んでいます…</p>
           ) : candidatesState === 'error' ? (
             <p className="text-danger text-xs">承認できる人を読み込めませんでした。開き直してください。</p>
           ) : (
-            <Select
+            <SaveErrorField names={["approverId","approver_id"]}><EntitySelect
               aria-label="承認をお願いする人"
               size="full"
               id="approval-approver"
@@ -126,26 +75,34 @@ export function ApprovalRequestFields({
               onChange={(value) => onApproverChange(value)}
               options={[
                 { value: '', label: candidates.length === 0 ? '承認できる人がいません' : '選んでください' },
-                ...candidates.map((item) => ({ value: item.id, label: item.name })),
+                ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name })),
               ]}
-            />
+            /></SaveErrorField>
           )}
-          <p className="text-ink-faint mt-1 text-xs">
-            送る相手 {formatCount(recipientCount)}。
-          </p>
+          {bare ? null : (
+            <p className="text-ink-faint mt-1 text-xs">
+              送る相手 {formatCount(recipientCount)}。
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor="approval-note" className="text-ink mb-1 block text-xs font-semibold">
             ひとこと（任意）
           </label>
-          <TextArea
+          <SaveErrorField names={["note"]}>{bare ? <TextField
+            id="approval-note"
+            maxLength={500}
+            value={note}
+            onChange={(event) => onNoteChange(event.target.value)}
+            placeholder="秋の案内です。10時までに見てください"
+          /> : <TextArea
             id="approval-note"
             rows={3}
             maxLength={500}
             value={note}
             onChange={(event) => onNoteChange(event.target.value)}
             placeholder="秋の案内です。10時までに見てください"
-          />
+          />}</SaveErrorField>
         </div>
       </div>
     </div>
@@ -184,14 +141,14 @@ export function SingleOperatorFields({
           </label>
           <HelpTip label="人数の説明">送る相手の人数。送信の直前に数えた数。</HelpTip>
         </div>
-        <TextField
+        <SaveErrorField names={["value"]}><TextField
           id="approval-count"
           inputMode="numeric"
           autoComplete="off"
           value={value}
           onChange={(event) => onChange(event.target.value.replace(/[^0-9]/g, ''))}
           placeholder={String(recipientCount)}
-        />
+        /></SaveErrorField>
         {value.trim() !== '' ? (
           matched ? (
             <p className="text-success mt-1 text-xs">人数が合いました</p>
@@ -240,7 +197,7 @@ export function ApprovalStatusSection({
         </p>
         {requesterName || approval.requestedAt ? (
           <p className="text-ink-secondary mt-1 text-xs leading-5">
-            依頼：{requesterName ?? '—'} ・ {formatApprovalDateTime(approval.requestedAt)}
+            依頼：{requesterName ?? '—'}・{formatApprovalDateTime(approval.requestedAt)}
           </p>
         ) : null}
         <p className="text-ink-secondary mt-1 text-xs leading-5">
@@ -265,7 +222,7 @@ export function ApprovalStatusSection({
   }
   if (approval.status === 'rejected') {
     return (
-      <section aria-label="差し戻し" className="bg-canvas rounded-card border-hairline border p-5">
+      <section aria-label="差し戻し" className="bg-canvas rounded-card content-card border p-5">
         <p className="text-ink text-sm font-semibold">差し戻されました</p>
         <p className="text-ink-secondary mt-1 text-xs leading-5">
           理由：{approval.rejectReason || '—'}
@@ -278,7 +235,7 @@ export function ApprovalStatusSection({
   }
   if (approval.status === 'expired') {
     return (
-      <section aria-label="期限切れ" className="bg-canvas rounded-card border-hairline border p-5">
+      <section aria-label="期限切れ" className="bg-canvas rounded-card content-card border p-5">
         <p className="text-ink text-sm font-semibold">期限切れです</p>
         <p className="text-ink-secondary mt-1 text-xs leading-5">
           承認されないまま予約の時刻を過ぎたため、送っていません。送るには作り直してください。
@@ -288,7 +245,7 @@ export function ApprovalStatusSection({
   }
   if (approval.status === 'approved') {
     return (
-      <section aria-label="承認済み" className="bg-canvas rounded-card border-hairline border p-5">
+      <section aria-label="承認済み" className="bg-canvas rounded-card content-card border p-5">
         <p className="text-ink text-sm font-semibold">承認されています</p>
         <p className="text-ink-faint mt-1 text-xs leading-5">
           {scheduledLabel ? `${scheduledLabel}に送ります。` : '送る操作へ進めます。'}
@@ -335,7 +292,7 @@ export function ApproverSection({
   const [rejectReason, setRejectReason] = useState('')
   if (approval.status !== 'pending' || !viewer.isApprover) return null
   return (
-    <section aria-label="承認の依頼" className="bg-canvas rounded-card border-hairline border p-5">
+    <section aria-label="承認の依頼" className="bg-canvas rounded-card content-card border p-5">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-ink flex items-center gap-1 text-sm font-semibold">
           承認の依頼
@@ -350,7 +307,7 @@ export function ApproverSection({
       <dl className="bg-canvas-sunken rounded-control mt-3 space-y-1 p-3 text-xs leading-5">
         <div className="flex gap-2">
           <dt className="text-ink-faint w-20 shrink-0">送る相手</dt>
-          <dd className="text-ink font-semibold tabular-nums">{recipientCount.toLocaleString('ja-JP')}人</dd>
+          <dd className="text-ink font-semibold tabular-nums">{formatNumber(recipientCount)}人</dd>
         </div>
         <div className="flex gap-2">
           <dt className="text-ink-faint w-20 shrink-0">送る日時</dt>
@@ -374,14 +331,14 @@ export function ApproverSection({
         <label htmlFor="approval-reject-reason" className="text-ink mb-1 block text-xs font-semibold">
           差し戻すときの理由（差し戻すときは必須）
         </label>
-        <TextArea
+        <SaveErrorField names={["rejectReason","reject_reason"]}><TextArea
           id="approval-reject-reason"
           rows={2}
           maxLength={1000}
           value={rejectReason}
           onChange={(event) => setRejectReason(event.target.value)}
           placeholder="理由を入れてください"
-        />
+        /></SaveErrorField>
       </div>
       {message ? <p className="text-danger mt-2 text-xs">{message}</p> : null}
       <div className="mt-3 flex flex-wrap gap-2">

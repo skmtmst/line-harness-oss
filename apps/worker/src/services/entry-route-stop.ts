@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   getEntryRouteByRefCodeAny,
   recordEntryRouteStopSuppression,
@@ -8,7 +9,9 @@ import type {
   FriendAddCandidateSource,
 } from '@line-crm/db';
 
-// N-244: 停止した流入経路の判定を各入口 (/r/:ref、/auth/line、/auth/oauth、
+
+
+// 停止した流入経路の判定を各入口 (/r/:ref、/auth/line、/auth/oauth、
 // /auth/callback、/api/liff/*、follow webhook) で共通化する。
 // entry_routes に行があり is_active != 1 のときだけ true (停止/アーカイブ)。
 // 行自体が無い不存在 ref は共有 namespace の正規フロー (tracked/affiliate/
@@ -42,7 +45,7 @@ export async function isStoppedEntryRouteRef(
   }
 }
 
-// N-244差戻(台帳): 停止試行の記録は失敗しても本線を壊さない。台帳が無い
+// 停止試行の記録は失敗しても本線を壊さない。台帳が無い
 // テスト用モックでは何もせず、DB失敗だけログに残す。
 export async function recordStopSuppressionSafe(
   db: D1Database,
@@ -89,7 +92,7 @@ export async function recordStopSuppressionSafe(
   throw lastError;
 }
 
-// N-244差戻(台帳): 直近の停止試行があればその行、DB読取失敗なら
+// 直近の停止試行があればその行、DB読取失敗なら
 // 'unknown' (fail-closed で抑止側に倒すため)、どちらも無ければ null。
 // 台帳が無いテスト用モックでは null (従来どおり通す側)。
 export async function getActiveStopSuppressionSafe(
@@ -108,7 +111,7 @@ export async function getActiveStopSuppressionSafe(
   try {
     return await lookup(db, { lineAccountId, lineUserId });
   } catch (err) {
-    console.error('Stop suppression lookup failed (fail-closed):', err);
+    logger.error("entry_route_stop.get_active_stop_suppression_safe_failed");
     return 'unknown';
   }
 }

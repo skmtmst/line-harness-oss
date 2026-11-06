@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -39,52 +40,41 @@ describe('m22b 表の左右の余白（共通部品）', () => {
 })
 
 describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
-  it('/broadcasts：操作列は120px・共通の余白で右へ寄せる', () => {
-    const body = read('app', 'broadcasts', 'page.tsx')
-    expect(body).toContain("width: '16%'")
-    expect(body).toContain('width: 120')
-    expect(body).toContain(
-      '<ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">',
-    )
-  })
 
-  it('/common-actions：操作の中身は枠いっぱいで右へ寄せる', () => {
-    const body = read('app', 'common-actions', 'page.tsx')
-    expect(body).toContain('relative flex w-full items-center justify-end gap-1.5')
-  })
+  // common-actionsの手書きTd／固定120は廃止。ActionCellの実幅を実画面で測る。
 
   it('/affiliate-offers（案件タブ）：操作は右端にそろえる', () => {
-    const body = read('app', 'affiliates', 'tabs.tsx')
-    expect(body).toContain('<Th align="right">操作</Th>')
-    expect(body).toContain('px-4 py-3 text-right whitespace-nowrap')
+    const body = read('v8', 'affiliates', 'offers.tsx')
+    const css = read('v8', 'affiliates', 'affiliates.module.css')
+    expect(body).toContain('<Th className={styles.colOfferOps}>操作</Th>')
+    expect(body).toContain('<Td className={styles.colOfferOps}>')
+    expect(body).toContain('className={styles.rowActions}')
+    expect(css).toMatch(/\.colOfferOps\s*\{[^}]*width:\s*var\(--tpl-icon-btn-row-hit\)/s)
+    expect(css).toMatch(/\.rowActions\s*\{[^}]*display: flex;[^}]*align-items: center;/)
   })
 
   it('/reminders：操作は右端にそろえる', () => {
-    const body = read('app', 'reminders', 'page.tsx')
-    expect(body).toContain('sticky right-0 w-44" align="right">操作')
-    expect(body).toContain('sticky right-0 px-3 text-right')
-    expect(body).toContain('relative flex w-full items-center justify-end gap-1')
+    /* 完全切り替え：管理画面 page は捨て、V8 の list-v8 を見る。絵に操作の見出しは無い。 */
+    const body = read("v8/reminders/list.tsx")
+    const css = read("app/reminders/list-v8.module.css")
+    expect(body).toContain('styles.menuCell')
+    expect(css).toContain('.menuCell')
+    expect(css).toContain('text-align: right')
   })
 
   it('/rich-menus：操作の中身は枠いっぱいで右へ寄せる', () => {
-    const body = read('app', 'rich-menus', 'page.tsx')
-    expect(body).toContain('relative flex w-full items-center justify-end gap-1.5')
+    const body = read('v8', 'rich-menus', 'list.tsx')
+    expect(body).toContain('className={styles.menuBox}')
+    expect(read('v8', 'rich-menus', 'list.module.css')).toMatch(/\.menuBox[^}]*justify-content: flex-end/)
   })
 
   it('/contents/vars：操作の中身は枠いっぱいで右へ寄せる', () => {
-    const body = read('app', 'contents', 'vars', 'page.tsx')
-    expect(body).toContain('flex w-full items-center justify-end gap-2')
-  })
-
-  it('/settings/file-scan：操作列は ActionCell＋固定幅で右へ寄せる', () => {
-    const body = read('app', 'settings', 'file-scan', 'page.tsx')
-    expect(body).toContain('ActionCell')
-    expect(body).toContain('<Th align="right">操作</Th>')
+    expect(read('v8', 'common-vars', 'list.module.css')).toMatch(/\.menuBox[^}]*justify-content: flex-end/)
   })
 
   it('/tags：操作列は中身＋共通の余白に広げる', () => {
-    const body = read('components', 'friend-fields', 'tags-page-v4.tsx')
-    expect(body).toContain('<Th style={{ width: 128 }} className="sticky right-0')
+    const body = read('v8', 'tags', 'tags-tab.tsx')
+    expect(body).toContain('<Th className={styles.colMenu}>')
   })
 })
 
@@ -92,27 +82,32 @@ describe('m22b 表の左右の余白（文字だけのセルを包む）', () =>
   it('/：日付と数字を包み、余白で測らせる', () => {
     const body = read('components', 'dashboard', 'friend-trend-table.tsx')
     expect(body).toContain('<span>{diff === null')
-    expect(body).toContain('<span>{row.active.toLocaleString')
+    expect(body).toContain('<span>{formatNumber(row.active')
   })
 
-  it('/booking/menus：行頭の名前を包む', () => {
-    const body = read('app', 'booking', 'menus', 'page.tsx')
-    expect(body).toContain('<span>{m.name}')
+  it('/booking/menus：名前の操作を専用の欄に収め、省略する', () => {
+    const body = read('v8', 'booking-menus', 'tabs', 'menus-tab.tsx')
+    const css = read('components', 'shared', 'table.module.css')
+    expect(body).toContain('className={styles.colName}')
+    expect(body).toContain('<RowNameButton title={menu.name} onClick={() => openMenuForm(menu)}>{menu.name}</RowNameButton>')
+    expect(css).toMatch(/\.rowNameLink[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*ellipsis/)
   })
 
   it('/duplicates：先頭の文字を包む', () => {
-    const body = read('app', 'duplicates', 'page.tsx')
-    expect(body).toContain('<span className="block truncate">{candidate.left.label}')
-    expect(body).toContain('<span className="block truncate">{row.accountName}</span>')
+    const body = read('v8', 'friends', 'duplicates', 'list.tsx')
+    expect(body).toContain('className={styles.cellText}')
+    expect(body).toContain('title={row.accountName}>{row.accountName}</span>')
   })
 
-  it('/friends/migrations：日付を包む', () => {
-    const body = read('app', 'friends', 'migrations', 'page.tsx')
-    expect(body).toContain('<span className="block">{new Date(job.created_at)')
+  it('/friends/migrations：V8の表は左右のセル余白を設計値で保つ', () => {
+    const css = read('v8', 'friends', 'migrations', 'migrations.module.css')
+    expect(css).toMatch(/\.table thead th\.th:first-child[^{]*\{[^}]*padding-left: var\(--tpl-fr-cell-inset\)/)
+    expect(css).toMatch(/\.table td\.td:last-child[^{]*\{[^}]*padding-right: var\(--tpl-fr-cell-inset\)/)
   })
 
-  it('/friends/identity-candidates：採用する値を包む', () => {
-    const body = read('app', 'friends', 'identity-candidates', 'page.tsx')
-    expect(body).toContain('<Td className="pr-5"><span>判定時に選択</span></Td>')
+  it('/friends/identity-candidates：V8の表は左右のセル余白を設計値で保つ', () => {
+    const css = read('v8', 'friends', 'compare', 'compare.module.css')
+    expect(css).toMatch(/\.table thead th\.th:first-child[^{]*\{[^}]*padding-left: var\(--tpl-fr-cell-inset\)/)
+    expect(css).toMatch(/\.table td\.td:last-child[^{]*\{[^}]*padding-right: var\(--tpl-fr-cell-inset\)/)
   })
 })

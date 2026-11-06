@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
-// 画面のまとめタブ(処理中・失敗)をサーバ側で絞る statusGroup(#517 中1)。
+// 画面のまとめタブ(処理中・失敗)をサーバ側で絞る statusGroup( 中1)。
 const dbMocks = vi.hoisted(() => ({
   listEcOrders: vi.fn(),
   listEcActionExecutions: vi.fn(),

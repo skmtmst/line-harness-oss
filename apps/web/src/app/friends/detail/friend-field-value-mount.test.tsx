@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,9 +13,9 @@ import { ApiError } from '@/lib/api'
  * （422）を画面が黙って「成功」扱いにしないことは、実際にコンポーネントを
  * mountして保存ボタンを押さないと確かめられない。差し替えるのは
  * api.friendFields / api.friends（サーバーとの境界）と
- * next/navigation・next/link だけで、画面の中身（save() の分岐・表示）は
+ * next/navigation・next/link だけで、画面の中身（save の分岐・表示）は
  * 本物のまま動かす。fetchApi自体が422をApiErrorへ変換する契約は
- * api.test.ts 側で別に固定済みのため、ここでは境界の一段上（save()の
+ * api.test.ts 側で別に固定済みのため、ここでは境界の一段上（saveの
  * 呼び出し口）で同じ形の拒否を再現する。
  */
 
@@ -132,6 +134,7 @@ let root: Root
 let FriendDetailPage: typeof import('./page').default
 
 beforeEach(async () => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   net.calls.length = 0
   routing.params = new URLSearchParams('id=friend-1&tab=info')
@@ -179,7 +182,7 @@ function setInputValue(input: HTMLInputElement, next: string) {
 }
 
 async function clickSave() {
-  const button = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '保存')
+  const button = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '保存する')
   if (!button) throw new Error('保存ボタンが見つかりません')
   await act(async () => {
     button.click()

@@ -1,9 +1,13 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WebinarNotificationOverview, WebinarNotificationSettings } from '@/lib/api'
-import WebinarNotifications from './webinar-notifications'
+import WebinarNotifications from '@/test-utils/webinar-notifications'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [] }) }))
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 /*
@@ -25,7 +29,7 @@ vi.mock('../../lib/api', async (importOriginal: () => Promise<typeof import('../
   return {
     ...actual,
     webinarApi: {
-      ...actual.webinarApi,
+      ...actual.webinarApi, actions: async () => ({ data: [] }), editor: async () => ({ data: { version: 2 } }),
       notifications: (...args: unknown[]) => net.notifications(...args),
       saveNotifications: (...args: unknown[]) => net.saveNotifications(...args),
     },
@@ -74,7 +78,7 @@ async function mount() {
 }
 
 function button(text: string): HTMLButtonElement {
-  const found = [...host.querySelectorAll('button')].find((node) => node.textContent === text)
+  const found = ([...host.querySelectorAll('button')].find((node) => node.textContent === text) ?? querySupplementaryPageAction(text))
   if (!found) throw new Error(`ボタンが見つかりません: ${text}`)
   return found as HTMLButtonElement
 }
@@ -91,11 +95,11 @@ describe('通知の設定がまだ無いウェビナー（WEBINAR-09）', () => 
     await act(async () => { entry.click() })
 
     // 編集面が出る。勝手にONになっている通知は1つもない。
-    expect(host.querySelector('[data-design-node="Ho8z4"]')).not.toBeNull()
-    const toggles = [...host.querySelectorAll('input[type="checkbox"]')] as HTMLInputElement[]
+    expect(host.querySelector('section[aria-labelledby="webinar-notify-title"]')).not.toBeNull()
+    const toggles = [...host.querySelectorAll('[role="switch"]')] as HTMLInputElement[]
     expect(toggles.length).toBe(6)
     for (const toggle of toggles) {
-      expect(toggle.checked, `${toggle.getAttribute('aria-label')} が勝手にONになっている`).toBe(false)
+      expect((toggle.getAttribute('aria-checked') === 'true'), `${toggle.getAttribute('aria-label')} が勝手にONになっている`).toBe(false)
     }
   })
 
@@ -109,7 +113,7 @@ describe('通知の設定がまだ無いウェビナー（WEBINAR-09）', () => 
     })
     await mount()
     await act(async () => { button('通知の設定を入力する').click() })
-    await act(async () => { button('通知の設定を保存').click() })
+    await act(async () => { button('下書きを保存').click() })
 
     expect(net.saveNotifications).toHaveBeenCalledWith('w1', {
       registrationEnabled: false,

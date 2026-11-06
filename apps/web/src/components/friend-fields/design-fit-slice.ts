@@ -12,7 +12,7 @@
 /** 注釈を落とす。注釈が本文の代わりに一致してしまうため。 */
 export function withoutComments(source: string): string {
   return source
-    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, '')
+    .replace(/\{\s*\/\*(?:(?!\*\/)[\s\S])*\*\/\s*\}/g, '')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^[ \t]*\/\/.*$/gm, '')
 }

@@ -64,10 +64,10 @@ vi.mock('@line-crm/db', async () => {
 
 vi.mock('@line-crm/line-sdk', () => {
   return {
-    LineClient: vi.fn().mockImplementation(() => ({
+    LineClient: vi.fn().mockImplementation(function () { return ({
       replyMessage: vi.fn().mockResolvedValue(undefined),
       pushMessage: vi.fn().mockResolvedValue(undefined),
-    })),
+    }); }),
   };
 });
 
@@ -83,17 +83,17 @@ vi.mock('./outgoing-webhook-delivery.js', async () => {
   return {
     ...actual,
     deliverWebhook: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 }),
-    // d23b R419: イベント発火の初回配送は1回固定経路(deliverOnce)を呼ぶ。
+    // d23b : イベント発火の初回配送は1回固定経路(deliverOnce)を呼ぶ。
     deliverOnce: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 }),
     recordDeliveryOutcome: vi.fn().mockResolvedValue(undefined),
   };
 });
 
-vi.mock('./automation-triggers.js', () => ({
+vi.mock('../features/automations/automation-trigger-handlers.js', () => ({
   dispatchAutomationEventWithLogging: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('./action-score-events.js', () => actionScoreMocks);
+vi.mock('./action-score-handlers.js', () => actionScoreMocks);
 
 describe('fireEvent — send_message action logging', () => {
   let captured: CapturedInsert[];
@@ -144,7 +144,7 @@ describe('fireEvent — send_message action logging', () => {
     expect(captured).toHaveLength(1);
     const insert = captured[0];
     expect(insert.sql).toContain('INSERT INTO messages_log');
-    // bind order: id, friendId, messageType, content, deliveryType, source, lineAccountId, createdAt
+    // バインド順: id、friendId、messageType、content、deliveryType、source、lineAccountId、createdAt。
     expect(insert.binds[1]).toBe('friend-1');
     expect(insert.binds[2]).toBe('flex');
     expect(insert.binds[4]).toBe('reply');
@@ -177,7 +177,7 @@ describe('fireEvent — send_message action logging', () => {
     (db.getActiveAutomationsByEvent as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue([
       {
         id: 'auto-2',
-        line_account_id: null,
+        line_account_id: 'acc-1',
         conditions: JSON.stringify({}),
         actions: JSON.stringify([
           {
@@ -197,13 +197,13 @@ describe('fireEvent — send_message action logging', () => {
       'tag_added',
       { friendId: 'friend-1', eventData: {} },
       'channel-token',
-      null,
+      'acc-1',
     );
 
     expect(captured).toHaveLength(1);
     expect(captured[0].binds[2]).toBe('text');
     expect(captured[0].binds[3]).toBe('hello');
-    expect(captured[0].binds[6]).toBe(null);
+    expect(captured[0].binds[6]).toBe('acc-1');
   });
 
   it('resolves params.template_id via templates table when set', async () => {
@@ -211,7 +211,7 @@ describe('fireEvent — send_message action logging', () => {
     (db.getActiveAutomationsByEvent as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue([
       {
         id: 'auto-tpl',
-        line_account_id: null,
+        line_account_id: 'acc-1',
         conditions: JSON.stringify({}),
         actions: JSON.stringify([
           {
@@ -243,7 +243,7 @@ describe('fireEvent — send_message action logging', () => {
       'manual_test',
       { friendId: 'friend-1', eventData: {} },
       'channel-token',
-      null,
+      'acc-1',
     );
 
     expect(captured).toHaveLength(1);
@@ -253,7 +253,7 @@ describe('fireEvent — send_message action logging', () => {
   });
 });
 
-describe('fireEvent — V6分析イベント', () => {
+describe('fireEvent — 分析イベント', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     actionScoreMocks.applyActionScoreEvent.mockResolvedValue({
@@ -308,7 +308,7 @@ describe('fireEvent — V6分析イベント', () => {
   });
 });
 
-describe('fireEvent — V6行動スコア', () => {
+describe('fireEvent — 行動スコア', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const dbModule = await import('@line-crm/db');
@@ -339,7 +339,7 @@ describe('fireEvent — V6行動スコア', () => {
       eventType: 'message_received',
       source: 'line_webhook',
       sourceEventId: 'webhook-1',
-    }));
+    }), fireEvent);
     expect(dbModule.applyScoring).not.toHaveBeenCalled();
   });
 
@@ -352,12 +352,12 @@ describe('fireEvent — V6行動スコア', () => {
   });
 
   /*
-   * IDEA-17: V6ルール未設定で旧ルールへ落ちるときも、発生元の不変IDを
+   * ルール未設定で旧ルールへ落ちるときも、発生元の不変IDを
    * 渡して決定的な履歴IDで受け付ける。実行台帳(execution)が無い呼び出し
    * でも payload.sourceEventId があれば、同じイベントの走り直しで
    * スコアと履歴は二重に増えない。
    */
-  it('V6未設定でも発生元IDが分かる旧ルール適用は冪等キー付きで呼ぶ', async () => {
+  it('未設定でも発生元IDが分かる旧ルール適用は冪等キー付きで呼ぶ', async () => {
     const dbModule = await import('@line-crm/db');
     actionScoreMocks.applyActionScoreEvent.mockResolvedValue({
       configured: false,
@@ -461,11 +461,7 @@ describe('fireEvent — 送信Webhookのアカウント解決', () => {
     expect(deliveryModule.recordDeliveryOutcome).toHaveBeenCalledWith(db, 'legacy-webhook', true);
     expect(log).toHaveBeenCalledOnce();
     const record = log.mock.calls[0]?.[0] as string;
-    expect(JSON.parse(record)).toEqual({
-      event: 'outgoing_webhook_line_account_unknown',
-      eventType: 'incoming_webhook.custom',
-      hasFriendId: false,
-    });
+    expect(JSON.parse(record)).toEqual({ code: 'outgoing_webhook_line_account_unknown', timestamp: expect.any(String), level: 'info', requestId: null, invocationId: null, source: 'background' });
     expect(record).not.toContain('webhook-1');
   });
 });
@@ -561,7 +557,7 @@ describe('fireEvent — 広告成果の配線(#638)', () => {
   });
 });
 
-describe('fireEvent — EC正規化イベントのV6連携', () => {
+describe('fireEvent — EC正規化イベントの連携', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const dbModule = await import('@line-crm/db');
@@ -586,7 +582,7 @@ describe('fireEvent — EC正規化イベントのV6連携', () => {
 
   it('自動化・分析・スコアへ同一イベントIDで渡す', async () => {
     const dbModule = await import('@line-crm/db');
-    const triggers = await import('./automation-triggers.js');
+    const triggers = await import('../features/automations/automation-trigger-handlers.js');
     const db = fakeDb({ capturedInserts: [] });
 
     await fireEvent(db, 'ec.order.confirmed', ecPayload(), 'account-token', 'account-a');
@@ -605,18 +601,18 @@ describe('fireEvent — EC正規化イベントのV6連携', () => {
       eventType: 'ec.order.confirmed',
       source: 'eccube',
       sourceEventId: 'event-12345678',
-    }));
+    }), fireEvent);
     expect(triggers.dispatchAutomationEventWithLogging).toHaveBeenCalledWith(db, expect.objectContaining({
       lineAccountId: 'account-a',
       eventType: 'ec.order.confirmed',
       sourceEventId: 'event-12345678',
       friendId: 'friend-1',
-    }));
+    }), { emitEvent: fireEvent });
   });
 
   it('分析の記録に失敗しても自動化への連携は止めない', async () => {
     const dbModule = await import('@line-crm/db');
-    const triggers = await import('./automation-triggers.js');
+    const triggers = await import('../features/automations/automation-trigger-handlers.js');
     (dbModule.recordAnalyticsEvent as unknown as { mockRejectedValueOnce: (e: unknown) => void })
       .mockRejectedValueOnce(new Error('analytics_event_type_unknown:ec.order.cancelled'));
     const db = fakeDb({ capturedInserts: [] });
@@ -631,12 +627,12 @@ describe('fireEvent — EC正規化イベントのV6連携', () => {
       lineAccountId: 'account-a',
       eventType: 'ec.order.cancelled',
       sourceEventId: 'event-cancel-1',
-    }));
+    }), { emitEvent: fireEvent });
     errorLog.mockRestore();
   });
 
-  it('アカウントが分からないイベントはV6自動化へ渡さない', async () => {
-    const triggers = await import('./automation-triggers.js');
+  it('アカウントが分からないイベントは自動化へ渡さない', async () => {
+    const triggers = await import('../features/automations/automation-trigger-handlers.js');
     const db = fakeDb({ capturedInserts: [] });
 
     await fireEvent(db, 'ec.order.confirmed', {
@@ -664,7 +660,7 @@ describe('fireEvent — 旧式 send_webhook は共通の安全送信へ通す', 
       .mockResolvedValue([
         {
           id: 'auto-legacy',
-          line_account_id: null,
+          line_account_id: 'acc-1',
           conditions: JSON.stringify({}),
           actions: JSON.stringify([{ type: 'send_webhook', params: { url } }]),
         },
@@ -672,7 +668,7 @@ describe('fireEvent — 旧式 send_webhook は共通の安全送信へ通す', 
     (dbModule.getActiveOutgoingWebhooksByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
       .mockResolvedValue([]);
     const db = fakeDb({ capturedInserts: [] });
-    await fireEvent(db, 'message_received', { friendId: 'friend-1', eventData: {} });
+    await fireEvent(db, 'message_received', { friendId: 'friend-1', eventData: {} }, undefined, 'acc-1');
     return dbModule.createAutomationLog as unknown as { mock: { calls: unknown[][] } };
   }
 
@@ -720,7 +716,7 @@ describe('fireEvent — 旧式 send_webhook は共通の安全送信へ通す', 
 
     const sent = seen.find((entry) => entry.url === 'https://hooks.example.com/ping');
     expect(sent).toBeDefined();
-    // N-371/N-372: 旧式経路でも共通封筒と X-Harness-* のヘッダを使う。
+    // 旧式経路でも共通封筒と X-Harness-* のヘッダを使う。
     const headers = (sent?.init?.headers ?? {}) as Record<string, string>;
     expect(headers['X-Harness-Event-Id']).toBeDefined();
     expect(headers['X-Harness-Timestamp']).toMatch(/^\d{10}$/);

@@ -3,23 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-/*
- * 司令塔独立審査(Opus, 2026-09-09)の差し戻し: `ec-commerce-load-contract.test.ts`は
- * `readFileSync(page.tsx)` への文字列一致だけで、実行4ms・mountもレンダリングもない。
- * 逆変異(M3〜M7)を当てても表明された文字列はすべて残ったまま挙動だけが壊れるため、
- * gate内では検知できなかった。ここは本物のReact(react-dom/client)で
- * `EcCommercePage`(default export)をmountし、通信(fetchApi・api.ecCommerce)と
- * タブ・アカウント選択だけを差し替えて、実際の画面の文字と通信回数で挙動を見張る。
- * Next.jsのpage規約上 `page.tsx` は default export 以外を許さないため、
- * `EventsPanel` を個別にexportできない ―― default export をそのままmountする。
- *
- * - M3: boundTo() の先頭に `if (slot) return slot` を挿す → アカウント境界fenceが無効
- * - M4: loadRecords の guard直前に `currentAccountIdRef.current = accountId` を挿す
- *       → 古いクロージャ弾きが無効。再試行応答待ち中の切替でBの一覧が固まる
- * - M5: loadRecords の catch で overview まで pendingFor に戻す → 部分失敗保護が消える
- * - M6: `params.set('query', searchQuery)` を消す → 検索語がサーバへ行かない
- * - M7: `view: 'actions'` を消す → 新APIを使わなくなる(この PR の修正が丸ごと消える)
- */
+/* アカウント切替・部分失敗・検索・取得口を、本物の描画と通信で守る。 */
 
 const fixture = vi.hoisted(() => ({ accountId: 'account-a' as string | null }))
 
@@ -46,8 +30,9 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-import { api, fetchApi } from '@/lib/api'
+import { ApiError, api, fetchApi } from '@/lib/api'
 import EcCommercePage from './page'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 
 const mockFetchApi = fetchApi as unknown as ReturnType<typeof vi.fn>
 const mockOverview = api.ecCommerce.overview as unknown as ReturnType<typeof vi.fn>
@@ -137,12 +122,12 @@ function action(id: string, overrides: Record<string, unknown> = {}) {
   }
 }
 
-function recordsList(items: ReturnType<typeof action>[], total = items.length) {
-  return {
-    items,
-    total,
-    summary: { pending: 0, processing: 0, succeeded: items.length, skipped: 0, retryable_failed: 0, permanent_failed: 0 },
-  }
+function recordsList(
+  items: ReturnType<typeof action>[],
+  total = items.length,
+  summary = { pending: 0, processing: 0, succeeded: items.length, skipped: 0, retryable_failed: 0, permanent_failed: 0 },
+) {
+  return { items, total, summary }
 }
 
 let container: HTMLDivElement | null = null
@@ -153,6 +138,7 @@ let overviewCalls: string[] = []
 let overviewDeferreds: Map<string, Deferred<unknown>[]> = new Map()
 
 beforeEach(() => {
+  flushListUrlState(); window.history.replaceState({}, '', '/ec-commerce'); window.dispatchEvent(new Event('popstate')); document.documentElement.dataset.theme='v8'
   vi.useFakeTimers()
   fixture.accountId = 'account-a'
   eventsCalls = []
@@ -161,6 +147,7 @@ beforeEach(() => {
   overviewDeferreds = new Map()
 
   mockFetchApi.mockImplementation((path: string) => {
+    if (new URL(path, 'http://localhost').pathname === '/api/dashboard/style') return Promise.resolve(ok({ style: 'ec', styleSelected: true, version: 1 }))
     eventsCalls.push(path)
     const d = deferred<unknown>()
     eventsDeferreds.push(d)
@@ -182,7 +169,7 @@ afterEach(async () => {
   if (container) container.remove()
   root = null
   container = null
-  vi.useRealTimers()
+  flushListUrlState(); vi.useRealTimers(); delete document.documentElement.dataset.theme
   vi.clearAllMocks()
 })
 
@@ -198,7 +185,7 @@ async function drainMicrotasks(): Promise<void> {
   for (let index = 0; index < 8; index += 1) await Promise.resolve()
 }
 
-function overviewFor(accountId: string, index = 0): Deferred<unknown> {
+function overviewFor(accountId: string, index = 1): Deferred<unknown> {
   const bucket = overviewDeferreds.get(accountId)
   const item = bucket?.[index]
   if (!item) throw new Error(`${accountId} 向けの overview 呼び出しが見つかりません`)
@@ -211,8 +198,8 @@ async function render(el: HTMLDivElement, r: Root) {
 }
 
 /**
- * `root.render()` をactで包まずに生で呼ぶと、Reactはcommit(DOM反映)と
- * passive effect(useEffectで走るload())のflushを別タスクとして積む。
+ * `root.render` をactで包まずに生で呼ぶと、Reactはcommit(DOM反映)と
+ * passive effect(useEffectで走るload)のflushを別タスクとして積む。
  * MutationObserverはDOM変異の直後にマイクロタスクとして呼ばれるので、
  * commit直後・useEffect未実行の瞬間をこの1点で捕まえられる。
  */
@@ -248,6 +235,27 @@ function nextPageButton(el: HTMLDivElement): HTMLButtonElement {
   if (!button) throw new Error('「次のページ」ボタンが見つかりません')
   return button as HTMLButtonElement
 }
+
+describe('EC注文の実際の金額表示', () => {
+  it.each([
+    { status: 'current', totalAmount: 1234.9, refundedAmount: null, expected: '商品amount × 1・¥1,234' },
+    { status: 'refunded', totalAmount: 1234.9, refundedAmount: 50.9, expected: '商品amount × 1・−¥50' },
+    { status: 'current', totalAmount: null, refundedAmount: null, expected: '商品amount × 1' },
+  ])('注文$status/$totalAmount/$refundedAmountを$expectedと表示する', async ({ expected, ...amounts }) => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    const row = action('amount')
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(1)))
+      eventsDeferreds[0].resolve(ok(recordsList([action('amount', { order: { ...row.order, ...amounts } })])))
+      await drainMicrotasks()
+    })
+    const renderedRow = el.querySelector('[data-row-id="action-amount"]')
+    expect(renderedRow).toBeTruthy()
+    expect(renderedRow!.querySelector('span[title^="商品amount"]')?.textContent).toBe(expected)
+  })
+})
 
 describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
   it('M3: アカウント切替の直後(commit直後・useEffect未実行)は前アカウントの一覧を表示し続けない', async () => {
@@ -367,7 +375,7 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
   })
 
   /*
-   * 司令塔切り分け(2026-09-10、列車229のartifactで実証): 検索欄debounceの
+   * 司令塔切り分け(2026-09-10、作業のartifactで実証): 検索欄debounceの
    * useEffect([query, setPage])は、マウント直後のqueryの初期値('')でも
    * 必ず1回実行され、300ms後に無条件でsetPage(1)を呼んでいた。一覧が
    * 表示された直後(300ms以内)に「次のページ」を押した利用者が、その後
@@ -410,7 +418,7 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
 
 /*
  * #635: 存在しない言葉で検索して0件になったとき、件数が減るだけでなく
- * 「条件に合う取り込みの記録はありません」と次にやること（解除）を出す。
+ * 「条件に合うものはありません」と次にやること（解除）を出す。
  * 監査5b_23: 不存在語を入れても明示の空メッセージが特定できなかった。
  */
 describe('EC取込一覧の絞り込み0件 (#635)', () => {
@@ -442,9 +450,9 @@ describe('EC取込一覧の絞り込み0件 (#635)', () => {
     })
 
     // 「0件」と分かる表示＋次の行動提案（別の言葉・絞り込み解除）。
-    expect(el.textContent).toContain('条件に合う取り込みの記録はありません')
-    expect(el.textContent).toContain('検索語や表示条件を変えてください。')
-    const clear = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '検索と絞り込みを解除')
+    expect(el.textContent).toContain('条件に合うものはありません')
+    expect(el.textContent).toContain('絞り込みや検索を外すと、すべて出ます')
+    const clear = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '条件を外す')
     expect(clear).toBeTruthy()
 
     // 解除すると検索語を外して取り直す。
@@ -452,6 +460,135 @@ describe('EC取込一覧の絞り込み0件 (#635)', () => {
     await act(async () => { await drainMicrotasks() })
     expect(eventsCalls.at(-1)).not.toContain('query=')
     expect(searchInput(el).value).toBe('')
+  })
+})
+
+/*
+ * R599: `/api/ec-commerce/events` だけが 503・403・404 で落ち、
+ * 集計が 200 のとき、状態タブが「処理中0」「失敗0」と未取得を 0件に
+ * 見せていた。一覧由来の状態別件数は取れるまで出さず、失敗理由と
+ * やり直しを出し、再試行の成功で実数へ戻る、を実mountで見張る。
+ * 「すべて」の数は集計由来なので、取れている間は残る。
+ * 空の一覧（取れたうえでの 0件）は実数の 0 を出す。失敗と区別する。
+ */
+describe('R599 一覧未取得の状態別件数', () => {
+  function statusTabText(el: HTMLDivElement, label: string): string | null {
+    const tab = Array.from(el.querySelectorAll('button[aria-pressed]'))
+      .find((node) => (node.textContent ?? '').startsWith(label))
+    return tab ? tab.textContent?.replaceAll(' ', '') ?? null : null
+  }
+
+  function retryListButton(el: HTMLDivElement): HTMLButtonElement {
+    const button = Array.from(el.querySelectorAll('button'))
+      .find((node) => node.textContent === 'もう一度読み込む')
+    if (!button) throw new Error('「もう一度読み込む」ボタンが見つかりません')
+    return button as HTMLButtonElement
+  }
+
+  async function failEventsOnly(el: HTMLDivElement, r: Root, status: number) {
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(111)))
+      eventsDeferreds[0].reject(new ApiError(status, `EC events ${status}`))
+      await drainMicrotasks()
+    })
+  }
+
+  it('一覧503＋集計200では「処理中」「失敗」に0を出さず、理由とやり直しを出す', async () => {
+    const { container: el, root: r } = mount()
+    await failEventsOnly(el, r, 503)
+
+    expect(el.textContent).toContain('取り込みの記録を読み込めませんでした')
+    expect(retryListButton(el)).toBeTruthy()
+    // 一覧由来の状態別件数は未取得（数を出さない）。
+    expect(statusTabText(el, '処理中')).toBe('処理中')
+    expect(statusTabText(el, '失敗')).toBe('失敗')
+    expect(statusTabText(el, '処理完了')).toBe('処理完了')
+    expect(statusTabText(el, '送信なし')).toBe('送信なし')
+    // 集計由来の「すべて」は取れているので残る。
+    expect(statusTabText(el, 'すべて')).toBe('すべて111')
+  })
+
+  it('一覧403では権限不足を出し、状態別件数に0を出さない', async () => {
+    const { container: el, root: r } = mount()
+    await failEventsOnly(el, r, 403)
+
+    expect(el.textContent).toContain('表示する権限がありません')
+    expect(statusTabText(el, '処理中')).toBe('処理中')
+    expect(statusTabText(el, '失敗')).toBe('失敗')
+    expect(statusTabText(el, 'すべて')).toBe('すべて111')
+  })
+
+  it('一覧404では読み込み失敗を出し、状態別件数に0を出さない', async () => {
+    const { container: el, root: r } = mount()
+    await failEventsOnly(el, r, 404)
+
+    expect(el.textContent).toContain('取り込みの記録を読み込めませんでした')
+    expect(statusTabText(el, '処理中')).toBe('処理中')
+    expect(statusTabText(el, '失敗')).toBe('失敗')
+  })
+
+  it('やり直しの成功で状態別件数が実数に戻る', async () => {
+    const { container: el, root: r } = mount()
+    await failEventsOnly(el, r, 503)
+    expect(statusTabText(el, '処理中')).toBe('処理中')
+
+    await act(async () => { retryListButton(el).click() })
+    await act(async () => { await drainMicrotasks() })
+    expect(eventsCalls).toHaveLength(2)
+
+    await act(async () => {
+      eventsDeferreds[1].resolve(ok(recordsList(
+        [action('1')],
+        1,
+        { pending: 1, processing: 2, succeeded: 5, skipped: 1, retryable_failed: 3, permanent_failed: 1 },
+      )))
+      await drainMicrotasks()
+    })
+
+    expect(el.textContent).not.toContain('取り込みの記録を読み込めませんでした')
+    expect(statusTabText(el, '処理中')).toBe('処理中3')
+    expect(statusTabText(el, '失敗')).toBe('失敗4')
+    expect(statusTabText(el, '処理完了')).toBe('処理完了5')
+    expect(statusTabText(el, '送信なし')).toBe('送信なし1')
+  })
+
+  it('正常時は実数を出し、1ページなら移動を出さない', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(111)))
+      eventsDeferreds[0].resolve(ok(recordsList(
+        [action('1')],
+        1,
+        { pending: 1, processing: 2, succeeded: 5, skipped: 1, retryable_failed: 3, permanent_failed: 1 },
+      )))
+      await drainMicrotasks()
+    })
+
+    expect(statusTabText(el, '処理中')).toBe('処理中3')
+    expect(statusTabText(el, '失敗')).toBe('失敗4')
+    expect(el.querySelector('[data-pagination]')).toBeNull()
+    expect(el.querySelector('[data-pagination] button[aria-label="次のページ"]')).toBeNull()
+    expect(el.querySelector('[data-pagination] button')).toBeNull()
+  })
+
+  it('空の一覧は「記録はありません」と実数の0を出す', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(0)))
+      eventsDeferreds[0].resolve(ok(recordsList([], 0)))
+      await drainMicrotasks()
+    })
+
+    expect(el.textContent).toContain('記録はありません')
+    // 取れたうえでの 0件なので、実数の 0 を出す（隠さない）。
+    expect(statusTabText(el, '処理中')).toBe('処理中0')
+    expect(statusTabText(el, '失敗')).toBe('失敗0')
   })
 })
 
@@ -492,7 +629,11 @@ describe('取り込みの記録の器（監査A2）', () => {
       }))
       await drainMicrotasks()
     })
-    expect(el.textContent).toContain('NEN-12492')
+    expect(el.querySelector('[title="注文 NEN-12492"]')).toBeTruthy()
     expect(el.textContent).not.toContain('取り込みの記録を読み込めませんでした')
   })
 })
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/lib/staff-role', async (importOriginal) => ({...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner'}))

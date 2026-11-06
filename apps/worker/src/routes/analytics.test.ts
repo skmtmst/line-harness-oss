@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 
 const mocks = {
   ANALYTICS_REPORT_SECTIONS: ['friends', 'reactions', 'routes', 'usage', 'mileage'],
@@ -44,6 +48,7 @@ const mocks = {
   setAnalyticsReportScheduleStatus: vi.fn(),
   getStaffMembers: vi.fn(),
   createAnalyticsCrossAudience: vi.fn(),
+  addConversionDefinitionUsage: vi.fn(),
   getCurrentFunnelVersion: vi.fn(),
   getLineAccountById: vi.fn(),
   getLineAccounts: vi.fn(),
@@ -80,6 +85,7 @@ app.use('*', async (c, next) => {
   return next();
 });
 app.route('/', analytics);
+app.onError(unhandledWorkerError);
 const staffApp = new Hono<Env>();
 staffApp.use('*', async (c, next) => {
   c.set('staff', {
@@ -90,7 +96,8 @@ staffApp.use('*', async (c, next) => {
   return next();
 });
 staffApp.route('/', analytics);
-// 実行間隔ガード(点検#508の中4)が読む最小の入れ物。テストごとに中身を変える。
+staffApp.onError(unhandledWorkerError);
+// 実行間隔ガード(点検の中4)が読む最小の入れ物。テストごとに中身を変える。
 const guardRows: { crossBusy: { id: string } | null; lastFunnelRunAt: string | null } = {
   crossBusy: null,
   lastFunnelRunAt: null,
@@ -131,6 +138,17 @@ function reqAsStaff(path: string, method = 'GET', body?: unknown) {
     }),
     env,
   );
+}
+
+async function expectUnhandledFailure(response: Response, path: string) {
+  expect(response.status).toBe(500);
+  const body = await response.json() as { incidentId: string };
+  expect(body).toEqual({ success: false, error: 'Internal Server Error', incidentId: expect.any(String) });
+  expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+  expect(JSON.stringify(body)).not.toMatch(/D1 unavailable|db down/);
+  expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+    source: 'worker', message: 'unhandled_worker_error', path: `GET ${path}`, incidentId: body.incidentId,
+  });
 }
 
 const FUNNEL = { id: 'fn-1', line_account_id: 'account-a', name: '購入まで', segment_json: null, window_days: 30, created_at: '2026-08-16', status: 'active' };
@@ -273,7 +291,7 @@ describe('期間の指定', () => {
   });
 });
 
-describe('V6分析の概要API', () => {
+describe('分析の概要API', () => {
   it('既定はアカウントの現地日付で30日、夏時間の日境界も保つ', () => {
     const result = readAnalyticsOverviewRange(
       () => undefined,
@@ -383,8 +401,7 @@ describe('V6分析の概要API', () => {
   it('使われ方の取得自体に失敗したとき正常な空データにせず500を返す', async () => {
     mocks.getAnalyticsUsageOverview.mockRejectedValueOnce(new Error('D1 unavailable'));
     const res = await req(`/api/analytics/usage?${ACCOUNT}`);
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ success: false, error: 'Internal server error' });
+    await expectUnhandledFailure(res, '/api/analytics/usage');
   });
 
   it('存在しない日付と13か月を超える期間を弾く', async () => {
@@ -437,7 +454,7 @@ describe('旧クロス集計', () => {
   });
 });
 
-describe('V6クロス分析API', () => {
+describe('クロス分析API', () => {
   const body = {
     rowAxis: { kind: 'route' },
     columnAxis: { kind: 'tag' },
@@ -467,7 +484,7 @@ describe('V6クロス分析API', () => {
     expect(mocks.createAnalyticsCrossRun).not.toHaveBeenCalled();
   });
 
-  // #951 N-276: 「数えるもの」は人数固定ではなく、イベントの回数も選べる。
+  //  「数えるもの」は人数固定ではなく、イベントの回数も選べる。
   // ルートは種類をこねず検証層へそのまま渡す。検証と集計は packages/db の
   // 実SQLite試験(analytics-cross.test.ts)が担う。
   it('イベントの回数を数えるmeasureも検証層へそのまま渡す', async () => {
@@ -526,7 +543,7 @@ describe('V6クロス分析API', () => {
   });
 });
 
-describe('V6保存した分析API', () => {
+describe('保存した分析API', () => {
   it('選択中アカウントの保存済み分析だけを返す', async () => {
     const res = await req(`/api/analytics/saved?${ACCOUNT}`);
     expect(res.status).toBe(200);
@@ -639,7 +656,7 @@ describe('ファネルの結果', () => {
       mocks.getStaffAccountScopeIds.mockResolvedValue([]);
       const res = await req(`/api/funnels/fn-1/result?${ACCOUNT}`);
       expect(res.status).toBe(422);
-      const body = (await res.json()) as { error: string };
+      const body = (await res.json()) as { error: string; code: string };
       expect(body.error).toBe('analytics_funnel_not_active');
       expect(mocks.countFunnelStep).not.toHaveBeenCalled();
     }
@@ -647,7 +664,7 @@ describe('ファネルの結果', () => {
 });
 
 describe('現行ファネルの削除', () => {
-  it('V6の版付き定義は現行APIから削除できない', async () => {
+  it('の版付き定義は現行APIから削除できない', async () => {
     const res = await req(`/api/funnels/fn-1?${ACCOUNT}`, 'DELETE');
     expect(res.status).toBe(404);
     expect(mocks.deleteFunnel).not.toHaveBeenCalled();
@@ -669,7 +686,7 @@ describe('現行ファネルの削除', () => {
   });
 });
 
-describe('V6ファネルAPI', () => {
+describe('ファネルAPI', () => {
   const body = {
     name: '購入まで',
     windowDays: 14,
@@ -720,8 +737,7 @@ describe('V6ファネルAPI', () => {
 
     const res = await req(`/api/analytics/funnels?${ACCOUNT}`);
 
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ success: false, error: 'Internal server error' });
+    await expectUnhandledFailure(res, '/api/analytics/funnels');
   });
 
   it('作成時に第1版を固定する', async () => {
@@ -912,13 +928,73 @@ describe('V6ファネルAPI', () => {
       cohortTo: '2026-08-10T23:59:59.999+09:00',
     });
     expect(res.status).toBe(422);
-    expect(await res.json()).toMatchObject({ error: 'analytics_funnel_not_active' });
+    expect(await res.json()).toMatchObject({ code: 'analytics_funnel_not_active' , fields: expect.any(Object), error: expect.any(String) });
 
     mocks.createFunnelVersion.mockRejectedValueOnce(new Error('analytics_funnel_not_active'));
     const version = await req(`/api/analytics/funnels/fn-1/versions?${ACCOUNT}`, 'POST', {
       windowDays: 14, steps: body.steps,
     });
     expect(version.status).toBe(422);
+  });
+
+  describe('段の成果地点への利用先記録', () => {
+    const conversionSteps = [
+      { label: '追加', kind: 'friend_add', match: {} },
+      { label: '購入', kind: 'conversion', match: { conversionPointId: 'cp-1' } },
+    ];
+    // 成果地点の版と名前だけを返す DB（利用先記録の CAS が読む）。
+    const pointEnv = {
+      DB: {
+        prepare: (sql: string) => ({
+          bind: () => ({
+            first: async () => sql.includes('FROM conversion_points') ? { version: 3, name: '購入完了' } : null,
+          }),
+        }),
+      } as unknown as D1Database,
+    };
+    const send = (path: string, payload: unknown) => app.fetch(
+      new Request(`https://example.com${path}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      }),
+      pointEnv,
+    );
+
+    it('作成と新版は、下書き・停止中の地点にも allowInactive で記し、成功なら断りを返さない', async () => {
+      mocks.createVersionedFunnel.mockResolvedValueOnce({
+        funnelId: 'fn-v6', version: { id: 'fv-1', versionNumber: 1, steps: conversionSteps },
+      });
+      const created = await send(`/api/analytics/funnels?${ACCOUNT}`, { name: '購入まで', windowDays: 14, steps: conversionSteps });
+      expect(created.status).toBe(201);
+      expect(await created.json()).toMatchObject({ success: true, data: { funnelId: 'fn-v6', usageWarnings: [] } });
+      expect(mocks.addConversionDefinitionUsage).toHaveBeenCalledWith(pointEnv.DB, expect.objectContaining({
+        conversionPointId: 'cp-1', lineAccountId: 'account-a', expectedVersion: 3,
+        refKind: 'analytics', refId: 'fn-v6', refVersionId: 'fv-1', allowInactive: true,
+      }));
+
+      mocks.createFunnelVersion.mockResolvedValueOnce({ id: 'fv-2', versionNumber: 2, steps: conversionSteps });
+      const version = await send(`/api/analytics/funnels/fn-v6/versions?${ACCOUNT}`, { windowDays: 14, steps: conversionSteps, expectedVersionNumber: 1 });
+      expect(version.status).toBe(201);
+      expect(await version.json()).toMatchObject({ data: { id: 'fv-2', usageWarnings: [] } });
+      expect(mocks.addConversionDefinitionUsage).toHaveBeenLastCalledWith(pointEnv.DB, expect.objectContaining({
+        refId: 'fn-v6', refVersionId: 'fv-2', allowInactive: true,
+      }));
+    });
+
+    it('記録に失敗した地点は作成を失敗にせず、地点名を応答の usageWarnings に載せる', async () => {
+      mocks.createVersionedFunnel.mockResolvedValueOnce({
+        funnelId: 'fn-v6', version: { id: 'fv-1', versionNumber: 1, steps: conversionSteps },
+      });
+      mocks.addConversionDefinitionUsage.mockRejectedValue(new Error('conversion_definition_inactive'));
+      const created = await send(`/api/analytics/funnels?${ACCOUNT}`, { name: '購入まで', windowDays: 14, steps: conversionSteps });
+      expect(created.status).toBe(201);
+      expect(await created.json()).toMatchObject({ success: true, data: { funnelId: 'fn-v6', usageWarnings: ['購入完了'] } });
+
+      mocks.createFunnelVersion.mockResolvedValueOnce({ id: 'fv-2', versionNumber: 2, steps: conversionSteps });
+      const version = await send(`/api/analytics/funnels/fn-v6/versions?${ACCOUNT}`, { windowDays: 14, steps: conversionSteps, expectedVersionNumber: 1 });
+      expect(version.status).toBe(201);
+      expect(await version.json()).toMatchObject({ data: { usageWarnings: ['購入完了'] } });
+      mocks.addConversionDefinitionUsage.mockReset();
+    });
   });
 });
 
@@ -942,7 +1018,7 @@ describe('LINE公式アカウントの分離', () => {
   });
 });
 
-describe('V6 定期レポートAPI', () => {
+describe('定期レポートAPI', () => {
   const body = {
     name: '週次まとめ', sections: ['friends', 'reactions'], savedAnalysisIds: [],
     cadence: 'weekly', weekday: 1, monthDay: null, sendTime: '09:00',
@@ -985,7 +1061,7 @@ describe('V6 定期レポートAPI', () => {
   });
 
   it('R228: 正しい宛先と形の合わない宛先が混ざっていても止める', async () => {
-    // 以前は不正な宛先を黙って外して作成していた（送ったつもりが届かない）。
+    // 送ったつもりで欠落しないよう、不正な宛先を含む作成は拒む。
     const mixed = await req(`/api/analytics/report-schedules?${ACCOUNT}`, 'POST', {
       ...body,
       recipients: [
@@ -1028,8 +1104,7 @@ describe('V6 定期レポートAPI', () => {
   it('読取失敗は500で返し、未取得を空に見せない', async () => {
     mocks.getAnalyticsReportSchedules.mockRejectedValueOnce(new Error('db down'));
     const res = await req(`/api/analytics/report-schedules?${ACCOUNT}`);
-    expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ success: false });
+    await expectUnhandledFailure(res, '/api/analytics/report-schedules');
   });
 
   const existingSchedule = {
@@ -1196,4 +1271,8 @@ describe('R454 1回送信の履歴と送り直し', () => {
     mocks.getAnalyticsReportRuns.mockResolvedValue([{ ...failedRun, state: 'running' }]);
     expect((await req(`/api/analytics/report-schedules/once-1/retry?${ACCOUNT}`, 'POST', {})).status).toBe(422);
   });
+});
+
+it.each(['messages','link-clicks','tracked-links','broadcasts'])('API-02 %s rejects a non-existent date',async path=>{
+ expect((await req(`/api/analytics/${path}?${ACCOUNT}&from=2026-02-30&to=2026-03-01`)).status).toBe(400);
 });

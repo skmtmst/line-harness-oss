@@ -1,10 +1,15 @@
 'use client'
 
-import { ChevronsUpDown, Plus, X } from 'lucide-react'
+import choiceStyles from './choice-field.module.css'
+import { inputPlaceholder } from './input-placeholder'
+import { ChevronDown, Plus, X } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
 import styles from './combobox.module.css'
+import { isImeComposing } from './ime'
+import { joinDescribedBy, useFieldContext } from './field-context'
+import { formatNumber } from '@/lib/format'
 
 export type ComboboxDot = 'green' | 'blue' | 'amber' | 'gray'
 
@@ -44,7 +49,7 @@ export interface ComboboxProps {
 }
 
 /**
- * 候補つき入力（1つ選ぶ）。Pencil ★V7 `WUVcz`「候補つき入力・複数選択」§1。
+ * 候補つき入力（1つ選ぶ）。Pencil ★V8（V8.pen）「候補から選ぶ」。
  *
  * 形の手本は select.tsx（開閉・枠・誤り）と date-field（欄の 6px 下の
  * 候補・motion-fast の出方）。寸法・色・文字は WUVcz の書き出しから。
@@ -73,8 +78,11 @@ export default function Combobox({
   placeholder,
   value,
 }: ComboboxProps) {
+  // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る。
+  const field = useFieldContext()
+  const invalid = Boolean(error) || Boolean(field?.invalid)
   const generatedId = useId()
-  const inputId = id ?? `${generatedId}-input`
+  const inputId = id ?? field?.controlId ?? `${generatedId}-input`
   const listboxId = `${generatedId}-listbox`
   const errorId = `${generatedId}-error`
   const statusId = `${generatedId}-status`
@@ -129,6 +137,8 @@ export default function Combobox({
   }
 
   const onInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    // 変換中のキー（確定の Enter・候補の上下・Esc）は日本語入力のもの。候補を選ばない。
+    if (isImeComposing(event)) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       if (!open) {
@@ -160,7 +170,7 @@ export default function Combobox({
     }
   }
 
-  const statusText = !open ? '' : loading ? '探しています' : `${matches.length}件の候補`
+  const statusText = !open ? '' : loading ? '探しています' : `${formatNumber(matches.length)}件の候補`
 
   return (
     <div
@@ -174,24 +184,26 @@ export default function Combobox({
       {name ? <input type="hidden" name={name} value={value} disabled={disabled} /> : null}
       <div
         ref={fieldRef}
-        className={[styles.field, open ? styles.open : null, error ? styles.invalid : null, disabled ? styles.disabled : null].filter(Boolean).join(' ')}
+        data-choice-field data-choice-invalid={invalid || undefined} data-choice-disabled={disabled || undefined}
+        className={[choiceStyles.frame, styles.field, open ? styles.open : null, invalid ? styles.invalid : null, disabled ? styles.disabled : null].filter(Boolean).join(' ')}
       >
         <input
           ref={inputRef}
           id={inputId}
           type="text"
+          data-choice-trigger
           role="combobox"
           aria-label={ariaLabel}
           aria-expanded={open}
           aria-controls={listboxId}
           aria-activedescendant={open && active ? `${listboxId}-${activeMatchIndex}` : undefined}
           aria-autocomplete="list"
-          aria-invalid={Boolean(error) || undefined}
-          aria-describedby={error ? errorId : undefined}
+          aria-invalid={invalid || undefined}
+          aria-describedby={joinDescribedBy(error ? errorId : undefined, field?.describedBy)}
           aria-busy={loading || undefined}
           autoComplete="off"
           disabled={disabled}
-          placeholder={placeholder}
+          placeholder={inputPlaceholder(placeholder)}
           value={text}
           onFocus={() => {
             if (!disabled) setOpen(true)
@@ -205,24 +217,24 @@ export default function Combobox({
           className={styles.input}
         />
         {text !== '' && !disabled ? (
-          <button type="button" aria-label="入力を消す" onMouseDown={(event) => event.preventDefault()} onClick={clear} className={`${styles.trailing} ${styles.clear}`}>
+          <button type="button" data-choice-action data-choice-clear aria-label="入力を消す" onMouseDown={(event) => event.preventDefault()} onClick={clear} className={`${styles.trailing} ${styles.clear}`}>
             <X aria-hidden="true" />
           </button>
-        ) : (
+        ) : null}
           <button
             type="button"
             aria-label={open ? '候補を閉じる' : '候補を開く'}
             disabled={disabled}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
-              setOpen((current) => !current)
+              const next = !open
               inputRef.current?.focus()
+              setOpen(next)
             }}
-            className={styles.trailing}
+            className={styles.trailing} data-choice-action
           >
-            <ChevronsUpDown aria-hidden="true" />
+            <ChevronDown aria-hidden="true" />
           </button>
-        )}
       </div>
       {open ? (
         <MenuPortal

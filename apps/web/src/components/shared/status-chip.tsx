@@ -1,14 +1,15 @@
 import React from 'react'
 import StatusBadge, { type StatusBadgeTone } from './status-badge'
+import styles from './status-chip.module.css'
 
-/** 設計 B（★V7「監査の直し」）の6つの状態。画面ごとの言い方はやめ、これに寄せる。 */
+/** 設計 B（★管理画面「監査の直し」）の6つの状態。画面ごとの言い方はやめ、これに寄せる。 */
 export type StatusChipStatus = 'draft' | 'ready' | 'reserved' | 'running' | 'paused' | 'ended'
 
 const LABEL: Record<StatusChipStatus, string> = {
   draft: '下書き',
   ready: '準備完了',
   reserved: '予約中',
-  running: '稼働中',
+  running: '有効',
   paused: '停止中',
   ended: '終了',
 }
@@ -18,7 +19,7 @@ const TONE: Record<StatusChipStatus, StatusBadgeTone> = {
   ready: 'info',
   reserved: 'info',
   running: 'success',
-  paused: 'warning',
+  paused: 'neutral',
   ended: 'neutral',
 }
 
@@ -36,27 +37,30 @@ export const STATUS_CHIP_HELP: Record<StatusChipStatus, string> = {
 }
 
 /**
- * 状態の札（★V7 共通部品。設計 B の6つ）。
+ * 状態の札（★管理画面 共通部品。設計 B の6つ）。
  * 色だけにしない（札の文字で分かる）。緑は「正常・うまくいっている」だけに使う。
  */
 export default function StatusChip({
   status,
   size = 'compact',
   withHelp = false,
+  defaultAccount = false,
 }: {
   status: StatusChipStatus
   size?: 'default' | 'compact'
   /** 札の意味を「？」に入れる（1つの札だけの場所で使う。表の行ごとは付けない）。 */
   withHelp?: boolean
+  /** 既定アカウントの行き先を示す小さな札。状態とは別に表示する。 */
+  defaultAccount?: boolean
 }) {
   return (
-    <StatusBadge
+    <span className={styles.group} data-status-chip-group><StatusBadge
       tone={TONE[status]}
       size={size}
       help={withHelp ? STATUS_CHIP_HELP[status] : undefined}
       helpLabel={LABEL[status]}
     >
       {LABEL[status]}
-    </StatusBadge>
+    </StatusBadge>{defaultAccount ? <StatusBadge tone="neutral" dot={false} size={size}>既定</StatusBadge> : null}</span>
   )
 }

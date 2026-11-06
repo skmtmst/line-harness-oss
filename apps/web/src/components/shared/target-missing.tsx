@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react'
-import { CloudOff, FileSearch, List, RotateCw, SearchX } from 'lucide-react'
+import { CloudOff, FileSearch, List, Lock, RotateCw, SearchX } from 'lucide-react'
 import Button from './button'
+import { loadFailureCopy, type PermissionScope } from './api-error-message'
+import LoadFailureContact from './load-failure-contact'
 import styles from './target-missing.module.css'
 
 /**
- * ★V7「開き先がない」（設計ノード `x5cgUH`）。
+ * 開く対象がないときの共通表示。見た目は現在のトークンを使う。
  *
  * 詳細・編集・結果の画面で、開く対象が無いときの1枚。3つの状態を
  * 言い分ける（いまは37画面が赤い字だけ・ピンクの箱・灰色の文だけ・
@@ -24,15 +26,18 @@ import styles from './target-missing.module.css'
  * 右の案内カード・下の固定バーなど、対象が無いと意味のない部品は
  * 呼び出し側で出さない（設計の決まり）。
  */
-export type TargetMissingKind = 'unspecified' | 'not-found' | 'error'
+/** forbiddenは権限が確認済みの入口拒否。通信の読込失敗とは区別して戻る道を出す。 */
+export type TargetMissingKind = 'unspecified' | 'not-found' | 'error' | 'forbidden'
 
 const ICONS = {
   unspecified: FileSearch,
   'not-found': SearchX,
   error: CloudOff,
+  forbidden: Lock,
 } as const
 
 export type TargetMissingProps = {
+  permissionScope?: PermissionScope
   kind: TargetMissingKind
   /** 「何が」＋「どうなっているか」の1文。 */
   title: string
@@ -44,8 +49,16 @@ export type TargetMissingProps = {
   backLabel?: string
   /** もう一度読み込む（`error`）。 */
   onRetry?: () => void
+  /**
+   * 捕まえた取得失敗（m23m）。`error` のときだけ見る。
+   * 403 は権限の案内にし、押しても直らない再試行の口は出さない。
+   * 429 は待ち秒数（`Retry-After` があれば使う）を添える。
+   */
+  error?: unknown
   /** 読み直している間。二度押しを止める。 */
   retrying?: boolean
+  /** 既存の再試行や権限確認の操作。渡したときは既定の再試行と重ねない。 */
+  action?: ReactNode
   /**
    * いまの LINE アカウント名（`not-found` のみ・任意）。
    * 渡すと説明のあとに「いまの LINE アカウントは「◯◯」です。」を足す
@@ -56,17 +69,29 @@ export type TargetMissingProps = {
 
 export default function TargetMissing({
   kind,
+  permissionScope = 'store',
   title,
   description,
   backHref,
   backLabel,
   onRetry,
+  error,
   retrying = false,
+  action: suppliedAction,
   accountName,
 }: TargetMissingProps) {
   const Icon = ICONS[kind]
-  const showBack = (kind === 'unspecified' || kind === 'not-found') && backHref && backLabel
-  const showRetry = kind === 'error' && onRetry
+  /*
+   * ：v8 の絵の失敗の題は「読み込めませんでした」。共通の文（ListState・失敗の言い分け）と、
+   * 画面が渡す「〇〇を表示できませんでした」を、v8 では「〇〇を読み込めませんでした」で出す。
+   */
+  const shownTitle = kind === 'error' ? title.replace(/表示できませんでした$/, '読み込めませんでした') : title
+  const showBack = (kind === 'unspecified' || kind === 'not-found' || kind === 'forbidden') && backHref && backLabel
+  // 権限の案内を残し、権限変更後にも同じ口から読み直せる。
+  // 文言は画面の指定どおり（出し分け文言が要るときは ListState の `error` を使う）。
+  const failure = kind === 'error' && error !== undefined ? loadFailureCopy(error, 'この画面', permissionScope) : null
+  const retry = onRetry ?? (() => window.location.reload())
+  const showRetry = kind === 'error'
   const accountLine =
     kind === 'not-found' && accountName ? `いまの LINE アカウントは「${accountName}」です。` : null
 
@@ -80,13 +105,16 @@ export default function TargetMissing({
       </Button>
     )
   } else if (showRetry) {
+    /* ：v8 の絵は「もう一度試す」。 */
+    /* 読み上げ名は見えている文字と同じにする（別の名前を付けると、声で操作する人が呼べない）。 */
     action = (
-      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying}>
-        <RotateCw aria-hidden="true" size={16} />
-        {retrying ? '読み込んでいます' : 'もう一度読み込む'}
+      <Button type="button" variant="secondary" onClick={retry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます">
+        <RotateCw aria-hidden="true" size={16} />もう一度読み込む
       </Button>
     )
   }
+
+  const finalAction = suppliedAction !== undefined ? suppliedAction : action
 
   return (
     <div
@@ -98,12 +126,12 @@ export default function TargetMissing({
       <div className={styles.mark}>
         <Icon aria-hidden="true" size={20} />
       </div>
-      <p className={styles.title}>{title}</p>
+      <p className={styles.title}>{shownTitle}</p>
       <p className={styles.description}>
-        {description}
+        {failure && !failure.retryable ? failure.description : kind === 'error' ? <LoadFailureContact description={description} /> : description}
         {accountLine ? <span> {accountLine}</span> : null}
       </p>
-      {action ? <div className={styles.action}>{action}</div> : null}
+      {finalAction ? <div className={styles.action}>{finalAction}</div> : null}
     </div>
   )
 }

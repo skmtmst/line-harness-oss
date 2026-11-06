@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const roleBundles = [
   { id: 'administrator', name: '管理者', description: '全機能', featureAccess: 'edit', requiresMfa: true },
@@ -77,6 +77,25 @@ beforeEach(() => {
 });
 
 describe('access users and role bundle routes', () => {
+  it.each(['limit=0', 'limit=201', 'limit=1.5', 'limit=abc', 'offset=-1', 'offset=100001', 'offset=1.5'])(
+    'ページ指定%sは丸めず400で断り、DBへ進まない', async (query) => {
+      expect((await request(`/api/access/users?${query}`)).status).toBe(400);
+      expect(mocks.listAccessUsers).not.toHaveBeenCalled();
+    },
+  );
+
+  it('空欄の既定値と、2ページ目の旧paginationと共通項目を保つ', async () => {
+    expect((await request('/api/access/users?limit=&offset=')).status).toBe(200);
+    expect(mocks.listAccessUsers).toHaveBeenLastCalledWith(env.DB, expect.objectContaining({ limit: 50, offset: 0 }));
+    mocks.listAccessUsers.mockResolvedValue({ ...userResult, total: 81, limit: 20, offset: 20 });
+    const response = await request('/api/access/users?limit=20&offset=20');
+    expect(await response.json()).toMatchObject({ data: {
+      total: 81, limit: 20, offset: 20,
+      pagination: { total: 81, limit: 20, offset: 20 }, summary: userResult.summary,
+    } });
+    expect(mocks.listAccessUsers).toHaveBeenLastCalledWith(env.DB, expect.objectContaining({ limit: 20, offset: 20 }));
+  });
+
   it('returns real KPI inputs, last activity and policy version for an owner', async () => {
     const response = await request('/api/access/users?lineAccountId=account-a&status=active');
     expect(response.status).toBe(200);
@@ -160,25 +179,31 @@ describe('audit event route', () => {
     const response = await request('/api/audit/events?lineAccountId=account-a&category=business&result=failed&query=配信');
     expect(response.status).toBe(200);
     expect(mocks.listAuditEvents).toHaveBeenCalledWith(env.DB, expect.objectContaining({
-      tenantId: 'tenant-a', includeTenantWide: true, lineAccountId: 'account-a',
+      tenantId: 'tenant-a', lineAccountId: 'account-a',
       category: 'business', result: 'failed', query: '配信',
     }));
   });
 
   it('requires a separate audit permission for staff', async () => {
-    expect((await request('/api/audit/events', 'staff', ['access.user.view'])).status).toBe(403);
-    expect((await request('/api/audit/events', 'staff', ['access.audit.view'])).status).toBe(200);
+    expect((await request('/api/audit/events?lineAccountId=account-a', 'staff', ['access.user.view'])).status).toBe(403);
+    expect((await request('/api/audit/events?lineAccountId=account-a', 'staff', ['access.audit.view'])).status).toBe(200);
+  });
+
+  it('requires a selected account and rejects an account outside the viewer scope', async () => {
+    expect((await request('/api/audit/events')).status).toBe(400);
+    expect((await request('/api/audit/events?lineAccountId=account-b')).status).toBe(404);
+    expect(mocks.listAuditEvents).not.toHaveBeenCalled();
   });
 
   it('rejects invalid dates before querying the database', async () => {
-    const response = await request('/api/audit/events?from=not-a-date');
+    const response = await request('/api/audit/events?lineAccountId=account-a&from=not-a-date');
     expect(response.status).toBe(400);
     expect(mocks.listAuditEvents).not.toHaveBeenCalled();
   });
 
   it('returns a safe error when audit search fails', async () => {
     mocks.listAuditEvents.mockRejectedValue(new Error('raw database detail'));
-    const response = await request('/api/audit/events');
+    const response = await request('/api/audit/events?lineAccountId=account-a');
     expect(response.status).toBe(500);
     expect(await response.text()).not.toContain('raw database detail');
   });

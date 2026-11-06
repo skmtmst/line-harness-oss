@@ -415,16 +415,16 @@ describe('getLatestDeployment', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns the first deployment entry from the list', async () => {
+  it('returns canonical production even when a newer preview exists', async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     fetchMock.mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => ({
-        result: [
-          { id: 'newest', created_on: '2026-05-12T00:00:00Z' },
-          { id: 'older', created_on: '2026-05-11T00:00:00Z' },
-        ],
+        success: true, result: {
+          latest_deployment: { id: 'preview-newer', environment: 'preview' },
+          canonical_deployment: { id: 'production', environment: 'production', latest_stage: {name:'deploy',status:'success'} },
+        },
       }),
     } as Response);
 
@@ -433,14 +433,19 @@ describe('getLatestDeployment', () => {
       projectName: 'myproj',
     });
 
-    expect(result).toEqual({ id: 'newest' });
+    expect(result).toEqual({ id: 'production' });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(
-      'https://api.cloudflare.com/client/v4/accounts/acct123/pages/projects/myproj/deployments?per_page=1',
+      'https://api.cloudflare.com/client/v4/accounts/acct123/pages/projects/myproj',
     );
     expect((init.method ?? 'GET').toUpperCase()).toBe('GET');
     const headers = init.headers as Record<string, string>;
     expect(headers['Authorization']).toBe('Bearer tok_abc');
+  });
+
+  it.each(['preview', 'failed', 'missing'])('拒否した%sを復旧先にしない',async(kind)=>{
+    globalThis.fetch=vi.fn(async()=>Response.json({success:true,result:{canonical_deployment:kind==='missing'?null:{id:'bad',environment:kind==='preview'?'preview':'production',latest_stage:{name:'deploy',status:kind==='failed'?'failure':'success'}}}}));
+    await expect(getLatestDeployment({creds,projectName:'myproj'})).rejects.toThrow('pages_production_snapshot_unavailable');
   });
 
   it('throws on 500', async () => {

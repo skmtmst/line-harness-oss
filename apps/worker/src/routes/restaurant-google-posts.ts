@@ -1,3 +1,6 @@
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+import { inputError, inputJsonBoundary, inputShapeErrors } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第3段：投稿（最新情報・イベント・特典）。
  * 設計正本：Googleビジネス正本.pen GB-4（MAozg）/ GB-5（fxNNJ・hZb3O）/ GB-6（sZEnK）
@@ -16,7 +19,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { getMediaById } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
@@ -38,6 +41,15 @@ import {
   type PostSchedule,
 } from '../services/google-business-posts.js';
 import {
+  InstagramError,
+  decryptInstagramCredential,
+  instagramCanPublish,
+  instagramConfig,
+  instagramImageUrl,
+  instagramPublish,
+  instagramUrlDetail,
+} from '../services/instagram.js';
+import {
   accessTokenFor,
   fail,
   googleAccessGuard,
@@ -49,19 +61,17 @@ import {
   writeEnabled,
   type StoreContext,
 } from './restaurant-google.js';
-import {
-  InstagramError,
-  decryptInstagramCredential,
-  instagramCanPublish,
-  instagramConfig,
-  instagramImageUrl,
-  instagramPublish,
-} from '../services/instagram.js';
-
 export const restaurantGooglePosts = new Hono<Env>();
 restaurantGooglePosts.use('/api/restaurant-test/google/*', googleAccessGuard);
 
 const LIST_LIMIT_MAX = 100;
+
+/** 検証では指定されたLINEアカウントの投稿作成だけを許可し、他のGoogle書き込みは停止する。 */
+function postWriteEnabled(env: Env['Bindings'], store: StoreContext): boolean {
+  if (writeEnabled(env)) return true;
+  const testAccountId = env.GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID?.trim();
+  return env.DEPLOY_ENV === 'staging' && !!testAccountId && testAccountId === store.lineAccountId;
+}
 
 type PostStatus = 'draft' | 'scheduled' | 'pending_confirm' | 'accepted' | 'published' | 'rejected' | 'failed' | 'cancelled' | 'deleted';
 type PostFilter = 'all' | 'draft' | 'published' | 'attention' | 'scheduled';
@@ -119,13 +129,30 @@ interface MediaRef {
   sourceUrl: string;
 }
 
-function parseMedia(json: string): MediaRef[] {
+interface MediaOriginals {
+  googleMediaId: string | null;
+  instagramMediaId: string | null;
+}
+
+function parseMediaStorage(json: string): { media: MediaRef[]; originals: MediaOriginals } {
+  const empty: MediaOriginals = { googleMediaId: null, instagramMediaId: null };
   try {
     const parsed = JSON.parse(json) as unknown;
-    return Array.isArray(parsed) ? (parsed as MediaRef[]) : [];
-  } catch {
-    return [];
-  }
+    if (Array.isArray(parsed)) return { media: parsed as MediaRef[], originals: empty };
+    if (!parsed || typeof parsed !== 'object') return { media: [], originals: empty };
+    const stored = parsed as { media?: unknown; originals?: Record<string, unknown> };
+    return {
+      media: Array.isArray(stored.media) ? stored.media as MediaRef[] : [],
+      originals: {
+        googleMediaId: typeof stored.originals?.googleMediaId === 'string' ? stored.originals.googleMediaId : null,
+        instagramMediaId: typeof stored.originals?.instagramMediaId === 'string' ? stored.originals.instagramMediaId : null,
+      },
+    };
+  } catch { return { media: [], originals: empty }; }
+}
+
+function parseMedia(json: string): MediaRef[] {
+  return parseMediaStorage(json).media;
 }
 
 /** Google側から届いた画像URL（sourceUrl）を media_json 用に変換する。Google発の画像には社内の登録メディアIDが無い。 */
@@ -154,12 +181,10 @@ function draftFromRow(row: PostRow): PostDraft {
 }
 
 /**
- * Instagram 同時投稿の見え方（★V8-B `U1X7T2`・`HEEN9`／2026-10-07 承認）。
- * 画面のことばは「なし／済み／失敗」の3つだけなので、DBの5値をそこへ畳む。
- * 送信前（出す設定だがまだ結果が無い）は札を出さないので 'none' で足りる。
- * この口は同時投稿に対応しているので、つないでいない店でも null は返さず常にこの形を返す。
+ * 画面では同時投稿をなし・済み・失敗の3つで示すため、DB の状態をまとめる。送信前は none とし、未接続の店でも同じ形を返す。設計図 ★V8-B U1X7T2・HEEN9 と照合する。
  */
 function publicInstagram(row: PostRow) {
+  const originals = parseMediaStorage(row.media_json).originals;
   const status =
     row.instagram_status === 'published'
       ? 'published'
@@ -169,6 +194,8 @@ function publicInstagram(row: PostRow) {
   return {
     enabled: row.instagram_enabled === 1,
     caption: row.instagram_caption,
+    mediaId: row.instagram_media_id,
+    originalMediaId: originals.instagramMediaId,
     status,
     permalink: row.instagram_permalink,
     error: row.instagram_error,
@@ -176,6 +203,7 @@ function publicInstagram(row: PostRow) {
 }
 
 function publicPost(row: PostRow) {
+  const storedMedia = parseMediaStorage(row.media_json);
   return {
     id: row.id,
     kind: row.kind,
@@ -188,7 +216,7 @@ function publicPost(row: PostRow) {
         : null,
     cta: row.cta_type && row.cta_type !== 'none' ? { type: row.cta_type, url: row.cta_url } : null,
     offer: row.kind === 'offer' ? { couponCode: row.coupon_code, redeemOnlineUrl: row.redeem_online_url, termsConditions: row.terms_conditions } : null,
-    media: parseMedia(row.media_json),
+    media: storedMedia.media.map((item) => ({ ...item, originalMediaId: storedMedia.originals.googleMediaId })),
     instagram: publicInstagram(row),
     publishMode: row.publish_mode,
     status: row.status,
@@ -230,8 +258,9 @@ interface DraftInput {
   cta: PostCta | null;
   offer: PostOffer | null;
   mediaId: string | null;
+  mediaOriginalId: string | null;
   /** Instagram へも同時に出すか。`caption` が null なら Google の本文をそのまま使う。 */
-  instagram: { enabled: boolean; caption: string | null };
+  instagram: { enabled: boolean; caption: string | null; mediaId: string | null; originalMediaId: string | null };
 }
 
 function parseDraftInput(body: Record<string, unknown>): DraftInput | null {
@@ -260,12 +289,22 @@ function parseDraftInput(body: Record<string, unknown>): DraftInput | null {
         }
       : null;
   const mediaId = typeof body.mediaId === 'string' && body.mediaId ? body.mediaId : null;
+  const mediaOriginalId = typeof body.mediaOriginalId === 'string' && body.mediaOriginalId ? body.mediaOriginalId : null;
   const rawInstagram = body.instagram as Record<string, unknown> | null | undefined;
   const instagram = {
     enabled: rawInstagram?.enabled === true,
     caption: typeof rawInstagram?.caption === 'string' && rawInstagram.caption.trim() ? rawInstagram.caption.trim() : null,
+    mediaId: typeof rawInstagram?.mediaId === 'string' && rawInstagram.mediaId ? rawInstagram.mediaId : null,
+    originalMediaId: typeof rawInstagram?.originalMediaId === 'string' && rawInstagram.originalMediaId ? rawInstagram.originalMediaId : null,
   };
-  return { kind, summary, title, schedule, cta, offer, mediaId, instagram };
+  return { kind, summary, title, schedule, cta, offer, mediaId, mediaOriginalId, instagram };
+}
+
+function serializeMedia(media: MediaRef[], input: DraftInput): string {
+  return JSON.stringify({ media, originals: {
+    googleMediaId: input.mediaOriginalId,
+    instagramMediaId: input.instagram.enabled ? input.instagram.originalMediaId : null,
+  } });
 }
 
 async function insertDraft(c: Context<Env>, store: StoreContext, input: DraftInput, media: MediaRef[]): Promise<PostRow> {
@@ -294,10 +333,10 @@ async function insertDraft(c: Context<Env>, store: StoreContext, input: DraftInp
       input.offer?.couponCode ?? null,
       input.offer?.redeemOnlineUrl ?? null,
       input.offer?.termsConditions ?? null,
-      JSON.stringify(media),
+      serializeMedia(media, input),
       input.instagram.enabled ? 1 : 0,
       input.instagram.caption,
-      input.instagram.enabled ? input.mediaId : null,
+      input.instagram.enabled ? (input.instagram.mediaId ?? input.mediaId) : null,
       staff?.id ?? null,
       staff?.name ?? null,
     )
@@ -327,10 +366,10 @@ async function updateDraft(c: Context<Env>, store: StoreContext, id: string, inp
       input.offer?.couponCode ?? null,
       input.offer?.redeemOnlineUrl ?? null,
       input.offer?.termsConditions ?? null,
-      JSON.stringify(media),
+      serializeMedia(media, input),
       input.instagram.enabled ? 1 : 0,
       input.instagram.caption,
-      input.instagram.enabled ? input.mediaId : null,
+      input.instagram.enabled ? (input.instagram.mediaId ?? input.mediaId) : null,
       nowIso(),
       id,
       store.id,
@@ -392,10 +431,8 @@ interface InstagramConnectionRow {
 }
 
 /**
- * Google へ出したあと、同じ写真と文章を Instagram へも出す（★V8-B `U1X7T2`・`HEEN9`／2026-10-07 承認）。
- * ここは例外を投げない。Instagram だけ失敗しても Google の公開は残すのが決めごとなので、
- * 失敗はぜんぶ instagram_status / instagram_error に書くだけにして、画面の「Instagram へ再送」へ任せる。
- * Meta の応答本文やトークンは error 列に入れず、自前のコードだけを残す。
+ * Instagram だけの失敗で Google の公開まで取り消さないよう、例外を投げず instagram_status / instagram_error に分類済みの結果を保存する。
+ * 再送は画面から行い、Meta の応答本文やトークンは error 列へ入れない。設計図 ★V8-B U1X7T2・HEEN9 と照合する。
  */
 async function crossPostToInstagram(c: Context<Env>, store: StoreContext, row: PostRow): Promise<void> {
   try {
@@ -441,6 +478,18 @@ async function crossPostToInstagram(c: Context<Env>, store: StoreContext, row: P
     });
   } catch (error) {
     const code = error instanceof InstagramError ? error.code : 'instagram_failed';
+    const detail = error instanceof InstagramError ? instagramUrlDetail(error.detail) : null;
+    const status = /(?:^| )status=([0-9]{3})(?= |$)/.exec(detail ?? '');
+    const upstreamCode = /(?:^| )code=([0-9]{1,9})(?= |$)/.exec(detail ?? '');
+    const upstreamSubcode = /(?:^| )subcode=([0-9]{1,9})(?= |$)/.exec(detail ?? '');
+    const stage = detail?.includes('/media_publish') ? 'publish' : detail?.includes('/media') ? 'container' : 'other';
+    logger.warn(stage === 'publish' ? 'instagram.cross_post.publish.failed'
+      : stage === 'container' ? 'instagram.cross_post.container.failed'
+        : 'instagram.cross_post.other.failed', {
+      status: status ? Number(status[1]) : undefined,
+      upstreamCode: upstreamCode ? Number(upstreamCode[1]) : undefined,
+      upstreamSubcode: upstreamSubcode ? Number(upstreamSubcode[1]) : undefined,
+    });
     await setStatus(c, store.id, row.id, { instagramStatus: 'failed', instagramError: code, instagramPermalink: null });
   }
 }
@@ -448,7 +497,7 @@ async function crossPostToInstagram(c: Context<Env>, store: StoreContext, row: P
 /** 下書き保存のときの Instagram 側の決まり（画面の検証と同じ内容をサーバーでも見る）。 */
 function instagramDraftError(input: DraftInput): string | null {
   if (!input.instagram.enabled) return null;
-  if (!input.mediaId) return 'Instagram にも投稿するときは、画像を1枚選んでください';
+  if (!input.instagram.mediaId && !input.mediaId) return 'Instagram にも投稿するときは、画像を1枚選んでください';
   if (input.instagram.caption && input.instagram.caption.length > 2200)
     return 'Instagram 用の文章は2,200文字までです';
   return null;
@@ -461,8 +510,7 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts', async (c) => {
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const filter = (c.req.query('filter') ?? 'all') as PostFilter;
   const kind = c.req.query('kind') ?? 'all';
-  const page = Math.max(1, Number.parseInt(c.req.query('page') ?? '1', 10) || 1);
-  const perPage = Math.min(LIST_LIMIT_MAX, Math.max(1, Number.parseInt(c.req.query('per_page') ?? '20', 10) || 20));
+  const { page, limit: perPage } = parseOffsetPaging({ limit: c.req.query('per_page'), page: c.req.query('page') }, { defaultLimit: 20, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: LIST_LIMIT_MAX }, pagePolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1 } });
 
   const rows = (await dbFor(c.env, store.id).prepare('SELECT * FROM rt_google_posts WHERE store_id = ? ORDER BY created_at DESC LIMIT 1000').bind(store.id).all<PostRow>()).results;
 
@@ -474,7 +522,7 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts', async (c) => {
     (filter === 'attention' && (r.status === 'rejected' || r.status === 'failed')) ||
     (filter === 'scheduled' && r.status === 'scheduled');
   // deleted（Googleから消えた／削除した）も「すべて」には残す。理由が分からないまま消えたように
-  // 見えないようにするため（GB-17統合前はこの一覧だけが唯一の記録）。
+  // 見えないようにするため。
   const filtered = rows.filter((r) => byKind(r) && byFilter(r));
   const counts = {
     all: rows.length,
@@ -484,16 +532,15 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts', async (c) => {
     scheduled: rows.filter((r) => r.status === 'scheduled').length,
   };
   const staff = c.get('staff');
-  return c.json({
-    success: true,
-    posts: filtered.slice((page - 1) * perPage, page * perPage).map(publicPost),
+  const responseItems = filtered.slice((page - 1) * perPage, page * perPage).map(publicPost);
+  return c.json(buildOffsetListResponse({ success: true,
+    posts: responseItems,
     total: filtered.length,
     page,
     perPage,
     counts,
-    writeEnabled: writeEnabled(c.env),
-    permissions: { canPublish: staff?.role === 'owner' || staff?.role === 'admin' },
-  });
+    writeEnabled: postWriteEnabled(c.env, store),
+    permissions: { canPublish: staff?.role === 'owner' || staff?.role === 'admin' }, items: responseItems, paging: { limit: perPage, offset: (page - 1) * perPage }, sort: [{ field: 'createdAt', direction: 'desc' }] }));
 });
 
 // ---------- 取り込み（sync） ----------
@@ -583,7 +630,7 @@ export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string
   }
 }
 
-restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', async (c) => {
+restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', inputJsonBoundary(), async (c) => {
   const ctx = await requireConnectedStore(c);
   if (ctx instanceof Response) return ctx;
   const { store, connection } = ctx;
@@ -608,16 +655,33 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', async (c) =
 
 // ---------- 下書き ----------
 
-restaurantGooglePosts.post('/api/restaurant-test/google/posts', async (c) => {
+restaurantGooglePosts.post('/api/restaurant-test/google/posts', inputJsonBoundary({ instagram: ['object', 'null'] }), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
+  const instagramFields = body.instagram && typeof body.instagram === 'object'
+    ? inputShapeErrors(body.instagram as Record<string, unknown>, { enabled: ['boolean'], caption: ['string', 'null'], mediaId: ['string', 'null'], originalMediaId: ['string', 'null'] }) : {};
+  if (Object.keys(instagramFields).length) return fail(c, 400, 'Instagram の入力内容の形式を確認してください', {
+    code: 'invalid_request', fields: Object.fromEntries(Object.entries(instagramFields).map(([key, reason]) => [`instagram.${key}`, reason])),
+  });
   const input = parseDraftInput(body);
-  if (!input) return fail(c, 400, 'kind が不正です', { code: 'invalid_request' });
+  if (!input) return fail(c, 400, 'kind が不正です', { code: 'invalid_request' }, ["kind","summary","title","schedule","cta","offer","mediaId"]);
   const instagramError = instagramDraftError(input);
-  if (instagramError) return fail(c, 400, instagramError, { code: 'invalid_request' });
+  if (instagramError) return fail(c, 400, instagramError, { code: 'invalid_request' }, [!input.instagram.mediaId && !input.mediaId ? 'instagram.mediaId' : 'instagram.caption']);
   const mediaResult = await resolveMedia(c, store, input.mediaId);
   if (!mediaResult.ok) return fail(c, 404, mediaResult.error, { code: 'media_not_found' });
+  if (input.mediaOriginalId && input.mediaOriginalId !== input.mediaId) {
+    const originalMedia = await resolveMedia(c, store, input.mediaOriginalId);
+    if (!originalMedia.ok) return fail(c, 404, originalMedia.error, { code: 'media_not_found' });
+  }
+  if (input.instagram.enabled && input.instagram.mediaId && input.instagram.mediaId !== input.mediaId) {
+    const instagramMedia = await resolveMedia(c, store, input.instagram.mediaId);
+    if (!instagramMedia.ok) return fail(c, 404, instagramMedia.error, { code: 'media_not_found' });
+  }
+  if (input.instagram.enabled && input.instagram.originalMediaId && input.instagram.originalMediaId !== input.instagram.mediaId && input.instagram.originalMediaId !== input.mediaId && input.instagram.originalMediaId !== input.mediaOriginalId) {
+    const originalMedia = await resolveMedia(c, store, input.instagram.originalMediaId);
+    if (!originalMedia.ok) return fail(c, 404, originalMedia.error, { code: 'media_not_found' });
+  }
   const row = await insertDraft(c, store, input, mediaResult.media);
   return c.json({ success: true, post: publicPost(row) });
 });
@@ -632,29 +696,46 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts/:id', async (c) => 
     success: true,
     post: publicPost(row),
     store: { id: store.id, name: store.name },
-    writeEnabled: writeEnabled(c.env),
+    writeEnabled: postWriteEnabled(c.env, store),
     canPublish: staff?.role === 'owner' || staff?.role === 'admin',
   });
 });
 
-restaurantGooglePosts.put('/api/restaurant-test/google/posts/:id', async (c) => {
+restaurantGooglePosts.put('/api/restaurant-test/google/posts/:id', inputJsonBoundary({ instagram: ['object', 'null'] }), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const row = await postFor(c, store.id, c.req.param('id'));
   if (!row) return fail(c, 404, '投稿が見つかりません');
   if (row.status !== 'draft') return fail(c, 409, 'この投稿は編集できません', { code: 'not_editable' });
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
+  const instagramFields = body.instagram && typeof body.instagram === 'object'
+    ? inputShapeErrors(body.instagram as Record<string, unknown>, { enabled: ['boolean'], caption: ['string', 'null'], mediaId: ['string', 'null'], originalMediaId: ['string', 'null'] }) : {};
+  if (Object.keys(instagramFields).length) return fail(c, 400, 'Instagram の入力内容の形式を確認してください', {
+    code: 'invalid_request', fields: Object.fromEntries(Object.entries(instagramFields).map(([key, reason]) => [`instagram.${key}`, reason])),
+  });
   const input = parseDraftInput(body);
-  if (!input) return fail(c, 400, 'kind が不正です', { code: 'invalid_request' });
+  if (!input) return fail(c, 400, 'kind が不正です', { code: 'invalid_request' }, ["kind","summary","title","schedule","cta","offer","mediaId"]);
   const instagramError = instagramDraftError(input);
-  if (instagramError) return fail(c, 400, instagramError, { code: 'invalid_request' });
+  if (instagramError) return fail(c, 400, instagramError, { code: 'invalid_request' }, [!input.instagram.mediaId && !input.mediaId ? 'instagram.mediaId' : 'instagram.caption']);
   const mediaResult = await resolveMedia(c, store, input.mediaId);
   if (!mediaResult.ok) return fail(c, 404, mediaResult.error, { code: 'media_not_found' });
+  if (input.mediaOriginalId && input.mediaOriginalId !== input.mediaId) {
+    const originalMedia = await resolveMedia(c, store, input.mediaOriginalId);
+    if (!originalMedia.ok) return fail(c, 404, originalMedia.error, { code: 'media_not_found' });
+  }
+  if (input.instagram.enabled && input.instagram.mediaId && input.instagram.mediaId !== input.mediaId) {
+    const instagramMedia = await resolveMedia(c, store, input.instagram.mediaId);
+    if (!instagramMedia.ok) return fail(c, 404, instagramMedia.error, { code: 'media_not_found' });
+  }
+  if (input.instagram.enabled && input.instagram.originalMediaId && input.instagram.originalMediaId !== input.instagram.mediaId && input.instagram.originalMediaId !== input.mediaId && input.instagram.originalMediaId !== input.mediaOriginalId) {
+    const originalMedia = await resolveMedia(c, store, input.instagram.originalMediaId);
+    if (!originalMedia.ok) return fail(c, 404, originalMedia.error, { code: 'media_not_found' });
+  }
   await updateDraft(c, store, row.id, input, mediaResult.media);
   return c.json({ success: true, post: publicPost((await postFor(c, store.id, row.id))!) });
 });
 
-restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/cancel', async (c) => {
+restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/cancel', inputJsonBoundary(), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const row = await postFor(c, store.id, c.req.param('id'));
@@ -666,23 +747,23 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/cancel', async
 
 // ---------- 公開 ----------
 
-restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/publish', requireRole('owner', 'admin'), async (c) => {
+restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary({"confirmed":["boolean"]}), async (c) => {
   const ctx = await requireConnectedStore(c);
   if (ctx instanceof Response) return ctx;
   const { store, connection } = ctx;
   const row = await postFor(c, store.id, c.req.param('id'));
   if (!row) return fail(c, 404, '投稿が見つかりません');
   const body = await c.req.json<{ confirmed?: boolean }>().catch(() => ({}) as { confirmed?: boolean });
-  if (body.confirmed !== true) return fail(c, 400, '投稿先・種類・本文の確認が必要です', { code: 'confirmation_required' });
-  if (!writeEnabled(c.env)) return fail(c, 403, 'この環境ではGoogleへ投稿できません', { code: 'write_disabled' });
+  if (body.confirmed !== true) return fail(c, 400, '投稿先・種類・本文の確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
+  if (!postWriteEnabled(c.env, store)) return fail(c, 403, 'この環境ではGoogleへ投稿できません', { code: 'write_disabled' });
   if (row.status === 'published' || row.status === 'accepted') return fail(c, 409, 'この投稿はすでに送信済みです', { code: 'already_sent' });
   if (row.status === 'cancelled' || row.status === 'deleted') return fail(c, 409, 'この投稿は取り消されています', { code: 'cancelled' });
-  if (row.publish_mode === 'scheduled') return fail(c, 400, '日時指定の投稿はこの環境では未対応です', { code: 'not_supported' });
+  if (row.publish_mode === 'scheduled') return fail(c, 400, '日時指定の投稿はこの環境では未対応です', { code: 'not_supported' }, ["store"]);
 
   const timeZone = await storeTimeZone(c, store.id);
   const draft = draftFromRow(row);
   const validated = validatePostDraft(draft, todayIn(timeZone));
-  if (!validated.ok) return fail(c, 400, `投稿の内容を見直してください（${validated.reason}）`, { code: 'invalid_request' });
+  if (!validated.ok) return fail(c, 400, `投稿の内容を見直してください（${validated.reason}）`, { code: 'invalid_request' }, ["store"]);
 
   let options: RequestOptions;
   try {
@@ -751,20 +832,63 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/publish', requ
       return fail(c, 400, `Googleに受け付けられない内容です${detail ? `（${detail}）` : ''}`, {
         code: 'invalid_request',
         post: publicPost((await postFor(c, store.id, row.id))!),
-      });
+      }, []);
     }
     return googleErrorResponse(c, error);
   }
 });
 
-restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requireRole('owner', 'admin'), async (c) => {
+/**
+ * Instagram へ再送する（★V8-B `sKbNq` の「Instagram 失敗・再試行」から呼ばれる口）。
+ * Google はもう公開済みなので触らない。出すのは Instagram だけ。
+ */
+restaurantGooglePosts.post(
+  '/api/restaurant-test/google/posts/:id/instagram/retry',
+  requireRole('owner', 'admin'),
+  inputJsonBoundary(),
+  async (c) => {
+    const store = await storeFor(c);
+    if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
+    const row = await postFor(c, store.id, c.req.param('id'));
+    if (!row) return fail(c, 404, '投稿が見つかりません');
+    if (!postWriteEnabled(c.env, store)) return fail(c, 403, 'この環境では投稿できません', { code: 'write_disabled' });
+    if (row.instagram_enabled !== 1)
+      return fail(c, 409, 'この投稿は Instagram へ出さない設定です', { code: 'instagram_disabled' });
+    if (!row.google_post_name)
+      return fail(c, 409, 'まだ Google ビジネスへ公開されていません', { code: 'not_published' });
+    if (row.instagram_status !== 'failed' && row.instagram_status !== 'skipped')
+      return fail(c, 409, 'Instagram へ再送できる状態ではありません', { code: 'not_retryable' });
+    if (row.instagram_error === 'instagram_publish_result_unknown')
+      return fail(c, 409, '公開結果を確認できないため、Instagram上の投稿を確認してください', { code: 'publish_result_unknown' });
+    const claim = await dbFor(c.env, store.id)
+      .prepare(`UPDATE rt_google_posts SET instagram_status = 'pending', instagram_error = NULL, updated_at = ?
+        WHERE id = ? AND store_id = ? AND instagram_enabled = 1 AND google_post_name IS NOT NULL
+          AND instagram_status IN ('failed', 'skipped')
+          AND (instagram_error IS NULL OR instagram_error != 'instagram_publish_result_unknown')`)
+      .bind(nowIso(), row.id, store.id)
+      .run();
+    if (claim.meta.changes !== 1)
+      return fail(c, 409, 'Instagram への再送はすでに始まっています', { code: 'not_retryable' });
+    await crossPostToInstagram(c, store, row);
+    const updated = (await postFor(c, store.id, row.id))!;
+    auditLog(
+      c,
+      'restaurant.google.post.instagram_retry',
+      { id: row.id, kind: 'rt_google_post' },
+      { result: updated.instagram_status === 'published' ? 'success' : 'failed', lineAccountId: store.lineAccountId },
+    );
+    return c.json({ success: true, post: publicPost(updated) });
+  },
+);
+
+restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requireRole('owner', 'admin'), inputJsonBoundary({"confirmed":["boolean"]}), async (c) => {
   const ctx = await requireConnectedStore(c);
   if (ctx instanceof Response) return ctx;
   const { store, connection } = ctx;
   const row = await postFor(c, store.id, c.req.param('id'));
   if (!row) return fail(c, 404, '投稿が見つかりません');
   const body = await c.req.json<{ confirmed?: boolean }>().catch(() => ({}) as { confirmed?: boolean });
-  if (body.confirmed !== true) return fail(c, 400, '削除の確認が必要です', { code: 'confirmation_required' });
+  if (body.confirmed !== true) return fail(c, 400, '削除の確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
   if (!writeEnabled(c.env)) return fail(c, 403, 'この環境ではGoogleを操作できません', { code: 'write_disabled' });
   if (!row.google_post_name) return fail(c, 409, 'まだGoogleへ公開されていません', { code: 'not_published' });
 
@@ -788,34 +912,3 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requi
     return googleErrorResponse(c, error);
   }
 });
-
-/**
- * Instagram へ再送する（★V8-B `sKbNq` の「Instagram 失敗・再試行」から呼ばれる口）。
- * Google はもう公開済みなので触らない。出すのは Instagram だけ。
- */
-restaurantGooglePosts.post(
-  '/api/restaurant-test/google/posts/:id/instagram/retry',
-  requireRole('owner', 'admin'),
-  async (c) => {
-    const store = await storeFor(c);
-    if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
-    const row = await postFor(c, store.id, c.req.param('id'));
-    if (!row) return fail(c, 404, '投稿が見つかりません');
-    if (!writeEnabled(c.env)) return fail(c, 403, 'この環境では投稿できません', { code: 'write_disabled' });
-    if (row.instagram_enabled !== 1)
-      return fail(c, 409, 'この投稿は Instagram へ出さない設定です', { code: 'instagram_disabled' });
-    if (!row.google_post_name)
-      return fail(c, 409, 'まだ Google ビジネスへ公開されていません', { code: 'not_published' });
-    if (row.instagram_status !== 'failed' && row.instagram_status !== 'skipped')
-      return fail(c, 409, 'Instagram へ再送できる状態ではありません', { code: 'not_retryable' });
-    await crossPostToInstagram(c, store, row);
-    const updated = (await postFor(c, store.id, row.id))!;
-    auditLog(
-      c,
-      'restaurant.google.post.instagram_retry',
-      { id: row.id, kind: 'rt_google_post' },
-      { result: updated.instagram_status === 'published' ? 'success' : 'failed', lineAccountId: store.lineAccountId },
-    );
-    return c.json({ success: true, post: publicPost(updated) });
-  },
-);

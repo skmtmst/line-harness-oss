@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { cleanup, render, waitFor } from '@testing-library/react'
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 let PoolsPage: typeof import('./page').default
 let FeatureDisabledGate: typeof import('@/components/feature-disabled-gate').default
@@ -28,12 +28,14 @@ const FEATURE_OFF = () => new Response(JSON.stringify({
 }), { status: 403 })
 
 describe('プール管理の直URL(#860)', () => {
+  beforeEach(() => window.history.replaceState(null, '', '/pools'))
   afterEach(() => {
     cleanup()
     vi.unstubAllGlobals()
+    window.history.replaceState(null, '', '/')
   })
 
-  it('機能offでAPIが403 FEATURE_DISABLEDを返すと、共通ゲートが機能設定への案内へ切り替える', async () => {
+  it('設定内のプール管理で補助APIが403でも、設定画面全体は閉じない', async () => {
     stubFetch((path) => path.startsWith('/api/traffic-pools')
       ? FEATURE_OFF()
       : new Response(JSON.stringify({ success: true, data: [] }), { status: 200 }))
@@ -43,14 +45,13 @@ describe('プール管理の直URL(#860)', () => {
     )
 
     await waitFor(() => {
-      expect(view.getByText('この機能は設定でオフになっています')).toBeTruthy()
-      expect(view.getByText('機能設定を開く')).toBeTruthy()
+      expect(view.getByText('プール一覧を読み込めませんでした')).toBeTruthy()
     })
-    // プールの管理UIは出ない（読み込み中にも留まらない）。
-    expect(view.queryByText('＋ プールをつくる')).toBeNull()
+    // 設定への導線は残し、補助APIの停止で共通ゲートを発動させない。
+    expect(view.getByText('新規プール')).toBeTruthy()
     expect(view.queryByText('まだプールがありません')).toBeNull()
     expect(view.queryByText('読み込んでいます')).toBeNull()
-    expect(view.container.querySelector('[data-feature-disabled="multi_store_hierarchy"]')).toBeTruthy()
+    expect(view.container.querySelector('[data-feature-disabled="multi_store_hierarchy"]')).toBeNull()
   })
 
   it('機能onなら通常どおり一覧と新規作成口を出す', async () => {
@@ -79,7 +80,12 @@ describe('プール管理の直URL(#860)', () => {
     )
 
     await waitFor(() => expect(view.getByText('メインプール')).toBeTruthy())
-    expect(view.getByText('＋ プールをつくる')).toBeTruthy()
+    expect(view.getByText('新規プール')).toBeTruthy()
     expect(view.queryByText('この機能は設定でオフになっています')).toBeNull()
   })
 })
+
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())

@@ -103,7 +103,7 @@ describe('getAvailability の実DB E2E（NY）', () => {
   test('UTC より遅れた店舗の夜の予約も、既存予約の取得範囲に入る', async () => {
     // NY 10/10 21:00 は 10/11 01:00Z。暦日を UTC の 00:00 と見なして
     // 前後 1 日を足す取り方だと `starts_at < 10/11 00:00Z` に当たらず、
-    // 埋まっているのに空き枠として出ていた（#651 の夜間二重予約）。
+    // 埋まっているのに空き枠として出ていた（ の夜間二重予約）。
     sqlite.exec(`
       UPDATE staff_shifts SET start_time = '19:00', end_time = '23:00'
        WHERE id = 'shift-ny-2';
@@ -125,9 +125,9 @@ describe('getAvailability の実DB E2E（NY）', () => {
       minLeadTimeMinutes: 0,
     });
     const starts = result.by_staff[0].slots.map((slot) => slot.start);
-    // R314: この店舗の booking_settings は枠間隔の指定なしで作るため
+    // この店舗の booking_settings は枠間隔の指定なしで作るため
     // DB 既定の 15 分（migrations/323・bootstrap.sql DEFAULT 15）が使われる。
-    // 実装の読み取りは正しく、期待の方が 30 分固定の古い値だったので直す。
+    // 枠の間隔は固定30分にせず、設定された値に従うことを確かめる。
     expect(starts).toEqual(['19:00', '19:15', '19:30', '19:45', '20:00', '22:00']);
     expect(starts).not.toContain('21:00');
   });

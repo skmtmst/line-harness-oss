@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import type { AutoReply, AutoReplyDraftSettings, AutoReplyVersionRow } from '@line-crm/db';
+
 
 const mocks = vi.hoisted(() => ({
   getAutoReplies: vi.fn(),
@@ -138,13 +139,10 @@ vi.mock('@line-crm/db', () => ({
   saveAutoReplyDraftVersion: mocks.saveAutoReplyDraftVersion,
   jstNow: () => '2026-08-30T10:00:00.000',
 }));
-vi.mock('../middleware/role-guard.js', () => ({
-  requireRole: () => async (_c: unknown, next: () => Promise<void>) => next(),
-}));
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: mocks.canAccessAllLineAccounts,
 }));
-vi.mock('../services/auto-reply.js', () => ({
+vi.mock('../features/auto-replies/auto-reply.js', () => ({
   compareAutoReplyCandidates: (a: AutoReply, b: AutoReply) => Number(a.line_account_id === null)
     - Number(b.line_account_id === null)
     || a.priority - b.priority
@@ -156,7 +154,7 @@ vi.mock('../services/auto-reply.js', () => ({
   previewAutoReplyContent: mocks.previewAutoReplyContent,
   resolveKeywordRules: (item: AutoReply) => [{ keyword: item.keyword, matchType: item.match_type }],
 }));
-vi.mock('../services/auto-reply-conditions.js', () => ({
+vi.mock('../features/auto-replies/auto-reply-conditions.js', () => ({
   isOperatorHandling: mocks.isOperatorHandling,
 }));
 
@@ -201,6 +199,7 @@ beforeEach(() => {
   mocks.getAutoReplyDraftVersion.mockResolvedValue(version());
   mocks.createAutoReplyWithDraftVersion.mockResolvedValue({ rule: current, version: version() });
   mocks.saveAutoReplyDraftVersion.mockResolvedValue(version());
+  mocks.recordAutoReplyDraftTest.mockResolvedValue({ applied: true });
   mocks.getTemplateById.mockResolvedValue(null);
   mocks.getAutoReplyHitCountSince.mockResolvedValue(214);
   mocks.canAccessAllLineAccounts.mockResolvedValue(true);
@@ -309,7 +308,7 @@ describe('自動応答の試験と公開', () => {
     expect(mocks.recordAutoReplyDraftTest).toHaveBeenCalledWith(db, 'version-draft', {
       succeeded: true,
       staffId: 'staff-a',
-    });
+    }, JSON.stringify(settings()));
     expect(mocks.publishAutoReplyDraftVersion).not.toHaveBeenCalled();
   });
 
@@ -393,6 +392,10 @@ describe('自動応答の試験と公開', () => {
     expect(mocks.publishAutoReplyDraftVersion).toHaveBeenCalledWith(db, 'rule-draft', {
       staffId: 'staff-a',
       idempotencyKey: 'publish-test-0002',
+      // m26c /: 公開前チェック時の内容と停止状態を渡す。
+      expectedSnapshot: JSON.stringify(settings()),
+      expectedStoppedAt: null,
+      expectedIsActive: 1,
     });
   });
 

@@ -3,17 +3,8 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  createAutoReplyWithDraftVersion,
-  ensureAutoReplyPublishedVersion,
-  getAutoReplyDraftVersion,
-  getAutoReplyPublishedVersion,
-  parseAutoReplyVersionSettings,
-  publishAutoReplyDraftVersion,
-  recordAutoReplyDraftTest,
-  saveAutoReplyDraftVersion,
-  type AutoReplyDraftSettings,
-} from '../src/auto-reply-runs.js';
+import { createAutoReplyWithDraftVersion, ensureAutoReplyPublishedVersion, getAutoReplyDraftVersion, getAutoReplyPublishedVersion, parseAutoReplyVersionSettings, publishAutoReplyDraftVersion, recordAutoReplyDraftTest, saveAutoReplyDraftVersion } from '../src/auto-reply-runs.js';
+import { type AutoReplyDraftSettings } from '../src/auto-reply-runs-types.js';
 import { getAutoReplyById } from '../src/auto-replies.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -81,6 +72,23 @@ describe('自動応答の下書き・試験・公開版', () => {
     sqlite = new Database(':memory:');
     sqlite.exec(readFileSync(join(ROOT, 'bootstrap.sql'), 'utf8'));
     db = asD1(sqlite);
+  });
+
+  it('通知とタグ付けの設定を同じ版に保存し、読み直しても変えない', async () => {
+    const actions = JSON.stringify([{actionType:'notify_staff',config:{notificationRuleId:'r',notificationRuleVersion:2,message:'受信箱を確認してください'},onFailure:'stop'},{actionType:'tag',config:{op:'add',tagIds:['t']},onFailure:'continue'}]);
+    const created = await createAutoReplyWithDraftVersion(db,settings({actions}));
+    const reread = await getAutoReplyDraftVersion(db,created.rule.id);
+    expect(parseAutoReplyVersionSettings(reread!).actions).toBe(actions);
+  });
+
+  it('公開した待ち時間・受信経路・キーワードの当て方を読み直しても失わない',async()=>{
+    const created=await createAutoReplyWithDraftVersion(db,settings({normalizeKeywords:false,receiveSources:['email'],replyDelaySeconds:60,unmatchedAction:JSON.stringify({type:'notify_operator'})}));
+    await recordAutoReplyDraftTest(db,created.version.id,{succeeded:true,staffId:'staff-1'});
+    const published=await publishAutoReplyDraftVersion(db,created.rule.id,{staffId:'staff-1',idempotencyKey:'settings'});
+    const row=await getAutoReplyById(db,created.rule.id);
+    const runtime=await ensureAutoReplyPublishedVersion(db,row!);
+    expect(runtime.id).toBe(published.id);
+    expect(parseAutoReplyVersionSettings(runtime)).toMatchObject({normalizeKeywords:false,receiveSources:['email'],replyDelaySeconds:60});
   });
 
   it('新規下書きは自動応答を動かさず、公開版も作らない', async () => {

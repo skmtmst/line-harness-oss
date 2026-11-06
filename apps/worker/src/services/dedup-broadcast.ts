@@ -1,31 +1,11 @@
+import { logger } from '@line-crm/shared/server';
+import { parseProgress } from './dedup-broadcast-progress.js';
+import type { DedupPreviewPerAccount, DedupPreviewResult, DedupProgress } from './dedup-broadcast-progress.js';
+export type { DedupPreviewPerAccount, DedupPreviewResult } from './dedup-broadcast-progress.js';
+import { recordSuppressedBroadcastRecipients, suppressedFriendIds } from '@line-crm/db/src/friend-delivery-consents.js';
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { holdMissingBroadcastAudience } from '../features/broadcasts/broadcast-audience-snapshot/index.js';
 import { URL_TOKEN_SQL } from '../lib/url-token.js';
-
-export interface DedupPreviewPerAccount {
-  accountId: string;
-  accountName: string;
-  accountCountry: string | null;
-  selectedCount: number;
-  sendCount: number;
-  excludedToHigherPriority: number;
-  // identKey: dedup の正規化 ID (URL_TOKEN_SQL / 'uid:'||user_id / 'solo:'||friend_id)。
-  // resume 時の send 済判定に使う。lineUserId はプロバイダ単位のID なので、
-  // 同じ論理人物が別 LINE 公式アカウント (別プロバイダ) にいる場合に二重配信
-  // する事故を防ぐため、cross-account でユニークな identKey を採用する。
-  recipients: Array<{
-    friendId: string;
-    lineUserId: string;
-    identKey: string;
-    displayName: string | null;
-  }>;
-}
-
-export interface DedupPreviewResult {
-  totalSelected: number;
-  uniqueRecipients: number;
-  reduction: number;
-  reductionRate: number;
-  perAccount: DedupPreviewPerAccount[];
-}
 
 interface RankedRow {
   friend_id: string;
@@ -35,20 +15,7 @@ interface RankedRow {
   display_name: string | null;
 }
 
-/**
- * Compute the per-account dedup preview for a multi-account broadcast.
- * Same function called from preview API and send executor — guarantees that
- * displayed numbers and actually-sent numbers are computed identically (modulo
- * live data drift between preview and send time, which is intentional design).
- *
- * Single SQL with WITH/ROW_NUMBER OVER does the dedup in the DB layer; JS
- * only aggregates per-account. This relies on production D1 supporting
- * ROW_NUMBER() OVER PARTITION BY (SQLite 3.25+; D1 is 3.45+).
- *
- * Filters: is_following=1 AND line_account_id IS NOT NULL.
- * identity_key: COALESCE(URL_TOKEN_SQL, 'uid:'||user_id, 'solo:'||id).
- * Tie-breaking: priority CASE first, created_at ASC second.
- */
+/** プレビューと送信で同じ計算法を使い、送信時の実データで対象を再計算する。DB の ROW_NUMBER で本人ごとに優先アカウント・作成順から1件を選び、JS はアカウント別の集計だけを行う。フォロー中で所属のある友だちだけを対象にする。 */
 export async function computeDedupBroadcastPreview(
   db: D1Database,
   accountIds: string[],
@@ -61,16 +28,14 @@ export async function computeDedupBroadcastPreview(
 
   const priority = dedupPriority.filter((id) => accountIds.includes(id));
 
-  const inPlaceholders = accountIds.map(() => '?').join(', ');
+  const inPlaceholders = sqlIdSet(accountIds).sql;
 
-  const caseWhens = priority.map((_, i) => `WHEN ? THEN ${i}`).join(' ');
   const caseExpr = priority.length === 0
     ? '999'
-    : `CASE line_account_id ${caseWhens} ELSE 999 END`;
+    : `COALESCE((SELECT CAST(key AS INTEGER) FROM json_each(?)
+        WHERE value = line_account_id ORDER BY CAST(key AS INTEGER) LIMIT 1), 999)`;
 
-  // Tag filter — applied identically to both selectedCount and ranked queries
-  // so the "selected" denominator and the dedup numerator share the same
-  // population. Empty/null targetTagId means "no tag filter".
+  // 分母と重複除外後の母集団がずれないよう、タグ条件を両方の問い合わせへ同じく適用する。空指定は制限なし。
   const hasTagFilter = !!targetTagId;
   const tagJoinForSelectedCount = hasTagFilter
     ? `AND EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = friends.id AND ft.tag_id = ?)`
@@ -79,7 +44,7 @@ export async function computeDedupBroadcastPreview(
     ? `AND EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)`
     : '';
 
-  // Per-account selectedCount.
+
   const selectedCountSql = `
     SELECT line_account_id, COUNT(*) AS cnt
     FROM friends
@@ -90,8 +55,8 @@ export async function computeDedupBroadcastPreview(
     GROUP BY line_account_id
   `;
   const selectedCountBinds = hasTagFilter
-    ? [...accountIds, targetTagId]
-    : [...accountIds];
+    ? [...sqlIdSet(accountIds).binds, targetTagId]
+    : [...sqlIdSet(accountIds).binds];
   const selectedCounts = await db
     .prepare(selectedCountSql)
     .bind(...selectedCountBinds)
@@ -103,7 +68,7 @@ export async function computeDedupBroadcastPreview(
   }
   const totalSelected = (selectedCounts.results ?? []).reduce((sum, r) => sum + r.cnt, 0);
 
-  // Ranked query: returns only the rn=1 rows (primary recipients).
+
   const rankedSql = `
     WITH selected AS (
       SELECT
@@ -132,18 +97,16 @@ export async function computeDedupBroadcastPreview(
     WHERE rn = 1
     ORDER BY line_account_id, created_at
   `;
-  // Bind order matches placeholder order in the SQL: accountIds (for IN), then
-  // tag filter (if any) inside the `selected` CTE, then priority (for the CASE
-  // in ORDER BY of the `ranked` CTE).
+  // SQL の出現順に、対象アカウント、タグ条件、優先順 JSON をバインドする。
   const rankedBinds = hasTagFilter
-    ? [...accountIds, targetTagId, ...priority]
-    : [...accountIds, ...priority];
+    ? [...sqlIdSet(accountIds).binds, targetTagId, ...(priority.length ? [JSON.stringify(priority)] : [])]
+    : [...sqlIdSet(accountIds).binds, ...(priority.length ? [JSON.stringify(priority)] : [])];
   const rankedRows = await db
     .prepare(rankedSql)
     .bind(...rankedBinds)
     .all<RankedRow>();
 
-  // Aggregate per-account.
+
   const sendCountByAccount = new Map<string, RankedRow[]>();
   for (const row of rankedRows.results ?? []) {
     const list = sendCountByAccount.get(row.line_account_id) ?? [];
@@ -155,11 +118,11 @@ export async function computeDedupBroadcastPreview(
   const reduction = totalSelected - uniqueRecipients;
   const reductionRate = totalSelected > 0 ? reduction / totalSelected : 0;
 
-  // Per-account meta.
+
   const accountMetaSql = `SELECT id, name, country FROM line_accounts WHERE id IN (${inPlaceholders})`;
   const metaRows = await db
     .prepare(accountMetaSql)
-    .bind(...accountIds)
+    .bind(...sqlIdSet(accountIds).binds)
     .all<{ id: string; name: string; country: string | null }>();
   const metaByAccount = new Map<string, { name: string; country: string | null }>();
   for (const r of metaRows.results ?? []) {
@@ -203,9 +166,9 @@ import {
   isOperationCapabilityStopped,
 } from '@line-crm/db';
 import { calculateStaggerDelay, sleep } from './stealth.js';
-import { createBroadcastRetryKey } from './broadcast-retry-key.js';
-import { processBroadcastAfterActions } from './broadcast-after-actions.js';
-import { classifyDeliveryFailure, deliveryErrorCode } from './broadcast-delivery-outcome.js';
+import { createBroadcastRetryKey } from '../features/broadcasts/broadcast-retry-key/index.js';
+import { processBroadcastAfterActions } from '../features/broadcasts/broadcast-after-actions/index.js';
+import { classifyDeliveryFailure, deliveryErrorCode } from '../features/broadcasts/broadcast-delivery-outcome/index.js';
 import {
   assertMessagePartsResolved,
   buildMessages,
@@ -215,7 +178,7 @@ import {
   renderMessageParts,
   varyTextMessages,
   type BroadcastMessagePart,
-} from './broadcast-message-set.js';
+} from '../features/broadcasts/broadcast-message-set/index.js';
 import {
   commonVarValuesForAccount,
   parseBroadcastCommonVarSnapshot,
@@ -238,7 +201,7 @@ export interface ProcessMultiAccountDedupResult {
   // caller は status='sent' にせず batch_offset=0 に戻して次の cron tick に継続させる。
   // true = 全 account を送り切った (= 完了)。caller が status='sent' にする。
   complete: boolean;
-  // 運用者が停止を押したので束の切れ目で降りた (#662)。complete=false と同じく
+  // 運用者が停止を押したので束の切れ目で降りた。complete=false と同じく
   // caller は status='sent' にしない。再開するまで queue は拾わない。
   stopped: boolean;
 }
@@ -250,68 +213,6 @@ export interface ProcessMultiAccountDedupResult {
 // 時点から更に 1 batch 分 (最大 ~5s sleep + multicast) はみ出し得る。それを見込んで Worker
 // CPU 制限 (約30s) に対し十分な余裕を取った 10s に設定する (実効ロック保持は最大 ~15-18s)。
 const MAX_RUN_MS = 10_000;
-
-/**
- * Send a multi-account-dedup broadcast.
- *
- * Called by processBroadcastSend (in broadcast.ts) when
- * broadcast.target_type === 'multi-account-dedup'. Re-runs
- * computeDedupBroadcastPreview at send time (live data, drift from preview by
- * design) to obtain the per-account recipient list, then for each account:
- *   - skip if account is missing or inactive (not a failure)
- *   - send recipients in 500-friend batches with stagger delays
- *   - log per-friend INSERTs into messages_log
- *   - on multicast exception, log the account in failedAccountIds and continue
- *
- * Persists failedAccountIds to broadcasts.failed_account_ids when non-empty.
- * Status determination ('sent' vs 'failed' vs 'sent + partial') is left to
- * the caller (processBroadcastSend) — see broadcast.ts §7.3.
- */
-/**
- * dedup broadcast の resume 用進捗。broadcasts.dedup_progress JSON カラムに保存。
- *
- * sentIdentKeys: dedup の正規化 ID (URL_TOKEN / uid:user_id / solo:friend_id) のうち
- *                既に multicast 済のもの全体集合。**アカウント横断で共有**する。
- *
- * 設計理由:
- *   - per-account の lineUserId 集合だと、resume 時に dedup 勝者が別アカウントに
- *     遷移したケース (account A が unfollow / tag 喪失 → 同じ logical person が
- *     account B で勝者になる) で新しい lineUserId が「未送信扱い」となり、結果
- *     同じ人物に二重配信される。
- *   - identKey は dedup の意味論上ユニークな key なので、横断 set で持てば論理
- *     重複を完全に防げる。
- *
- * 容量見積り: 2000 人 × ~40 文字 (url_token または uid:UUID) = ~80KB。
- * D1 row 1MB 上限内。
- *
- * **スケール限界**: ~25,000 人を超える broadcast では JSON サイズが 1MB を超え、
- * UPDATE が失敗してその時点で resume 機能が止まる (multicast 自体は LINE 側に
- * 届くが、進捗は記録されない → 完了時に重複扱いになる)。それ以上の規模が
- * 必要になったら別テーブル `broadcast_dedup_progress(broadcast_id, ident_key)` に
- * row 単位で持つ設計へ移行すること (現状は対応せず、コメントで明示)。
- *
- * 安全マージン: 2000-5000 人なら問題なし。10000 人で要監視 (~400KB)。
- */
-interface DedupProgress {
-  sentIdentKeys: string[];
-}
-
-function parseProgress(raw: string | null | undefined): DedupProgress {
-  const empty: DedupProgress = { sentIdentKeys: [] };
-  if (!raw) return empty;
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { sentIdentKeys?: unknown }).sentIdentKeys)) {
-      return {
-        sentIdentKeys: (parsed as { sentIdentKeys: unknown[] }).sentIdentKeys
-          .filter((s): s is string => typeof s === 'string'),
-      };
-    }
-  } catch {
-    // ignore — corrupt JSON は最初からやり直す
-  }
-  return empty;
-}
 
 export async function processMultiAccountDedupBroadcast(
   db: D1Database,
@@ -335,7 +236,7 @@ export async function processMultiAccountDedupBroadcast(
   opts: { maxRunMs?: number; now?: () => number } = {},
 ): Promise<ProcessMultiAccountDedupResult> {
   // 時間バジェット制御 (テストでは clock を注入して yield を決定的に再現できる)。
-  // 変数名は clock — batch ループ内の `const now = jstNow()` (timestamp 文字列) と
+  // 変数名は clock — batch ループ内の `const now = jstNow` (timestamp 文字列) と
   // 衝突させないため。
   const clock = opts.now ?? (() => Date.now());
   const maxRunMs = opts.maxRunMs ?? MAX_RUN_MS;
@@ -344,26 +245,36 @@ export async function processMultiAccountDedupBroadcast(
   // (毎 tick 必ず success_count が伸びる → 永久に同じ所で足踏みしない)。
   let sentAnyBatch = false;
   let timeExceeded = false;
-  // 運用者が停止を押した (#662)。束の切れ目で降りる。
+  // 運用者が停止を押した。束の切れ目で降りる。
   let stopRequested = false;
 
   const accountIds = (broadcast.account_ids ? JSON.parse(broadcast.account_ids) : []) as string[];
   const dedupPriority = (broadcast.dedup_priority ? JSON.parse(broadcast.dedup_priority) : []) as string[];
 
-  const preview = await computeDedupBroadcastPreview(
-    db,
-    accountIds,
-    dedupPriority,
-    broadcast.target_tag_id ?? null,
-  );
-
-  // resume 用の進捗を読み込む。crash した前回の途中状態が入っていれば、
-  // identKey ベースで既送ぶんを除外して残差だけ送る。
   const progress = parseProgress(broadcast.dedup_progress);
+  if (!progress.audience) {
+    const ledger=await db.prepare('SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=?')
+      .bind(broadcast.id).first<{n:number}>();
+    if (await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:0,known:0,
+      started:progress.sentIdentKeys.length>0 || Number(ledger?.n ?? 0)>0})) {
+      return {totalCount:progress.sentIdentKeys.length,successCount:progress.sentIdentKeys.length,
+        failedAccountIds:[],complete:false,stopped:true};
+    }
+  }
+  const preview = progress.audience ?? await computeDedupBroadcastPreview(
+    db, accountIds, dedupPriority, broadcast.target_tag_id ?? null,
+  );
+  if (!progress.audience) {
+    // 当選した友だちと正規IDを、最初の外部送信より先に固定する。
+    progress.audience = preview;
+    await db.prepare('UPDATE broadcasts SET dedup_progress=? WHERE id=?')
+      .bind(JSON.stringify(progress),broadcast.id).run();
+  }
+
   const sentSet = new Set(progress.sentIdentKeys);
 
   /*
-   * 送達台帳（#662）。dedup は identKey で「送った人」を覚えているが、
+   * 送達台帳。dedup は identKey で「送った人」を覚えているが、
    * **送れなかった人・外へ出たか分からない人**は覚えていない。台帳の
    * blocked は送達済み(sent)と送達不明(unknown)の friend_id で、停止をまたいだ
    * 再送で送達不明の相手へ2通目が出るのを防ぐ。identKey の集合と役割が
@@ -380,7 +291,7 @@ export async function processMultiAccountDedupBroadcast(
   const allIdentKeys = new Set<string>(progress.sentIdentKeys);
 
   const failedAccountIds: string[] = [];
-  // 緊急停止 (#1050) で止まっているアカウント。失敗とは別に覚え、
+  // 緊急停止  で止まっているアカウント。失敗とは別に覚え、
   // 残っている間は complete にしない（復旧後に残りを送るため）。
   const heldAccountIds: string[] = [];
 
@@ -402,10 +313,10 @@ export async function processMultiAccountDedupBroadcast(
     if (stopRequested) break; // 停止済み — 新しいアカウントの送信を始めない
     const account = await getLineAccountById(db, accountResult.accountId);
     if (!account || !account.is_active) {
-      console.log(`[multi-account-dedup] skipping inactive/missing account ${accountResult.accountId}`);
+      logger.log("services_dedup_broadcast_log");
       continue;
     }
-    // 緊急停止 (#1050): broadcast_dispatch が止まっているアカウントの束は
+    // 緊急停止 : broadcast_dispatch が止まっているアカウントの束は
     // 始めない。identKey が未送信のまま残るので、復旧後の tick が続きを送る。
     // 他のアカウントは止まっていなければ送る。
     if (await isOperationCapabilityStopped(db, accountResult.accountId, 'broadcast_dispatch')) {
@@ -457,7 +368,7 @@ export async function processMultiAccountDedupBroadcast(
           continue;
         }
       } catch (err) {
-        console.error(`[multi-account-dedup] account ${account.id} failed to load common vars:`, err);
+        logger.error("dedup_broadcast.resolve_account_variables_failed");
         failedAccountIds.push(account.id);
         continue;
       }
@@ -474,9 +385,7 @@ export async function processMultiAccountDedupBroadcast(
         }
       }
       if (missing.size > 0) {
-        console.error(
-          `[multi-account-dedup] account ${account.id} missing common vars: ${[...missing].join(', ')} — skipping without cross-account fallback`,
-        );
+        logger.error("dedup_broadcast.validate_account_variables_failed");
         failedAccountIds.push(account.id);
         continue;
       }
@@ -499,7 +408,11 @@ export async function processMultiAccountDedupBroadcast(
     try {
       for (let i = 0; i < remaining.length; i += deliveryBatchSize) {
         const batchIdx = Math.floor(i / deliveryBatchSize);
-        const batch = remaining.slice(i, i + deliveryBatchSize);
+        const candidates = remaining.slice(i, i + deliveryBatchSize);
+        const suppressed = await suppressedFriendIds(db,candidates.map(r=>r.friendId));
+        await recordSuppressedBroadcastRecipients(db,broadcast.id,[...suppressed]);
+        const batch = candidates.filter(r=>!suppressed.has(r.friendId));
+        if(!batch.length) continue;
 
         // 時間バジェットを超えたら、残りは次の cron tick に回して yield する。
         // ただし最低 1 batch は必ず送る (sentAnyBatch ガード) ことで毎 tick 前進を保証。
@@ -508,9 +421,9 @@ export async function processMultiAccountDedupBroadcast(
           break;
         }
 
-        // 次の束へ進む前に停止を読み直す（#662）。送り終えた束は取り消せない
+        // 次の束へ進む前に停止を読み直す。送り終えた束は取り消せない
         // ので、新しい束を始めないことで止める。
-        // 緊急停止 (#1050) も同じ扱い: broadcast_dispatch が止まった
+        // 緊急停止  も同じ扱い: broadcast_dispatch が止まった
         // アカウントは次の束を始めず、残りは未送信のまま残す。
         if (await isBroadcastStopped(db, broadcast.id) ||
             await isOperationCapabilityStopped(db, account.id, 'broadcast_dispatch')) {
@@ -645,7 +558,7 @@ export async function processMultiAccountDedupBroadcast(
         try {
           await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 100 });
         } catch (afterError) {
-          console.error(`[broadcast] after-actions failed broadcast=${broadcast.id}`, afterError);
+          logger.error("dedup_broadcast.process_after_actions_failed");
         }
         sentAnyBatch = true; // 1 batch 以上 durable に記録した → 前進保証 & yield 可
         if (batchDeliveryError) {
@@ -663,7 +576,7 @@ export async function processMultiAccountDedupBroadcast(
         }
       }
     } catch (err) {
-      console.error(`[multi-account-dedup] account ${account.id} failed:`, err);
+      logger.error("dedup_broadcast.send_account_batch_failed");
       failedAccountIds.push(account.id);
     }
   }
@@ -684,12 +597,8 @@ export async function processMultiAccountDedupBroadcast(
     await updateBroadcastLineRequestId(db, broadcast.id, null, unit);
   }
 
-  // dedup_progress の clear は意図的にここでは行わない。caller (processQueuedBroadcastBatches
-  // など) が updateBroadcastStatus(broadcast.id, 'sent', ...) を呼ぶときに同一 UPDATE で
-  // clear される設計 (db/broadcasts.ts: updateBroadcastStatus 参照)。
-  // この関数の return 後・status='sent' 確定前に Worker crash した場合は dedup_progress
-  // が残ったままで status='sending', batch_offset=-1 になり、recoverStalledBroadcasts が
-  // 再投入して resume → 完走済みアカは batchOffset >= recipients.length で skip → 重複なし。
+  // 完了後も開始時の宛先・既送IDを保持し、失敗した相手の再試行に使う。
+  // status='sent' は回復対象外。送信完了の前に落ちても同じ snapshot で再開する。
   //
   // complete=false (timeExceeded) のときは caller が status='sent' にせず batch_offset=0 に
   // 戻し、次の cron tick が getQueuedBroadcasts で拾って残りを送る (= 分割送信)。

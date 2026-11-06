@@ -2,8 +2,12 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent } from '@testing-library/react'
 import type { WebinarNotificationOverview } from '@/lib/api'
-import WebinarNotifications from './webinar-notifications'
+import WebinarNotifications from '@/test-utils/webinar-notifications'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [] }) }))
 
 /*
  * #745 — 見送りの内訳を画面に出す。
@@ -21,11 +25,11 @@ vi.mock('../../lib/api', async (importOriginal: () => Promise<typeof import('../
   const actual = await importOriginal()
   return {
     ...actual,
-    webinarApi: { ...actual.webinarApi, notifications: (...args: unknown[]) => net.notifications(...args) },
+    webinarApi: { ...actual.webinarApi, actions: async () => ({ data: [] }), editor: async () => ({ data: { version: 2 } }), notifications: (...args: unknown[]) => net.notifications(...args) },
   }
 })
 
-vi.mock('../shared/list-state', () => ({ default: () => null }))
+
 
 const overview = (over: Partial<WebinarNotificationOverview> = {}): WebinarNotificationOverview => ({
   total: 10, pending: 2, sent: 3, failed: 0, skipped: 0, cancelled: 0,
@@ -58,7 +62,7 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-async function show(data: WebinarNotificationOverview) {
+async function show(data: WebinarNotificationOverview | null) {
   net.notifications.mockResolvedValue({ data: { settings, overview: data } })
   await act(async () => {
     root.render(<WebinarNotifications webinarId="w1" />)
@@ -75,22 +79,32 @@ describe('見送りの内訳（#745）', () => {
       ],
     }))
 
-    const panel = host.querySelector('[data-testid="webinar-skip-reasons"]')
+    const panel = host.querySelector('[aria-label="見送りの内訳"]')
     expect(panel, '見送りの内訳が出ていない').not.toBeNull()
     const rows = [...panel!.querySelectorAll('li')].map((li) => li.textContent)
-    expect(rows).toEqual(['対象回が終了済み3件', 'すでに視聴済み1件'])
+    expect(rows).toEqual(['対象回が終了済み3 件', 'すでに視聴済み1 件'])
   })
 
   it('見送りが無いときは枠ごと出さない', async () => {
     /* 常に空の枠があると、誰も見なくなる。 */
     await show(overview({ skipped: 0, skippedReasons: [] }))
-    expect(host.querySelector('[data-testid="webinar-skip-reasons"]')).toBeNull()
+    expect(host.querySelector('[aria-label="見送りの内訳"]')).toBeNull()
   })
 
   it('合計だけで内訳が無いときも、合計は出す', async () => {
     /* 古い返事（内訳を持たない）でも画面が壊れないこと。 */
     await show(overview({ skipped: 2, skippedReasons: [] }))
     expect(host.textContent).toContain('見送り')
-    expect(host.querySelector('[data-testid="webinar-skip-reasons"]')).toBeNull()
+    expect(host.querySelector('[aria-label="見送りの内訳"]')).toBeNull()
+  })
+
+  it('件数を読めていない補足は0件や「—件」と案内しない', async () => {
+    await show(null)
+    fireEvent.click(host.querySelector('button[aria-label="送った数と通知の対象"]')!)
+    const note = host.querySelector('[role="note"]')
+    expect(note?.textContent).toContain('予定 —・取消 —・合計 —')
+    expect(note?.textContent).not.toContain('—件')
+    const values = [...host.querySelectorAll('dl dd')].map((node) => node.textContent)
+    expect(values).toEqual(['—', '—', '—'])
   })
 })

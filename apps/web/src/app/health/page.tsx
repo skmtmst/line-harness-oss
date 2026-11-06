@@ -1,8 +1,12 @@
 'use client'
 
+import { useStaffRole } from '@/lib/staff-role'
+import { PageHeading } from '@/components/templates/page-frame'
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import ListState from '@/components/shared/list-state'
 import Progress from '@/components/shared/progress'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Select from '@/components/shared/select'
@@ -11,6 +15,8 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { parseJstDateTime, shortDateTime } from '@/lib/hq-banners'
 import { ChevronDown } from 'lucide-react'
+import { formatDateTime, formatNumber } from '@/lib/format'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 interface LineAccount {
   id: string
@@ -43,6 +49,7 @@ type AccountHealthState = AccountHealthLog['riskLevel'] | 'unknown' | 'error' | 
 interface AccountHealthSnapshot {
   state: AccountHealthState
   logs: AccountHealthLog[]
+  checkedAt?: string | null
 }
 
 interface AccountHealthResponse {
@@ -88,16 +95,14 @@ function resolveAccountHealth(response: AccountHealthResponse): AccountHealthSna
   if (!response.success) return { state: 'error', logs: [] }
 
   const payload = response.data && typeof response.data === 'object'
-    ? response.data as { riskLevel?: unknown; logs?: unknown }
+    ? response.data as { riskLevel?: unknown; logs?: unknown; connection?: { checkedAt?: unknown } }
     : {}
   const logs = Array.isArray(payload.logs) ? payload.logs as AccountHealthLog[] : []
   const state = isRiskLevel(payload.riskLevel)
     ? payload.riskLevel
-    : isRiskLevel(logs[0]?.riskLevel)
-      ? logs[0].riskLevel
-      : 'unknown'
+    : 'unknown'
 
-  return { state, logs }
+  return { state, logs, checkedAt: typeof payload.connection?.checkedAt === 'string' ? payload.connection.checkedAt : null }
 }
 
 async function loadAccountHealthStates(
@@ -126,6 +131,7 @@ export default function HealthPage() {
   usePageTitle('BAN検知ダッシュボード')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [healthLogs, setHealthLogs] = useState<Record<string, AccountHealthLog[]>>({})
+  const [connectionCheckedAt, setConnectionCheckedAt] = useState<Record<string, string | null>>({})
   const [latestRisk, setLatestRisk] = useState<Record<string, AccountHealthState>>({})
   const [migrations, setMigrations] = useState<AccountMigration[]>([])
   const [migrationLoadState, setMigrationLoadState] = useState<MigrationLoadState>('loading')
@@ -136,10 +142,17 @@ export default function HealthPage() {
   const [migrateToId, setMigrateToId] = useState('')
   const [migrating, setMigrating] = useState(false)
   const [retryingHealthIds, setRetryingHealthIds] = useState<Set<string>>(new Set())
+  /*
+   * M018：アカウント一覧の読み込み失敗は、空（未登録）とは別の状態で持つ。
+   * 失敗なのに「登録されていません」と出すと、障害時に登録作業へ誘導してしまう。
+   */
+  const [accountsError, setAccountsError] = useState<unknown>(null)
+  // M019：移行口は owner 専用（サーバの権限表）。画面側でも役割で出し分ける目安。
+  const role = useStaffRole()
 
   const loadAccounts = useCallback(async () => {
     setLoading(true)
-    setError('')
+    setAccountsError(null)
     try {
       const res = await api.health.accounts()
       if (res.success) {
@@ -152,14 +165,15 @@ export default function HealthPage() {
         setHealthLogs(Object.fromEntries(
           Object.entries(snapshots).map(([accountId, snapshot]) => [accountId, snapshot.logs]),
         ))
+        setConnectionCheckedAt(Object.fromEntries(Object.entries(snapshots).map(([id, snapshot]) => [id, snapshot.checkedAt ?? null])))
         setLatestRisk(Object.fromEntries(
           Object.entries(snapshots).map(([accountId, snapshot]) => [accountId, snapshot.state]),
         ))
       } else {
-        setError('アカウント情報の取得に失敗しました。もう一度読み込んでください。')
+        setAccountsError(new Error(res.error))
       }
-    } catch {
-      setError('アカウント情報の読み込みに失敗しました。もう一度お試しください。')
+    } catch (caught) {
+      setAccountsError(caught)
     } finally {
       setLoading(false)
     }
@@ -173,6 +187,7 @@ export default function HealthPage() {
     )
     const snapshot = snapshots[accountId]
     setHealthLogs((current) => ({ ...current, [accountId]: snapshot.logs }))
+    setConnectionCheckedAt((current) => ({ ...current, [accountId]: snapshot.checkedAt ?? null }))
     setLatestRisk((current) => ({ ...current, [accountId]: snapshot.state }))
     setRetryingHealthIds((current) => {
       const next = new Set(current)
@@ -199,6 +214,10 @@ export default function HealthPage() {
   useEffect(() => {
     loadAccounts()
     loadMigrations()
+    try {
+    } catch {
+      // ストレージが使えなくても画面は出せる
+    }
   }, [loadAccounts, loadMigrations])
 
   const handleExpand = (accountId: string) => {
@@ -214,12 +233,18 @@ export default function HealthPage() {
       setMigrateFrom(null)
       setMigrateToId('')
       loadMigrations()
-    } catch {
-      setError('移行リクエストに失敗しました。通信を確かめて、もう一度お試しください。')
+    } catch (caught) {
+      // M019：一律の汎用文にせず、403 は権限不足として区別する。
+      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '移行', {
+        forbidden: '友だちの移行はオーナーだけができます。オーナーの方に操作してもらってください。',
+      }))
     } finally {
       setMigrating(false)
     }
   }
+
+  // M019：役割が分かっていて owner でないときは移行の入口を出さない。最終の門はサーバ。
+  const canMigrate = role === 'owner'
 
   const getAccountName = (id: string): string => {
     const account = accounts.find((a) => a.id === id)
@@ -228,6 +253,7 @@ export default function HealthPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div><PageHeading title="BAN検知ダッシュボード" /></div>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
 
       {/* Error */}
@@ -238,7 +264,15 @@ export default function HealthPage() {
       {/* Loading */}
       {loading ? (
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
-          読み込み中...
+          読み込み中…
+        </div>
+      ) : accountsError !== null ? (
+        /*
+         * M018：読み込み失敗は「未登録」と出さない。捕まえた失敗を共通部品へ
+         * 渡し、再試行口を出す（403 は権限の案内になり、再試行口は出ない）。
+         */
+        <div className="bg-canvas rounded-card border border-hairline p-8">
+          <ListState kind="error" error={accountsError} onRetry={() => void loadAccounts()} />
         </div>
       ) : accounts.length === 0 ? (
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
@@ -253,9 +287,9 @@ export default function HealthPage() {
               const storedRisk = latestRisk[account.id] ?? 'unknown'
               const isExpanded = expandedId === account.id
               const logs = healthLogs[account.id] || []
-              const latestLog = logs[0] ?? null
+              const checkedAt = connectionCheckedAt[account.id] ?? null
               // R168: 最終確認が古いときは、記録上の結果ではなく「確認が止まっている」を出す。
-              const stale = storedRisk !== 'unknown' && storedRisk !== 'error' && isStaleCheck(latestLog?.createdAt)
+              const stale = storedRisk !== 'unknown' && storedRisk !== 'error' && isStaleCheck(checkedAt)
               const risk: AccountHealthState = stale ? 'stale' : storedRisk
               const config = riskConfig[risk]
               const healthUnavailable = risk === 'unknown' || risk === 'error' || risk === 'stale'
@@ -275,13 +309,13 @@ export default function HealthPage() {
                           <p className="text-xs text-ink-faint">チャネル {account.channelId}</p>
                           {/* R168: いつ確かめた結果かを常に出す。 */}
                           <p className="text-xs text-ink-faint">
-                            最終確認 {latestLog ? shortDateTime(latestLog.createdAt) : '—'}
+                            最終確認 {checkedAt ? shortDateTime(checkedAt) : '—'}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-full ${config.bgColor} ${config.textColor}`}>
-                          <span className={`w-2 h-2 rounded-full ${config.color} ${risk === 'danger' ? 'animate-pulse' : ''}`} />
+                        <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-pill ${config.bgColor} ${config.textColor}`}>
+                          <span className={`w-2 h-2 rounded-pill ${config.color} ${risk === 'danger' ? 'animate-pulse' : ''}`} />
                           {config.label}
                         </span>
                         <ChevronDown aria-hidden="true" className={`size-4 text-ink-faint transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -298,16 +332,16 @@ export default function HealthPage() {
                             {risk === 'error'
                               ? 'ヘルス情報を取得できませんでした。'
                               : risk === 'stale'
-                                ? `最後の確認は ${latestLog ? shortDateTime(latestLog.createdAt) : '—'} です。確認が止まっているため、現在の状態は分かりません（最後の結果は「${latestLog ? riskConfig[latestLog.riskLevel].label : '—'}」）。`
-                                : 'まだ確認結果がありません。'}
+                                ? `最後の確認は ${checkedAt ? shortDateTime(checkedAt) : '—'} です。確認が止まっているため、現在の状態は分かりません（最後の結果は「${storedRisk !== 'unknown' && storedRisk !== 'error' && storedRisk !== 'stale' ? riskConfig[storedRisk].label : '—'}」）。`
+                                : '接続の確認がまだです。'}
                           </p>
                           <button
                             type="button"
                             onClick={() => void retryAccountHealth(account.id)}
                             disabled={retryingHealthIds.has(account.id)}
-                            className="text-action mt-2 text-sm font-medium underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="text-action mt-2 text-sm font-medium underline underline-offset-2 disabled:cursor-not-allowed"
                           >
-                            {retryingHealthIds.has(account.id) ? '再取得中...' : '再試行'}
+                            {retryingHealthIds.has(account.id) ? '再取得中…' : '再試行'}
                           </button>
                         </div>
                       )}
@@ -315,15 +349,20 @@ export default function HealthPage() {
                       {/* 確認が止まっていても、最後の結果が危険なら移行の入口は残す。 */}
                       {storedRisk === 'danger' && (
                         <div className="mb-3">
-                          <button
-                            onClick={() => {
-                              setMigrateFrom(account.id)
-                              setMigrateToId('')
-                            }}
-                            className="px-3 py-1.5 rounded-control text-white text-xs font-medium bg-danger hover:brightness-92 transition-colors"
-                          >
-                            友だちを移行する
-                          </button>
+                          {/*
+                            M019：移行口は owner 専用。押せない役割には
+                            ボタンの代わりに理由を出す（最終の門はサーバ）。
+                          */}
+                          {canMigrate ? (
+                            <Button variant="danger" className="px-3 py-1.5 text-xs font-medium border-0 h-auto whitespace-normal" onClick={() => {
+                                setMigrateFrom(account.id)
+                                setMigrateToId('')
+                              }}>
+                              友だちを移行する
+                            </Button>
+                          ) : (
+                            <p className="text-xs text-ink-secondary">友だちの移行はオーナーだけができます。</p>
+                          )}
                         </div>
                       )}
 
@@ -349,13 +388,13 @@ export default function HealthPage() {
                                     <Td className="text-ink-secondary">{log.errorCount}</Td>
                                     <Td className="text-ink-secondary">{log.checkPeriod}</Td>
                                     <Td>
-                                      <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${logConfig.bgColor} ${logConfig.textColor}`}>
-                                        <span className={`w-1.5 h-1.5 rounded-full ${logConfig.color} ${log.riskLevel === 'danger' ? 'animate-pulse' : ''}`} />
+                                      <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-pill ${logConfig.bgColor} ${logConfig.textColor}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-pill ${logConfig.color} ${log.riskLevel === 'danger' ? 'animate-pulse' : ''}`} />
                                         {logConfig.label}
                                       </span>
                                     </Td>
                                     <Td className="text-ink-faint text-xs">
-                                      {new Date(log.createdAt).toLocaleString('ja-JP')}
+                                      {formatDateTime(log.createdAt)}
                                     </Td>
                                   </Tr>
                                 )
@@ -381,7 +420,7 @@ export default function HealthPage() {
               <form onSubmit={handleMigrate}>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-ink-secondary mb-1">移行先アカウント</label>
-                  <Select size="full"
+                  <EntitySelect size="full"
                     value={migrateToId}
                     onChange={(value) => setMigrateToId(value)}
                     aria-label="移行先アカウント"
@@ -389,7 +428,7 @@ export default function HealthPage() {
                       { value: '', label: '選択してください' },
                       ...accounts
                         .filter((account) => account.id !== migrateFrom && account.isActive)
-                        .map((account) => ({
+                        .map((account) => ({ ...entityOptionMetadata(account),
                           value: account.id,
                           label: `${account.name} (${account.channelId})`,
                         })),
@@ -397,8 +436,7 @@ export default function HealthPage() {
                   />
                 </div>
                 <div className="flex items-center gap-3">
-                  <Button type="submit" variant="primary" disabled={migrating || !migrateToId}>
-                    {migrating ? '移行中...' : '移行を開始'}
+                  <Button type="submit" variant="primary" disabled={migrating || !migrateToId} busy={migrating} busyLabel="移行中…">移行を開始
                   </Button>
                   <Button
                     type="button"
@@ -419,20 +457,19 @@ export default function HealthPage() {
             <h2 className="text-lg font-bold text-ink mb-4">移行履歴</h2>
             {migrationLoadState === 'loading' ? (
               <div className="border-hairline bg-canvas text-ink-faint rounded-card border p-8 text-center">
-                移行履歴を読み込んでいます...
+                移行履歴を読み込んでいます…
               </div>
             ) : migrationLoadState === 'error' ? (
               <Notice
                 tone="danger"
                 message="移行履歴を取得できませんでした。"
                 action={
-                  <button
+                  <Button variant="text" size="inline" data-notice-inline-action
                     type="button"
                     onClick={() => void loadMigrations()}
-                    className="text-sm font-medium underline underline-offset-2"
                   >
                     再読み込み
-                  </button>
+                  </Button>
                 }
               />
             ) : migrations.length === 0 ? (
@@ -454,7 +491,7 @@ export default function HealthPage() {
                     <tbody>
                       {migrations.map((migration) => {
                         const status = statusConfig[migration.status]
-                        const countText = `${migration.migratedCount.toLocaleString('ja-JP')} / ${migration.totalCount.toLocaleString('ja-JP')} 人`
+                        const countText = `${formatNumber(migration.migratedCount)} / ${formatNumber(migration.totalCount)} 人`
                         const percent = migration.totalCount > 0
                           ? (migration.migratedCount / migration.totalCount) * 100
                           : 0
@@ -467,7 +504,7 @@ export default function HealthPage() {
                               {getAccountName(migration.toAccountId)}
                             </Td>
                             <Td>
-                              <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full ${status.bgColor} ${status.textColor}`}>
+                              <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-pill ${status.bgColor} ${status.textColor}`}>
                                 {status.label}
                               </span>
                             </Td>
@@ -493,11 +530,11 @@ export default function HealthPage() {
                               )}
                             </Td>
                             <Td className="text-ink-faint text-xs">
-                              {new Date(migration.createdAt).toLocaleString('ja-JP')}
+                              {formatDateTime(migration.createdAt)}
                             </Td>
                             <Td className="text-ink-faint text-xs">
                               {migration.completedAt
-                                ? new Date(migration.completedAt).toLocaleString('ja-JP')
+                                ? formatDateTime(migration.completedAt)
                                 : '-'}
                             </Td>
                           </Tr>

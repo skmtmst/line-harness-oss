@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyLayout } from '@line-crm/shared'
-import { clearCreationAttempt, creationStorageKey, loadCreationAttempt, persistCreationAttempt } from './hq-template-create-attempt'
+import { clearCreationAttempt, clearEditorDraft, creationStorageKey, editorDraftStorageKey, loadCreationAttempt, loadEditorDraft, persistCreationAttempt, persistEditorDraft } from './hq-template-create-attempt'
 
 const scope = { tenantId: 'tenant-a', actorId: 'owner' }
 const attempt = { requestId: 'request-123', distribute: true, input: { type: 'tag' as const, name: '来店', definition: { schemaVersion: 1 as const, tag: { name: '来店' }, folders: [] } } }
@@ -20,6 +20,10 @@ describe('HQ creation receipt storage', () => {
     persistCreationAttempt(s, scope, 'tag', attempt); clearCreationAttempt(s, scope, 'tag', attempt.requestId)
     expect(loadCreationAttempt(s, scope, 'tag')).toBeNull()
   })
+  it('分類付きの未確定依頼を復元する', () => {
+    const s=storage(), item={...attempt,input:{...attempt.input,folderId:'folder-a'}}
+    persistCreationAttempt(s,scope,'tag',item); expect(loadCreationAttempt(s,scope,'tag')).toEqual(item)
+  })
   it('認証値等の未定義フィールドを保存しない', () => {
     const s = storage()
     expect(() => persistCreationAttempt(s, scope, 'tag', { ...attempt, token: 'fixture-not-a-secret' } as typeof attempt)).toThrow()
@@ -35,6 +39,17 @@ describe('HQ creation receipt storage', () => {
     }, folders: [] } } }
     persistCreationAttempt(s, scope, 'tag', item)
     expect(loadCreationAttempt(s, scope, 'tag')).toEqual(item)
+  })
+  it('店と同じ6種類の素材（クーポン・リッチメッセージ）を含むテンプレートの作成依頼を保存し、知らない種類は保存しない', () => {
+    const template = { id: 'hq-authored-message', name: '冬の10%オフ', category: 'general', messageType: 'text' as const, messageContent: '', carouselActionsJson: null, carouselTapLimitMode: 'none' as const, carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' as const }
+    const item = (asset: unknown) => ({ requestId: 'request-asset', distribute: true, input: { type: 'template' as const, name: '冬の10%オフ', definition: { schemaVersion: 1 as const, template, media: [], asset } } })
+    for (const asset of [{ kind: 'coupon', payload: { description: '割引', startsAt: '2026-12-01', endsAt: '2026-12-31' } }, { kind: 'rich_message', payload: { baseUrl: 'https://img.test/r', tapAreas: [] } }]) {
+      const s = storage()
+      persistCreationAttempt(s, scope, 'template', item(asset) as never)
+      expect(loadCreationAttempt(s, scope, 'template')).toEqual(item(asset))
+    }
+    expect(() => persistCreationAttempt(storage(), scope, 'template', item({ kind: 'unknown', payload: {} }) as never)).toThrow()
+    expect(() => persistCreationAttempt(storage(), scope, 'template', item({ kind: 'coupon', payload: [] }) as never)).toThrow()
   })
   it('店舗画面と同じ回答フォームのレイアウトを含む作成依頼を保存する', () => {
     const s = storage(), layout = emptyLayout()
@@ -80,4 +95,61 @@ describe('HQ creation receipt storage', () => {
     expect(() => loadCreationAttempt(s, { ...scope, tenantId: 'tenant-b' }, 'tag')).toThrow()
     for (const raw of ['{broken', 'x'.repeat(32_001)]) { s.setItem(key, raw); expect(() => loadCreationAttempt(s, scope, 'tag')).toThrow(); expect(s.getItem(key)).toBe(raw) }
   })
+})
+describe('HQ create editor draft (H-18原文の一時下書き）', () => {
+  const draft = { kind: 'message', name: '人工の下書き', messageType: 'text', messageContent: '人工の本文' }
+  it('所属・種別・タブで分離し、保存・読込・消去ができる', () => {
+    const s = storage()
+    persistEditorDraft(s, scope, 'template', 'message', draft)
+    expect(loadEditorDraft(s, scope, 'template', 'message')).toEqual(draft)
+    expect(loadEditorDraft(s, { ...scope, tenantId: 'tenant-b' }, 'template', 'message')).toBeNull()
+    expect(loadEditorDraft(s, scope, 'template', 'coupon')).toBeNull()
+    expect(loadEditorDraft(s, scope, 'form', 'message')).toBeNull()
+    clearEditorDraft(s, scope, 'template', 'message')
+    expect(loadEditorDraft(s, scope, 'template', 'message')).toBeNull()
+  })
+  it('破損・別所属・過大な下書きは捨てて本機能を止めない', () => {
+    const s = storage()
+    const key = editorDraftStorageKey(scope, 'template', 'message')
+    persistEditorDraft(s, scope, 'template', 'message', draft)
+    s.setItem(key, '{broken')
+    expect(loadEditorDraft(s, scope, 'template', 'message')).toBeNull()
+    expect(s.getItem(key)).toBeNull()
+    persistEditorDraft(s, scope, 'template', 'message', { ...draft, messageContent: 'x'.repeat(300_000) })
+    expect(s.getItem(key)).toBeNull()
+  })
+  it('置き場が使えなくても例外にせず本機能を止めない', () => {
+    const broken = { getItem: () => { throw new Error('unavailable') }, setItem: () => { throw new Error('unavailable') }, removeItem: () => { throw new Error('unavailable') } }
+    expect(loadEditorDraft(broken, scope, 'template', 'message')).toBeNull()
+    expect(() => persistEditorDraft(broken, scope, 'template', 'message', draft)).not.toThrow()
+    expect(() => clearEditorDraft(broken, scope, 'template', 'message')).not.toThrow()
+  })
+})
+
+describe('一時下書きの失敗時は古い内容を復元しない', () => {
+  const draft = { kind: 'message', name: '架空の旧入力', messageContent: '旧本文' }
+  it.each(['oversize', 'invalid', 'write', 'serialize', 'mismatch'])('%sでも旧記録を破棄して失敗を返す', mode => {
+    const s = storage()
+    persistEditorDraft(s, scope, 'template', 'message', draft)
+    const next = { ...draft, name: '架空の最新入力', messageContent: '最新本文' }
+    if (mode === 'oversize') next.messageContent = 'x'.repeat(300_000)
+    if (mode === 'invalid') next.name = 'x'.repeat(201)
+    if (mode === 'serialize') Object.assign(next, { circular: next })
+    const port = { ...s, setItem: (key: string, value: string) => {
+      if (mode === 'write') throw new Error('artificial quota')
+      if (mode !== 'mismatch') s.setItem(key, value)
+    } }
+    const saved = persistEditorDraft(port, scope, 'template', 'message', next)
+    expect(loadEditorDraft(s, scope, 'template', 'message')).toBeNull()
+    expect(saved).toBe(false)
+  })
+})
+
+it('壊れた途中入力の構造は復元せず、失敗を知らせる', () => {
+  const s = storage(), key = editorDraftStorageKey(scope, 'template', 'research')
+  s.setItem(key, JSON.stringify({ version: 1, ...scope, type: 'template', kind: 'research', draft: { kind: 'research', name: '架空の破損入力', payload: {}, editorState: { questions: null } } }))
+  let notified = false
+  expect(loadEditorDraft(s, scope, 'template', 'research', () => { notified = true })).toBeNull()
+  expect(notified).toBe(true)
+  expect(s.getItem(key)).toBeNull()
 })

@@ -1,9 +1,13 @@
-// main.tsx — Event booking LIFF entry. Loaded via dynamic import from
+import { responseLiffError } from '../../../../liff/src/lib/api-error.js';
+// イベント予約の LIFF 画面は共通入口から必要時に読み込む。
 // apps/worker/src/client/main.ts (?page=event&id=<eventId> or ?page=event-me).
 // Mirrors salon-booking design language (LINE 緑 + sb-card + fade animations).
 
-import { StrictMode, useEffect, useState } from 'react';
+import { useRequestGeneration } from '../../../../liff/src/lib/use-request-generation.js';
+import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import LoadErrorView from '../../../../liff/src/components/LoadErrorView.js';
+import '../../../../liff/src/embedded.css';
 import './styles.css';
 import {
   bookingOutcome,
@@ -79,15 +83,7 @@ function apiGet<T>(path: string, ctx: EventBookingContext): Promise<T> {
   const url = new URL(path, window.location.origin);
   url.searchParams.set('liffId', ctx.liffId);
   return fetch(url.toString(), { headers: buildAuthHeaders(ctx) }).then(async (r) => {
-    if (!r.ok) {
-      const text = await r.text();
-      let parsed: unknown = null;
-      try { parsed = JSON.parse(text); } catch { /* ignore */ }
-      const err = new Error(`API ${r.status}`) as Error & { status: number; body: unknown };
-      err.status = r.status;
-      err.body = parsed ?? text;
-      throw err;
-    }
+    if (!r.ok) throw await responseLiffError(r);
     return r.json() as Promise<T>;
   });
 }
@@ -105,15 +101,7 @@ async function apiPost<T>(
     headers: buildAuthHeaders(ctx, { 'Content-Type': 'application/json', ...extraHeaders }),
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    let parsed: unknown = null;
-    try { parsed = JSON.parse(text); } catch { /* ignore */ }
-    const err = new Error(`API ${res.status}`) as Error & { status: number; body: unknown };
-    err.status = res.status;
-    err.body = parsed ?? text;
-    throw err;
-  }
+  if (!res.ok) throw await responseLiffError(res);
   return res.json();
 }
 
@@ -305,7 +293,7 @@ function EventDetailScreen({
               {slots.map((s) => {
                 const full = s.remaining != null && s.remaining <= 0;
                 /*
-                 * 満席でも、この枠がキャンセル待ちを受けるなら押せる (#747)。
+                 * 満席でも、この枠がキャンセル待ちを受けるなら押せる。
                  * サーバは前から満席の申込を待ち行列へ入れて 200 を返すのに、
                  * 画面が押させないので、その口へ辿り着けなかった。
                  * 予約上限に達している人は、待ちにも入れないので押せない。
@@ -352,7 +340,7 @@ function EventDetailScreen({
   );
 }
 
-function ConfirmScreen({
+export function ConfirmScreen({
   ctx,
   event,
   slot,
@@ -370,17 +358,22 @@ function ConfirmScreen({
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(uid);
   /*
-   * 満席の枠を選んで来た = キャンセル待ちの申込 (#747)。押せるようにした
+   * 満席の枠を選んで来た = キャンセル待ちの申込。押せるようにした
    * 以上、「予約をリクエスト」と書いたままだと何を頼んだのか分からない。
    * 実際に待ちへ入るかはサーバが決めるので、ここは見せ方だけを変える。
    */
   const slotIsFull = slot.remaining != null && slot.remaining <= 0;
+
+  const request = useRequestGeneration(JSON.stringify([ctx.liffId, event.id, slot.id]));
+  function back() { request.invalidate(); setSubmitting(false); onBack(); }
 
   async function submit() {
     if (note.length > 5000) {
       setError('備考は 5000 字以内で入力してください');
       return;
     }
+    if (submitting) return;
+    const generation = request.begin();
     setSubmitting(true);
     setError(null);
     try {
@@ -391,13 +384,15 @@ function ConfirmScreen({
         { 'Idempotency-Key': idemKey },
       );
       /*
-       * キャンセル待ちに入ったときの応答は 200 で `{ waitlisted: true }` (#747)。
+       * キャンセル待ちに入ったときの応答は 200 で `{ waitlisted: true }`。
        * 200 なので apiPost は投げない。ここで見分けないと res.status が
        * undefined のまま渡り、完了画面が「予約が確定しました」と出す。
        * 満席の枠を押せるようにした以上、この道は日常的に通る。
        */
+      if (!request.isCurrent(generation)) return;
       onDone(bookingOutcome(res));
     } catch (err) {
+      if (!request.isCurrent(generation)) return;
       const e = err as { status?: number; body?: { error?: string } };
       const code = e.body?.error;
       const msg = (() => {
@@ -421,13 +416,13 @@ function ConfirmScreen({
       })();
       setError(msg);
     } finally {
-      setSubmitting(false);
+      if (request.isCurrent(generation)) setSubmitting(false);
     }
   }
 
   return (
     <div className="px-4 py-4 pb-24 space-y-4 eb-slide-up">
-      <button onClick={onBack} className="eb-back-btn">
+      <button onClick={back} className="eb-back-btn">
         <span aria-hidden>←</span>
         戻る
       </button>
@@ -482,7 +477,7 @@ function ConfirmScreen({
       <button onClick={submit} disabled={submitting} className="eb-primary-btn">
         {submitting ? '送信中...' : slotIsFull ? 'キャンセル待ちに入る' : '予約をリクエスト'}
       </button>
-      <button onClick={onBack} disabled={submitting} className="eb-secondary-btn">
+      <button onClick={back} disabled={submitting} className="eb-secondary-btn">
         戻る
       </button>
     </div>
@@ -499,15 +494,7 @@ function Row({ label, value, valueClassName }: { label: string; value: string; v
 }
 
 /**
- * 申込のあとの完了画面。
- *
- * `status` は3通り (#747)。
- *  - `waitlisted`: 席が埋まっていてキャンセル待ちに入った。**予約は取れていない**
- *  - `requested` : 申込を受け付けた。運営の承認待ち
- *  - それ以外     : 予約が確定した
- *
- * 以前は `requested` かどうかの二択で、待ちに入っただけの人にも
- * 「予約が確定しました」と出していた。
+ * キャンセル待ちは予約確定と区別して表示する。waitlisted は未確保、requested は承認待ち、それ以外は確定を示す。
  */
 function DoneScreen({ status, onGoHistory }: { status: string; onGoHistory: () => void }) {
   const copy = doneScreenCopy(status as BookingOutcome);
@@ -562,21 +549,24 @@ function HistoryScreen({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const requestGeneration = useRef(0);
   async function refresh() {
+    const generation = ++requestGeneration.current;
     setLoading(true);
     setError(null);
     try {
       const res = await apiGet<{ items: MyBooking[] }>(`/api/liff/events/me?tab=${tab}`, ctx);
-      setItems(res.items);
+      if (generation === requestGeneration.current) setItems(res.items);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (generation === requestGeneration.current) setError('読み込めませんでした');
     } finally {
-      setLoading(false);
+      if (generation === requestGeneration.current) setLoading(false);
     }
   }
 
   useEffect(() => {
     void refresh();
+    return () => { requestGeneration.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -598,8 +588,9 @@ function HistoryScreen({
         </div>
       </div>
       <div className="px-4 py-4 space-y-4">
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-sm">{error}</div>}
-        {loading ? (
+        {error ? (
+          <LoadErrorView note="申し込みはなくなっていません。" onRetry={() => void refresh()} />
+        ) : loading ? (
           <Spinner />
         ) : items.length === 0 ? (
           <div className="eb-card text-center text-sm text-gray-500 py-8">
@@ -807,10 +798,10 @@ function App({ ctx, initial }: { ctx: EventBookingContext; initial: Screen }) {
   })();
 
   return (
-    <div className="min-h-screen" style={{ background: '#f5f5f5' }}>
+    <div className="min-h-screen" style={{ background: 'var(--customer-background, #f5f5f5)' }}>
       <header
         className="px-4 py-3 text-white text-center font-bold sticky top-0 z-20"
-        style={{ background: '#06C755', fontSize: '15px' }}
+        style={{ background: 'var(--customer-primary, #06C755)', fontSize: '15px' }}
       >
         {headerLabel}
       </header>

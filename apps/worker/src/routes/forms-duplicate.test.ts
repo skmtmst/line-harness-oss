@@ -1,5 +1,5 @@
 /*
- * POST /api/forms/:id/duplicate — フォーム全体の複製(R230)。
+ * POST /api/forms/:id/duplicate — フォーム全体の複製。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物のルートを当てる。モックは
  * 役割の門番が見る staff だけで、保存の経路は本物のまま通す。
@@ -10,9 +10,9 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
-vi.mock('../services/friend-tag-attach.js', () => ({
+vi.mock('../features/friends/friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: vi.fn(),
 }));
 vi.mock('../services/event-bus.js', () => ({

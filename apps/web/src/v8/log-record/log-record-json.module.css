@@ -1,0 +1,8 @@
+/* 記録の JSON を開いて写す部品。値は共通の変数から読む。 */
+.root { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); }
+.body { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
+/* 長い記録は箱の中だけを送って読む（画面全体を伸ばさない）。 */
+.code { display: flex; flex-direction: column; max-height: 40vh; min-width: 0; }
+.code > pre { min-height: 0; }
+.note { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--text-caption--line-height); }

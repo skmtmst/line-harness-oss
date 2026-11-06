@@ -13,15 +13,12 @@ const sendXServerMail = vi.hoisted(() =>
 vi.mock('./support-relay.js', () => ({ sendViaXServerRelay }));
 vi.mock('./xserver-mail.js', () => ({ sendXServerMail }));
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { mailFromName, MUSUBO_FROM_NAME, NEN_FROM_NAME } from './mail-from-name.js';
 import { sendPlainMail } from './plain-mail.js';
 
 /**
- * 差出人の表示名（2026-09-30）。
- *
- * musubo の会員登録メールが「然-NEN- お客様窓口」から届いていたので、件名の呼び名から
- * 表示名を決めるようにした。ここが崩れると、ペットフードとSaaSの名前が入れ替わる。
+ * 共有のメール送信経路でも SaaS とペットフードの差出人名が混ざらないよう、件名に対応した表示名を確かめる。
  */
 describe('mailFromName', () => {
   it('件名が【musubo】で始まるメールは musubo から送る', () => {
@@ -30,10 +27,10 @@ describe('mailFromName', () => {
     expect(mailFromName('【musubo運用】お知らせ')).toBe(MUSUBO_FROM_NAME);
   });
 
-  it('それ以外は 然-NEN- の窓口名から送る', () => {
+  it('然-NEN- の明示的な件名だけ専用の窓口名から送る', () => {
     expect(mailFromName('【然-NEN-】ご注文ありがとうございます')).toBe(NEN_FROM_NAME);
-    expect(mailFromName('お問い合わせへの返信')).toBe(NEN_FROM_NAME);
-    expect(mailFromName('')).toBe(NEN_FROM_NAME);
+    expect(mailFromName('お問い合わせへの返信')).toBe(MUSUBO_FROM_NAME);
+    expect(mailFromName('')).toBe(MUSUBO_FROM_NAME);
   });
 
   it('表示名に改行は入らない（From ヘッダーを壊さない）', () => {

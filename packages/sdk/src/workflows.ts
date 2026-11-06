@@ -1,7 +1,7 @@
 import type { FriendsResource } from './resources/friends.js'
 import type { ScenariosResource } from './resources/scenarios.js'
 import type { BroadcastsResource } from './resources/broadcasts.js'
-import type { StepDefinition, ScenarioTriggerType, ScenarioWithSteps, Broadcast, MessageType, SegmentCondition } from './types.js'
+import type { StepDefinition, ScenarioTriggerType, ScenarioWithSteps, Broadcast, BroadcastSendOptions, MessageType, SegmentCondition } from './types.js'
 import { parseDelay } from './delay.js'
 
 export class Workflows {
@@ -11,6 +11,7 @@ export class Workflows {
     private readonly broadcasts: BroadcastsResource,
   ) {}
 
+  /** Creates an inactive scenario. After reviewing the steps, activate with scenarios.update(id, { isActive: true }) using publish permission. */
   async createStepScenario(
     name: string,
     triggerType: ScenarioTriggerType,
@@ -31,20 +32,21 @@ export class Workflows {
     return this.scenarios.get(scenario.id)
   }
 
-  async broadcastText(text: string): Promise<Broadcast> {
+  async broadcastText(text: string, options?: BroadcastSendOptions): Promise<Broadcast> {
     const broadcast = await this.broadcasts.create({
       title: text.slice(0, 50),
       messageType: 'text',
       messageContent: text,
       targetType: 'all',
     })
-    return this.broadcasts.send(broadcast.id)
+    return options ? this.broadcasts.send(broadcast.id, options) : this.broadcasts.send(broadcast.id)
   }
 
   async broadcastToTag(
     tagId: string,
     messageType: MessageType,
     content: string,
+    options?: BroadcastSendOptions,
   ): Promise<Broadcast> {
     const broadcast = await this.broadcasts.create({
       title: content.slice(0, 50),
@@ -53,13 +55,14 @@ export class Workflows {
       targetType: 'tag',
       targetTagId: tagId,
     })
-    return this.broadcasts.send(broadcast.id)
+    return options ? this.broadcasts.send(broadcast.id, options) : this.broadcasts.send(broadcast.id)
   }
 
   async broadcastToSegment(
     messageType: MessageType,
     content: string,
     conditions: SegmentCondition,
+    options?: BroadcastSendOptions,
   ): Promise<Broadcast> {
     const broadcast = await this.broadcasts.create({
       title: content.slice(0, 50),
@@ -67,7 +70,7 @@ export class Workflows {
       messageContent: content,
       targetType: 'all',
     })
-    return this.broadcasts.sendToSegment(broadcast.id, conditions)
+    return options ? this.broadcasts.sendToSegment(broadcast.id, conditions, options) : this.broadcasts.sendToSegment(broadcast.id, conditions)
   }
 
   async sendTextToFriend(friendId: string, text: string): Promise<{ messageId: string }> {

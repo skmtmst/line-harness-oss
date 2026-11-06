@@ -1,0 +1,355 @@
+'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+
+
+import type { Folder } from '@line-crm/shared'
+import { api } from '@/lib/api'
+import Button from '@/components/shared/button'
+import Chip from '@/components/shared/chip'
+import { AttachmentRow } from '@/components/shared/file-drop'
+import MediaSlot from '@/components/shared/media-slot'
+import Notice from '@/components/shared/notice'
+import Progress from '@/components/shared/progress'
+import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
+import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
+import { formatMediaSize } from './media-usage-display'
+import { formatNumber } from '@/lib/format'
+import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+
+type UploadState = 'ready' | 'preparing' | 'uploading' | 'verifying' | 'done' | 'error'
+
+type UploadEntry = {
+  file: File
+  state: UploadState
+  message: string
+  retryable: boolean
+  progress: number
+  mediaId?: string | null
+  /** 検査の状態。確かめ終わるまで中身は出さない。 */
+  scanStatus?: 'pending' | 'clean' | 'rejected' | 'quarantined' | null
+}
+
+function scanChipProps(status: NonNullable<UploadEntry['scanStatus']>): { tone: 'info' | 'ok' | 'danger' | 'warn'; label: string } {
+  if (status === 'clean') return { tone: 'ok', label: '使えます' }
+  if (status === 'rejected') return { tone: 'danger', label: '使えません' }
+  if (status === 'quarantined') return { tone: 'warn', label: '確認のため使えません' }
+  return { tone: 'info', label: '確かめています' }
+}
+
+const LIMITS = [
+  { label: '画像', note: 'JPG・PNG・GIF・WebP ／ 10MBまで' },
+  { label: '音声', note: 'MP3・M4A ／ 200MBまで' },
+  { label: '動画', note: 'MP4 ／ 200MBまで' },
+  { label: 'PDF', note: '20MBまで。LINEでは直接送れないので、リンクとして使います' },
+]
+
+export default function MediaUploadDialog({
+  open,
+  accountId,
+  folders,
+  initialFolderId,
+  onCreateFolder,
+  onClose,
+  onComplete,
+}: {
+  open: boolean
+  accountId: string | null
+  folders: Folder[]
+  initialFolderId: string
+  /** 入れるフォルダを選ぶ欄からその場で作る（dLffh）。閲覧のみは渡さない。 */
+  onCreateFolder?: FolderSelectCreate
+  onClose: () => void
+  onComplete: () => void
+}) {
+  const inputId = useId()
+  const [entries, setEntries] = useState<UploadEntry[]>([])
+  const [folderId, setFolderId] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const pendingFiles = entries.some(entry => entry.state !== 'done')
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({ dirty: open && (pendingFiles || busy), busy: open && busy, onDiscard: onClose })
+  const current = useRef({ open, accountId, busy, target: guard.leaveTarget })
+  current.current = { open, accountId, busy, target: guard.leaveTarget }
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  useEffect(() => { if (!open) guard.cancelLeave() }, [open, guard.cancelLeave])
+  useEffect(() => { guard.cancelLeave() }, [accountId, guard.cancelLeave])
+  const discardAndLeave = () => {
+    const target = guard.leaveTarget
+    if (!alive.current || !current.current.open || current.current.accountId !== accountId || current.current.busy || !target || current.current.target !== target) return
+    current.current.target = null
+    guard.disarm(); guard.confirmLeave()
+  }
+
+
+  useEffect(() => {
+    if (!open) return
+    setEntries([])
+    setFolderId(initialFolderId === '__ungrouped__' ? '' : initialFolderId)
+    setBusy(false)
+    setError('')
+  }, [initialFolderId, open])
+
+  const readyCount = useMemo(
+    () => entries.filter((entry) => entry.state === 'ready').length,
+    [entries],
+  )
+  const errorCount = entries.filter((entry) => entry.state === 'error').length
+  const doneCount = entries.filter((entry) => entry.state === 'done').length
+  const allDone = entries.length > 0 && doneCount === entries.length
+  const uploadPercent = entries.length === 0 ? 0 : entries.reduce((sum, entry) => {
+    if (entry.state === 'done') return sum + 100
+    if (entry.state === 'uploading' || entry.state === 'verifying') return sum + Math.min(99, Math.max(0, entry.progress))
+    return sum
+  }, 0) / entries.length
+  /*
+    全体の進みは実測だけ出す。登録を押す前（すべて登録待ち）は棒を出さない。
+    一度でも登録を実行した（完了か、登録中の失敗がある）ときだけ
+    Active（登録中）／Done／Partial を出す。
+  */
+  const attempted = entries.some((entry) => entry.state === 'done' || (entry.state === 'error' && entry.retryable))
+  const uploadErrorCount = entries.filter((entry) => entry.state === 'error' && entry.retryable).length
+
+  function removeEntry(index: number) {
+    setEntries((current) => current.filter((_, entryIndex) => entryIndex !== index))
+  }
+
+  function stage(files: File[]) {
+    const next = files.slice(0, 20).map((file) => {
+      const message = validateMediaFile(file)
+      return { file, state: message ? 'error' : 'ready', message, retryable: false, progress: 0 } satisfies UploadEntry
+    })
+    setEntries(next)
+    setError(files.length > 20 ? 'いちどに登録できるのは20件までです。先頭の20件を表示しています。' : '')
+  }
+
+  async function uploadReady() {
+    if (!accountId || readyCount === 0 || busy) return
+    setBusy(true)
+    setError('')
+    let completed = 0
+    const pending = entries
+      .map((entry, index) => ({ entry, index }))
+      .filter(({ entry }) => entry.state === 'ready')
+    setEntries((current) => current.map((entry) => (
+      entry.state === 'ready' ? { ...entry, state: 'preparing', message: '送信を準備しています', progress: 0 } : entry
+    )))
+    try {
+      const prepared = await api.media.prepareUploads({
+        accountId,
+        files: await Promise.all(pending.map(async ({ entry }) => ({
+          filename: entry.file.name,
+          mimeType: entry.file.type,
+          sizeBytes: entry.file.size,
+          folderId: folderId || null,
+          metadata: await extractMediaMetadata(entry.file),
+        }))),
+      })
+      if (!prepared.success || prepared.data.sessions.length !== pending.length) {
+        throw new Error('送信の準備結果を確認できませんでした。時間をおいて、もう一度お試しください。')
+      }
+      for (let position = 0; position < pending.length; position += 1) {
+        const selected = pending[position]
+        const session = prepared.data.sessions[position]
+        if (!selected || !session) continue
+        const { index, entry } = selected
+        try {
+          setEntries((current) => current.map((item, entryIndex) => (
+            entryIndex === index ? { ...item, state: 'uploading', message: '送信中 0%', progress: 0 } : item
+          )))
+          const etag = await putMediaFile(session, entry.file, (progress) => {
+            setEntries((current) => current.map((item, entryIndex) => (
+              entryIndex === index
+                ? { ...item, progress, message: `送信中 ${progress}%` }
+                : item
+            )))
+          })
+          setEntries((current) => current.map((item, entryIndex) => (
+            entryIndex === index ? { ...item, state: 'verifying', message: '中身を確認しています', progress: 100 } : item
+          )))
+          const response = await api.media.completeUpload(session.id, { accountId, etag })
+          if (!response.success || response.data.status !== 'completed') throw new Error('登録を完了できませんでした。時間をおいて、もう一度お試しください。')
+          completed += 1
+          const mediaId = response.data.mediaId ?? null
+          setEntries((current) => current.map((item, entryIndex) => (
+            entryIndex === index
+              ? { ...item, state: 'done', message: '入りました', retryable: false, progress: 100, mediaId, scanStatus: 'pending' }
+              : item
+          )))
+          // 検査の状態を読む。確かめ終わるまで配信・公開には出さない。
+          if (mediaId) {
+            try {
+              const scan = await api.fileScan.forMedia(mediaId, accountId)
+              const status = scan.success ? scan.data.scan?.status ?? null : null
+              setEntries((current) => current.map((item, entryIndex) => (
+                entryIndex === index ? { ...item, scanStatus: status ?? 'pending' } : item
+              )))
+            } catch {
+              // 読めなくても登録自体は済んでいる。確かめ中として置く。
+            }
+          }
+        } catch (caught) {
+          const message = describeApiFailure(caught, '登録')
+          setEntries((current) => current.map((item, entryIndex) => (
+            entryIndex === index ? { ...item, state: 'error', message, retryable: true } : item
+          )))
+        }
+      }
+    } catch (caught) {
+      const message = describeApiFailure(caught, '送信')
+      setEntries((current) => current.map((item) => (
+        item.state === 'preparing' ? { ...item, state: 'error', message, retryable: true } : item
+      )))
+      setError(message)
+    }
+    setBusy(false)
+    if (completed > 0) onComplete()
+  }
+
+  if (!open) return null
+
+  return <><Dialog contentLayout="form" open={open} dirty={pendingFiles} title="ファイルを入れる" onCancel={onClose} busy={busy} error={error || undefined} designNode="eXAJP" designWidth={720} footer={(<DialogActions leadingAction={<p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
+            {errorCount > 0 ? `${formatNumber(errorCount)}件は登録できません` : allDone ? `${formatNumber(doneCount)}件を登録しました` : `${entries.length}件を選択中`}
+          </p>}>
+
+          <>
+            {allDone && !busy ? <Button type="button" variant="primary" onClick={onClose}>完了</Button> : <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId} busy={busy} busyLabel="登録しています…">
+              {`${formatNumber(readyCount)}件を登録する`}
+            </Button>}
+          </>
+        </DialogActions>)}>{}
+        <div className="space-y-4 p-6">
+        <MediaSlot kind="file"
+          title="ここにファイルをドラッグ、または押して選ぶ"
+          help="いちどに20件まで"
+          accept={MEDIA_ACCEPT}
+          busy={busy}
+          onFiles={stage}
+        />
+
+        <Notice tone="info">
+          <p className="font-bold">LINEで送れる大きさ（超えると入れられません）</p>
+          {LIMITS.map((limit) => <p key={limit.label}>{limit.label} {limit.note}</p>)}
+          <p className="mt-2 font-semibold">大きなファイルも管理画面を経由せず、保存先へ直接送ります。</p>
+          <p className="mt-2 font-semibold">中身の形式とファイル名の拡張子が食い違うものは保存できません。</p>
+          <p className="font-semibold">公開リンクが作られるため、個人情報の取り扱いに注意してください。</p>
+        </Notice>
+
+        {entries.length > 0 ? (
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-ink text-sm font-bold">入れているもの</p>
+              {busy || attempted ? null : (
+                <p className="text-ink-faint text-xs">{formatNumber(entries.length)} 件中 {formatNumber(doneCount)} 件 完了</p>
+              )}
+            </div>
+            {/*
+              全体の進みは登録を実行してから出す（実測の完了数だけ）。
+              登録前は同じ数字の重複になるので、上の「X件中 Y件 完了」だけにする。
+            */}
+            {busy ? (
+              <Progress
+                state="active"
+                title="登録しています"
+                percent={uploadPercent}
+                countText={`${formatNumber(doneCount)} / ${formatNumber(entries.length)} 件完了`}
+                className="mb-3"
+              />
+            ) : attempted ? (
+              <Progress
+                state={uploadErrorCount > 0 ? 'partial' : 'done'}
+                title={uploadErrorCount > 0
+                  ? `${formatNumber(doneCount)} 件を登録し、${formatNumber(uploadErrorCount)} 件は入りませんでした`
+                  : `${formatNumber(doneCount)} 件を登録しました`}
+                percent={entries.length > 0 ? (doneCount / entries.length) * 100 : 0}
+                className="mb-3"
+              />
+            ) : null}
+            <ul className="max-h-64 space-y-2 overflow-y-auto">
+              {entries.map((entry, index) => {
+                const sizeText = formatMediaSize(entry.file.size)
+                const tone = entry.file.type.startsWith('image/') ? 'photo' as const : 'document' as const
+                if (entry.state === 'uploading' || entry.state === 'preparing' || entry.state === 'verifying') {
+                  return (
+                    <li key={`${entry.file.name}-${entry.file.size}-${index}`} aria-live="polite">
+                      <AttachmentRow
+                        name={entry.file.name}
+                        status="uploading"
+                        percent={entry.progress}
+                        uploadingText={entry.message || `送信中 ${entry.progress}%`}
+                        tone={tone}
+                      />
+                    </li>
+                  )
+                }
+                if (entry.state === 'error' && entry.retryable) {
+                  return (
+                    <li key={`${entry.file.name}-${entry.file.size}-${index}`} aria-live="polite">
+                      <AttachmentRow
+                        name={entry.file.name}
+                        status="error"
+                        errorText={entry.message}
+                        tone={tone}
+                        onRetry={() => setEntries((current) => current.map((item, entryIndex) => (
+                          entryIndex === index ? { ...item, state: 'ready', message: '', retryable: false, progress: 0 } : item
+                        )))}
+                      />
+                    </li>
+                  )
+                }
+                if (entry.state === 'error') {
+                  return (
+                    <li key={`${entry.file.name}-${entry.file.size}-${index}`} aria-live="polite">
+                      <AttachmentRow
+                        name={entry.file.name}
+                        status="error"
+                        errorText={entry.message}
+                        tone={tone}
+                        onRemove={() => removeEntry(index)}
+                      />
+                    </li>
+                  )
+                }
+                const scan = entry.state === 'done' ? scanChipProps(entry.scanStatus ?? 'pending') : null
+                return (
+                  <li key={`${entry.file.name}-${entry.file.size}-${index}`} aria-live="polite">
+                    <AttachmentRow
+                      name={entry.file.name}
+                      meta={entry.state === 'done' ? `${sizeText}・入りました` : `${sizeText}・${entry.message || '登録できます'}`}
+                      tone={tone}
+                      onRemove={busy ? undefined : () => removeEntry(index)}
+                    />
+                    {scan ? (
+                      <p className="mt-1 flex items-center gap-2">
+                        <Chip tone={scan.tone}>{scan.label}</Chip>
+                        {entry.scanStatus === 'pending' ? (
+                          <span className="text-ink-faint text-xs">確かめ終わるまで配信・公開には出ません</span>
+                        ) : null}
+                      </p>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        ) : null}
+
+        <div><Field label="入れるフォルダ" htmlFor={`${inputId}-folder`}><SaveErrorField names={["folderId","folder_id"]}><FolderSelect
+            aria-label="入れるフォルダ"
+            value={folderId}
+            folders={folders.map(folderById)}
+            onCreate={onCreateFolder}
+            onChange={setFolderId}
+          /></SaveErrorField></Field></div>
+        </div>
+  </Dialog><OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="選択したファイル" busy={busy} onConfirm={discardAndLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></>
+}

@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const get = vi.hoisted(() => vi.fn())
-vi.mock('./api', () => ({ api: { featureSettings: { get } } }))
+
 
 import { clearFeatureSettingsCache, loadFeatureSettings } from './feature-settings-cache'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from './feature-settings-event'
@@ -26,16 +26,23 @@ const ok = {
 
 describe('機能設定全体の共有', () => {
   beforeEach(() => {
+    localStorage.setItem('lh_csrf', 'fixture-session')
     clearFeatureSettingsCache()
     get.mockReset()
     get.mockResolvedValue(ok)
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      const url = new URL(input)
+      if (url.pathname === '/api/staff/me') return new Response(JSON.stringify({ success: true, data: { id: 'me' } }))
+      return new Response(JSON.stringify(await get(url.searchParams.get('account_id'))))
+    }))
   })
-  afterEach(() => vi.restoreAllMocks())
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
   it('同時に来た要求は1本にまとめ、同じ答えを返す', async () => {
     const [a, b] = await Promise.all([loadFeatureSettings('acc-1'), loadFeatureSettings('acc-1')])
     expect(get).toHaveBeenCalledTimes(1)
-    expect(a).toBe(b)
+    expect(a).toEqual(b)
+    expect(a).not.toBe(b)
   })
 
   it('アカウントが違えば別に取る', async () => {

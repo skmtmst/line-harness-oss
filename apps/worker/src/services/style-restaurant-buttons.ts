@@ -1,0 +1,70 @@
+import {
+  liffActionUrl,
+  type AccountStyle,
+  type SetupAnswer,
+} from '@line-crm/shared';
+
+import { isCustomerUri, type StarterItem } from './style-starter-definition.js';
+import { featureReadiness } from './style-readiness.js';
+export async function restaurantMenuButtons(
+  db: D1Database,
+  account: string,
+  style: AccountStyle,
+  item: StarterItem,
+  answers: Record<string, SetupAnswer>,
+) {
+  const line = await db
+    .prepare('SELECT liff_id FROM line_accounts WHERE id=?')
+    .bind(account)
+    .first<{ liff_id: string | null }>();
+  const buttons = [];
+  for (const button of item.buttons ?? []) {
+    if(button.actionType==='uri') {
+      if(!isCustomerUri(button.actionData))continue;
+      const url=new URL(button.actionData);
+      if(url.hostname==='liff.line.me'&&url.pathname.split('/')[1]!==line?.liff_id)continue;
+      buttons.push({...button,actionType:'uri',actionData:button.actionData,intent:'url'});
+      continue;
+    }
+    if(button.actionType==='message'&&button.actionData?.trim()) {
+      buttons.push({...button,actionType:'message',actionData:button.actionData,intent:'text'});
+      continue;
+    }
+    const answer = answers[button.feature];
+    if (
+      button.feature !== 'contact' &&
+      ((answer && (answer.mode !== 'configured' || answer.value === false)) ||
+        (!answer &&
+          !(await featureReadiness(db, account, button.feature, style)).ready))
+    )
+      continue;
+    let actionType = 'message',
+      actionData = button.label,
+      intent = 'text';
+    if (line?.liff_id && ['booking', 'stamps'].includes(button.feature)) {
+      if (button.feature === 'stamps')
+        actionData = liffActionUrl({
+          kind: 'visit_stamp',
+          liffId: line.liff_id,
+        });
+      else if (style === 'restaurant') {
+        const link = await db
+          .prepare(
+            'SELECT l.token FROM rt_reservation_links l JOIN rt_stores s ON s.id=l.store_id WHERE s.line_account_id=? LIMIT 1',
+          )
+          .bind(account)
+          .first<{ token: string }>();
+        if (!link) continue;
+        // 予約の確認は席予約の画面の「自分の予約」（view=mine）を開く。
+        actionData = `https://liff.line.me/${encodeURIComponent(line.liff_id)}?${new URLSearchParams({ page: 'restaurant', token: link.token, ...(button.actionData === 'history' ? { view: 'mine' } : {}) })}`;
+      } else if (style === 'lesson')
+        actionData = `https://liff.line.me/${encodeURIComponent(line.liff_id)}?page=event`;
+      else
+        actionData = liffActionUrl({ kind: 'booking', liffId: line.liff_id });
+      actionType = 'uri';
+      intent = 'url';
+    }
+    buttons.push({ ...button, actionType, actionData, intent });
+  }
+  return buttons;
+}

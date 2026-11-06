@@ -1,0 +1,124 @@
+// DB と同じ保存形式を使うため、ID は UUID/nanoid の TEXT とする。
+
+export type BookingStatus =
+  | 'requested'
+  | 'confirmed'
+  | 'rejected'
+  | 'expired'
+  | 'cancelled'
+  | 'completed'
+  | 'no_show';
+
+export type ReminderKind = 'day_before' | 'hours_before';
+
+export type ReminderStatus =
+  | 'pending'
+  | 'sent'
+  | 'failed'
+  | 'failed_permanent'
+  | 'cancelled';
+
+export interface MenuRow {
+  id: string;
+  line_account_id: string;
+  name: string;
+  category_label: string | null;
+  description: string | null;
+  duration_minutes: number;
+  buffer_after_minutes: number;
+  base_price: number;
+  sort_order: number;
+  is_active: number;
+  deleted_at: string | null;
+}
+
+export interface StaffRow {
+  id: string;
+  line_account_id: string;
+  name: string;
+  display_name: string;
+  role: string | null;
+  profile_image_url: string | null;
+  bio: string | null;
+  sort_order: number;
+  is_designation_optional: number;
+  is_active: number;
+  deleted_at: string | null;
+}
+
+export interface StaffMenuRow {
+  staff_id: string;
+  menu_id: string;
+  is_offered: number;
+  override_duration_minutes: number | null;
+  override_price: number | null;
+}
+
+export interface ShiftRow {
+  id: string;
+  staff_id: string;
+  work_date: string;  // 日本時間の YYYY-MM-DD。
+  start_time: string; // HH:MM JST
+  end_time: string;   // HH:MM JST
+}
+
+export interface BookingRow {
+  id: string;
+  line_account_id: string;
+  friend_id: string;
+  staff_id: string;
+  menu_id: string;
+  starts_at: string;       // UTC の ISO8601（Z）。
+  ends_at: string;
+  block_ends_at: string;
+  status: BookingStatus;
+  customer_note: string | null;
+  internal_note: string | null;
+  price_at_booking: number;
+  requested_at: string;
+  decided_at: string | null;
+  decided_by_staff_id: string | null;
+}
+
+export interface AvailabilitySlot {
+  date: string;  // YYYY-MM-DD（店舗タイムゾーンの暦日）
+  start: string; // HH:MM（店舗タイムゾーンの壁時刻）
+  end: string;   // HH:MM（店舗タイムゾーンの壁時刻）
+  /** 店舗タイムゾーン名（例 Asia/Tokyo）。表示・送信はこの zone で読む。 */
+  timeZone: string;
+  /** 開始 instant（offset 付き ISO。fold 日の重複壁時刻も一意になる）。 */
+  startUtc: string;
+  /** 終了 instant（開始＋所要分。offset 付き ISO）。 */
+  endUtc: string;
+  capacity: number;
+  remaining: number;
+  state: 'available' | 'limited' | 'full' | 'closed';
+}
+
+export interface AvailabilityByStaff {
+  staff_id: string;
+  display_name: string;
+  slots: AvailabilitySlot[];
+}
+
+export interface AccountSettings {
+  reminder_hours_before: number;
+  min_lead_time_minutes: number;
+}
+
+export const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
+  reminder_hours_before: 2,
+  min_lead_time_minutes: 60,
+};
+
+export const SLOT_GRANULARITY_MINUTES = 30;
+
+/** 予約枠の間隔の候補（分）。店舗設定・DB CHECK と同じ顔ぶれ。 */
+export const SLOT_GRANULARITY_CHOICES = [5, 10, 15, 30, 60] as const;
+export const REQUEST_TTL_HOURS = 24;
+export const IDEMPOTENCY_TTL_MINUTES = 5;
+/** メニュー作成の応答再送の窓。作成画面を開き直すまでの再試行に備えて24時間。 */
+export const MENU_IDEMPOTENCY_TTL_MINUTES = 60 * 24;
+/** 電話客の台帳作成の応答再送の窓。予約の確定操作中の再送に備えて24時間。 */
+export const BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES = 60 * 24;
+export const REMINDER_MAX_RETRY = 3;

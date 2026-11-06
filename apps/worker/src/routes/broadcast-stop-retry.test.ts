@@ -1,5 +1,5 @@
 /*
- * #662 / N-059 — 停止・再開・失敗分再送の口。
+ *  /  — 停止・再開・失敗分再送の口。
  *
  * 見張るのは境界と版。
  *
@@ -12,8 +12,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index';
-import type { AuthenticatedStaff } from '../middleware/auth';
+import type { Env } from '../worker-env';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { broadcasts } from './broadcasts';
 
@@ -265,7 +265,7 @@ describe('一斉配信の停止・再開・失敗分再送（#662）', () => {
     it('失敗した相手だけ開け直し、送達済みと送達不明には触れない', async () => {
       seedBroadcast(testDb, 'b1', { status: 'sent', sent_at: '2026-09-11T10:00:00.000' });
       seedClaim(testDb, 'f1', 'sent');
-      // #816: 一時的な失敗（混み合い）だけ送り直す。
+      // 一時的な失敗（混み合い）だけ送り直す。
       seedClaim(testDb, 'f2', 'failed', { errorCode: 'line_http_429' });
       seedClaim(testDb, 'f3', 'unknown');
 

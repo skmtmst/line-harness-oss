@@ -46,7 +46,7 @@ export async function createAccountHealthLog(
  *
  * 同じ時刻のログが複数あるときは id の大きい方を採る。まとめて取る
  * `getLatestRiskLevels` と同じ並びにしておかないと、サイドバーの要約と
- * 個別画面で違うレベルが出る(#630)。
+ * 個別画面で違うレベルが出る。
  */
 export async function getLatestRiskLevel(db: D1Database, lineAccountId: string): Promise<string | null> {
   const row = await db.prepare(`SELECT risk_level FROM account_health_logs WHERE line_account_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`)
@@ -67,7 +67,7 @@ export interface LatestAccountRiskRow {
  * それを通してしまうが、同じ時刻のログが2件あるとどちらの値が返るかは
  * 決まらない。危険と正常が同時刻で並んだときにサイドバーの警告が
  * 出たり出なかったりするので、順位付け(時刻の新しい順、同着は id の
- * 大きい順)で1件に決めてから取り出す(#630)。
+ * 大きい順)で1件に決めてから取り出す。
  */
 export async function getLatestRiskLevels(
   db: D1Database,

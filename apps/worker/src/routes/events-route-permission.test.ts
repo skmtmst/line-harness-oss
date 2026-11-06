@@ -1,15 +1,11 @@
 /**
- * N-065 回帰テスト (6件目): 本番 events ルートの権限を実認証で確かめる。
- *
- * 偽ルートではなく本物の events ルーター + 本物の authMiddleware に
- * Bearer トークンで叩く。司令塔裁定どおり、イベント操作は owner/admin または
- * /events 権限つき staff だけが通り、権限なし staff・閲覧専用・他店舗は止まる。
- * 外部 LINE・Calendar へは送らない。
+ * 偽の入口だけで権限が通ることを保証しないよう、実 events route と実 authMiddleware に Bearer トークンで要求する。
+ * owner/admin または /events 権限のある staff だけを許可し、権限なし・閲覧専用・他店舗は拒む。外部へは送信しない。
  */
 import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 
@@ -99,7 +95,7 @@ function post(path: string, key?: string) {
 
 describe('本番 events ルートの権限 (実認証)', () => {
   it('cancel: 権限なしstaff・閲覧専用・無認証は止まり、状態を変えない', async () => {
-    const { db, raw } = createTestD1();
+    const { db, raw } = createTestD1({ loginPolicy: 'off' });
     seed(raw);
     const { app, env } = makeApp(db);
     const cancel = (id: string, account: string, key?: string) =>
@@ -121,7 +117,7 @@ describe('本番 events ルートの権限 (実認証)', () => {
   });
 
   it('cancel: /events権限つきstaff と owner は通る', async () => {
-    const { db, raw } = createTestD1();
+    const { db, raw } = createTestD1({ loginPolicy: 'off' });
     seed(raw);
     const { app, env } = makeApp(db);
     const cancel = (id: string, key: string) =>
@@ -141,7 +137,7 @@ describe('本番 events ルートの権限 (実認証)', () => {
   });
 
   it('decide: 権限なしstaff は 403、owner と /events権限つきstaff は落選できる', async () => {
-    const { db, raw } = createTestD1();
+    const { db, raw } = createTestD1({ loginPolicy: 'off' });
     seed(raw);
     const { app, env } = makeApp(db);
     const decide = (id: string, key?: string) =>

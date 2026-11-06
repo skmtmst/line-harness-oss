@@ -1,7 +1,9 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 import { toJstString } from '@line-crm/db';
 
 /**
- * PHOTO-06 (#1079): 採用写真のECポイント付与（nen_photo_reward_outbox）を
+ * 採用写真のECポイント付与（nen_photo_reward_outbox）を
  * 外部ECへ届けて状態を進める消費側。
  *
  * 背景: outbox 行は採用時に pending で積まれるが、これまで処理する側が
@@ -30,6 +32,11 @@ export type PhotoRewardOutboxRow = {
   created_at: string;
   updated_at: string;
 };
+
+type RewardKind = 'adoption' | 'publication';
+function rewardTable(kind: RewardKind = 'adoption') {
+  return kind === 'publication' ? 'nen_photo_publication_reward_outbox' : 'nen_photo_reward_outbox';
+}
 
 export type EcPhotoPointClient = { baseUrl: string; secret: string };
 
@@ -183,7 +190,7 @@ async function deliverClaimedReward(
   db: D1Database,
   row: PhotoRewardOutboxRow,
   client: EcPhotoPointClient,
-  options: { now: Date; fetcher: typeof fetch },
+  options: { now: Date; fetcher: typeof fetch; rewardKind?: RewardKind },
 ): Promise<RewardDeliveryOutcome> {
   const now = options.now;
   const nowIso = toJstString(now);
@@ -200,7 +207,7 @@ async function deliverClaimedReward(
       ? { kind: 'retry_later', reason: classified.reason, nextAttemptAt: backoffNextAttempt(now, attemptCount, classified.reason) }
       : classified;
   } catch (error) {
-    console.error('photo reward delivery failed', row.id, error);
+    logger.error("photo_reward_sync.deliver_claimed_reward_failed");
     outcome = {
       kind: 'retry_later',
       reason: 'ec_unavailable',
@@ -212,21 +219,21 @@ async function deliverClaimedReward(
   }
   if (outcome.kind === 'synced') {
     await db.prepare(
-      `UPDATE nen_photo_reward_outbox
+      `UPDATE ${rewardTable(options.rewardKind)}
          SET status = 'synced', attempt_count = ?, last_error = NULL,
              next_attempt_at = NULL, synced_at = ?, updated_at = ?
        WHERE id = ?`,
     ).bind(attemptCount, nowIso, nowIso, row.id).run();
   } else if (outcome.kind === 'permanent') {
     await db.prepare(
-      `UPDATE nen_photo_reward_outbox
+      `UPDATE ${rewardTable(options.rewardKind)}
          SET status = 'failed', attempt_count = ?, last_error = ?,
              next_attempt_at = NULL, updated_at = ?
        WHERE id = ?`,
     ).bind(attemptCount, outcome.reason, nowIso, row.id).run();
   } else {
     await db.prepare(
-      `UPDATE nen_photo_reward_outbox
+      `UPDATE ${rewardTable(options.rewardKind)}
          SET status = 'failed', attempt_count = ?, last_error = ?,
              next_attempt_at = ?, updated_at = ?
        WHERE id = ?`,
@@ -244,14 +251,14 @@ export async function deliverPhotoReward(
   db: D1Database,
   row: PhotoRewardOutboxRow,
   client: EcPhotoPointClient,
-  options: { now: Date; fetcher?: typeof fetch; force?: boolean },
+  options: { now: Date; fetcher?: typeof fetch; force?: boolean; rewardKind?: RewardKind },
 ): Promise<RewardDeliveryOutcome | null> {
   const nowIso = toJstString(options.now);
   const leaseExpiredBefore = toJstString(new Date(options.now.getTime() - PHOTO_REWARD_CLAIM_LEASE_MS));
   // force時は次回時刻を待たずに取る。期限切れでない時刻だけを壁にする。
   const dueBefore = options.force ? '9999-12-31T23:59:59.999+09:00' : nowIso;
   const claimed = await db.prepare(
-    `UPDATE nen_photo_reward_outbox
+    `UPDATE ${rewardTable(options.rewardKind)}
         SET status = 'processing', updated_at = ?
       WHERE id = ?
         AND (status IN ('pending', 'failed')
@@ -259,7 +266,7 @@ export async function deliverPhotoReward(
         AND (next_attempt_at IS NULL OR next_attempt_at <= ?)`,
   ).bind(nowIso, row.id, leaseExpiredBefore, dueBefore).run();
   if (!claimed.meta.changes) return null;
-  return deliverClaimedReward(db, row, client, { now: options.now, fetcher: options.fetcher ?? fetch });
+  return deliverClaimedReward(db, row, client, { now: options.now, fetcher: options.fetcher ?? fetch, rewardKind: options.rewardKind });
 }
 
 /** 写真1件のoutboxを即時で届ける（採用直後・再試行・照合の共通入口）。 */
@@ -301,26 +308,35 @@ export async function attemptPhotoRewardForPhoto(
 export async function processDuePhotoRewards(
   db: D1Database,
   client: EcPhotoPointClient | undefined,
-  options: { now: Date; limit?: number; fetcher?: typeof fetch },
+  options: { now: Date; limit?: number; fetcher?: typeof fetch; rewardKind?: RewardKind },
 ): Promise<{ claimed: number; synced: number; failed: number; skipped: number }> {
   if (!client) return { claimed: 0, synced: 0, failed: 0, skipped: 0 };
   const nowIso = toJstString(options.now);
   const rows = await db.prepare(
-    `SELECT * FROM nen_photo_reward_outbox
-      WHERE status IN ('pending', 'failed')
+    `SELECT * FROM ${rewardTable(options.rewardKind)}
+      WHERE (status IN ('pending', 'failed') OR (status='processing' AND updated_at < ?))
+        AND (last_error IS NULL OR last_error NOT IN ('customer_unlinked','invalid_award','ec_auth_failed','attempts_exhausted'))
         AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
       ORDER BY created_at LIMIT ?`,
-  ).bind(nowIso, options.limit ?? 50).all<PhotoRewardOutboxRow>();
+  ).bind(toJstString(new Date(options.now.getTime() - PHOTO_REWARD_CLAIM_LEASE_MS)), nowIso, options.limit ?? 50).all<PhotoRewardOutboxRow>();
   let synced = 0;
   let failed = 0;
   let skipped = 0;
   for (const row of rows.results) {
     const outcome = await deliverPhotoReward(db, row, client, {
-      now: options.now, fetcher: options.fetcher,
+      now: options.now, fetcher: options.fetcher, rewardKind: options.rewardKind,
     });
     if (!outcome) { skipped++; continue; }
     if (outcome.kind === 'synced') synced++;
     else failed++;
   }
   return { claimed: synced + failed + skipped, synced, failed, skipped };
+}
+
+/** 掲載の追加報酬も、採用報酬と同じ署名・再送規則で届ける。 */
+export function processDuePhotoPublicationRewards(
+  db: D1Database, client: EcPhotoPointClient | undefined,
+  options: { now: Date; limit?: number; fetcher?: typeof fetch },
+) {
+  return processDuePhotoRewards(db, client, { ...options, rewardKind: 'publication' });
 }

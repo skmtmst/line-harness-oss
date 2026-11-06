@@ -1,4 +1,4 @@
-/** V6 3-2-A / 23-1-A が共有する、本人照合候補の読み取り契約。 */
+/** 3-2-A / 23-1-A が共有する、本人照合候補の読み取り契約。 */
 export type IdentityCandidateKind = "friend_duplicate" | "ec_member";
 
 export type IdentityCandidateStatus =
@@ -146,7 +146,7 @@ export interface UndoIdentityCandidateRequest {
 }
 
 /**
- * 計量キーの正本(#517 軽4)。
+ * 計量キーの正本。
  *
  * 保存済みの `impact_json` を読む2か所(集計 `potentialRevenue` と画面表示)で
  * 共有する。キー名がずれると画面が黙って「—(未取得)」になり、型でも守れない

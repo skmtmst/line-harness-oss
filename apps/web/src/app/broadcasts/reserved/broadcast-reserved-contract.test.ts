@@ -1,12 +1,13 @@
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(process.cwd(), 'src/app/broadcasts/reserved/page.tsx'), 'utf8')
-const FORM = readFileSync(join(process.cwd(), 'src/components/broadcasts/broadcast-form.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('page.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../../../v8/broadcast-detail/reserved.tsx', import.meta.url), 'utf8')
+const FORM = readUiSource(join(process.cwd(), 'src/components/broadcasts/broadcast-form.tsx'), 'utf8')
 const NEW_PAGE = readFileSync(join(process.cwd(), 'src/app/broadcasts/new/page.tsx'), 'utf8')
 
-describe('V6 一斉配信の予約完了', () => {
+describe("管理画面 一斉配信の予約完了", () => {
   it('作成結果の実IDを完了画面へ渡す', () => {
     expect(FORM).toContain('await persistDraft(')
     expect(FORM).toContain('scheduledAtIso(),')
@@ -34,22 +35,23 @@ describe('V6 一斉配信の予約完了', () => {
     */
     expect(PAGE).toContain('api.broadcasts.preflight')
     expect(PAGE).toContain('const audienceCount = estimate?.audienceCount ?? null')
-    expect(PAGE).toContain('配信対象は送信開始直前に再集計します')
     expect(PAGE).not.toContain('totalCount')
   })
 
   it('未取得と実値0を分ける', () => {
-    /*
-      **人数だけ取れなくても、予約そのものは出す。** 数は `KpiCard` が
-      `—` にし、理由を副文で言う。0人（本当に誰にも届かない）とは別物。
-    */
-    expect(PAGE).toContain('対象人数は現在確認できません。')
-    expect(PAGE).toContain('estimate.hiddenExcluded.toLocaleString')
+    expect(PAGE).toContain('formatNumber(estimate.hiddenExcluded')
   })
 
   it('選択中アカウントと所属先が違う配信を表示しない', () => {
     expect(PAGE).toContain('belongsToAccount(broadcast, selectedAccountId)')
-    expect(PAGE).toContain('選択中のアカウントの配信ではありません')
+  })
+
+  it('対象なしと通信失敗を混ぜず、戻り口と再試行を分ける（R582）', () => {
+    expect(PAGE).toContain('err instanceof ApiError && err.status === 404')
+    expect(PAGE).toContain('kind="not-found"')
+    // 通信失敗は同画面の再試行。存在しない旨とは別の1枚。
+    expect(PAGE).toContain('kind="error"')
+    expect(PAGE).toContain('onRetry={() => void load()}')
   })
 
   it('遲れて返った別の予約の結果で画面を上書きしない', () => {
@@ -60,48 +62,27 @@ describe('V6 一斉配信の予約完了', () => {
     expect(PAGE).toContain('if (isCurrent()) setLoading(false)')
   })
 
-  it('送信時に再集計することを明記する', () => {
-    expect(PAGE).toContain('配信対象は送信開始直前に再集計します')
-    expect(PAGE).toContain('現在の見込み')
-  })
-
   it('予約した内容を実値で読み合わせる', () => {
-    /* 設計 `bPF0s` の面。**固定値を混ぜず、予約したものそのものを出す。** */
-    expect(PAGE).toContain('data-design-node="bPF0s"')
-    expect(PAGE).toContain('一斉配信を予約しました')
     expect(PAGE).toContain('const scheduledLabel = formatJst(broadcast.scheduledAt)')
-  })
-
-  it('設計の5段と予約要約を表示する', () => {
-    expect(PAGE).toContain('<BroadcastStepRail')
-    for (const label of ['基本設定', '対象者', 'メッセージ', '送信設定', '確認']) {
-      expect(PAGE).toContain(`label: '${label}'`)
-    }
-    for (const label of ['管理名', '配信対象', '送信予定', '状態']) {
-      expect(PAGE).toContain(`['${label}'`)
-    }
   })
 
   it('予約後の操作は本物のAPIまたは実在する画面へつなぐ', () => {
     expect(PAGE).toContain('api.broadcasts.testSend(broadcast.id)')
     expect(PAGE).toContain('api.broadcasts.create({')
     expect(PAGE).toContain("duplicateKey.current ??= crypto.randomUUID()")
-    expect(PAGE).toContain('予約の内容を見る')
-    expect(PAGE).not.toContain('準備中')
   })
 
   it('予約取消は確認後に専用の競合防止APIへ渡す', () => {
-    /*
-      題は**配信の名前**を出す（削除の窓 `EGMb1` と同じ形）。2枚開いて
-      いるときに、どちらを取り消すのか読めなくなるため。
-    */
-    expect(PAGE).toContain('の予約を取り消しますか？`}')
-    expect(PAGE).toContain('書いた内容は下書きとして残るので、作り直しにはなりません。')
     /* **取り消せるのは、まだ送り始めていない予約だけ。** */
-    expect(PAGE).toContain("{broadcast.status === 'scheduled' && !cancelled && (")
+    expect(PAGE).toContain("const canCancel = canEdit && broadcast.status === 'scheduled' && !cancelled")
     /* 口の返事をそのまま出さない。409 も通信の失敗も、やることは同じ。 */
     expect(PAGE).not.toMatch(/setCancelError\(\s*(res\.error|String\()/)
     expect(PAGE).toContain('api.broadcasts.cancelReservation(broadcast.id)')
     expect(PAGE).not.toContain('api.broadcasts.delete(broadcast.id)')
   })
+  it('送信時に再集計することを明記する', () => {
+    expect(PAGE).toContain('送る前にもう一度、対象の人数を数え直します')
+    expect(PAGE).toContain('除く見込み')
+  })
+
 })

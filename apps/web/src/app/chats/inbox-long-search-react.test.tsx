@@ -14,7 +14,7 @@ import ChatsPage from './page'
  * #625: 検索窓に2000文字入れたときの受信箱。
  *
  * D1 の LIKE パターン50バイト制限で一覧口が500になる事故があった。
- * サーバー側は instr() に直したが、画面側は次を守る必要がある:
+ * サーバー側は instr に直したが、画面側は次を守る必要がある:
  *   - 長い検索語は上限(200文字)へ切り詰めてサーバーへ渡す
  *     （/api/chats 系は元々サーバー側でも200文字で切り詰める）
  *   - 0件なら「条件に一致する会話がありません」の空状態を出す
@@ -30,7 +30,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
-  selectedAccountId: fixture.accountId, selectedAccount: null, loading: false,
+  selectedAccountId: fixture.accountId, selectedAccount: { emailInboxEnabled: true }, loading: false,
 }) }))
 
 const LONG_QUERY = 'あ'.repeat(2000)
@@ -60,7 +60,7 @@ function base(url: URL) {
 }
 const list = () => host.querySelector<HTMLElement>('[data-inbox-v4="conversation-list"]')!
 const searchInput = () => host.querySelector<HTMLInputElement>('input[aria-label="名前・メールアドレス・内容で検索"]')!
-const quickTabCounts = () => [...host.querySelectorAll<HTMLElement>('[aria-label="受信箱のクイック絞り込み"] button span.tabular-nums')]
+const quickTabCounts = () => [...host.querySelectorAll<HTMLElement>('[aria-label="受信箱のクイック絞り込み"] button [data-segment-count]')]
   .map((span) => span.textContent?.trim())
 async function settle() {
   await act(async () => { await Promise.resolve(); await Promise.resolve() })
@@ -150,16 +150,16 @@ test('長い検索語で一覧口が落ちても、失敗行＋再読み込み�
 
   // 一覧の失敗は一覧の場所で、再読み込みつきで伝える（N-030）。
   await eventually(() => {
-    expect(list().textContent).toContain('チャットの読み込みに失敗しました。')
+    expect(list().textContent).toContain('LINE の会話を読み込めませんでした。')
   })
   expect(list().querySelector('[data-inbox-list-state="loading"]')).toBeNull()
-  // タブ件数は失敗を0件と読ませない。★V7（2026-09-24）では「—」も出さず、件数そのものを出さない。
+  // タブ件数は失敗を0件と読ませない。★管理画面（2026-09-24）では「—」も出さず、件数そのものを出さない。
   expect(quickTabCounts()).toEqual([])
 
   // 再読み込みで同じ条件（長い検索語のまま）を取り直せる。
   fail = false
   const retry = [...list().querySelectorAll('button')]
-    .find((item) => item.textContent?.trim() === '会話を読み込み直す')
+    .find((item) => item.textContent?.trim() === 'もう一度読み込む')
   expect(retry).toBeTruthy()
   await act(async () => { retry!.click() })
   await eventually(() => {
@@ -171,4 +171,11 @@ test('長い検索語で一覧口が落ちても、失敗行＋再読み込み�
   await eventually(() => {
     expect(quickTabCounts()).toEqual(['3', '2', '1'])
   })
+})
+
+test('過去本文だけで一致したサーバーの検索結果を消さない（WEB282）', async () => {
+  handler = url => url.pathname === '/api/chats' && url.searchParams.get('q')
+    ? response({ success:true,data:[{ id:'old-hit',friendName:'山本',status:'unread',lastMessageContent:'こんにちは',lastMessageAt:'2026-10-01T00:00:00Z',revision:1 }] }) : base(url)
+  await act(async()=>root.render(<ChatsPage />));await settle();await typeQuery('過去の注文')
+  await eventually(()=>{ expect(list().textContent).toContain('山本') })
 })

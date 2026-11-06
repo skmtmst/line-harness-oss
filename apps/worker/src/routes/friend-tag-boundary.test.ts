@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { friends } from './friends.js';
@@ -62,7 +62,7 @@ describe('N-041/N-044 タグ付与の所属と手動禁止 (#803)', () => {
   let target: ReturnType<typeof createApp>;
 
   beforeEach(() => {
-    testDb = createTestD1();
+    testDb = createTestD1({ loginPolicy: 'off' });
     seed(testDb);
     target = createApp(testDb.db);
   });

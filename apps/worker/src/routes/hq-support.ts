@@ -1,8 +1,14 @@
+import { logger } from '@line-crm/shared/server';
+import { HQ_SUPPORT_KIND_LABELS, serialize } from './hq-support-display.js';
+export { HQ_SUPPORT_KIND_LABELS } from './hq-support-display.js';
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
   HQ_SUPPORT_KINDS,
   createHqSupportRequest,
+  findRecentDuplicateHqSupportRequest,
   getTenantBilling,
   getStaffById,
   listHqSupportRequests,
@@ -16,7 +22,8 @@ import {
   listSupportMessages,
   SUPPORT_STAGE_LABELS,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { sendPlainMail } from '../services/plain-mail.js';
@@ -24,7 +31,7 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { findPlan, formatJstMonthDay } from '../services/billing-plans.js';
 
 /**
- * 統括から運営へのお問い合わせ（★V6 36-3）。
+ * 統括から運営へのお問い合わせ（★36-3）。
  *
  * - 送るとこの統括の記録に残り、運営の連絡先へメールで知らせ、送信者に控えを送る
  * - メールが送れなくても記録は残す（`notified` が false で返る）
@@ -38,14 +45,6 @@ const BODY_MAX = 4000;
 const ATTACHMENT_MAX = 3;
 const ATTACHMENT_BYTES_MAX = 5 * 1024 * 1024;
 const ATTACHMENT_TYPES = new Set(['image/png', 'image/jpeg']);
-
-export const HQ_SUPPORT_KIND_LABELS: Record<HqSupportKind, string> = {
-  usage: '使い方について',
-  bug: '不具合の報告',
-  billing: '料金・契約について',
-  feature: '要望・提案',
-  other: 'その他',
-};
 
 function tenantOf(c: Context<Env>): string {
   return c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
@@ -64,35 +63,6 @@ function supportPlanLabel(billing: Awaited<ReturnType<typeof getTenantBilling>>)
   if (billing.plan_status === 'exempt') return '課金対象外';
   if (billing.plan_status === 'canceled') return '契約終了';
   return findPlan(billing.plan_key)?.name ?? '—';
-}
-
-type ReplyView = { id: string; authorName: string; body: string; createdAt: string };
-
-function serialize(row: HqSupportRequest, base: string, replies: ReplyView[] = []) {
-  let keys: string[] = [];
-  try {
-    const parsed = JSON.parse(row.attachment_keys) as unknown;
-    keys = Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === 'string') : [];
-  } catch {
-    keys = [];
-  }
-  return {
-    id: row.id,
-    kind: row.kind,
-    kindLabel: HQ_SUPPORT_KIND_LABELS[row.kind] ?? row.kind,
-    subject: row.subject,
-    body: row.body,
-    lineAccountId: row.line_account_id,
-    attachments: keys.map((key) => ({ key, url: `${base}/images/${key}` })),
-    status: row.status,
-    staffName: row.staff_name,
-    notified: row.notified_at !== null,
-    createdAt: row.created_at,
-    // 運営側のチケット番号と返信（★V6 37-6 の返信は統括の履歴にも載る）
-    ticketLabel: formatTicketNo(row.ticket_no ?? null),
-    stage: row.stage,
-    replies,
-  };
 }
 
 function hasImageSignature(bytes: Uint8Array, mimeType: string): boolean {
@@ -138,6 +108,21 @@ function parseAttachments(raw: unknown): { uploads: Upload[] } | { error: string
   return { uploads };
 }
 
+/** 一覧のページ数に左右されない、所属する統括のお問い合わせ集計。 */
+hqSupport.get('/api/hq/support/summary', async (c) => {
+  const data = await c.env.DB.prepare(`SELECT COUNT(*) AS total,
+    COALESCE(SUM(stage='new'),0) AS newCount,
+    COALESCE(SUM(stage='in_progress'),0) AS inProgressCount,
+    COALESCE(SUM(stage='in_progress' AND assignee_staff_id IS NOT NULL),0) AS assignedInProgressCount,
+    COALESCE(SUM(strftime('%Y-%m',resolved_at)=strftime('%Y-%m','now','+9 hours')),0) AS resolvedThisMonth,
+    COALESCE(SUM(strftime('%Y-%m',resolved_at)=strftime('%Y-%m','now','+9 hours','start of month','-1 month')),0) AS resolvedPreviousMonth,
+    AVG(CASE WHEN julianday(first_replied_at)>=julianday(created_at)
+      THEN (julianday(first_replied_at)-julianday(created_at))*24 END) AS averageFirstReplyHours,
+    COUNT(CASE WHEN julianday(first_replied_at)>=julianday(created_at) THEN 1 END) AS firstReplySampleCount
+    FROM hq_support_requests WHERE tenant_id=?`).bind(tenantOf(c)).first();
+  return c.json({ success: true, data });
+});
+
 hqSupport.get('/api/hq/support/requests', async (c) => {
   try {
     const rows = await listHqSupportRequests(c.env.DB, tenantOf(c));
@@ -151,8 +136,7 @@ hqSupport.get('/api/hq/support/requests', async (c) => {
     }));
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('GET /api/hq/support/requests error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -172,8 +156,8 @@ hqSupport.get('/api/hq/support/context', async (c) => {
     let accountRows: Array<{ id: string; name: string }> = [];
     if (accounts.length > 0) {
       const rows = await c.env.DB
-        .prepare(`SELECT id, name FROM line_accounts WHERE id IN (${accounts.map(() => '?').join(',')}) AND COALESCE(tenant_id, ?) = ? ORDER BY name, id`)
-        .bind(...accounts.map((account) => account.id), DEFAULT_TENANT_ID, tenantId)
+        .prepare(`SELECT id, name FROM line_accounts WHERE id IN (${sqlIdSet(accounts.map(account => account.id)).sql}) AND COALESCE(tenant_id, ?) = ? ORDER BY name, id`)
+        .bind(...sqlIdSet(accounts.map(account => account.id)).binds, DEFAULT_TENANT_ID, tenantId)
         .all<{ id: string; name: string }>();
       accountRows = rows.results ?? [];
     }
@@ -191,8 +175,7 @@ hqSupport.get('/api/hq/support/context', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/hq/support/context error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -203,23 +186,23 @@ hqSupport.get('/api/hq/support/kinds', (c) => {
   });
 });
 
-hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'), async (c) => {
+hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const staff = c.get('staff');
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-    if (!body) return c.json({ success: false, error: '送信内容を読み取れませんでした' }, 400);
+    if (!body) return inputError(c, { success: false, error: '送信内容を読み取れませんでした' }, 400, []);
 
     const kind = typeof body.kind === 'string' ? body.kind : '';
     if (!(HQ_SUPPORT_KINDS as readonly string[]).includes(kind)) {
-      return c.json({ success: false, error: '種類を選んでください' }, 400);
+      return inputError(c, { success: false, error: '種類を選んでください' }, 400, ["kind"]);
     }
     const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
-    if (!subject) return c.json({ success: false, error: '件名を入力してください' }, 400);
-    if (subject.length > SUBJECT_MAX) return c.json({ success: false, error: `件名は${SUBJECT_MAX}文字以内で入力してください` }, 400);
+    if (!subject) return inputError(c, { success: false, error: '件名を入力してください' }, 400, ["subject"]);
+    if (subject.length > SUBJECT_MAX) return inputError(c, { success: false, error: `件名は${SUBJECT_MAX}文字以内で入力してください` }, 400, ["subject"]);
     const text = typeof body.body === 'string' ? body.body.trim() : '';
-    if (!text) return c.json({ success: false, error: '本文を入力してください' }, 400);
-    if (text.length > BODY_MAX) return c.json({ success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400);
+    if (!text) return inputError(c, { success: false, error: '本文を入力してください' }, 400, ["body"]);
+    if (text.length > BODY_MAX) return inputError(c, { success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400, ["body"]);
 
     let lineAccountId: string | null = null;
     let lineAccountName: string | null = null;
@@ -235,16 +218,43 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
       lineAccountName = accountLabel?.name ?? null;
     }
 
+    const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
+    const staffName = member?.name ?? staff?.name ?? '';
+
+    /*
+     * 確定応答を失った再送で重複チケットを作らない。
+     * 同じ人・同じ内容の直近の送信があれば、新しく作らず既存のものを返す。
+     * 作り直さないので、運営への知らせも送り直さない。R2 への置き場確保より前で見る。
+     */
+    const duplicate = await findRecentDuplicateHqSupportRequest(c.env.DB, {
+      tenantId,
+      staffId: staff?.id ?? null,
+      staffName,
+      kind: kind as HqSupportKind,
+      subject,
+      body: text,
+      lineAccountId,
+    });
+    if (duplicate) {
+      const base = workerUrl(c);
+      const messages = await listSupportMessages(c.env.DB, duplicate.id);
+      const replies = messages
+        .filter((m) => m.author_kind === 'ops')
+        .map((m) => ({ id: m.id, authorName: m.author_name, body: m.body, createdAt: m.created_at }));
+      return c.json({
+        success: true,
+        data: { ...serialize(duplicate, base, replies), notified: duplicate.notified_at !== null },
+      }, 200);
+    }
+
     const parsed = parseAttachments(body.attachments);
-    if ('error' in parsed) return c.json({ success: false, error: parsed.error }, parsed.status);
+    if ('error' in parsed) return inputError(c, { success: false, error: parsed.error }, parsed.status, []);
     const uploads = parsed.uploads;
     for (const upload of uploads) {
       await c.env.IMAGES.put(upload.key, upload.bytes, { httpMetadata: { contentType: upload.mimeType } });
     }
 
-    const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
     const tenant = await c.env.DB.prepare('SELECT name FROM tenants WHERE id = ?').bind(tenantId).first<{ name: string }>().catch(() => null);
-    const staffName = member?.name ?? staff?.name ?? '';
     const staffEmail = member?.email ?? null;
 
     const request = await createHqSupportRequest(c.env.DB, {
@@ -292,7 +302,7 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
         });
       }
     } catch (error) {
-      console.warn('hq support mail failed:', error instanceof Error ? error.message : error);
+      logger.warn("hq_support.send_request_notification_failed");
     }
     if (notified) await markHqSupportRequestNotified(c.env.DB, request.id);
 
@@ -301,8 +311,7 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
       data: { ...serialize({ ...request, notified_at: notified ? request.created_at : null }, base), notified },
     }, 201);
   } catch (err) {
-    console.error('POST /api/hq/support/requests error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -331,8 +340,7 @@ hqSupport.get('/api/hq/support/requests/:id', async (c) => {
       },
     });
   } catch (err) {
-    console.error('GET /api/hq/support/requests/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -346,19 +354,19 @@ function safeKeysOf(raw: string): string[] {
 }
 
 /** 36-3-A：続きを送る。運営のチケットは対応中へ戻り、運営へ通知メール、送信者に控えを送る。 */
-hqSupport.post('/api/hq/support/requests/:id/messages', requireRole('owner', 'admin', 'staff'), async (c) => {
+hqSupport.post('/api/hq/support/requests/:id/messages', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
     const tenantId = tenantOf(c);
     const staff = c.get('staff');
     const row = await getHqSupportRequest(c.env.DB, c.req.param('id'), tenantId);
     if (!row) return c.json({ success: false, error: 'お問い合わせが見つかりません' }, 404);
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-    if (!body) return c.json({ success: false, error: '送信内容を読み取れませんでした' }, 400);
+    if (!body) return inputError(c, { success: false, error: '送信内容を読み取れませんでした' }, 400, []);
     const text = typeof body.body === 'string' ? body.body.trim() : '';
-    if (!text) return c.json({ success: false, error: '本文を入力してください' }, 400);
-    if (text.length > BODY_MAX) return c.json({ success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400);
+    if (!text) return inputError(c, { success: false, error: '本文を入力してください' }, 400, ["body"]);
+    if (text.length > BODY_MAX) return inputError(c, { success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400, ["body"]);
     const parsed = parseAttachments(body.attachments);
-    if ('error' in parsed) return c.json({ success: false, error: parsed.error }, parsed.status);
+    if ('error' in parsed) return inputError(c, { success: false, error: parsed.error }, parsed.status, []);
     for (const upload of parsed.uploads) {
       await c.env.IMAGES.put(upload.key, upload.bytes, { httpMetadata: { contentType: upload.mimeType } });
     }
@@ -403,7 +411,7 @@ hqSupport.post('/api/hq/support/requests/:id/messages', requireRole('owner', 'ad
         });
       }
     } catch (error) {
-      console.warn('hq support follow-up mail failed:', error instanceof Error ? error.message : error);
+      logger.warn("hq_support.send_reply_notification_failed");
     }
     return c.json({
       success: true,
@@ -419,7 +427,6 @@ hqSupport.post('/api/hq/support/requests/:id/messages', requireRole('owner', 'ad
       },
     }, 201);
   } catch (err) {
-    console.error('POST /api/hq/support/requests/:id/messages error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });

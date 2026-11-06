@@ -1,3 +1,4 @@
+import { migrationApi } from './support/migration-api.js';
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -88,6 +89,7 @@ interface Fixture {
   workerHash: string;
   adminHash: string;
   liffHash: string;
+  migrationsHash: string;
 }
 
 function buildFixture(): Fixture {
@@ -148,6 +150,7 @@ function buildFixture(): Fixture {
     workerHash,
     adminHash: hashMap(adminMap),
     liffHash: hashMap(liffMap),
+    migrationsHash: hashMap(new Map([['041_x.sql',migration]])),
   };
 }
 
@@ -165,6 +168,7 @@ const sampleRelease = (
   worker_bundle_hash: fixture.workerHash,
   admin_hash: fixture.adminHash,
   liff_hash: fixture.liffHash,
+  migrations_hash: fixture.migrationsHash,
   bundle_url: BUNDLE_URL,
   bundle_size_bytes: fixture.tarballBytes.length,
   required_secrets: [],
@@ -267,6 +271,7 @@ function makeFetch(
   let pagesGetCalls = 0; // for distinguishing admin vs liff getLatestDeployment
   let adminDeploymentCalls = 0;
 
+  const journal = migrationApi();
   return vi.fn(async (url: string, init?: RequestInit) => {
     const method = (init?.method ?? 'GET').toUpperCase();
 
@@ -312,6 +317,8 @@ function makeFetch(
 
     // CF API: D1 query (preflight, migration, verify).
     if (url.includes(D1_QUERY_SUBSTR)) {
+      const internal = journal(init);
+      if (internal) return internal;
       const o = overrides.d1Query ?? {
         ok: true,
         status: 200,
@@ -347,11 +354,11 @@ function makeFetch(
 
     // Pages admin project — getLatestDeployment, deploy, rollback, preflight.
     if (url.includes(`/pages/projects/${ADMIN_PROJECT}/deployments/`) && url.endsWith('/rollback')) {
-      const o = overrides.adminRollback ?? { ok: true, status: 200 };
+      const o = overrides.adminRollback ?? { ok: true, status: 200, body: {success:true} };
       return makeResponse(o);
     }
     if (url.includes(`/pages/projects/${LIFF_PROJECT}/deployments/`) && url.endsWith('/rollback')) {
-      const o = overrides.liffRollback ?? { ok: true, status: 200 };
+      const o = overrides.liffRollback ?? { ok: true, status: 200, body: {success:true} };
       return makeResponse(o);
     }
     if (url.includes(`/pages/projects/${ADMIN_PROJECT}/deployments`)) {
@@ -419,11 +426,11 @@ function makeFetch(
     }
     if (url.includes(`/pages/projects/${ADMIN_PROJECT}`)) {
       pagesGetCalls++;
-      const o = overrides.adminCheck ?? { ok: true, status: 200 };
+      const o = overrides.adminCheck ?? { ok: true, status: 200, body:{success:true,result:{canonical_deployment:{id:OLD_ADMIN_DEPLOY,environment:'production',latest_stage:{name:'deploy',status:'success'}}}} };
       return makeResponse(o);
     }
     if (url.includes(`/pages/projects/${LIFF_PROJECT}`)) {
-      const o = overrides.liffCheck ?? { ok: true, status: 200 };
+      const o = overrides.liffCheck ?? { ok: true, status: 200, body:{success:true,result:{canonical_deployment:{id:OLD_LIFF_DEPLOY,environment:'production',latest_stage:{name:'deploy',status:'success'}}}} };
       return makeResponse(o);
     }
 
@@ -501,7 +508,7 @@ describe('runUpdate orchestrator', () => {
     expect(lines.length).toBe(events.length);
   });
 
-  it('preflight fails (token 403) → rollback runs, status = rolled_back', async () => {
+  it('preflight fails (token 403) → records failure without redeploying unchanged code', async () => {
     globalThis.fetch = makeFetch(fixture, {
       tokenVerify: { ok: false, status: 403, body: { error: 'bad token' } },
     }) as unknown as typeof fetch;
@@ -525,19 +532,13 @@ describe('runUpdate orchestrator', () => {
     const rows = rawDb.prepare('SELECT id FROM update_history').all() as Array<{ id: string }>;
     expect(rows.length).toBe(1);
     const row = (await getSnapshot(d1, rows[0].id)) as SnapshotRow;
-    expect(row.status).toBe('rolled_back');
+    expect(row.status).toBe('failed');
     expect(row.error).not.toBeNull();
 
-    // Rollback events emitted.
-    expect(events.some((e) => e.step === 'rollback' && e.status === 'running')).toBe(true);
-    expect(events.some((e) => e.step === 'rollback' && e.status === 'done')).toBe(true);
-    const rollbackRun = events.find(
-      (e) => e.step === 'rollback' && e.status === 'running',
-    );
-    expect(rollbackRun.error).toBeDefined();
+    expect(events.some((e) => e.step === 'rollback')).toBe(false);
   });
 
-  it('apply fails (D1 migration error) → rollback runs, status = rolled_back', async () => {
+  it('apply fails (D1 migration error) → stops without redeploying unchanged code', async () => {
     // Make ALL D1 queries fail. But preflight does a SELECT 1 first — so we
     // need preflight's D1 to succeed but the migration's D1 to fail. Use a
     // call counter via fetch internals.
@@ -584,10 +585,10 @@ describe('runUpdate orchestrator', () => {
 
     const rows = rawDb.prepare('SELECT id FROM update_history').all() as Array<{ id: string }>;
     const row = (await getSnapshot(d1, rows[0].id)) as SnapshotRow;
-    expect(row.status).toBe('rolled_back');
-    expect(events.some((e) => e.step === 'rollback' && e.status === 'done')).toBe(true);
+    expect(row.status).toBe('failed');
+    expect(events.some((e) => e.step === 'rollback')).toBe(false);
     // Preflight + migration:running, but migration:done should NOT have fired.
-    expect(events.some((e) => e.step === 'migration' && e.status === 'running')).toBe(true);
+    expect(events.some((e) => e.step === 'worker')).toBe(false);
     expect(events.some((e) => e.step === 'migration' && e.status === 'done')).toBe(false);
   });
 
@@ -620,6 +621,21 @@ describe('runUpdate orchestrator', () => {
     expect(events.some((e) => e.step === 'rollback' && e.status === 'done')).toBe(true);
   }, 30000);
 
+  it('履歴D1が配備後に停止してもメモリの控えでWorkerと両Pagesを復旧する',async()=>{
+    const calls:string[]=[];
+    const baseFetch=makeFetch(fixture);
+    globalThis.fetch=vi.fn(async(url,init)=>{calls.push(String(url));return baseFetch(url,init);});
+    let databaseOffline=false;
+    const failingD1:D1Like={prepare(sql){if(databaseOffline)throw new Error('history database unavailable');return d1.prepare(sql);}};
+    const handle=await runUpdate({ctx:sampleCtx(fixture),d1:failingD1,workerHealthUrl:WORKER_HEALTH_URL,adminUrl:ADMIN_URL,liffUrl:LIFF_URL,currentWorkerBundleUrl:SNAPSHOT_WORKER_URL,
+      onEvent(event){if(event.step==='verify'&&event.status==='running')databaseOffline=true;},
+    });
+    await expect(handle.done).rejects.toThrow('history database unavailable');
+    expect(calls).toContain(SNAPSHOT_WORKER_URL);
+    expect(calls.some(url=>url.includes(`/pages/projects/${ADMIN_PROJECT}/deployments/${OLD_ADMIN_DEPLOY}/rollback`))).toBe(true);
+    expect(calls.some(url=>url.includes(`/pages/projects/${LIFF_PROJECT}/deployments/${OLD_LIFF_DEPLOY}/rollback`))).toBe(true);
+  });
+
   it('rollback fails after primary failure → status = failed, error captures both', async () => {
     // Apply: token verify ok, but make worker PUT fail. Then make rollback
     // bundle fetch return 404 so rollback ALSO fails.
@@ -647,7 +663,7 @@ describe('runUpdate orchestrator', () => {
     expect(row.error).toMatch(/rollback:/);
   });
 
-  it('bundle hash mismatch (tampered) → throws via verifyBundleIntegrity, rollback runs', async () => {
+  it('bundle hash mismatch (tampered) → throws via verifyBundleIntegrity, no code deployment', async () => {
     // Build a release with a WRONG byte hash — verifyBundleIntegrity should reject.
     globalThis.fetch = makeFetch(fixture) as unknown as typeof fetch;
 
@@ -673,9 +689,9 @@ describe('runUpdate orchestrator', () => {
 
     const rows = rawDb.prepare('SELECT id FROM update_history').all() as Array<{ id: string }>;
     const row = (await getSnapshot(d1, rows[0].id)) as SnapshotRow;
-    expect(row.status).toBe('rolled_back');
+    expect(row.status).toBe('failed');
     // Rollback ran (and succeeded).
-    expect(events.some((e) => e.step === 'rollback' && e.status === 'done')).toBe(true);
+    expect(events.some((e) => e.step === 'rollback')).toBe(false);
   });
 
   it('getLatestDeployment fails (snapshot never created) → outer await rejects, no row', async () => {
@@ -687,8 +703,8 @@ describe('runUpdate orchestrator', () => {
       const method = (init?.method ?? 'GET').toUpperCase();
       if (
         method === 'GET' &&
-        (url.includes(`/pages/projects/${ADMIN_PROJECT}/deployments`) ||
-          url.includes(`/pages/projects/${LIFF_PROJECT}/deployments`))
+        (url.endsWith(`/pages/projects/${ADMIN_PROJECT}`) ||
+          url.endsWith(`/pages/projects/${LIFF_PROJECT}`))
       ) {
         return makeResponse({
           ok: false,

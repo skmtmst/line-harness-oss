@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { claimFormCapacitySlot, countFriendFormSubmissions, createFormSubmission, escapeLikeLiteral, getFormSubmissions, getFormSubmissionsByFriend, getFormSubmissionsByFriendCursor, getFormSubmissionsPage, incrementFormSubmitCount, insertFormSubmissionRecord, releaseFormCapacityClaims, resyncFormSubmitCount, updateFormSubmissionDestinationWriteResult } from './forms/submissions.js';

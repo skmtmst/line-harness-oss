@@ -35,9 +35,14 @@ const route: EntryRoute = {
   updatedAt: '2026-09-01T09:00:00.000+09:00',
 }
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: fixture.replace }),
   useSearchParams: () => new URLSearchParams('id=route-1'),
+}))
+
+vi.mock('@/contexts/account-context', () => ({
+  // 詳細の「入ったLINEアカウント」欄だけに使う。試験では空のまま。
+  useAccount: () => ({ accounts: [], selectedAccountId: 'acc-1' }),
 }))
 
 vi.mock('@/lib/api', () => ({
@@ -49,7 +54,7 @@ vi.mock('@/lib/api', () => ({
       get: async () => ({ success: true, data: route }),
       funnel: async () => ({
         success: true,
-        data: { click_count: 0, friend_add_count: 0, form_submission_count: 0, cv_count: 0 },
+        data: { click_count: 200, friend_add_count: 100, form_submission_count: 0, cv_count: 0, remainingCount: 98, blockedCount: 2, valuePerFriend: 1200, monthly:[{month:'2026-10',friendAddCount:100,remainingCount:98,blockedCount:2,conversionCount:2,conversionValueSum:120000}] },
       }),
       update: fixture.update,
     },
@@ -84,13 +89,13 @@ describe('流入経路のURLコピーに失敗したとき（V6R-S3-f）', () =>
       value: { writeText: vi.fn(async () => { throw new Error('denied') }) },
     })
     render(<InflowLinkDetailPage />)
-    const button = await screen.findByRole('button', { name: 'URLをコピー' })
+    const button = await screen.findByRole('button', { name: 'URL をコピー' })
     await act(async () => { fireEvent.click(button) })
 
     const alerts = await screen.findAllByRole('alert')
     const alert = alerts.find((node) => node.textContent?.includes('コピーできませんでした'))
     if (!alert) throw new Error('コピー失敗の知らせが出ていません')
-    const field = within(alert).getByLabelText('流入経路のURL') as HTMLInputElement
+    const field = screen.getByLabelText('URL をコピー') as HTMLInputElement
     expect(field.value).toContain('/r/shop-qr')
     expect(field.readOnly).toBe(true)
     expect(promptSpy).not.toHaveBeenCalled()
@@ -102,10 +107,17 @@ describe('流入経路のURLコピーに失敗したとき（V6R-S3-f）', () =>
       value: { writeText: vi.fn(async () => undefined) },
     })
     render(<InflowLinkDetailPage />)
-    const button = await screen.findByRole('button', { name: 'URLをコピー' })
+    const button = await screen.findByRole('button', { name: 'URL をコピー' })
     await act(async () => { fireEvent.click(button) })
 
-    expect(await screen.findByRole('button', { name: 'コピーしました' })).toBeTruthy()
-    expect(screen.queryByLabelText('流入経路のURL')).toBeNull()
+    expect(button.textContent).toBe('コピーしました')
+    expect(screen.queryByRole('textbox', { name: 'URL をコピー' })).toBeNull()
   })
 })
+
+ it('shows server totals and monthly detail even when the friend page is empty',async()=>{
+  render(<InflowLinkDetailPage />); await screen.findByRole('button',{name:'URL をコピー'});
+  expect(await screen.findByText(/いま残っている 98人/)).toBeTruthy();
+  expect(screen.getByRole('region',{name:'月別内訳'}).textContent).toContain('100 人');
+  expect(screen.getByText(/1人あたり.*1,200/)).toBeTruthy();
+ });

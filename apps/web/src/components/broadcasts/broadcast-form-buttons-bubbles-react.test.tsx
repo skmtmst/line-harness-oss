@@ -9,13 +9,16 @@
  *   R208: テキストのまま削除・上下移動ができ、本文を保って並べ替わる。
  *   R209: ボタンの編集欄は1つだけ（2通目を直すと全通に反映されていた）。
  */
+import { setTextControlValue } from '@/test-utils/text-control'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 
+const scope = vi.hoisted(() => ({ account: 'acc-1', recent: vi.fn(async () => ({success: true, data: [] as Array<Record<string, string>>})) }))
 const createApi = vi.hoisted(() => vi.fn())
 const updateApi = vi.hoisted(() => vi.fn())
 const getApi = vi.hoisted(() => vi.fn())
+const templatesApi = vi.hoisted(() => vi.fn(async () => ({ success: true, data: [{ id: 't1', name: 'お礼', messageType: 'text', messageContent: '追加する本文', kind: 'message', accountId: 'acc-1', publishedAt: '2026-10-01', publishedVersion: 1 }] })))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -29,16 +32,18 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         create: createApi,
         update: updateApi,
         get: getApi,
-        list: async () => ({ success: true, data: [] }),
+        list: scope.recent,
         preflight: async () => ({ success: true, data: { audienceCount: 10 } }),
         previewCount: async () => ({ success: true, data: { count: 10 } }),
       },
+      staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
+      featureSettings: { visibility: async () => ({ success: true, data: {} }) },
       folders: { list: emptyList },
       scenarios: { list: emptyList },
       commonVars: { list: emptyList },
       friendFields: { list: emptyList },
       broadcastMessageAssets: { list: emptyList, upload: emptyList },
-      templates: { list: emptyList },
+      templates: { list: templatesApi },
       commonActions: { resources: async () => ({ success: true, data: [] }) },
       accountSettings: { getTestRecipients: async () => ({ success: true, data: [] }) },
     },
@@ -56,7 +61,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
+  useAccount: () => ({ selectedAccountId: scope.account, loading: false }),
 }))
 
 vi.hoisted(() => {
@@ -95,12 +100,7 @@ function unmount() {
 }
 
 function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const proto = element instanceof HTMLTextAreaElement
-    ? HTMLTextAreaElement.prototype
-    : HTMLInputElement.prototype
-  const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set
-  setter?.call(element, value)
-  element.dispatchEvent(new Event('input', { bubbles: true }))
+  setTextControlValue(element, value)
 }
 
 function titleInput(): HTMLInputElement | null {
@@ -108,7 +108,7 @@ function titleInput(): HTMLInputElement | null {
 }
 
 function textareas(): HTMLTextAreaElement[] {
-  return [...container.querySelectorAll<HTMLTextAreaElement>('textarea[placeholder="テキストを入力"]')]
+  return [...container.querySelectorAll<HTMLTextAreaElement>('[role="textbox"][placeholder="テキストを入力"]')]
 }
 
 function buttonByText(label: string): HTMLButtonElement | undefined {
@@ -119,9 +119,7 @@ function buttonByText(label: string): HTMLButtonElement | undefined {
 }
 
 function headings(): string[] {
-  return [...container.querySelectorAll('h4')]
-    .map((h) => h.textContent ?? '')
-    .filter((text) => text.includes('通目'))
+  return [...container.querySelectorAll('[aria-label$="通目の吹き出し"]')].map(card => `${card.getAttribute('aria-label')?.replace('の吹き出し','')}・${card.querySelector('[role=tab][aria-selected=true]')?.textContent}`)
 }
 
 describe('一斉配信のボタンとテキスト操作（R206・R208・R209）', () => {
@@ -130,13 +128,13 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
     try {
       expect(headings()).toEqual(['1通目・テキスト'])
       await act(async () => {
-        buttonByText('メッセージを追加')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('メッセージを追加する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
       expect(headings()).toEqual(['1通目・テキスト', '2通目・テキスト'])
       // 各テキストの下に編集欄が出ていた頃は、ここが2つになっていた。
       const addButtons = [...container.querySelectorAll('button')].filter(
-        (button) => (button.textContent ?? '').includes('＋ ボタンを追加'),
+        (button) => (button.textContent ?? '').includes('＋ ボタンを追加する'),
       )
       expect(addButtons).toHaveLength(1)
     } finally {
@@ -148,7 +146,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
     await renderForm()
     try {
       await act(async () => {
-        buttonByText('メッセージを追加')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('メッセージを追加する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
       await act(async () => {
@@ -159,7 +157,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
       expect(textareas().map((t) => t.value)).toEqual(['あ', 'い'])
 
       // 1通目を下へ動かすと、本文を保ったまま入れ替わる。
-      const downButtons = [...container.querySelectorAll('button[aria-label="下へ移動"]')]
+      const downButtons = [...container.querySelectorAll('button[aria-label$="通目を下へ移動"]')]
       expect(downButtons).toHaveLength(2)
       await act(async () => {
         downButtons[0].dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -170,7 +168,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
 
       // 2通目をテキストのまま削除できる（画像へ切り替える裏技は要らない）。
       const deleteButtons = [...container.querySelectorAll('button')].filter(
-        (button) => button.textContent === '削除' && !button.disabled,
+        (button) => Boolean(button.getAttribute('aria-label')?.endsWith('通目を削除する')) && !button.disabled,
       )
       expect(deleteButtons).toHaveLength(2)
       await act(async () => {
@@ -194,13 +192,13 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
       })
       await flush()
       await act(async () => {
-        buttonByText('＋ ボタンを追加')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('＋ ボタンを追加する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
 
       // 空のまま保存すると、何番の何が足りないかを言う（理由のない失敗にしない）。
       await act(async () => {
-        buttonByText('下書き保存')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('下書きを保存する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
       expect(container.textContent).toContain('ボタン1の名前を入力してください')
@@ -214,7 +212,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
       })
       await flush()
       await act(async () => {
-        buttonByText('下書き保存')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('下書きを保存する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
       expect(container.textContent).toContain('ボタン1のURLを入力してください')
@@ -230,7 +228,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
       // 入力欄の近くにも https の制限が出る。
       expect(container.textContent).toContain('ボタン1のURLは https:// から始めてください')
       await act(async () => {
-        buttonByText('下書き保存')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('下書きを保存する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
       expect(createApi).not.toHaveBeenCalled()
@@ -244,7 +242,7 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
       })
       await flush()
       await act(async () => {
-        buttonByText('下書き保存')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        buttonByText('下書きを保存する')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
       expect(createApi).toHaveBeenCalledTimes(1)
@@ -253,4 +251,40 @@ describe('一斉配信のボタンとテキスト操作（R206・R208・R209）'
       unmount()
     }
   })
+})
+
+it('WEB256: テンプレートを足しても3通目以降の入力を捨てない', async () => {
+  await renderForm()
+  try {
+    for (let i = 0; i < 3; i++) { await act(async () => buttonByText('メッセージを追加する')!.click()); await flush() }
+    await act(async () => textareas().forEach((el, i) => setNativeValue(el, `元の本文${i}`)))
+    const choice = container.querySelector<HTMLInputElement>('input[value="template"]')!
+    await act(async () => choice.click()); await flush()
+    await act(async () => (document.querySelector('[role="dialog"] input[type="radio"]') as HTMLInputElement).click()); await flush()
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '選ぶ')!.click()); await flush()
+    expect(textareas().map(t => t.value)).toEqual(['元の本文0', '元の本文1', '元の本文2', '元の本文3', '追加する本文'])
+  } finally { unmount() }
+})
+
+it('WEB257: 最近の配信は切替前の遅い応答で置き換わらない', async () => {
+ let resolve!: (value: {success: boolean; data: Array<Record<string, string>>})=>void
+ scope.account='acc-1'
+ scope.recent.mockImplementationOnce(()=>new Promise(done=>{resolve=done})).mockResolvedValue({success:true,data:[{id:'b',title:'新しい配信',messageType:'text',messageContent:'新',status:'sent'}]})
+ await renderForm()
+ scope.account='acc-2'
+ await act(async()=>root.render(<BroadcastForm tags={[]} onSuccess={()=>{}} onCancel={()=>{}}/>));await flush()
+ expect(container.textContent).toContain('新しい配信')
+ await act(async()=>resolve({success:true,data:[{id:'old',title:'古い配信',messageType:'text',messageContent:'古',status:'sent'}]}))
+ expect(container.textContent).not.toContain('古い配信')
+ unmount();scope.account='acc-1';scope.recent.mockResolvedValue({success:true,data:[]})
+})
+it('WEB259: テンプレートを開いただけでは確認したと表示しない',async()=>{
+ await renderForm()
+ const picker=[...container.querySelectorAll('button')].find(button=>button.textContent?.includes('テンプレートから選ぶ'))!
+ await act(async()=>picker.click());await flush()
+ const template=document.querySelector<HTMLInputElement>('[role="dialog"] input[type="radio"][aria-label="お礼"]')!
+ await act(async()=>template.click());await flush()
+ const dialog=document.querySelector('[role="dialog"]')!
+ expect(dialog.textContent).not.toContain('確認しました')
+ unmount()
 })

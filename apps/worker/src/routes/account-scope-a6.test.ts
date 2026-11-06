@@ -53,7 +53,7 @@ function app(route: Hono<any>) {
       run: vi.fn(async () => ({})),
       all: vi.fn(async () => ({ results: [] })),
     };
-    c.env = { DB: { prepare: () => statement } as unknown as D1Database };
+    c.env = { DB: { prepare: (sql:string) => sql.includes('COUNT(*) total') ? {...statement,bind(){return this;},first:async()=>({total:0})}:statement } as unknown as D1Database };
     c.set('staff' as never, { id: 'owner', role: 'owner', tenantId: 'tenant-a' } as never);
     await next();
   });
@@ -96,7 +96,8 @@ beforeEach(() => {
   mocks.createAutomation.mockResolvedValue(automation);
   mocks.getAutomationLogs.mockResolvedValue([]);
   mocks.getAutoReplyById.mockResolvedValue(autoReply);
-  mocks.createAutoReply.mockResolvedValue(autoReply);
+  // 543の冪等性でcreateAutoReplyは{rule,replayed}を返す。製品の形に合わせる（assert無変更）。
+  mocks.createAutoReply.mockResolvedValue({ rule: autoReply, replayed: false });
   mocks.getFolderById.mockResolvedValue(null);
   mocks.getAutoReplyHitCounts.mockResolvedValue([]);
   mocks.getAffiliateOfferById.mockResolvedValue(offer);
@@ -152,11 +153,11 @@ describe('A-6 account tenant scope', () => {
     expect(mocks.getChatById).not.toHaveBeenCalled();
   });
 
-  test('auto-reply update permits null to clear scope but rejects an empty account id', async () => {
+  test('F1: tenant owner cannot clear scope to create a global rule or use an empty account id', async () => {
     expect((await app(autoReplies).request(
       '/api/auto-replies/auto-reply',
       request('PUT', { lineAccountId: null }),
-    )).status).not.toBe(403);
+    )).status).toBe(403);
 
     expect((await app(autoReplies).request(
       '/api/auto-replies/auto-reply',

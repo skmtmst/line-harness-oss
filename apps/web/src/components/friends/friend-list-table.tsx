@@ -1,21 +1,37 @@
 'use client'
+import type { FriendListColumn } from './friend-list-types'
+export type { FriendListColumn } from './friend-list-types'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import MenuPortal from '@/components/shared/menu-portal'
 import Pagination from '@/components/shared/pagination'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
+import { RefreshCover } from '@/components/shared/refresh-cover'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ListRange from '@/components/ui/list-range'
 import PageSizeSelect from '@/components/ui/page-size-select'
+import { VirtualRows } from '@/components/shared/virtual-rows'
 import FriendListRow, { FriendListCard } from './friend-list-row'
-
-export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
+import type { FriendAction } from './single-friend-actions'
+import { formatNumber } from '@/lib/format'
+import './friend-list-table.css'
 
 interface Props {
+  toolbarFilters?: ReactNode
+  sortControl?: ReactNode
+  canEdit?: boolean
+  allowedActions?: FriendAction[]
+  onAction?: (friend: FriendListItem, action: FriendAction) => void
   friends: FriendListItem[]
   status?: 'loading' | 'ready' | 'error'
+  /*
+   * 読み直し中（★管理画面 sTJsh §2）。行が残っている再取得では一覧を
+   * 消さず、表を 0.55 に薄めて上に 2px の線の帯を出す。
+   */
+  refreshing?: boolean
   emptyTitle?: string
   emptyDescription?: string
   onRetry?: () => void
@@ -44,8 +60,14 @@ const COLUMN_LABELS: Array<{ key: FriendListColumn; label: string }> = [
 ]
 
 export default function FriendListTable({
+  toolbarFilters,
+  sortControl,
   friends,
+  canEdit = false,
+  allowedActions,
+  onAction,
   status = 'ready',
+  refreshing = false,
   emptyTitle = '条件に合う友だちが見つかりません',
   emptyDescription = '検索条件を外すか、別のキーワードでお試しください。',
   onRetry,
@@ -91,35 +113,69 @@ export default function FriendListTable({
     }
   }, [preferencesReady, visible])
 
-  const gridTemplateColumns = useMemo(() => [
-    '36px',
-    '36px',
-    'minmax(180px,1.3fr)',
-    visible.has('support') ? 'minmax(125px,.9fr)' : null,
-    visible.has('scenario') ? 'minmax(85px,.65fr)' : null,
-    visible.has('latest') ? 'minmax(150px,1.45fr)' : null,
-    visible.has('tags') ? 'minmax(150px,1.35fr)' : null,
-    visible.has('source') ? 'minmax(110px,.8fr)' : null,
-    visible.has('last') ? '90px' : null,
-  ].filter(Boolean).join(' '), [visible])
+  const columnTracks = useMemo(() => ([
+    { key: 'check', track: '36px' },
+    { key: 'star', track: '36px' },
+    { key: 'friend', track: 'minmax(0,1.6fr)' },
+    { key: 'support', track: 'minmax(0,1.1fr)' },
+    { key: 'scenario', track: 'minmax(0,.7fr)' },
+    { key: 'latest', track: 'minmax(0,1.2fr)' },
+    { key: 'tags', track: 'minmax(0,1.1fr)' },
+    { key: 'source', track: 'minmax(0,.6fr)' },
+    { key: 'last', track: '70px' },
+    { key: 'actions', track: '36px' },
+  ].filter((column) => column.key === 'check' || column.key === 'star' || column.key === 'friend' || column.key === 'actions' || visible.has(column.key as FriendListColumn))), [visible])
+
+  const gridTemplateColumns = columnTracks.map((column) => column.track).join(' ')
+  /*
+   * ★V8（夕14・WIDTHS-20261001）：1280px 幅で右の列が板の外に切れる。
+   * AGENTS.md の順番（横送りより先に「大事でない列を隠す」）に従い、
+   * v8 の 1366px 未満では流入元列を隠す。流入元は追加時の計測値で、
+   * 詳細の「友だち情報」にあるので一覧から消しても辿れる。
+   */
+  const narrowGridTemplateColumns = columnTracks.filter((column) => column.key !== 'source').map((column) => column.track).join(' ')
 
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1
   const rangeEnd = Math.min(page * pageSize, total)
 
+  /*
+   * ★V8：多い行は窓で描く（M10・2,000行対策）。
+   * 机（lg）では行の高さが78pxでそろっているので窓に入れる。
+   * 手（lg未満）の札は高さがばらばらのため窓にせず、見える側だけ描く。
+   * 幅を測る前は両方描き、CSSで見える側を選ぶ。
+   */
+  const [desktop, setDesktop] = useState<boolean | null>(null)
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1024px)')
+    const apply = () => setDesktop(query.matches)
+    apply()
+    query.addEventListener?.('change', apply)
+    return () => query.removeEventListener?.('change', apply)
+  }, [])
+  const singleBranch = desktop !== null
+  const windowing = singleBranch && desktop === true && friends.length > 60
+  /*
+   * 初回は先頭30行だけ（描画の不一致なし・最初の絵が速い）。
+   * 効果で広げる：窓か見える側だけを描く。
+   */
+  const [expanded, setExpanded] = useState(false)
+  useEffect(() => {
+    setExpanded(true)
+  }, [friends])
+  const firstFriends = !expanded && friends.length > 60 ? friends.slice(0, 30) : friends
+
   return (
-    <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" data-design="V6FriendTable" data-design-node="k4Hz0X">
+    <section
+      className="overflow-hidden bg-canvas"
+      style={{ '--friend-cols': gridTemplateColumns, '--friend-cols-narrow': narrowGridTemplateColumns } as React.CSSProperties}
+      data-design="V8FriendTable" data-design-node="ywJ5H" aria-busy={status === 'loading' || undefined}
+    >
       {/*
         FRIEND-17: 狭い幅ではツールバーの右側（件数・表示項目）を折り返して
         隠さない。h-14 の固定高は lg 以上にだけ掛ける。
       */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 lg:h-14 lg:flex-nowrap lg:py-0">
-        <h2 className="whitespace-nowrap text-sm font-bold text-ink">
-          {/*
-            未取得の件数は0件に見せない（絞り込みの行の件数を消した後は、
-            この見出しがその役目を持つ）。取れるまでは「—」。
-          */}
-          友だち一覧 <span className="ml-1 text-xs font-bold text-ink-faint">{status === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
-        </h2>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">{toolbarFilters ?? <span className="text-xs text-ink-faint">{status === 'ready' ? `${formatNumber(total)}件` : '—'}</span>}</div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           {/* 選んでいる時だけ出す（★V7：0件の時は意味が無い）。 */}
           {selectedCount > 0 ? <span className="whitespace-nowrap font-semibold text-accent-deep">{selectedCount}件選択中</span> : null}
@@ -141,6 +197,7 @@ export default function FriendListTable({
             >
               <div
                 className="w-52 rounded-card border border-hairline bg-canvas p-2 shadow-float"
+                data-design-node="CYJ0L"
                 // 最上層では absolute 指定を無効にする（位置は器が決める）。
                 style={{ position: 'static' }}
               >
@@ -170,11 +227,12 @@ export default function FriendListTable({
             onChange={onPageSizeChange}
             options={[...pageSizeOptions]}
           />
+          {sortControl}
         </div>
       </div>
 
       {/* FRIEND-17: 列見出しは表と対になるため、カード表示の幅では出さない。 */}
-      <div className="hidden h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary lg:grid" style={{ gridTemplateColumns }}>
+      <div data-friend-cols className="hidden h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary lg:grid">
         <div>
           {/* ★V7 共通 チェックボックス（gvjpx）。一部だけ選んでいるときは「―」。 */}
           <Checkbox
@@ -188,17 +246,37 @@ export default function FriendListTable({
         <div className="truncate">友だち</div>
         {visible.has('support') ? <div className="truncate">対応・担当</div> : null}
         {visible.has('scenario') ? <div className="truncate" data-column="scenario">シナリオ</div> : null}
-        {visible.has('latest') ? <div className="truncate">最新メッセージ</div> : null}
-        {visible.has('tags') ? <div className="truncate">タグ・属性</div> : null}
+        {visible.has('latest') ? <div className="truncate">最新のメッセージ</div> : null}
+        {visible.has('tags') ? <div className="truncate">タグ</div> : null}
         {visible.has('source') ? <div className="truncate" data-column="source">流入元</div> : null}
         {visible.has('last') ? <div className="truncate text-center">最終接触</div> : null}
+        <span className="sr-only">操作</span>
       </div>
 
+      <RefreshCover refreshing={refreshing}>
       <div>
         {status === 'loading' ? (
-          <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
-            <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
-          </div>
+          /*
+           * ★管理画面 仕上げ §3: 表は中身の代わりに同じ形の骨組みを出す。
+           * 列の見出しは上にそのまま出ているので、ここは行だけ。
+           * 0.3 秒より早く来たら出さない（DelayedSkeleton）。
+           */
+          <DelayedSkeleton
+            loading
+            skeleton={
+              <div aria-hidden="true">
+                {[0, 1, 2, 3, 4, 5].map((row) => (
+                  <div key={row} className="flex items-center gap-3 border-b border-hairline px-3 py-3">
+                    <Skeleton className="h-5 w-5 shrink-0" />
+                    <Skeleton circle className="h-9 w-9 shrink-0" />
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-28" />
+                  </div>
+                ))}
+              </div>
+            }
+          />
         ) : status === 'error' ? (
           <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
             <ListState
@@ -212,15 +290,41 @@ export default function FriendListTable({
           <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
             <ListState kind="empty" title={emptyTitle} description={emptyDescription} />
           </div>
-        ) : friends.map((friend) => (
+        ) : windowing && expanded ? (
+          /*
+            ★V8：多い行は窓で描く（M10・2,000行対策）。
+            机の行は78pxでそろっているので窓に入れる。札は描かない
+            （窓の高さが合わなくなるため。手では下の片枝描画を使う）。
+          */
+          <VirtualRows
+            count={friends.length}
+            rowHeight={78}
+            renderRow={(index) => {
+              const friend = friends[index]
+              return (
+                <FriendListRow
+                  friend={friend}
+                  selected={selectedIds?.has(friend.id)}
+                  onToggleSelect={() => onToggleSelect?.(friend.id)}
+                  onToggleAttention={() => onToggleAttention?.(friend)}
+                  visibleColumns={visible}
+                />
+              )
+            }}
+          />
+        ) : firstFriends.map((friend) => (
           /*
             FRIEND-17: lg未満はカード、lg以上はグリッド行。
-            両方描いてCSSで分ける。列の表示切替（visible）は両側で効く。
+            見える側だけ描く（初回は両方描いてCSSで分ける）。
+            初回は先頭30行だけ（両テーマ同一・描画の不一致なし）。
+            列の表示切替（visible）は両側で効く。
           */
           <div key={friend.id} className="contents">
             <div className="lg:hidden">
               <FriendListCard
                 friend={friend}
+                canEdit={canEdit} allowedActions={allowedActions}
+                onAction={(action) => onAction?.(friend, action)}
                 selected={selectedIds?.has(friend.id)}
                 onToggleSelect={() => onToggleSelect?.(friend.id)}
                 onToggleAttention={() => onToggleAttention?.(friend)}
@@ -230,21 +334,31 @@ export default function FriendListTable({
             <div className="hidden lg:block">
               <FriendListRow
                 friend={friend}
+                canEdit={canEdit} allowedActions={allowedActions}
+                onAction={(action) => onAction?.(friend, action)}
                 selected={selectedIds?.has(friend.id)}
                 onToggleSelect={() => onToggleSelect?.(friend.id)}
                 onToggleAttention={() => onToggleAttention?.(friend)}
                 visibleColumns={visible}
-                gridTemplateColumns={gridTemplateColumns}
               />
             </div>
           </div>
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0">
-        <ListRange total={total} first={rangeStart} last={rangeEnd} />
-        <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} disabled={status !== 'ready'} ariaLabel="友だち一覧のページ" />
+      {/* ページ送りの帯に件数と操作をまとめる（jX2Uw）。 */}
+      <div data-pagebar className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0">
+        <Pagination
+          className="w-full"
+          page={page}
+          pageCount={pageCount}
+          onPageChange={onPageChange}
+          disabled={status !== 'ready'}
+          ariaLabel="友だち一覧のページ"
+          summary={status === 'ready' ? <ListRange bare total={total} first={rangeStart} last={rangeEnd} /> : <span>—</span>}
+        />
       </div>
+      </RefreshCover>
     </section>
   )
 }

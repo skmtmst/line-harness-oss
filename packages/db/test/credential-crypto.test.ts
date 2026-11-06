@@ -1,15 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  CredentialEncryptionKeyError,
-  decryptCredential,
-  decryptLineAccountCredentials,
-  encryptCredential,
-  createLineAccount,
-  getLineAccountCredentialHealth,
-  resolveLineCredential,
-  DEFAULT_TENANT_ID,
-  type LineAccount,
-} from '../src/index.js';
+import { CredentialEncryptionKeyError, decryptCredential, decryptLineAccountCredentials, encryptCredential, createLineAccount, getLineAccountCredentialHealth, resolveLineCredential, DEFAULT_TENANT_ID } from '../src/index.js';
+import { type LineAccount } from '../src/line-accounts-types.js';
 
 const KEY = btoa('0123456789abcdef0123456789abcdef');
 const OTHER_KEY = btoa('abcdef0123456789abcdef0123456789');
@@ -90,7 +81,7 @@ describe('LINE credential AES-GCM encryption', () => {
     warn.mockRestore();
   });
 
-  it('warns with safe structured fields and falls back when decrypt fails', async () => {
+  it('warns with a fixed code without identifiers and falls back when decrypt fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const encryptedToken = await encryptCredential('new-token', KEY);
     const encryptedSecret = await encryptCredential('new-secret', KEY);
@@ -106,12 +97,8 @@ describe('LINE credential AES-GCM encryption', () => {
     expect(resolved.channel_access_token_last4).toBeNull();
     expect(resolved.channel_secret_last4).toBeNull();
     expect(warn).toHaveBeenCalledTimes(2);
-    expect(warn.mock.calls[0]).toEqual([{
-      event: 'line_credential_plaintext_fallback',
-      line_account_id: 'acc-1',
-      field: 'channel_access_token',
-      reason: 'decrypt_failed',
-    }]);
+    expect(warn.mock.calls[0]).toHaveLength(1);
+    expect(JSON.parse(String(warn.mock.calls[0][0]))).toEqual({ code: 'line_credential_plaintext_fallback', timestamp: expect.any(String), level: 'warn', requestId: null, invocationId: null, source: 'background' });
     const output = JSON.stringify(warn.mock.calls);
     for (const value of [
       KEY,
@@ -122,6 +109,7 @@ describe('LINE credential AES-GCM encryption', () => {
       'new-secret',
       'legacy-token',
       'legacy-secret',
+      'acc-1',
     ]) {
       expect(output).not.toContain(value);
     }
@@ -156,7 +144,7 @@ describe('LINE credential AES-GCM encryption', () => {
     warn.mockRestore();
   });
 
-  it('logs a missing-key classification when a joined credential falls back', async () => {
+  it('logs a fixed fallback code without joined identifiers when the key is missing', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const encryptedToken = await encryptCredential('new-token', KEY);
 
@@ -168,12 +156,9 @@ describe('LINE credential AES-GCM encryption', () => {
         undefined,
       ),
     ).resolves.toBe('legacy-token');
-    expect(warn).toHaveBeenCalledWith({
-      event: 'line_credential_plaintext_fallback',
-      line_account_id: 'acc-joined',
-      field: 'channel_access_token',
-      reason: 'key_unavailable_or_invalid',
-    });
+    expect(warn.mock.calls.map(([raw]) => JSON.parse(String(raw)))).toContainEqual({ code: 'line_credential_plaintext_fallback', timestamp: expect.any(String), level: 'warn', requestId: null, invocationId: null, source: 'background' });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('acc-joined');
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('legacy-token');
     warn.mockRestore();
   });
 
@@ -227,6 +212,9 @@ describe('LINE credential AES-GCM encryption', () => {
   it('writes both encrypted columns when an account is created', async () => {
     let insertValues: unknown[] = [];
     const db = {
+      async batch(statements: D1PreparedStatement[]) {
+        return Promise.all(statements.map((statement) => statement.run()));
+      },
       prepare(sql: string) {
         const statement = {
           bind(...values: unknown[]) {

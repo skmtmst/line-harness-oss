@@ -1,0 +1,21 @@
+import { Hono } from 'hono';
+import { expect, it, vi } from 'vitest';
+import type { Env } from '../worker-env.js';
+const mock = vi.hoisted(() => ({ record: vi.fn() }));
+vi.mock('../services/webinar-comment-idempotency.js', () => ({ recordKeyedWebinarComment: mock.record }));
+vi.mock('../features/webinars/webinar-caller/index.js', () => ({ resolveWebinarCaller: async () => ({ friendId:'friend', webinar:{id:'w',duration_seconds:3600,schedule_json:'[]'} }) }));
+vi.mock('../features/webinars/webinar-schedule/index.js', () => ({ parseScheduleRules: () => [], resolveSession: () => ({live:true,sessionStartAt:123}) }));
+vi.mock('./webinars-definition.js', async original => ({ ...await original<typeof import('./webinars-definition.js')>(), resolveWebinarDeliveryKind: async () => 'scheduled' }));
+import { post__api_liff_webinars_slug_comments_4 } from './webinars-public-view-handlers.js';
+const app = new Hono<Env>();
+app.post('/api/liff/webinars/:slug/comments',post__api_liff_webinars_slug_comments_4);
+it('識別子つき投稿を保存処理へ渡し、再送と内容の競合を区別する', async () => {
+  mock.record.mockResolvedValueOnce('saved').mockResolvedValueOnce('duplicate').mockResolvedValueOnce('conflict');
+  const body={sessionStartAt:123,atSeconds:100,body:'こんにちは',requestId:'u-12345678-1234-4234-8234-123456789abc'};
+  const post=(value:unknown)=>app.request('/api/liff/webinars/sample/comments',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(value)},{DB:{} as D1Database} as Env['Bindings']);
+  expect((await post(body)).status).toBe(200);
+  expect(mock.record).toHaveBeenCalledWith(expect.anything(),{webinarId:'w',friendId:'friend',sessionStartAt:123,atSeconds:100,body:'こんにちは'},body.requestId,60);
+  expect((await post(body)).status).toBe(200);
+  expect((await post(body)).status).toBe(409);
+  expect((await post({...body,requestId:'invalid'})).status).toBe(422);
+});

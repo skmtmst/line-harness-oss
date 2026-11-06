@@ -6,6 +6,7 @@ import {
   postActionsNeedRetry,
   postActionsText,
   postActionStepLabel,
+  ratingAverageText,
   type FormSubmissionSummary,
 } from './response-summary'
 
@@ -42,6 +43,12 @@ describe('回答フォームの全件集計表示', () => {
     expect(nextVisitPeople(summary)).toBe(892)
     expect(nextVisitPeople({ ...summary, dateFields: [] })).toBe(900)
     expect(nextVisitPeople(null)).toBeNull()
+  })
+
+  it('F-11 評価の平均は小数第1位まで出す。無いときは横線', () => {
+    expect(ratingAverageText(4.26)).toBe('4.3')
+    expect(ratingAverageText(5)).toBe('5.0')
+    expect(ratingAverageText(null)).toBe('—')
   })
 
   it('回答ごとの書き込み成否と件数を運用者向けに言い分ける', () => {

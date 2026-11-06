@@ -33,6 +33,7 @@ const TEMPLATES = [
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
   api: {
+    staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
     templates: {
       list: () => Promise.resolve({ success: true, data: TEMPLATES }),
       get: templateGet,
@@ -43,8 +44,8 @@ vi.mock('@/lib/api', () => ({
 }))
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
-    React.createElement('a', { href }, children),
+  default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
+    React.createElement('a', { href, ...rest }, children),
 }))
 
 import TemplatesPage from './page'
@@ -55,6 +56,7 @@ const EMPTY_USED_BY = {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/templates')
   // N-144: 変更操作は owner/admin だけに出す。行の操作を試す試験は owner で立てる。
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
@@ -81,7 +83,7 @@ afterEach(() => cleanup())
  * `role="link"` の行が出るので、画面全体では1件に定まらない。
  */
 const tableRow = (name: string) =>
-  within(screen.getByRole('table')).getByRole('link', { name })
+  within(screen.getByRole('table')).getByText(name.replace('の詳細を開く', '')).closest('tr')!
 
 async function renderAndWait() {
   render(<TemplatesPage />)
@@ -94,7 +96,7 @@ describe('テンプレート一覧行のキーボード操作 (N-140)', () => {
   test('行はTabでフォーカスできる', async () => {
     await renderAndWait()
     const row = tableRow('来店お礼の詳細を開く')
-    expect(row.getAttribute('tabindex')).toBe('0')
+    expect((row.querySelector('a[data-row-link]') as HTMLElement)?.tabIndex).toBe(0)
   })
 
   test('行にフォーカスしてEnterで詳細を開く', async () => {
@@ -102,7 +104,7 @@ describe('テンプレート一覧行のキーボード操作 (N-140)', () => {
     const row = tableRow('来店お礼の詳細を開く')
     fireEvent.keyDown(row, { key: 'Enter' })
     await act(async () => { await Promise.resolve() })
-    expect(templateGet).toHaveBeenCalledWith('tpl-1')
+    expect(within(await screen.findByRole('dialog')).getByText('ご来店ありがとうございました。')).toBeTruthy()
   })
 
   test('行にフォーカスしてSpaceでも詳細を開く', async () => {
@@ -110,17 +112,21 @@ describe('テンプレート一覧行のキーボード操作 (N-140)', () => {
     const row = tableRow('予約確認の詳細を開く')
     fireEvent.keyDown(row, { key: ' ' })
     await act(async () => { await Promise.resolve() })
-    expect(templateGet).toHaveBeenCalledWith('tpl-2')
+    expect(within(await screen.findByRole('dialog')).getByText('ご予約を承りました。')).toBeTruthy()
   })
 
   test('行内のリンク・ボタン上のEnterでは詳細を誤作動させない', async () => {
     await renderAndWait()
     const row = tableRow('来店お礼の詳細を開く')
-    const innerLink = row.querySelector('a') as HTMLElement
+    const innerLink = row.querySelector('a[data-row-link]') as HTMLElement
     expect(innerLink).toBeTruthy()
     // 行内の操作にフォーカスがあるとき、キーは行へ伝搬するが行は開かない。
     fireEvent.keyDown(innerLink, { key: 'Enter' })
     await act(async () => { await Promise.resolve() })
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(templateGet).not.toHaveBeenCalled()
   })
 })
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())

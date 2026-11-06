@@ -1,9 +1,11 @@
+import { jstDate as japanDate, jstDateTimeLocal as japanDateTimeLocal, jstCalendar as japanCalendar } from '@line-crm/shared';
+import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 /**
  * TikTok利益計算の自動化（第2段＝API連携）。
  *
  * 流れ（6時間ごとの重いレーンで1tick）:
  *   1. 利益計算用スプレッドシートが無ければ雛形から自動作成する
- *      （Googleの認可は #838 の google_sheets_integrations を使い回す）。
+ *      （Googleの認可は  の google_sheets_integrations を使い回す）。
  *   2. EC-CUBE の読み取り専用エンドポイント `/line-harness/tiktok-order-export`
  *      から TikTok 注文明細を取り込み、D1 (tiktok_pnl_order_lines) へ upsert。
  *   3. 未反映（sheet_dirty=1）の行だけを「注文明細（自動）」タブへ upsert。
@@ -12,7 +14,7 @@
  * worker が書くのは A〜L 列の生データだけ（M列以降は数式なので触らない）。
  * 秘密値（トークン・署名鍵）は応答・ログに出さない。
  */
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import {
   GoogleBusinessError,
   authorizedJson,
@@ -38,11 +40,11 @@ const SHEET_BATCH_SIZE = 200;
 export const TIKTOK_PNL_SPREADSHEET_TITLE = 'TikTok利益計算（自動集計）';
 
 /**
- * 利益計算が使える連携の状態（#838 の google_sheets_integrations.status）。
+ * 利益計算が使える連携の状態（ の google_sheets_integrations.status）。
  *
- * `pending_target` は「Googleの認可は済んでいるが、#838 の書き出し先スプレッドシートを
+ * `pending_target` は「Googleの認可は済んでいるが、 の書き出し先スプレッドシートを
  * まだ選んでいない」状態で、更新用トークンは保存されている。利益計算は自分で
- * スプレッドシートを作るので #838 の書き出し先を必要とせず、この状態でも動かせる。
+ * スプレッドシートを作るので  の書き出し先を必要とせず、この状態でも動かせる。
  * 除外するのは認可が切れた `expired` と、行自体が無い未接続だけ。
  */
 export const TIKTOK_PNL_USABLE_INTEGRATION_STATUSES = ['connected', 'pending_target'] as const;
@@ -139,18 +141,18 @@ function jstDateOf(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const time = Date.parse(iso);
   if (Number.isNaN(time)) return null;
-  return new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return japanDate(new Date(time));
 }
 
 function jstDateTimeOf(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const time = Date.parse(iso);
   if (Number.isNaN(time)) return null;
-  return new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 16).replace('T', ' ');
+  return japanDateTimeLocal(new Date(time)).replace('T', ' ');
 }
 
 function jstMonthOf(nowIso: string, offsetMonths: number): string {
-  const base = new Date(Date.parse(nowIso) + 9 * 60 * 60 * 1000);
+  const base = japanCalendar(new Date(nowIso));
   const month = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + offsetMonths, 1));
   return month.toISOString().slice(0, 7);
 }
@@ -872,7 +874,7 @@ export async function syncTiktokPnlForAccount(
 }
 
 /**
- * 6時間ごとの定期実行。Google Sheets 連携済み（#838）かつ利益計算シートを
+ * 6時間ごとの定期実行。Google Sheets 連携済みかつ利益計算シートを
  * 有効化したアカウントを対象に、機能ゲート（external_integrations）を
  * 通ったものだけ同期する。
  */
@@ -883,7 +885,7 @@ export async function processTiktokPnlTick(
   const db = env.DB;
   const gate = createFeatureJobGate();
   // enabled = 1 のアカウントだけを対象にする。Google Sheets 連携は
-  // 他の機能（#838）でも使うので、連携済みを条件にすると利益計算を
+  // 他の機能でも使うので、連携済みを条件にすると利益計算を
   // 頼んでいないアカウントにも勝手にスプレッドシートを作ってしまう。
   // 管理画面の手動同期が押された時に enabled が 1 になる。
   const integrations = await db.prepare(
@@ -909,12 +911,7 @@ export async function processTiktokPnlTick(
       if (one.status === 'error') result.failed += 1;
     } catch (error) {
       result.failed += 1;
-      console.error(JSON.stringify({
-        event: 'tiktok_pnl_sync_failed',
-        lineAccountId: integration.line_account_id,
-        error: error instanceof GoogleBusinessError ? error.kind
-          : error instanceof Error ? error.name : 'unknown',
-      }));
+      logger.error("tiktok_pnl.sync_failed");
     }
   }
   return result;

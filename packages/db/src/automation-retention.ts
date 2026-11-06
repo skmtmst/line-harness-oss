@@ -1,8 +1,8 @@
+import { jstCalendar } from '@line-crm/shared';
 import { accountFeatureOffExclusionSql } from './account-settings.js';
-import { jstNow } from './utils.js';
 
 /**
- * v6-25 §15: 実行履歴の保持期間。
+ * -25 §15: 実行履歴の保持期間。
  * 条件外を含む明細は90日。それ以前は日別件数だけを13か月残す。
  * 「待つ」の上限も明細保持期間（90日）までなので、waiting のまま残る行は
  * 運用の取りこぼしとして消さない。消すのは確定済みだけ。
@@ -20,7 +20,8 @@ const TERMINAL_RUN_STATUSES = ['success', 'partial', 'failed', 'cancelled', 'ski
 const PURGE_BATCH_SIZE = 1000;
 
 function monthCutoffDay(now: Date, months: number): string {
-  const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months, now.getUTCDate()));
+  const calendar = jstCalendar(now);
+  const date = new Date(Date.UTC(calendar.getUTCFullYear(), calendar.getUTCMonth() - months, calendar.getUTCDate()));
   return date.toISOString().slice(0, 10);
 }
 
@@ -62,64 +63,37 @@ export async function purgeExpiredAutomationRuns(
       status: string; step_count: number;
     }>();
     if (targets.results.length === 0) break;
-    // 先に消す。消えた行だけを畳むので、競合があっても二重に数えない。
-    const byId = new Map(targets.results.map((row) => [row.id, row]));
-    const placeholders = targets.results.map(() => '?').join(',');
-    const deleted = await db.prepare(`
-      DELETE FROM automation_runs
-       WHERE id IN (${placeholders})
-         AND datetime(created_at) < datetime(?, '-${AUTOMATION_RUN_DETAIL_RETENTION_DAYS} days')
-         AND status IN (${TERMINAL_RUN_STATUSES.map(() => '?').join(',')})
-         ${offAutomations('automation_runs')}
-      RETURNING id
-    `).bind(...targets.results.map((row) => row.id), nowIso, ...TERMINAL_RUN_STATUSES)
-      .all<{ id: string }>();
-    const deletedIds = deleted.results.map((row) => row.id);
-    if (deletedIds.length > 0) {
-      const stepPlaceholders = deletedIds.map(() => '?').join(',');
-      const deletedSteps = await db.prepare(`
-        DELETE FROM automation_run_steps WHERE automation_run_id IN (${stepPlaceholders})
-      `).bind(...deletedIds).run();
-      steps += Number(deletedSteps.meta?.changes ?? 0);
-      runs += deletedIds.length;
-      // 消えた行だけを日・状態ごとに畳む。
-      const groups = new Map<string, {
-        line_account_id: string; automation_id: string; day: string; status: string;
-        run_count: number; step_count: number;
-      }>();
-      for (const id of deletedIds) {
-        const row = byId.get(id);
-        if (!row) continue;
-        const key = `${row.line_account_id} ${row.automation_id} ${row.day} ${row.status}`;
-        const group = groups.get(key) ?? {
-          line_account_id: row.line_account_id, automation_id: row.automation_id,
-          day: row.day, status: row.status, run_count: 0, step_count: 0,
-        };
-        group.run_count += 1;
-        group.step_count += Number(row.step_count ?? 0);
-        groups.set(key, group);
-      }
-      // D1 は 1 文 100 bind まで。1 群 8 bind なので 10 群ずつ運ぶ。
-      const entries = [...groups.values()];
-      for (let offset = 0; offset < entries.length; offset += 10) {
-        const batch = entries.slice(offset, offset + 10);
-        const values = batch.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(',');
-        const bindings = batch.flatMap((group) => [
-          group.line_account_id, group.automation_id, group.day, group.status,
-          group.run_count, group.step_count, nowIso, nowIso,
-        ]);
-        const upserted = await db.prepare(`
-          INSERT INTO automation_run_daily_counts
-            (line_account_id, automation_id, day, status, run_count, step_count, created_at, updated_at)
-          VALUES ${values}
-          ON CONFLICT(line_account_id, automation_id, day, status) DO UPDATE SET
-            run_count = automation_run_daily_counts.run_count + excluded.run_count,
-            step_count = automation_run_daily_counts.step_count + excluded.step_count,
-            updated_at = excluded.updated_at
-        `).bind(...bindings).run();
-        dailyBuckets += Number(upserted.meta?.changes ?? 0);
-      }
-    }
+    const idsJson = JSON.stringify(targets.results.map((row) => row.id));
+    const eligible = `r.id IN (SELECT value FROM json_each(?))
+      AND datetime(r.created_at) < datetime(?, '-${AUTOMATION_RUN_DETAIL_RETENTION_DAYS} days')
+      AND r.status IN (${TERMINAL_RUN_STATUSES.map(() => '?').join(',')})
+      ${offAutomations('r')}`;
+    const bindings = [idsJson, nowIso, ...TERMINAL_RUN_STATUSES];
+    // 集計保存・子明細・親履歴を同じトランザクションで確定する。
+    // 競合した後続処理には対象が残らず、失敗時には履歴も集計も戻る。
+    const results = await db.batch([
+      db.prepare(`
+        INSERT INTO automation_run_daily_counts
+          (line_account_id, automation_id, day, status, run_count, step_count, created_at, updated_at)
+        SELECT r.line_account_id, r.automation_id, date(r.created_at, '+9 hours'), r.status,
+               COUNT(*), SUM((SELECT COUNT(*) FROM automation_run_steps s WHERE s.automation_run_id = r.id)),
+               ?, ?
+          FROM automation_runs r WHERE ${eligible}
+         GROUP BY r.line_account_id, r.automation_id, date(r.created_at, '+9 hours'), r.status
+        ON CONFLICT(line_account_id, automation_id, day, status) DO UPDATE SET
+          run_count = automation_run_daily_counts.run_count + excluded.run_count,
+          step_count = automation_run_daily_counts.step_count + excluded.step_count,
+          updated_at = excluded.updated_at
+      `).bind(nowIso, nowIso, ...bindings),
+      db.prepare(`DELETE FROM automation_run_steps
+        WHERE automation_run_id IN (SELECT r.id FROM automation_runs r WHERE ${eligible})`)
+        .bind(...bindings),
+      db.prepare(`DELETE FROM automation_runs
+        WHERE id IN (SELECT r.id FROM automation_runs r WHERE ${eligible})`).bind(...bindings),
+    ]);
+    dailyBuckets += Number(results[0].meta?.changes ?? 0);
+    steps += Number(results[1].meta?.changes ?? 0);
+    runs += Number(results[2].meta?.changes ?? 0);
     if (targets.results.length < PURGE_BATCH_SIZE) break;
   }
 

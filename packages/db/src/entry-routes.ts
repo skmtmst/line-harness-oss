@@ -1,6 +1,9 @@
-import { jstNow } from './utils.js';
+import type { RefTracking } from './entry-route-tracking-types.js';
+export type { RefTracking } from './entry-route-tracking-types.js';
+import { jstNow, nextVersionToken } from './utils.js';
 import { ensureEntryRouteGenre } from './entry-route-genres.js';
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { DEFAULT_TENANT_ID, type EntryRouteMonth } from '@line-crm/shared';
+
 export interface EntryRoute {
   id: string;
   ref_code: string;
@@ -20,28 +23,11 @@ export interface EntryRoute {
   tenant_id: string | null;
   /** migration 308 より前の互換行は未割当のため null。 */
   line_account_id?: string | null;
+  coupon_asset_id?: string | null;
+  coupon_enabled?: number;
+  coupon_audience?: 'new_friends' | 'all_friends';
   created_at: string;
   updated_at: string;
-}
-
-export interface RefTracking {
-  id: string;
-  ref_code: string;
-  friend_id: string | null;
-  entry_route_id: string | null;
-  source_url: string | null;
-  fbclid: string | null;
-  gclid: string | null;
-  twclid: string | null;
-  ttclid: string | null;
-  utm_source: string | null;
-  utm_medium: string | null;
-  utm_campaign: string | null;
-  user_agent: string | null;
-  ip_address: string | null;
-  line_account_id: string | null;
-  ad_conversion_consent_at: string | null;
-  created_at: string;
 }
 
 export type AdClickIdType = 'fbclid' | 'gclid' | 'twclid' | 'ttclid';
@@ -77,21 +63,32 @@ export interface CreateEntryRouteInput {
   redirectUrl?: string | null;
   poolId?: string | null;
   introTemplateId?: string | null;
+  couponAssetId?: string | null;
+  couponEnabled?: boolean;
+  couponAudience?: 'new_friends' | 'all_friends';
   runAccountFriendAddScenarios?: boolean;
   isActive?: boolean;
   tenantId?: string;
   /**
-   * R39: 作成時に所属させるLINEアカウント。migration 308 の
+   * 作成時に所属させるLINEアカウント。migration 308 の
    * line_account_id 列へ保存する。未指定は未割当のまま残す。
    */
   lineAccountId?: string | null;
 }
 
 export interface EntryRouteFunnel {
+  new_friend_add_count: number;
+  coupon_received_count: number;
+  coupon_used_count: number;
   click_count: number;
   friend_add_count: number;
   form_submission_count: number;
   cv_count: number;
+  remainingCount: number;
+  blockedCount: number;
+  conversionValueSum: number;
+  valuePerFriend: number | null;
+  monthly: EntryRouteMonth[];
 }
 
 export async function getEntryRoutes(db: D1Database, tenantId: string): Promise<EntryRoute[]> {
@@ -115,7 +112,7 @@ export async function getEntryRouteByRefCode(
 }
 
 /**
- * N-244: ref 名前空間の所有確認用。is_active を問わず行を返す。
+ * ref 名前空間の所有確認用。is_active を問わず行を返す。
  * 停止した経路を「存在しない」と区別し、公開URL受付を止めるために使う。
  * 返す行の redirect_url / pool_id / tag_id 等を公開応答に含めてはならない。
  */
@@ -146,8 +143,8 @@ export async function createEntryRoute(
       `INSERT INTO entry_routes
          (id, ref_code, genre, name, tag_id, scenario_id, redirect_url,
           pool_id, intro_template_id, run_account_friend_add_scenarios,
-          is_active, tenant_id, line_account_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          is_active, tenant_id, line_account_id, coupon_asset_id, coupon_enabled, coupon_audience, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -163,6 +160,9 @@ export async function createEntryRoute(
       isActive,
       input.tenantId ?? DEFAULT_TENANT_ID,
       input.lineAccountId ?? null,
+      input.couponAssetId ?? null,
+      input.couponEnabled === true ? 1 : 0,
+      input.couponAudience ?? 'new_friends',
       now,
       now,
     )
@@ -171,7 +171,7 @@ export async function createEntryRoute(
   // Backfill historical ref_tracking rows that were recorded *before* this
   // entry_route existed (e.g. X Harness UUIDs first seen as unregistered
   // inflow, later registered via the /inflow-links 登録 button). Without
-  // this, getEntryRouteFunnel() — which counts clicks via
+  // this, getEntryRouteFunnel — which counts clicks via
   // ref_tracking.entry_route_id — would drop every pre-registration click
   // even though the same rows still show in the inflow-links list. Only
   // touch rows whose entry_route_id is NULL so we don't clobber attribution
@@ -194,14 +194,20 @@ export async function createEntryRoute(
 export async function updateEntryRoute(
   db: D1Database,
   id: string,
-  input: Partial<CreateEntryRouteInput> & { stoppedReason?: string | null },
+  input: Partial<CreateEntryRouteInput> & { stoppedReason?: string | null; expectedUpdatedAt?: string },
 ): Promise<EntryRoute | null> {
-  const now = jstNow();
+  const existing = await getEntryRouteById(db,id);
+  if (!existing) return null;
+  if (input.expectedUpdatedAt !== undefined && input.expectedUpdatedAt !== existing.updated_at) throw new Error('ENTRY_ROUTE_VERSION_CONFLICT');
+  const now = nextVersionToken(existing.updated_at);
   const fields: string[] = ['updated_at = ?'];
   const values: unknown[] = [now];
 
   if (input.genre) await ensureEntryRouteGenre(db, input.genre);
 
+  if (input.couponAssetId !== undefined) { fields.push('coupon_asset_id = ?'); values.push(input.couponAssetId); }
+  if (input.couponEnabled !== undefined) { fields.push('coupon_enabled = ?'); values.push(input.couponEnabled ? 1 : 0); }
+  if (input.couponAudience !== undefined) { fields.push('coupon_audience = ?'); values.push(input.couponAudience); }
   if (input.name !== undefined) { fields.push('name = ?'); values.push(input.name); }
   if (input.genre !== undefined) { fields.push('genre = ?'); values.push(input.genre?.trim() || null); }
   if (input.refCode !== undefined) { fields.push('ref_code = ?'); values.push(input.refCode); }
@@ -234,11 +240,13 @@ export async function updateEntryRoute(
   }
 
   values.push(id);
+  if (input.expectedUpdatedAt !== undefined) values.push(input.expectedUpdatedAt);
 
-  await db
-    .prepare(`UPDATE entry_routes SET ${fields.join(', ')} WHERE id = ?`)
+  const saved = await db
+    .prepare(`UPDATE entry_routes SET ${fields.join(', ')} WHERE id = ?${input.expectedUpdatedAt !== undefined ? ' AND updated_at = ?' : ''}`)
     .bind(...values)
     .run();
+  if (input.expectedUpdatedAt !== undefined && !saved.meta.changes) throw new Error('ENTRY_ROUTE_VERSION_CONFLICT');
 
   return db
     .prepare(`SELECT * FROM entry_routes WHERE id = ?`)
@@ -261,6 +269,7 @@ export async function deleteEntryRoute(
     `DELETE FROM entry_routes
       WHERE id = ?
         AND name = ?
+        AND NOT EXISTS (SELECT 1 FROM entry_route_coupon_receipts WHERE entry_route_id = entry_routes.id)
         AND NOT EXISTS (
           SELECT 1 FROM ref_tracking rt
            WHERE rt.entry_route_id = ? OR rt.ref_code = entry_routes.ref_code
@@ -327,25 +336,47 @@ export async function getEntryRouteFunnel(
 ): Promise<EntryRouteFunnel> {
   const row = await db
     .prepare(
-      `WITH first_touch AS (
-         SELECT f.id AS friend_id
+      `WITH route AS (SELECT id, ref_code, line_account_id FROM entry_routes WHERE id = ?),
+       first_touch AS (
+         SELECT f.id AS friend_id, f.is_following
          FROM friends f
-         INNER JOIN entry_routes er ON er.ref_code = f.ref_code
-         WHERE er.id = ?1
+         INNER JOIN route er ON er.ref_code = f.ref_code
        )
        SELECT
-         (SELECT COUNT(*) FROM ref_tracking WHERE entry_route_id = ?1) AS click_count,
+         (SELECT COUNT(DISTINCT e.friend_id) FROM friend_add_events e JOIN route r ON r.id = e.entry_route_id AND r.line_account_id = e.line_account_id WHERE e.friend_kind = 'first_time') AS new_friend_add_count,
+         (SELECT COUNT(*) FROM entry_route_coupon_receipts WHERE entry_route_id IN (SELECT id FROM route) AND received_at IS NOT NULL) AS coupon_received_count,
+         (SELECT COUNT(DISTINCT cr.entry_route_coupon_receipt_id) FROM coupon_redemptions cr JOIN entry_route_coupon_receipts r ON r.id = cr.entry_route_coupon_receipt_id WHERE r.entry_route_id IN (SELECT id FROM route)) AS coupon_used_count,
+         (SELECT COUNT(*) FROM ref_tracking WHERE entry_route_id IN (SELECT id FROM route)) AS click_count,
          (SELECT COUNT(*) FROM first_touch) AS friend_add_count,
          (SELECT COUNT(*) FROM form_submissions
             WHERE friend_id IN (SELECT friend_id FROM first_touch)) AS form_submission_count,
          (SELECT COUNT(*) FROM conversion_events
-            WHERE friend_id IN (SELECT friend_id FROM first_touch)) AS cv_count`,
+            WHERE friend_id IN (SELECT friend_id FROM first_touch)) AS cv_count,
+         (SELECT COUNT(*) FROM first_touch WHERE is_following = 1) AS remainingCount,
+         (SELECT COUNT(*) FROM first_touch WHERE is_following = 0) AS blockedCount,
+         (SELECT COALESCE(SUM(COALESCE(ce.value_snapshot, cp.value, 0)), 0) FROM conversion_events ce
+            LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+            WHERE ce.friend_id IN (SELECT friend_id FROM first_touch)) AS conversionValueSum`,
     )
     .bind(entryRouteId)
     .first<EntryRouteFunnel>();
-  return (
-    row ?? { click_count: 0, friend_add_count: 0, form_submission_count: 0, cv_count: 0 }
-  );
+  const monthly = await db.prepare(`WITH route AS (SELECT ref_code FROM entry_routes WHERE id = ?),
+    cv AS (SELECT ce.friend_id, COUNT(*) AS n, SUM(COALESCE(ce.value_snapshot, cp.value, 0)) AS amount
+      FROM conversion_events ce LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+      WHERE ce.friend_id IN (SELECT f.id FROM friends f JOIN route r ON r.ref_code = f.ref_code) GROUP BY ce.friend_id)
+    SELECT strftime('%Y-%m', CASE
+        WHEN substr(f.created_at,-1) = 'Z' OR substr(f.created_at,-6,1) IN ('+','-')
+        THEN datetime(f.created_at,'+9 hours') ELSE f.created_at END) AS month,
+      COUNT(*) AS friendAddCount,
+      SUM(CASE WHEN f.is_following = 1 THEN 1 ELSE 0 END) AS remainingCount,
+      SUM(CASE WHEN f.is_following = 0 THEN 1 ELSE 0 END) AS blockedCount,
+      SUM(COALESCE(cv.n,0)) AS conversionCount,
+      SUM(COALESCE(cv.amount,0)) AS conversionValueSum
+    FROM friends f JOIN route r ON r.ref_code = f.ref_code LEFT JOIN cv ON cv.friend_id = f.id
+    GROUP BY month ORDER BY month DESC`).bind(entryRouteId).all<EntryRouteMonth>();
+  const summary = row ?? { new_friend_add_count: 0, coupon_received_count: 0, coupon_used_count: 0, click_count: 0, friend_add_count: 0, form_submission_count: 0, cv_count: 0, remainingCount: 0, blockedCount: 0, conversionValueSum: 0 };
+  return { ...summary, valuePerFriend: summary.friend_add_count > 0 ? summary.conversionValueSum / summary.friend_add_count : null, monthly: monthly.results };
+
 }
 
 export interface EntryRouteSource {

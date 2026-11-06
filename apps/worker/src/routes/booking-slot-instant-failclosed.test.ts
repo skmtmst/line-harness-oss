@@ -16,10 +16,10 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../services/account-access.js', () => ({
@@ -101,8 +101,7 @@ function slotWithStartUtc(startUtc: unknown) {
 }
 
 /**
- * 司令塔が挙げた「欠落・不正値」の並び。
- * 3 つめは Idempotency-Key に使う札。ヘッダーは ASCII しか通らない。
+ * 欠落・不正値を並べ、入口で拒めることを確かめる。3つめは Idempotency-Key 用なので、HTTP ヘッダで使える ASCII を使う。
  */
 const BROKEN_START_UTC: Array<[string, unknown, string]> = [
   ['欠落（キーが無い）', undefined, 'missing'],
@@ -238,7 +237,7 @@ describe('候補の startUtc が欠落・不正なら予約を作らない（実
     respondWithSlot(value);
     const res = await liffCreate(`liff-broken-${key}`);
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: 'slot_not_available' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'slot_not_available' , fields: expect.any(Object), error: expect.any(String) });
     expect(bookingCount()).toBe(0);
   });
 

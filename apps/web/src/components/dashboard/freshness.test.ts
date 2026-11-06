@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import DashboardFreshness, { dashboardFreshnessText, formatDashboardAsOf } from './freshness'
+import DashboardFreshness, { dashboardFreshnessText, dashboardPeriodLabel, formatDashboardAsOf } from './freshness'
 
 describe('ダッシュボードの更新時刻と鮮度表示(#759)', () => {
   // 比較の「今日」は JST 2026-09-13（UTC 09-13T15:00 は JST 09-14 0:00）。
@@ -14,10 +14,10 @@ describe('ダッシュボードの更新時刻と鮮度表示(#759)', () => {
   })
 
   it('日付が違うときは日付を添える（DASH-16。時刻だけだと前日の値を今日と誤読する）', () => {
-    expect(formatDashboardAsOf('2026-09-12T03:04:00.000Z', sameDay)).toBe('9/12 12:04')
-    expect(formatDashboardAsOf('2026-09-01T03:04:00.000Z', sameDay)).toBe('9/1 12:04')
+    expect(formatDashboardAsOf('2026-09-12T03:04:00.000Z', sameDay)).toBe('9月12日（土） 12:04')
+    expect(formatDashboardAsOf('2026-09-01T03:04:00.000Z', sameDay)).toBe('9月1日（火） 12:04')
     // 前日との境目。JSTで日が変わる瞬間は日付付きに切り替わる。
-    expect(formatDashboardAsOf('2026-09-12T14:59:00.000Z', sameDay)).toBe('9/12 23:59')
+    expect(formatDashboardAsOf('2026-09-12T14:59:00.000Z', sameDay)).toBe('9月12日（土） 23:59')
     expect(formatDashboardAsOf('2026-09-12T15:00:00.000Z', sameDay)).toBe('00:00')
   })
 
@@ -63,4 +63,9 @@ describe('ダッシュボードの更新時刻と鮮度表示(#759)', () => {
     }))
     expect(html).toContain(`class="${className} shrink-0 text-xs font-medium"`)
   })
+})
+
+it('30日と旧28日の応答を異なる期間として表示する', () => {
+  expect(dashboardPeriodLabel('last30')).toBe('過去30日')
+  expect(dashboardPeriodLabel('last28')).toBe('過去28日')
 })

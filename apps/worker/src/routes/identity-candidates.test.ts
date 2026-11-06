@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const identityMocks = vi.hoisted(() => {
   class TestIdentityCandidateError extends Error {
@@ -35,10 +35,10 @@ const profileMocks = vi.hoisted(() => ({
   getFriendProfileCandidates: vi.fn(),
 }));
 
-vi.mock('../services/identity-candidates.js', () => identityMocks);
+vi.mock('../features/identity/identity-candidates.js', () => identityMocks);
 vi.mock('../services/account-access.js', () => accessMocks);
-vi.mock('../services/friend-duplicate-candidates.js', () => detectorMocks);
-vi.mock('../services/friend-profile-candidates.js', () => profileMocks);
+vi.mock('../features/friends/friend-duplicate-candidates.js', () => detectorMocks);
+vi.mock('../features/friends/friend-profile-candidates.js', () => profileMocks);
 
 const { identityCandidates } = await import('./identity-candidates.js');
 
@@ -113,7 +113,8 @@ describe('identity candidate HTTP contract', () => {
     const empty = await app.request('/api/identity-candidates?kind=friend_duplicate');
     expect(empty.status).toBe(200);
     expect(await empty.json()).toEqual({
-      success: true, data: { items: [], total: 0, limit: 20, offset: 0 },
+      success: true, data: { items: [], total: 0, limit: 20, offset: 0,
+        sort: [{ field: 'detectedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] },
     });
   });
 
@@ -210,7 +211,7 @@ describe('identity candidate HTTP contract', () => {
     const response = await harness().request('/api/identity-candidates/candidate-a/decide', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: '{',
     });
-    expect(response.status).toBe(422);
+    expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ success: false, code: 'INVALID_JSON' });
     expect(identityMocks.decideIdentityCandidate).not.toHaveBeenCalled();
   });

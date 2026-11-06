@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 /**
  * カルーセルの選択肢が押されたことを受け取るための約束事。
  *
@@ -62,7 +63,7 @@ export function pickCarouselActions(
     const actions = column?.[String(actionIndex)];
     return Array.isArray(actions) ? actions : [];
   } catch {
-    console.error('[carouselTap] unreadable carousel_actions_json — ignored');
+    logger.error("carousel_tap.parse_actions_failed");
     return [];
   }
 }

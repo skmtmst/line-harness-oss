@@ -1,50 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useBrand } from '@/lib/use-brand'
-import { loadAdminVersion } from '@/lib/admin-version-cache'
-import { isRealVersion } from '@/lib/deploy-info'
 import styles from './sidebar-identity.module.css'
 import { brandInitial } from './brand-initial'
 
 /**
- * 共通メニューのいちばん上。**アイコン ＋ 会社名 ＋ バージョン**だけ。
- *
- * ここには 2026-08-26 まで「現在のLINEアカウント」の切替カードがあった。
- * 切替は共通トップバーへ移したので、ここは**いまどの会社の管理画面を
- * 見ているか**だけを示す（Pencil `J33xq/V2WbXF`、`docs/v6-common-rules.md` §1）。
- *
- * 枠も影も付けない。カードにすると、下のメニューと同じ重さに見えて、
- * 押せるものだと読み違える。ここは押せない。
+ * 共通メニューのいちばん上に置く公式ロゴ。
+ * 店舗・統括・停止中・モバイルの各メニューで同じ画像を使う。
  */
-export default function SidebarIdentity() {
-  const brand = useBrand()
-  const [version, setVersion] = useState('')
-
-  useEffect(() => {
-    let cancelled = false
-    // 更新案内の帯と同じ版番号を共有する（2回取らない）。
-    ;(async () => {
-      try {
-        const { version } = await loadAdminVersion()
-        if (!cancelled && version) setVersion(version)
-      } catch {
-        // 取れなければ出さない。「Ver. -」のような穴埋めはしない。
-      }
-    })()
-    return () => { cancelled = true }
-  }, [])
-
-  const name = brand.name || '管理画面'
-  // 1文字は会社名から出す。1社の名前を直接書くと別の会社でも同じ字が出る。
-  const initial = brandInitial(name)
-
+export default function SidebarIdentity({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={styles.root} data-design-node="J33xq/V2WbXF">
-      <span className={styles.mark} aria-hidden="true">{initial}</span>
-      <span className={styles.text}>
-        <span className={styles.name} title={name}>{name}</span>
-        {isRealVersion(version) && <span className={styles.version}>Ver. {version.trim()}</span>}
+    <div className={`${styles.logoRoot} ${compact ? styles.compact : ''}`} data-design-node="J33xq/V2WbXF">
+      <span className={styles.logoViewport}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- 提供されたロゴの透過ピクセルをそのまま表示する */}
+        <img className={styles.logoImage} src="/brand/musubo-color.png" width={3020} height={890} alt="musubo" />
       </span>
     </div>
   )

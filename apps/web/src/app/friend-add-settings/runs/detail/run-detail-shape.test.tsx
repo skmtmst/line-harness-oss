@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /*
  * 全ルート監査 A1（2026-09-25）:
  * `/friend-add-settings/runs/detail?id=friend-add-run-1` が `filter` で
@@ -15,7 +16,7 @@ const apiMocks = vi.hoisted(() => ({ runDetail: vi.fn(), retryRun: vi.fn() }))
 vi.mock('next/link', () => ({ default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a> }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('id=run-1') }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', loading: false }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {}, usePageTitle: () => undefined }))
 vi.mock('@/components/shared/button', () => ({ default: ({ children, ...props }: any) => <button {...props}>{children}</button> }))
 vi.mock('@/components/shared/list-state', () => ({ default: ({ title }: { title: string }) => <div>{title}</div> }))
 vi.mock('@/components/shared/status-badge', () => ({ default: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }))
@@ -61,6 +62,6 @@ describe('実行詳細の actionRuns なし', () => {
     })
     await show()
     expect(host.textContent).toContain('Kenta Kawano')
-    expect(host.textContent).toContain('実行した処理はありません。')
+    expect(host.textContent).toContain('追加の処理はありません。')
   })
 })

@@ -1,13 +1,18 @@
+import { parseOffsetPaging, buildOffsetListResponse, buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { logger } from '@line-crm/shared/server';
+import { lineMessagePreview } from '@line-crm/shared';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import PostalMime from 'postal-mime';
-import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import type { Env } from '../worker-env.js';
+import { denyReadOnly, requirePermission, requireRole } from '../middleware/role-guard.js';
 import { computeUnansweredInbox, countUnanswered } from '../services/unanswered-inbox.js';
 import { sendSupportEmailReply, storeSupportEmail } from '../services/support-email.js';
-import { verifySupportRelay } from '../services/support-relay.js';
+import { SUPPORT_EMAIL_RAW_MAX_CHARACTERS, verifySupportRelay } from '../services/support-relay.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { markInboxConversationRead } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { canAssignChatTo } from '../services/chat-assignees.js';
 import {
   inboxEventStatement,
   inboxNoteStatement,
@@ -15,7 +20,7 @@ import {
   acquireInboxReplyLease,
   releaseInboxReplyLease,
 } from '../services/inbox-events.js';
-
+import { fail } from '../lib/fail.js';
 export const supportInbox = new Hono<Env>();
 
 export function paginateSupportInboxItems<T>(items: T[], offset: number, limit: number): T[] {
@@ -52,7 +57,7 @@ export function extractContactFormReceipt(text: string | undefined): {
   };
 }
 
-supportInbox.post('/webhooks/xserver/support-email', async (c) => {
+supportInbox.post('/webhooks/xserver/support-email', inputJsonBoundary(), async (c) => {
   const secret = c.env.XSERVER_RELAY_SECRET;
   if (!secret) return c.json({ success: false, error: 'Relay not configured' }, 503);
   const rawBody = await c.req.text();
@@ -68,10 +73,10 @@ supportInbox.post('/webhooks/xserver/support-email', async (c) => {
   try {
     payload = JSON.parse(rawBody) as { raw?: string };
   } catch {
-    return c.json({ success: false, error: 'Invalid JSON' }, 400);
+    return inputError(c, { success: false, error: 'Invalid JSON' }, 400, []);
   }
-  if (!payload.raw || payload.raw.length > 14 * 1024 * 1024) {
-    return c.json({ success: false, error: 'Invalid email payload' }, 400);
+  if (!payload.raw || payload.raw.length > SUPPORT_EMAIL_RAW_MAX_CHARACTERS) {
+    return inputError(c, { success: false, error: 'Invalid email payload' }, 400, ["raw"]);
   }
   const binary = atob(payload.raw);
   const raw = Uint8Array.from(binary, (character) => character.charCodeAt(0));
@@ -84,12 +89,7 @@ supportInbox.post('/webhooks/xserver/support-email', async (c) => {
   const formCustomer = recipients.find(
     (recipient) => recipient.address && recipient.address.toLowerCase() !== contactEmail,
   );
-  // EC-CUBE sends the customer receipt to the form submitter and BCCs the
-  // private support mailbox. In that copy Reply-To is the support mailbox,
-  // while To is the actual customer who must own the support thread.
-  // The support mailbox receives the customer receipt as BCC. Its visible To
-  // address is therefore the form submitter, while ordinary inbound mail has
-  // the private contact mailbox in To.
+  // EC-CUBE の控えは問い合わせ窓口へ BCC で届き、Reply-To が窓口でも To は実際の顧客になる。通常の受信と区別し、問い合わせの所有者は提出者へ結び付ける。
   const isContactFormReceipt = Boolean(formCustomer);
   const formData = isContactFormReceipt ? extractContactFormReceipt(parsed.text) : {};
   const sender = isContactFormReceipt
@@ -97,7 +97,7 @@ supportInbox.post('/webhooks/xserver/support-email', async (c) => {
     : replyAddress?.address
       ? replyAddress
       : parsed.from;
-  if (!sender?.address) return c.json({ success: false, error: 'Missing sender' }, 400);
+  if (!sender?.address) return inputError(c, { success: false, error: 'Missing sender' }, 400, ["raw"]);
   const result = await storeSupportEmail(c.env, {
     customerEmail: formData.customerEmail || sender.address,
     customerName: isContactFormReceipt
@@ -106,6 +106,7 @@ supportInbox.post('/webhooks/xserver/support-email', async (c) => {
     subject: parsed.subject,
     bodyText: formData.inquiry || parsed.text,
     bodyHtml: formData.inquiry ? undefined : parsed.html,
+    sentAt: parsed.date || parsed.headers.find(h=>h.key==='received')?.value,
     messageId: parsed.messageId,
     inReplyTo: parsed.inReplyTo,
     references: parsed.references,
@@ -164,8 +165,7 @@ supportInbox.get('/api/support/summary', async (c) => {
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'support_summary_failed', error: String(error) }));
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 });
 
@@ -179,14 +179,13 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     if (quickFilter && quickFilter !== 'reply' && quickFilter !== 'overdue') {
       return c.json({ success: false, error: 'invalid_quick_filter' }, 400);
     }
-    // These filters belong to the email list; LINE uses /api/chats.
+    // これらの絞込はメール一覧に限り、LINE は /api/chats で扱う。
     if ((assignee || unreadOnly || quickFilter) && channel !== 'email') {
       return c.json({ success: false, error: 'email_channel_required' }, 400);
     }
     const status = c.req.query('status') || 'open';
     const query = (c.req.query('q') || '').trim();
-    const limit = Math.min(200, Math.max(1, Number.parseInt(c.req.query('limit') || '100', 10) || 100));
-    const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 100, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: 200 }, offsetPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 0 } });
     // LINEとメールを待ち時間順で統合してからページを切るため、要求ページの末尾まで
     // 両方の候補を取得する。1回に読む件数は従来どおり最大200件に抑える。
     const fetchLimit = Math.min(200, limit + offset);
@@ -195,10 +194,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     let emailUnread = 0;
     let lineTotal = 0;
 
-    // Email threads have no account key in the legacy schema. Until a thread
-    // is explicitly attributed, only the default tenant may view them.
-    // メール問い合わせは LINE アカウントに所属しないため、選択中の
-    // LINE アカウントがあっても対象から外さない（件数の数え方と同じ）。
+    // 所属列のないメール履歴は、明示帰属するまで既定統括だけへ許可する。LINE アカウントには属さないため、選択中のアカウントでは除かず、件数と一致させる。
     if (channel !== 'line' && scope.canSeeUnassigned) {
       const statusSql = status === 'all'
         ? '1=1'
@@ -212,7 +208,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
       let searchSql = '';
       if (query) {
-        // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+        // LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
         searchSql = `AND (
           instr(lower(t.customer_email), lower(?)) > 0
           OR instr(lower(t.customer_name), lower(?)) > 0
@@ -228,7 +224,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
         if (assignee === 'unassigned') searchSql += ' AND t.assigned_staff_id IS NULL';
         else {
           searchSql += ' AND t.assigned_staff_id = ?';
-          bindings.push(assignee);
+          bindings.push(assignee.startsWith('staff:') ? assignee.slice(6) : assignee);
         }
       }
       if (unreadOnly) {
@@ -307,7 +303,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           customerName: row.displayName || '(名前なし)',
           customerIdentifier: row.accountName,
           subject: 'LINEお問い合わせ',
-          preview: row.lastIncomingContent,
+          preview: lineMessagePreview(row.lastIncomingType, row.lastIncomingContent),
           status: 'unread',
           lastMessageAt: row.lastIncomingAt,
           lastIncomingAt: row.lastIncomingAt,
@@ -337,8 +333,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     }, null);
     return c.json({
       success: true,
-      data: {
-        items: channel === 'email' ? items : paginateSupportInboxItems(items, offset, limit),
+      data: buildCursorListResponse({ items: channel === 'email' ? items : paginateSupportInboxItems(items, offset, limit),
         summary: {
           total: lineTotal + emailTotal,
           line: lineTotal,
@@ -347,19 +342,17 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           oldestWaitMinutes: oldest
             ? Math.max(0, Math.floor((Date.now() - new Date(oldest).getTime()) / 60_000))
             : null,
-        },
-      },
+        }, paging: { limit }, sort: [] }),
     });
   } catch (error) {
-    console.error(JSON.stringify({ event: 'support_inbox_failed', error: String(error) }));
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 });
 
 supportInbox.use('/api/support/email/*', async (c, next) => {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!scope.canSeeUnassigned) {
-    return c.json({ success: false, error: 'Thread not found' }, 404);
+    return fail(c, 404, 'THREAD_NOT_FOUND');
   }
   return next();
 });
@@ -385,13 +378,13 @@ supportInbox.get('/api/support/email/threads/:id', async (c) => {
             last_message_at, last_incoming_at, last_outgoing_at, resolved_at, revision
      FROM support_email_threads WHERE id = ?`,
   ).bind(id).first();
-  if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
+  if (!thread) return fail(c, 404, 'THREAD_NOT_FOUND');
   /*
     PERF-11: 毎回全件は返さない。初回は新しい側から limit 件、
     before= で古い履歴、after= で新着の差分を取る。
     返す messages は常に created_at 昇順。
   */
-  const parsedLimit = Number(c.req.query('limit'));
+  const parsedLimit = listQueryNumber(c.req.query('limit'), Number.NaN);
   const limit = Number.isSafeInteger(parsedLimit) && parsedLimit > 0
     ? Math.min(parsedLimit, 200)
     : 100;
@@ -445,29 +438,28 @@ supportInbox.get('/api/support/email/threads/:id', async (c) => {
   const total = await c.env.DB.prepare(
     'SELECT COUNT(*) AS c FROM support_email_messages WHERE thread_id = ?',
   ).bind(id).first<{ c: number }>();
+  const responseItems = messages;
   return c.json({
     success: true,
-    data: {
-      thread,
-      messages,
+    data: buildOffsetListResponse({ thread,
+      messages: responseItems,
       total: total?.c ?? messages.length,
       hasMoreOlder,
       oldestCursor: messages.length ? encodeMessageCursor(messages[0].created_at, messages[0].id) : null,
-      newestCursor: messages.length ? encodeMessageCursor(messages[messages.length - 1].created_at, messages[messages.length - 1].id) : null,
-    },
+      newestCursor: messages.length ? encodeMessageCursor(messages[messages.length - 1].created_at, messages[messages.length - 1].id) : null, items: responseItems, paging: { limit }, sort: [{ field: 'created_at', direction: 'asc' }, { field: 'id', direction: 'asc' }] }),
   });
 });
 
 supportInbox.post(
   '/api/support/email/threads/:id/read',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const id = c.req.param('id');
     const thread = await c.env.DB
       .prepare(`SELECT last_incoming_at FROM support_email_threads WHERE id = ?`)
       .bind(id)
       .first<{ last_incoming_at: string | null }>();
-    if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (!thread) return fail(c, 404, 'THREAD_NOT_FOUND');
     if (thread.last_incoming_at) {
       await markInboxConversationRead(c.env.DB, {
         staffId: c.get('staff').id,
@@ -483,7 +475,7 @@ supportInbox.post(
 supportInbox.post(
   '/api/support/email/read-all',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const now = new Date().toISOString();
     await c.env.DB
       .prepare(
@@ -502,20 +494,20 @@ supportInbox.post(
   },
 );
 
-supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner', 'admin', 'staff'), async (c) => {
+supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const id = c.req.param('id');
   const body: { status?: string; revision?: number; reason?: string } = await c.req
     .json<{ status?: string; revision?: number; reason?: string }>()
     .catch(() => ({}));
   if (!isInboxStatus(body.status)) {
-    return c.json({ success: false, error: '対応状態が正しくありません' }, 400);
+    return inputError(c, { success: false, error: '対応状態が正しくありません' }, 400, ["status"]);
   }
   const staff = c.get('staff');
   const now = new Date().toISOString();
   const current = await c.env.DB.prepare(
     `SELECT status, revision, assigned_staff_id FROM support_email_threads WHERE id = ?`,
   ).bind(id).first<{ status: string; revision: number; assigned_staff_id: string | null }>();
-  if (!current) return c.json({ success: false, error: 'Thread not found' }, 404);
+  if (!current) return fail(c, 404, 'THREAD_NOT_FOUND');
   const expectedRevision = body.revision ?? current.revision;
   if (expectedRevision !== current.revision) {
     return c.json({
@@ -530,7 +522,7 @@ supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner',
   }
   // 担当は「まだ誰も付いていないとき」だけ、操作した人を入れる。
   //
-  // 以前は毎回 staff.id で上書きしていた。担当を選べるようにすると、
+  // 選択した担当者を保存し、操作した staff.id で上書きしない。
   // 対応を変えるたびに担当が勝手に別の人へ移ってしまう。
   const nextRevision = expectedRevision + 1;
   const correlationId = crypto.randomUUID();
@@ -567,25 +559,24 @@ supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner',
 supportInbox.patch(
   '/api/support/email/threads/:id/assignee',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  denyReadOnly(), requirePermission('/chats'),
+  inputJsonBoundary(), async (c) => {
     const id = c.req.param('id');
     const body: { staffId?: string | null; revision?: number; reason?: string } = await c.req
       .json<{ staffId?: string | null; revision?: number; reason?: string }>()
       .catch(() => ({}));
     const staffId = body.staffId ? String(body.staffId) : null;
 
-    // 知らないIDを入れると、誰も見ていない担当になる。実在を確かめる。
-    if (staffId) {
-      const exists = await c.env.DB.prepare(`SELECT 1 FROM staff_members WHERE id = ? AND is_active = 1`)
-        .bind(staffId)
-        .first();
-      if (!exists) return c.json({ success: false, error: '担当者が見つかりません' }, 400);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.canSeeUnassigned) return fail(c, 404, 'THREAD_NOT_FOUND');
+    if (staffId && !await canAssignChatTo(c.env.DB, staffId, null, true)) {
+      return inputError(c, { success: false, error: '担当者が見つかりません' }, 400, ["staffId"]);
     }
 
     const current = await c.env.DB.prepare(
       `SELECT assigned_staff_id, revision FROM support_email_threads WHERE id = ?`,
     ).bind(id).first<{ assigned_staff_id: string | null; revision: number }>();
-    if (!current) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (!current) return fail(c, 404, 'THREAD_NOT_FOUND');
     const expectedRevision = body.revision ?? current.revision;
     if (expectedRevision !== current.revision) {
       return c.json({ success: false, error: 'ほかの担当者が先に更新しました。最新の内容を確認してください', code: 'REVISION_CONFLICT' }, 409);
@@ -624,19 +615,19 @@ supportInbox.patch(
 supportInbox.patch(
   '/api/support/email/threads/:id/notes',
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const id = c.req.param('id');
     const body: { notes?: string; revision?: number; reason?: string } = await c.req
       .json<{ notes?: string; revision?: number; reason?: string }>()
       .catch(() => ({}));
     const notes = (body.notes ?? '').trim();
     if (notes.length > 10_000) {
-      return c.json({ success: false, error: '内部メモは10,000文字以内で入力してください' }, 400);
+      return inputError(c, { success: false, error: '内部メモは10,000文字以内で入力してください' }, 400, ["notes"]);
     }
     const current = await c.env.DB.prepare(
       `SELECT notes, revision FROM support_email_threads WHERE id = ?`,
     ).bind(id).first<{ notes: string | null; revision: number }>();
-    if (!current) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (!current) return fail(c, 404, 'THREAD_NOT_FOUND');
     const expectedRevision = body.revision ?? current.revision;
     if (expectedRevision !== current.revision) {
       return c.json({ success: false, error: 'ほかの担当者が先に更新しました。最新の内容を確認してください', code: 'REVISION_CONFLICT' }, 409);
@@ -682,7 +673,7 @@ supportInbox.get(
     const exists = await c.env.DB.prepare(`SELECT 1 FROM support_email_threads WHERE id = ?`)
       .bind(id)
       .first();
-    if (!exists) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (!exists) return fail(c, 404, 'THREAD_NOT_FOUND');
     const rows = await c.env.DB.prepare(
       `SELECT id, event_type, before_json, after_json, actor_staff_id,
               (SELECT name FROM staff_members sm WHERE sm.id = e.actor_staff_id) AS actor_staff_name,
@@ -708,25 +699,25 @@ supportInbox.get(
   },
 );
 
-supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', 'admin', 'staff'), async (c) => {
+supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   const id = c.req.param('id');
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
   if (!isValidIdempotencyKey(idempotencyKey)) {
-    return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
   }
   const body: { body?: string; revision?: number } = await c.req
     .json<{ body?: string; revision?: number }>()
     .catch(() => ({}));
   const content = body.body?.trim() || '';
   if (!content || content.length > 50_000) {
-    return c.json({ success: false, error: '本文は1〜50,000文字で入力してください' }, 400);
+    return inputError(c, { success: false, error: '本文は1〜50,000文字で入力してください' }, 400, ["body"]);
   }
   let leaseAcquired = false;
   try {
     const thread = await c.env.DB.prepare(
       `SELECT revision FROM support_email_threads WHERE id = ?`,
     ).bind(id).first<{ revision: number }>();
-    if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (!thread) return fail(c, 404, 'THREAD_NOT_FOUND');
     if (body.revision !== undefined && body.revision !== thread.revision) {
       return c.json({
         success: false,
@@ -755,7 +746,7 @@ supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', '
     return c.json({ success: true, data: result });
   } catch (error) {
     if (error instanceof Error && error.message === 'THREAD_NOT_FOUND') {
-      return c.json({ success: false, error: 'Thread not found' }, 404);
+      return fail(c, 404, 'THREAD_NOT_FOUND');
     }
     if (error instanceof Error && error.message === 'INVALID_CUSTOMER_RECIPIENT') {
       return c.json({ success: false, error: '顧客のメールアドレスを確認できないため送信を停止しました' }, 409);
@@ -766,7 +757,7 @@ supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', '
     if (error instanceof Error && error.message === 'IDEMPOTENCY_IN_PROGRESS') {
       return c.json({ success: false, error: '前回の送信結果を確認中です。再送せず受信履歴を確認してください' }, 409);
     }
-    console.error(JSON.stringify({ event: 'support_email_reply_failed', threadId: id, error: String(error) }));
+    logger.error("support_email.send_reply_failed");
     return c.json({ success: false, error: 'メール送信に失敗しました' }, 502);
   } finally {
     if (leaseAcquired) {

@@ -1,7 +1,45 @@
 'use client'
+import CloseButton from '@/components/shared/close-button'
+import { eventsApi } from '@/lib/api';
+
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Workflow } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import styles from './action-editor.module.css'
+import Button from '@/components/shared/button'
+import { ActionAddButton, ActionDragHandle, ActionRow, type ActionChoice } from '@/components/shared/action-list'
+import { useReorder } from '@/components/shared/row-actions'
+import { EntityPickerField } from '@/components/shared/entity-picker'
+import { EntityKindField, type EntityKind } from '@/components/shared/entity-picker-sources'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Select from '@/components/shared/select'
+import {
+  api,
+  describeSaveFailure,
+  type ScenarioAction,
+  type ScenarioActionHook,
+  type ScenarioActionType,
+  type ScenarioDraftActionV6,
+} from '@/lib/api'
+import Notice from '@/components/shared/notice'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import ConditionBuilder, {
+  findConditionDraftIssue as findSharedConditionDraftIssue,
+  findInvalidRangeIssue,
+  type SegmentCondition,
+} from '@/components/shared/condition-builder'
+import { useAccount } from '@/contexts/account-context'
+import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import { scenarioReferenceData } from './scenario-reference-data'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import InlineSettings from '@/components/shared/inline-settings'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
+import { ToggleField } from '@/components/shared/toggle'
 
 /*
- * シナリオのアクションを編集する窓（設計 `V6 5 hz9ti 送信後のアクションを設定`）。
+ * シナリオのアクションを編集する窓（設計 `管理画面 5 hz9ti 送信後のアクションを設定`）。
  *
  * 段の並びは設計に合わせて **「追加する動作を選ぶ」が先、「実行する動作」が後**。
  * 先に一覧を出して最後に追加口を置くと、まだ1つも無いときに何をすれば
@@ -22,42 +60,12 @@
  *     `scenario_actions` に名前もフォルダもセットの口も無く、読む口も
  *     書く口も無い。入口だけ置くと、書いたものが消えたように見える・
  *     保存できるように見えて設定済みだと誤認させる（R241）。
- *     引き継ぎは `docs/design-qa/v6-scenario-action-editor-handoff.md`
  *   - 8つの動作 … 現行の編集口が持つ種別は `ScenarioActionType` の5つ。
- *     変更時は、安全に変換できる設定をV6下書きAPIへ同時保存する
+ *     変更時は、安全に変換できる設定を管理画面下書きAPIへ同時保存する
  *   - 「発動2回目以降も各動作を実行」をセクションに1つ … `repeatOnRefire` は
  *     動作1件ごとの列。1つにまとめると、動作ごとに違う値を持てなくなり、
  *     既にある設定を黙って上書きすることになる
  */
-
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
-import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Workflow } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
-import styles from './action-editor.module.css'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import Combobox from '@/components/shared/combobox'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Select from '@/components/shared/select'
-import {
-  api,
-  type ScenarioAction,
-  type ScenarioActionHook,
-  type ScenarioActionType,
-  type ScenarioDraftActionV6,
-} from '@/lib/api'
-import Notice from '@/components/shared/notice'
-import ConditionBuilder, {
-  findInvalidRangeIssue,
-  isEmptyCondition,
-  isRuleComplete,
-  type SegmentCondition,
-  type SegmentRule,
-} from '@/components/shared/condition-builder'
-import { useAccount } from '@/contexts/account-context'
-import { useFeatureVisibility } from '@/lib/use-feature-visibility'
-import { scenarioReferenceData } from './scenario-reference-data'
 
 export const ACTION_KINDS: {
   feature?: 'friend_fields' | 'support_marks' | 'common_vars'
@@ -107,7 +115,7 @@ const KIND_LABEL: Record<ScenarioActionType, string> = {
   event_booking: 'イベント予約操作',
 }
 
-/** 既存5種を、機能5 V6の下書き契約へ安全に写せる形だけ変換する。 */
+/** 既存5種を、機能5 管理画面の下書き契約へ安全に写せる形だけ変換する。 */
 function toDraftActions(actions: ScenarioAction[]): ScenarioDraftActionV6[] {
   return actions.flatMap<ScenarioDraftActionV6>((action, actionIndex) => {
     const config = (action.config ?? {}) as Record<string, unknown>
@@ -173,7 +181,7 @@ function toDraftActions(actions: ScenarioAction[]): ScenarioDraftActionV6[] {
       return [{ ...common, id: action.id, type: 'start_reminder', params: { reminderId: config.reminderId }, sortOrder: actionIndex * 10 }]
     }
     if (action.actionType === 'event_booking' && typeof config.eventId === 'string' && config.eventId) {
-      return [{ ...common, id: action.id, type: 'common_action', params: { eventId: config.eventId }, sortOrder: actionIndex * 10 }]
+      return [{ ...common, id: action.id, type: 'event_booking', params: config, sortOrder: actionIndex * 10 }]
     }
     return []
   })
@@ -271,7 +279,10 @@ export function describeAction(action: ScenarioAction, lookups: ActionLookups): 
       const target = typeof c.eventId === 'string' && c.eventId
         ? lookups.events.find((t) => t.id === c.eventId)?.name
         : undefined
-      return target ? `イベント予約「${target}」` : 'イベント予約未選択'
+      if (! target) return 'イベント予約未選択'
+      const operation = c.op === 'cancel' ? '申し込みを取り消す' : 'イベントに申し込む'
+      const slot = typeof c.slotId === 'string' && c.slotId ? '（選んだ回）' : ''
+      return `${operation}「${target}」${slot}`
     }
     default:
       return '設定した内容を実行'
@@ -281,26 +292,15 @@ export function describeAction(action: ScenarioAction, lookups: ActionLookups): 
 /*
  * R243: 編集中の未完成行は保持し、保存のときに入力不足を案内する。
  * 未完成のまま黙って「条件なし」に置き換えない。
+ * 判定は共通のものを使う。空のかたまりだけの下書きも止める。
  */
 export function findConditionDraftIssue(draft: SegmentCondition | null): string | null {
-  if (!draft || isEmptyCondition(draft)) return null
-  const hasIncompleteRule = (rules: SegmentRule[]) => rules.some((rule) => !isRuleComplete(rule))
-  if (hasIncompleteRule(draft.rules ?? [])) {
-    return '入力が未完成の条件があります。空欄を埋めるか、「この条件を外す」で取り除いてください。'
-  }
-  for (const group of draft.groups ?? []) {
-    if ((group.rules ?? []).length === 0) {
-      return '空の「いずれか」の条件のかたまりがあります。項目を足すか、かたまりを外してください。'
-    }
-    if (hasIncompleteRule(group.rules ?? [])) {
-      return '入力が未完成の条件があります。空欄を埋めるか、「この条件を外す」で取り除いてください。'
-    }
-  }
-  return null
+  return findSharedConditionDraftIssue(draft)
 }
 
 export interface ActionEditorProps {
   scenarioId: string
+  accountId?: string | null
   hook: ScenarioActionHook
   stepId?: string | null
   choiceIndex?: number | null
@@ -313,6 +313,7 @@ export interface ActionEditorProps {
 
 export default function ActionEditor({
   scenarioId,
+  accountId,
   hook,
   stepId = null,
   choiceIndex = null,
@@ -320,9 +321,14 @@ export default function ActionEditor({
   onClose,
   onChanged,
 }: ActionEditorProps) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId: contextAccountId } = useAccount()
+  const selectedAccountId = accountId === undefined ? contextAccountId : accountId
   // 共通の窓の約束: Escapeで閉じる・Tabは窓の中・閉じたら起点へ戻す。
-  const panelRef = useOverlayFocus(true, onClose)
+  const pendingRef = useRef(0)
+  const [pendingCount, setPendingCount] = useState(0)
+  const errorRef = useRef('')
+  const retryRef = useRef<(() => Promise<void>) | null>(null)
+  const closeWhenSaved = () => { if (!pendingRef.current && !errorRef.current) onClose() }
   // 任意機能の動作種は、そのaccountで機能がオフなら追加口ごと出さない。
   const actionFeatureVisibility = useFeatureVisibility(selectedAccountId)
   const [actions, setActions] = useState<ScenarioAction[]>([])
@@ -332,7 +338,16 @@ export default function ActionEditor({
     setActions(next)
   }
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [draftReady, setDraftReady] = useState(false)
+  const [reload, setReload] = useState(0)
+  const scope = `${scenarioId}:${selectedAccountId}:${hook}:${stepId}:${choiceIndex}`
+  const scopeRef = useRef({ key: scope, generation: 0 })
+  if (scopeRef.current.key !== scope) {
+    scopeRef.current = { key: scope, generation: scopeRef.current.generation + 1 }
+  }
+  const scopeSubject = scopeRef.current
+  const [error, setErrorState] = useState('')
+  const setError = (message: string) => { errorRef.current = message; setErrorState(message) }
   const [conditionFor, setConditionFor] = useState<string | null>(null)
   /*
    * R243: 条件は編集中の下書きとして持ち、保存のときだけ整える。
@@ -378,10 +393,12 @@ export default function ActionEditor({
 
   /* 一覧の取得。表示の作り直しは呼び出し側が決める。 */
   const fetchActions = useCallback(async (): Promise<ScenarioAction[]> => {
+    const at = scopeSubject
+    if (at !== scopeRef.current) return []
     const res = await api.scenarios.actions.list(scenarioId)
+    if (scopeRef.current !== at) return []
     if (!res.success) {
-      setError(res.error)
-      return actionsRef.current
+      throw new Error(res.error)
     }
     return res.data.filter(
         (a) =>
@@ -389,39 +406,52 @@ export default function ActionEditor({
           (a.stepId ?? null) === (stepId ?? null) &&
           (a.choiceIndex ?? null) === (choiceIndex ?? null),
       )
-  }, [scenarioId, hook, stepId, choiceIndex])
+  }, [scenarioId, selectedAccountId, hook, stepId, choiceIndex, scopeSubject])
 
   /* 初回の読み込みだけ「読み込んでいます」を出す。R244: 保存のたびに
    * 作り直して編集欄を閉じないよう、更新時は黙って入れ替える。 */
   const load = useCallback(async (): Promise<ScenarioAction[]> => {
+    const at = scopeSubject
     setLoading(true)
-    const next = await fetchActions()
-    setActionsSync(next)
-    if (initialRef.current === null) initialRef.current = next
-    setLoading(false)
-    return next
-  }, [fetchActions])
+    try {
+      const next = await fetchActions()
+      if (scopeRef.current !== at) return []
+      setActionsSync(next)
+      if (initialRef.current === null) initialRef.current = next
+      return next
+    } finally { if (scopeRef.current === at) setLoading(false) }
+  }, [fetchActions, scopeSubject])
 
   /* 保存後の読み直し。開いている編集欄・入力焦点を残すため、読み込み中の
    * 表示には切り替えない。 */
   const refresh = useCallback(async (): Promise<ScenarioAction[]> => {
+    const at = scopeSubject
     const next = await fetchActions()
-    setActionsSync(next)
+    if (scopeRef.current === at) setActionsSync(next)
     return next
-  }, [fetchActions])
+  }, [fetchActions, scopeSubject])
 
   const saveDraftSnapshot = async (next: ScenarioAction[]) => {
+    if (scopeSubject !== scopeRef.current) return false
     if (!selectedAccountId) {
       setError('LINE公式アカウントを選んでください')
       return false
     }
+    const at = scopeSubject
     setDraftSaving(true)
     try {
+      const current = await api.scenarios.getDraft(scenarioId, selectedAccountId)
+      if (at !== scopeRef.current) return false
+      if (!current.success) throw new Error(current.error)
+      const siblings = (current.data?.afterActions ?? []).filter((action) =>
+        action.hook !== hook || (action.stepId ?? null) !== stepId ||
+        (action.choiceKey ?? null) !== (choiceIndex === null ? null : String(choiceIndex)))
       const response = await api.scenarios.saveDraft(scenarioId, {
         lineAccountId: selectedAccountId,
         expectedVersion: draftVersionRef.current,
-        afterActions: toDraftActions(next),
+        afterActions: [...siblings, ...toDraftActions(next)],
       })
+      if (at !== scopeRef.current) return false
       if (!response.success) {
         setError(response.error)
         return false
@@ -430,45 +460,85 @@ export default function ActionEditor({
       setDraftVersion(response.data.version)
       return true
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'V6下書きを保存できませんでした')
+      if (at !== scopeRef.current) return false
+      setError(describeSaveFailure(saveError))
       return false
     } finally {
-      setDraftSaving(false)
+      if (at === scopeRef.current) setDraftSaving(false)
     }
   }
 
   /* 保存は1本の列に並べる。打ち続けても順序が入れ替わらない。 */
-  const enqueue = (task: () => Promise<void>) => {
-    const run = saveQueueRef.current.then(task, task)
-    saveQueueRef.current = run.catch(() => {})
+  const enqueue = (task: () => Promise<void>, retrySafe = false) => {
+    const at = scopeSubject
+    pendingRef.current += 1
+    setPendingCount(pendingRef.current)
+    const run = saveQueueRef.current.then(() => { if (at === scopeRef.current) return task() }).catch((caught) => {
+      if (at !== scopeRef.current) return
+      setError(describeSaveFailure(caught))
+      retryRef.current = retrySafe ? async () => {
+        // 古い操作の写しを再送せず、その後に打ち足した現在の入力を保存する。
+        const latest = actionsRef.current
+        for (const action of latest) {
+          if (at !== scopeRef.current) return
+          const response = await api.scenarios.actions.update(scenarioId, action.id, {
+            config: action.config, condition: action.condition,
+            repeatOnRefire: action.repeatOnRefire, sortOrder: action.sortOrder,
+          })
+          if (!response.success) throw new Error(response.error)
+        }
+        if (!await saveDraftSnapshot(latest)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
+        onChanged?.()
+      } : null
+    }).finally(() => {
+      if (at === scopeRef.current) {
+        pendingRef.current -= 1
+        setPendingCount(pendingRef.current)
+      }
+    })
+    saveQueueRef.current = run
     return run
   }
 
   useEffect(() => {
+    pendingRef.current = 0
+    setPendingCount(0)
+    saveQueueRef.current = Promise.resolve()
+    retryRef.current = null
+  }, [scopeSubject])
+
+  useEffect(() => {
     let cancelled = false
+    setActionsSync([]); initialRef.current = null; setError(''); setDraftReady(false)
+    draftVersionRef.current = 0; setDraftVersion(0); setDraftSaving(false)
     void Promise.all([
       load(),
       selectedAccountId
-        ? api.scenarios.getDraft(scenarioId, selectedAccountId).catch(() => null)
+        ? api.scenarios.getDraft(scenarioId, selectedAccountId)
         : Promise.resolve(null),
     ]).then(([, draftResponse]) => {
       if (cancelled) return
+      if (!draftResponse?.success) { setError('下書きを読み込めませんでした。もう一度読み込んでください。'); return }
+      setDraftReady(true)
       const version = draftResponse?.success && draftResponse.data ? draftResponse.data.version : 0
       draftVersionRef.current = version
       setDraftVersion(version)
-    })
+    }).catch((caught) => { if (!cancelled) setError(japaneseDetailOf(caught) || '下書きを読み込めませんでした。') })
     return () => {
       cancelled = true
     }
-  }, [load, scenarioId, selectedAccountId])
+  }, [load, scenarioId, selectedAccountId, reload])
 
   useEffect(() => {
+    let cancelled = false
+    setTags([]); setFields([]); setMarks([]); setScenarioOpts([]); setVars([]); setTemplates([]); setReminders([]); setEvents([])
     if (!selectedAccountId) {
       setMarks([])
       return
     }
     void (async () => {
       setTargetsLoading(true)
+      try {
       const toOption = (row: unknown): Option => {
         const record = (row ?? {}) as Record<string, unknown>
         return {
@@ -487,6 +557,8 @@ export default function ActionEditor({
           scenarioReferenceData.reminders(selectedAccountId),
           scenarioReferenceData.events(selectedAccountId),
         ])
+      if (cancelled) return
+      if ([tagRes, fieldRes, markRes, scenarioRes, varRes, templateRes, reminderRes, eventRes].some(response => !response.success)) throw new Error('Reference data failed')
       if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
       if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
       if (markRes.success) setMarks(markRes.data.map((m) => ({ id: m.id, name: m.name })))
@@ -518,11 +590,13 @@ export default function ActionEditor({
           }),
         )
       }
-      setTargetsLoading(false)
+      } catch { if (!cancelled) setError('候補を読み込めませんでした。もう一度お試しください。') }
+      finally { if (!cancelled) setTargetsLoading(false) }
     })()
-  }, [scenarioId, selectedAccountId])
+    return () => { cancelled = true }
+  }, [scenarioId, selectedAccountId, reload])
 
-  const add = (kind: (typeof ACTION_KINDS)[number]) => {
+  const add = (kind: (typeof ACTION_KINDS)[number], config = kind.make()) => {
     setError('')
     void enqueue(async () => {
       const res = await api.scenarios.actions.create(scenarioId, {
@@ -530,15 +604,15 @@ export default function ActionEditor({
         stepId,
         choiceIndex,
         actionType: kind.type,
-        config: kind.make(),
+        config,
         repeatOnRefire: true,
       })
       if (!res.success) {
-        setError(res.error)
-        return
+        throw new Error(res.error)
       }
       const fresh = await refresh()
-      await saveDraftSnapshot(fresh)
+      setExpandedId(res.data.id)
+      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
       onChanged?.()
     })
   }
@@ -559,12 +633,11 @@ export default function ActionEditor({
         sortOrder: patch.sortOrder ?? action.sortOrder,
       })
       if (!res.success) {
-        setError(res.error)
-        return
+        throw new Error(res.error)
       }
-      await saveDraftSnapshot(next)
+      if (!await saveDraftSnapshot(next)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
       onChanged?.()
-    })
+    }, true)
   }
 
   const remove = (action: ScenarioAction) => {
@@ -579,37 +652,12 @@ export default function ActionEditor({
         return
       }
       const fresh = await refresh()
-      await saveDraftSnapshot(fresh)
+      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
       onChanged?.()
     })
   }
 
   /** 上下の入れ替え。並び順は実行順なので、見た目と実行が一致している必要がある。 */
-  const move = (index: number, direction: -1 | 1) => {
-    const list = actionsRef.current
-    const target = list[index + direction]
-    if (!target) return
-    const current = list[index]
-    if (!current) return
-    setError('')
-    const next = [...list]
-    next[index] = target
-    next[index + direction] = current
-    setActionsSync(next)
-    void enqueue(async () => {
-      const first = await api.scenarios.actions.update(scenarioId, current.id, {
-        sortOrder: target.sortOrder,
-      })
-      const second = await api.scenarios.actions.update(scenarioId, target.id, {
-        sortOrder: current.sortOrder,
-      })
-      if (!first.success) setError(first.error)
-      else if (!second.success) setError(second.error)
-      const fresh = await refresh()
-      await saveDraftSnapshot(fresh)
-      onChanged?.()
-    })
-  }
 
   /* R243: 条件の窓を開くとき、下書きに写して持つ。入力のたびに保存しない。 */
   const openCondition = (action: ScenarioAction) => {
@@ -642,7 +690,7 @@ export default function ActionEditor({
           return
         }
         const fresh = await refresh()
-        await saveDraftSnapshot(fresh)
+        if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
         onChanged?.()
         setConditionFor(null)
       } finally {
@@ -698,12 +746,12 @@ export default function ActionEditor({
           }
         }
         const fresh = await refresh()
-        await saveDraftSnapshot(fresh)
+        if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
         onChanged?.()
         onClose()
       } catch (restoreError) {
         setError(
-          restoreError instanceof Error ? restoreError.message : '開く前の状態に戻せませんでした',
+          describeSaveFailure(restoreError),
         )
       } finally {
         setCancelling(false)
@@ -711,11 +759,39 @@ export default function ActionEditor({
     })
   }
 
+  const actionChoices: ActionChoice<{ kind: (typeof ACTION_KINDS)[number]; config: unknown }>[] = ACTION_KINDS
+    .filter(kind => kind.type !== 'common_var' && (!kind.feature || actionFeatureVisibility.enabled(kind.feature)))
+    .map(kind => {
+      const target = kind.type === 'tag' ? { items: tags, key: 'tagIds', title: 'タグ', multiple: true }
+        : kind.type === 'support_mark' ? { items: marks, key: 'markId', title: '対応マーク' }
+        : kind.type === 'friend_field' ? { items: fields, key: 'fieldId', title: '友だち情報欄' }
+        : kind.type === 'scenario' ? { items: scenarioOpts, key: 'scenarioId', title: 'シナリオ' }
+        : kind.type === 'send_template' ? { items: templates, key: 'templateId', title: 'テンプレート' }
+        : kind.type === 'reminder' ? { items: reminders, key: 'reminderId', title: 'リマインダ' }
+        : kind.type === 'event_booking' ? { items: events, key: 'eventId', title: 'イベント' } : null
+      return { id: kind.type, label: kind.label, icon: kind.icon, make: () => ({ kind, config: kind.make() }),
+        picker: target ? { title: `${target.title}を選ぶ`, items: target.items, multiple: target.multiple,
+          apply: (item, ids) => ({ ...item, config: { ...(item.config as object), [target.key]: target.multiple ? ids : ids[0] } }) } : undefined }
+    })
+  const reorder = useReorder({ items: actions, idOf: action => action.id, onReorder: ({ ids }) => {
+    const next = ids.map(id => actionsRef.current.find(action => action.id === id)!)
+    setActionsSync(next)
+    void enqueue(async () => {
+      for (const [index, action] of next.entries()) {
+        const res = await api.scenarios.actions.update(scenarioId, action.id, { sortOrder: index })
+        if (!res.success) throw new Error(res.error)
+      }
+      const fresh = await refresh()
+      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
+      onChanged?.()
+    })
+  } })
+
   const editing = actions.find((a) => a.id === conditionFor) ?? null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="action-editor-title" data-design-node="hz9ti" className={`${styles.dialog} flex w-full flex-col overflow-hidden rounded-card shadow-lg`}>
+    <InlineSettings open title={title } onClose={closeWhenSaved}>
+      <div data-design-node="hz9ti">
         {/* ① 見出しと説明。設計は見出し20/700・説明13。 */}
         <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6" style={{ paddingBlock: 18 }}>
           <div className="min-w-0">
@@ -725,16 +801,11 @@ export default function ActionEditor({
             </p>
             <p className="hidden">{title}に実行する動作を決めます。上から順に実行します。</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ink-secondary shrink-0 px-2 text-2xl leading-none"
-            aria-label="閉じる"
-          >
-            ×
-          </button>
+          <CloseButton onClick={closeWhenSaved} />
         </div>
 
+        {pendingCount > 0 && <p role="status">保存しています…</p>}
+        {error && <Button onClick={() => { const retry = retryRef.current; setError(''); if (retry) void enqueue(retry, true); else setReload(value => value + 1) }}>もう一度試す</Button>}
         {editing ? (
           <div className="flex-1 px-6 pb-5 pt-0">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -742,15 +813,10 @@ export default function ActionEditor({
                 {actions.indexOf(editing) + 1}. [{KIND_LABEL[editing.actionType]}] の条件設定
               </p>
               <div className="flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setConditionFor(null)}
-                  className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-4 text-sm"
-                >
+                <Button variant="secondary" className="text-ink-secondary h-9 px-4 whitespace-normal" type="button" onClick={() => setConditionFor(null)}>
                   戻る
-                </button>
-                <Button variant="primary" onClick={saveCondition} disabled={conditionSaving}>
-                  {conditionSaving ? '保存中…' : '条件を保存'}
+                </Button>
+                <Button variant="primary" onClick={saveCondition} disabled={conditionSaving} busy={conditionSaving}>条件を保存する
                 </Button>
               </div>
             </div>
@@ -758,7 +824,7 @@ export default function ActionEditor({
               ここで決めた条件に合う友だちにだけ、この動作を実行します。条件なしなら全員に実行します。
             </p>
             {conditionError && (
-              <Notice tone="validation" className="mb-4">
+              <Notice tone="warn" className="mb-4">
                 {conditionError}
               </Notice>
             )}
@@ -779,7 +845,7 @@ export default function ActionEditor({
             <p className="text-ink-secondary mb-4 text-xs">
               追加・変更・削除はその場で保存されます。キャンセルは開いたときの状態に戻します。
             </p>
-            {loading ? (
+            {loading || !draftReady ? (
               <p className="text-ink-faint py-8 text-center text-sm">読み込んでいます</p>
             ) : (
               <div className="space-y-4">
@@ -811,22 +877,7 @@ export default function ActionEditor({
                     選ぶと、下の「実行する動作」の最後に足します。中身はあとから決められます。
                   </p>
                   {/* 設計は4×2。実装が持つ種別は5つなので、押せない札は並べない。 */}
-                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {ACTION_KINDS.filter((kind) => kind.type !== 'common_var' && (!kind.feature || actionFeatureVisibility.enabled(kind.feature))).map((kind) => {
-                      const Icon = kind.icon
-                      return (
-                        <button
-                          key={kind.type}
-                          type="button"
-                          onClick={() => void add(kind)}
-                          className={`${styles.kindButton} border-hairline text-ink hover:bg-canvas-sunken flex flex-col items-center justify-center gap-1 border text-caption font-bold transition-colors`}
-                        >
-                          <Icon aria-hidden size={18} strokeWidth={1.75} />
-                          {kind.label}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <ActionAddButton choices={actionChoices} disabled={pendingCount > 0 || targetsLoading} onAdd={item => add(item.kind, item.config)} />
                   <p className="sr-only">
                     {draftSaving
                       ? 'V6下書きへ保存しています…'
@@ -842,68 +893,19 @@ export default function ActionEditor({
                     タグは付け直しても、加算はもう一度足したくない、といった使い分けができます。
                   </p>
                   <div className="mt-1 space-y-2">
-                    {actions.map((action, index) => {
-                      const open = expandedId === action.id
-                      return (
-                      <div key={action.id} className="border-hairline rounded-card border">
-                        <div className={`${styles.actionRow} bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 px-4 py-2.5`}>
-                          <p className="text-ink flex flex-wrap items-center gap-2 text-sm font-bold">
-                            {/* 実行順の丸番号（設計 26x26）。並べ替えるとここが変わる。 */}
-                            <span className={`${styles.orderMark} bg-accent-deep text-on-accent flex shrink-0 items-center justify-center rounded-pill text-caption font-bold`}>
-                              {index + 1}
-                            </span>
-                            {/*
-                              R240: 種別と要約は実際の設定から作る。並べ替えで
-                              変わるのは順序番号だけ。
-                            */}
-                            <span><span className="block">{KIND_LABEL[action.actionType]}</span><span className="text-ink-secondary mt-1 block text-xs font-normal">{describeAction(action, lookups)}</span></span>
-                            {/* 埋まっていないアクションは配信で実行されない。
-                                黙って何もしないと、効いていないことに気づけない。 */}
-                            {action.complete === false && (
-                              <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 font-medium" style={{ fontSize: 10 }}>
-                                未完成 — 配信では実行されません
-                              </span>
-                            )}
-                          </p>
-                          <div className="flex shrink-0 items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => openCondition(action)}
-                              className={`rounded-control h-9 border px-3 text-xs ${
-                                action.condition
-                                  ? 'border-accent text-accent-deep bg-accent-soft'
-                                  : 'border-hairline text-ink-secondary'
-                              }`}
-                            >
-                              {action.condition ? '条件ON' : '条件OFF'}
-                            </button>
-                            {/*
-                              R244: 開閉は画面側で持つ。保存のたびに作り直して
-                              閉じないし、入力焦点も残る。
-                            */}
-                            <button
-                              type="button"
-                              onClick={() => setExpandedId(open ? null : action.id)}
-                              aria-expanded={open}
-                              className="text-action cursor-pointer list-none text-xs"
-                            >
-                              内容を編集
-                            </button>
-                          </div>
-                        </div>
-                        {open && (
-                          <div className="border-hairline border-t p-4">
-                            <ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} templates={templates} reminders={reminders} events={events} targetsLoading={targetsLoading} onChange={(config) => save(action, { config })} />
-                            <Checkbox className="mt-3" checked={action.repeatOnRefire} onCheckedChange={(checked) => save(action, { repeatOnRefire: checked })}>発動2回目以降も実行する</Checkbox>
-                            <div className="mt-3 flex gap-2"><button type="button" onClick={() => move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => remove(action)} className="text-danger">削除</button></div>
-                          </div>
-                        )}
-                      </div>
-                      )
-                    })}
+                    {reorder.shown.map((action, index) => <ActionRow key={action.id} number={index + 1} kind={KIND_LABEL[action.actionType]} title={describeAction(action, lookups)}
+                      icon={ACTION_KINDS.find(kind => kind.type === action.actionType)?.icon} open={expandedId === action.id} onToggle={() => setExpandedId(expandedId === action.id ? null : action.id)}
+                      rowProps={reorder.rowProps(action.id)} handle={<ActionDragHandle label={`${index + 1}つ目の行うこと`} ariaLabel={`${index + 1}つ目の行うことを並べ替える`} {...reorder.handle(action.id)} {...reorder.handleProps(action.id)} />}
+                      menuItems={reorder.menuItems(action.id)} onRemove={() => remove(action)} extra={<>
+                        {action.complete === false ? <span className="text-warning text-xs">未完成</span> : null}
+                        <Button onClick={() => openCondition(action)}>{action.condition ? '条件ON' : '条件OFF'}</Button>
+                      </>}>
+                      <ActionConfigEditor action={action} accountId={selectedAccountId} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} templates={templates} reminders={reminders} events={events} targetsLoading={targetsLoading} onChange={config => save(action, { config })} />
+                      <SaveErrorField names={[`actions.${index}.repeatOnRefire`,`actions.${index}.repeat_on_refire`,"repeatOnRefire","action.repeatOnRefire","repeat_on_refire","action.repeat_on_refire"]}><ToggleField checked={action.repeatOnRefire} onChange={checked => save(action, { repeatOnRefire: checked })}>発動2回目以降も実行する</ToggleField></SaveErrorField>
+                    </ActionRow>)}
                     {actions.length === 0 && (
                       <p className="text-ink-faint rounded-card border-hairline border border-dashed py-8 text-center text-sm">
-                        まだ動作がありません。上の「追加する動作を選ぶ」から足してください。
+                        まだ動作がありません。「行うことを足す」から足してください。
                       </p>
                     )}
                   </div>
@@ -914,9 +916,9 @@ export default function ActionEditor({
           </div>
         )}
         {/* R242: キャンセルは開く前の値に戻して閉じる。反映は今の内容のまま閉じる。 */}
-        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling}>{cancelling ? '戻しています…' : 'キャンセル'}</Button><Button variant="primary" onClick={onClose}>このアクションを反映</Button></div>}
+        {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling} busy={cancelling} busyLabel="戻しています…">キャンセル</Button><Button variant="primary" disabled={pendingCount > 0 || Boolean(error) || loading || !draftReady} onClick={closeWhenSaved}>このアクションを反映</Button></div>}
       </div>
-    </div>
+    </InlineSettings>
   )
 }
 
@@ -933,8 +935,10 @@ const inputClass = 'border-hairline rounded-control text-ink h-9 border px-3 tex
  * R245: テンプレート・リマインダ・イベント予約の対象は、アカウントで絞った
  * 候補から名前で選ぶ。IDの直入力では運用者が選べず、内容も確かめられない。
  */
+/** 作ってあるものを選ぶ欄（共通の選ぶ窓・dJZ7Q）。保存する値は今と同じ ID。 */
 function TargetSelector({
   label,
+  kind,
   kindName,
   value,
   options,
@@ -943,6 +947,7 @@ function TargetSelector({
 }: {
   /** 欄の名前（読み上げ用）。 */
   label: string
+  kind: EntityKind
   /** 「選べる○○がありません」の○○。 */
   kindName: string
   value: string
@@ -950,20 +955,10 @@ function TargetSelector({
   loading: boolean
   onChange: (value: string) => void
 }) {
-  const missing = value !== '' && !options.some((o) => o.id === value)
+  const missing = !loading && value !== '' && !options.some((o) => o.id === value)
   return (
     <div className="min-w-0 flex-1">
-      <Combobox
-        aria-label={label}
-        value={value}
-        onChange={onChange}
-        options={[
-          ...options.map((o) => ({ value: o.id, label: o.name, hint: o.hint })),
-          ...(missing ? [{ value, label: '現在の保存値' }] : []),
-        ]}
-        loading={loading}
-        placeholder="名前で探す"
-      />
+      <SaveErrorField names={["value"]}><EntityKindField kind={kind} label={label} options={options} meta={(row) => (row as ActionTargetOption).hint ?? undefined} value={value} onChange={onChange} /></SaveErrorField>
       {!loading && options.length === 0 && !missing && (
         <p className="text-ink-secondary mt-1.5 text-xs">選べる{kindName}がありません。</p>
       )}
@@ -978,6 +973,7 @@ function TargetSelector({
 
 export function ActionConfigEditor({
   action,
+  accountId,
   tags,
   fields,
   marks,
@@ -990,6 +986,7 @@ export function ActionConfigEditor({
   onChange,
 }: {
   action: ScenarioAction
+  accountId?: string | null
   tags: Option[]
   fields: Option[]
   marks: Option[]
@@ -1002,6 +999,26 @@ export function ActionConfigEditor({
   onChange: (config: unknown) => void
 }) {
   const c = (action.config ?? {}) as Record<string, unknown>
+  const [eventSlots, setEventSlots] = useState<Array<{ id: string; starts_at: string }>>([])
+  const [eventSlotsLoading, setEventSlotsLoading] = useState(false)
+  const [eventSlotsFailed, setEventSlotsFailed] = useState(false)
+  const eventId = typeof c.eventId === 'string' ? c.eventId : ''
+
+  useEffect(() => {
+    let cancelled = false
+    setEventSlots([])
+    setEventSlotsFailed(false)
+    setEventSlotsLoading(Boolean(accountId && eventId))
+    if (!accountId || !eventId) return
+    void eventsApi.listSlots(accountId, eventId).then(({ items }) => {
+      if (!cancelled) setEventSlots(items.filter((slot) => slot.is_active === 1).map((slot) => ({ id: slot.id, starts_at: slot.starts_at })))
+    }).catch(() => {
+      if (!cancelled) { setEventSlots([]); setEventSlotsFailed(true) }
+    }).finally(() => {
+      if (!cancelled) setEventSlotsLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [accountId, eventId])
 
   switch (action.actionType) {
     case 'tag': {
@@ -1020,28 +1037,7 @@ export function ActionConfigEditor({
               />
             ))}
           </RadioCardGroup>
-          <div className="flex flex-wrap gap-1.5">
-            {tags.map((tag) => {
-              const on = selected.includes(tag.id)
-              return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() =>
-                    onChange({
-                      ...c,
-                      tagIds: on ? selected.filter((id) => id !== tag.id) : [...selected, tag.id],
-                    })
-                  }
-                  className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
-                  }`}
-                >
-                  {tag.name}
-                </button>
-              )
-            })}
-          </div>
+          <EntityKindField kind="tag" label="タグ" multiple value={selected} options={tags} onChange={tagIds => onChange({ ...c, tagIds })} />
         </>
       )
     }
@@ -1049,35 +1045,27 @@ export function ActionConfigEditor({
     case 'friend_field':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <Select
-            aria-label="友だち情報の項目"
-            value={String(c.fieldId ?? '')}
-            onChange={(value) => onChange({ ...c, fieldId: value })}
-            options={[
-              { value: '', label: '項目を選ぶ' },
-              ...fields.map((f) => ({ value: f.id, label: f.name })),
-            ]}
-          />
+          <SaveErrorField names={["fieldId","c.fieldId","field_id","c.field_id"]}><EntityPickerField label="友だち情報の項目" noun="友だち情報欄" items={fields} value={String(c.fieldId ?? '')} onChange={fieldId => onChange({ ...c, fieldId })} /></SaveErrorField>
           <span className="text-ink-secondary text-sm">に</span>
           {c.op !== 'clear' && (
-            <input
+            <SaveErrorField names={["value","c.value"]}><SharedTextField
               value={String(c.value ?? '')}
               onChange={(e) => onChange({ ...c, value: e.target.value })}
               className={inputClass}
-            />
+            /></SaveErrorField>
           )}
           <span className="text-ink-secondary text-sm">を</span>
-          <Select
+          <SaveErrorField names={["op","c.op"]}><Select
             aria-label="友だち情報の操作"
             value={String(c.op ?? 'set')}
             onChange={(value) => onChange({ ...c, op: value })}
             options={[
-              { value: 'set', label: '← (代入)' },
-              { value: 'add', label: '＋ (加算)' },
-              { value: 'sub', label: '－ (減算)' },
-              { value: 'clear', label: 'X (消去)' },
+              { value: 'set', label: '←（代入）' },
+              { value: 'add', label: '＋（加算）' },
+              { value: 'sub', label: '－（減算）' },
+              { value: 'clear', label: 'X（消去）' },
             ]}
-          />
+          /></SaveErrorField>
           <span className="text-ink-secondary text-sm">する</span>
         </div>
       )
@@ -1085,16 +1073,16 @@ export function ActionConfigEditor({
     case 'support_mark':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">対応マーク</span>
-          <Select
+          <span className="text-ink text-sm font-semibold">対応マーク</span>
+          <SaveErrorField names={["markId","c.markId","mark_id","c.mark_id"]}><EntitySelect
             aria-label="対応マーク"
             value={String(c.markId ?? '')}
             onChange={(value) => onChange({ ...c, markId: value || null })}
             options={[
               { value: '', label: 'マークを外す' },
-              ...marks.map((m) => ({ value: m.id, label: m.name })),
+              ...marks.map((m) => ({ ...entityOptionMetadata(m), value: m.id, label: m.name })),
             ]}
-          />
+          /></SaveErrorField>
         </div>
       )
 
@@ -1102,7 +1090,7 @@ export function ActionConfigEditor({
       return (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Select
+            <SaveErrorField names={["op","c.op"]}><Select
               aria-label="シナリオ操作"
               value={String(c.op ?? 'start')}
               onChange={(value) => onChange({ ...c, op: value })}
@@ -1111,27 +1099,23 @@ export function ActionConfigEditor({
                 { value: 'stop', label: '購読を止める' },
                 { value: 'resume_previous', label: '1つ前のシナリオを再開する' },
               ]}
-            />
+            /></SaveErrorField>
             {c.op !== 'resume_previous' && (
-              <Select
-                aria-label="対象のシナリオ"
-                value={String(c.scenarioId ?? '')}
-                onChange={(value) => onChange({ ...c, scenarioId: value })}
-                options={[
-                  { value: '', label: c.op === 'stop' ? 'このシナリオ' : 'シナリオを選ぶ' },
-                  ...scenarios.map((s) => ({ value: s.id, label: s.name })),
-                ]}
-              />
+              <div className="min-w-0 flex-1">
+                <SaveErrorField names={["scenarioId","c.scenarioId"]}><EntityKindField kind="scenario" label="対象のシナリオ" options={scenarios} value={String(c.scenarioId ?? '')}
+                  placeholder={c.op === 'stop' ? '（このシナリオ）' : undefined} clearable={c.op === 'stop'}
+                  onChange={(value) => onChange({ ...c, scenarioId: value })} /></SaveErrorField>
+              </div>
             )}
           </div>
           {c.op === 'start' && (
             <div className="bg-canvas-sunken rounded-card space-y-2 px-3 py-2.5">
-              <p className="text-ink text-xs font-bold">シナリオを購読する場合</p>
+              <p className="text-ink text-xs font-medium">シナリオを購読する場合</p>
               <RadioCardGroup legend="シナリオを購読する場合">
                 {(
                   [
-                    { value: 'from_start', label: '(新規)最初から／(再開)最初から' },
-                    { value: 'from_read', label: '(再開)友だちが読んだところから' },
+                    { value: 'from_start', label: '（新規）最初から／（再開）最初から' },
+                    { value: 'from_read', label: '（再開）友だちが読んだところから' },
                   ] as const
                 ).map((opt) => (
                   <RadioCard
@@ -1144,12 +1128,12 @@ export function ActionConfigEditor({
                   />
                 ))}
               </RadioCardGroup>
-              <Checkbox
+              <SaveErrorField names={["rememberPrevious","c.rememberPrevious","remember_previous","c.remember_previous"]}><ToggleField
                 checked={c.rememberPrevious === true}
-                onCheckedChange={(checked) => onChange({ ...c, rememberPrevious: checked })}
+                onChange={(checked) => onChange({ ...c, rememberPrevious: checked })}
               >
                 いま読んでいるシナリオを控えて、あとで「1つ前のシナリオを再開」で戻せるようにする
-              </Checkbox>
+              </ToggleField></SaveErrorField>
             </div>
           )}
         </div>
@@ -1158,46 +1142,47 @@ export function ActionConfigEditor({
     case 'common_var':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <Select
+          <SaveErrorField names={["varKey","c.varKey","var_key","c.var_key"]}><EntitySelect
             aria-label="共通情報"
             value={String(c.varKey ?? '')}
             onChange={(value) => onChange({ ...c, varKey: value })}
             options={[
               { value: '', label: '共通情報を選ぶ' },
-              ...vars.map((v) => ({ value: v.varKey, label: v.name })),
+              ...vars.map((v) => ({ ...entityOptionMetadata(v), value: v.varKey, label: v.name })),
             ]}
-          />
+          /></SaveErrorField>
           <span className="text-ink-secondary text-sm">に</span>
-          <input
+          <SaveErrorField names={["value","c.value"]}><SharedTextField
             value={String(c.value ?? '')}
             onChange={(e) => onChange({ ...c, value: e.target.value })}
             className={inputClass}
-          />
+          /></SaveErrorField>
           <span className="text-ink-secondary text-sm">を</span>
-          <Select
+          <SaveErrorField names={["op","c.op"]}><Select
             aria-label="共通情報の操作"
             value={String(c.op ?? 'add')}
             onChange={(value) => onChange({ ...c, op: value })}
             options={[
-              { value: 'add', label: '＋ (加算)' },
-              { value: 'sub', label: '－ (減算)' },
+              { value: 'add', label: '＋（加算）' },
+              { value: 'sub', label: '－（減算）' },
             ]}
-          />
+          /></SaveErrorField>
           <span className="text-ink-secondary text-sm">する</span>
         </div>
       )
 
     case 'send_message':
-      return <textarea value={String(c.content ?? '')} onChange={(e) => onChange({ ...c, content: e.target.value })} placeholder="送信する本文" />
+      return <SaveErrorField names={["content","c.content"]}><SharedTextArea value={String(c.content ?? '')} onChange={(e) => onChange({ ...c, content: e.target.value })} placeholder="送信する本文" /></SaveErrorField>
     case 'send_template': {
       const templateId = typeof c.templateId === 'string' ? c.templateId : ''
       const selected = templates.find((t) => t.id === templateId)
       return (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-sm font-medium">テンプレート</span>
+            <span className="text-ink text-sm font-semibold">テンプレート</span>
             <TargetSelector
               label="テンプレート"
+              kind="template"
               kindName="テンプレート"
               value={templateId}
               options={templates}
@@ -1214,9 +1199,10 @@ export function ActionConfigEditor({
     case 'reminder':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">リマインダ</span>
+          <span className="text-ink text-sm font-semibold">リマインダ</span>
           <TargetSelector
             label="リマインダ"
+            kind="reminder"
             kindName="リマインダ"
             value={typeof c.reminderId === 'string' ? c.reminderId : ''}
             options={reminders}
@@ -1228,15 +1214,39 @@ export function ActionConfigEditor({
     case 'event_booking':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">イベント予約</span>
+          <Select
+            aria-label="イベント予約の操作"
+            value={c.op === 'cancel' ? 'cancel' : 'register'}
+            options={[{ value: 'register', label: 'イベントに申し込む' }, { value: 'cancel', label: '申し込みを取り消す' }]}
+            onChange={(op) => onChange({ ...c, op })}/>
           <TargetSelector
             label="イベント予約"
+            kind="event"
             kindName="イベント予約"
             value={typeof c.eventId === 'string' ? c.eventId : ''}
             options={events}
             loading={targetsLoading}
-            onChange={(value) => onChange({ ...c, eventId: value })}
+            onChange={(value) => onChange({ ...c, eventId: value, slotId: null })}
           />
+          {eventId && (
+            <EntitySelect
+              aria-label="開催回"
+              value={typeof c.slotId === 'string' ? c.slotId : ''}
+              options={[
+                { value: '', label: c.op === 'cancel' ? 'イベント全体の申込を取り消す' : '次に空いている回' },
+                ...eventSlots.map((slot) => ({
+                  ...entityOptionMetadata(slot),
+                  value: slot.id,
+                  label: new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(slot.starts_at)),
+                })),
+              ]}
+              disabled={eventSlotsLoading || eventSlots.length === 0}
+              onChange={(value) => onChange({ ...c, slotId: value || null })}
+            />
+          )}
+          {eventSlotsLoading && <span className="text-ink-secondary text-xs" role="status">開催回を読み込み中…</span>}
+          {eventId && !eventSlotsLoading && eventSlotsFailed && <span className="text-ink-secondary text-xs" role="status">開催回を読み込めませんでした</span>}
+          {eventId && !eventSlotsLoading && !eventSlotsFailed && eventSlots.length === 0 && <span className="text-ink-secondary text-xs">選べる開催回がありません</span>}
         </div>
       )
 

@@ -1,5 +1,5 @@
 /*
- * 送信予約のdispatcher(N-025)。固定時計・実DBで確かめる。
+ * 送信予約のdispatcher。固定時計・実DBで確かめる。
  *
  *   - 期限到来だけがclaimされ、leaseが付く
  *   - claimした分だけLINEへpush(冪等キー同じ)し、messages_logへ残る
@@ -16,7 +16,7 @@ import {
 
 const pushMessage = vi.fn().mockResolvedValue({ sentMessages: [{}] });
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({ pushMessage })),
+  LineClient: vi.fn().mockImplementation(function () { return ({ pushMessage }); }),
 }));
 
 const { processDueScheduledChatSends } = await import('./scheduled-chat-sends.js');
@@ -81,7 +81,7 @@ beforeEach(() => {
   seed();
 });
 
-// #977: サーバー側の冪等照合。同じ版(対象・内容・送信予定時刻)の
+// サーバー側の冪等照合。同じ版(対象・内容・送信予定時刻)の
 // 処理中予約は、別の冪等キーが来ても新しい行を作らず再利用する。
 describe('送信予約の重複登録の拒否(#977)', () => {
   test('別キーで同じ版を登録しても既存行が返り、行は1件のまま', async () => {
@@ -253,7 +253,7 @@ describe('送信予約のdispatcher(N-025)', () => {
     expect(row('s-nofriend').last_error_code).toBe('friend_not_found');
   });
 
-  // N-026: 差し込みは「送る瞬間」の値で解決する。予約から送信までの間に
+  // 差し込みは「送る瞬間」の値で解決する。予約から送信までの間に
   // 表示名が変わっていても、古い値ではなく新しい値が届く。
   test('差し込みは送信時の値で解決され、履歴にも解決後の本文が残る', async () => {
     await schedule({ id: 's-name', key: '88888888-2222-4333-8444-555555555555', at: '2026-01-09T23:00:00.000Z', content: '{{name}}さんへの連絡です' });
@@ -270,7 +270,7 @@ describe('送信予約のdispatcher(N-025)', () => {
     expect(logged.content).toBe('改名後さんへの連絡です');
   });
 
-  // N-026/N-189: 解決しきれない差し込みが残る予約は LINE を呼ばない。
+  // 解決しきれない差し込みが残る予約は LINE を呼ばない。
   // 消えた共通情報は運用者が直せば送れる失敗なので、バックオフ付きで
   // 予約へ戻して再試行する(冪等キーは同じなので重複送信にならない)。
   test('解決できない差し込みが残る予約はLINEを呼ばず再試行へ戻る', async () => {
@@ -305,4 +305,22 @@ describe('送信予約のdispatcher(N-025)', () => {
     expect(row('s-unres-max').status).toBe('failed');
     expect(row('s-unres-max').last_error_code).toBe('unresolved_template_variables');
   });
+});
+
+test('受理後に処理が消え、鍵の有効時間を越えた予約は自動で送り直さない', async () => {
+  await schedule({id:'expired',key:'aaaaaaaa-2222-4333-8444-555555555555',at:'2026-01-09T00:00:00Z'});
+  sqlite.raw.exec("UPDATE scheduled_chat_sends SET status='sending',attempt_count=1,lease_token='lost',lease_expires_at='2026-01-09T00:01:00Z',updated_at='2026-01-09T00:00:00Z'");
+  await processDueScheduledChatSends(env(),{now:NOW});
+  expect(pushMessage).not.toHaveBeenCalled();
+  expect(row('expired')).toMatchObject({status:'failed',last_error_code:'LINE_RETRY_KEY_EXPIRED'});
+});
+
+
+test('予約後にブロックされた相手は送らず理由を残し、再送しない', async () => {
+  await schedule({ id: 'blocked', key: '11111111-2222-4333-8444-555555555555', at: NOW });
+  sqlite.raw.prepare("UPDATE friends SET is_following = 0 WHERE id = 'fr-1'").run();
+  await processDueScheduledChatSends(env(), { now: NOW });
+  expect(row('blocked')).toMatchObject({ status: 'failed', last_error_code: 'friend_not_following' });
+  await processDueScheduledChatSends(env(), { now: '2026-01-11T00:00:00.000Z' });
+  expect(pushMessage).not.toHaveBeenCalled();
 });

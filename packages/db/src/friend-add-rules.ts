@@ -1,13 +1,57 @@
 import { jstNow } from './utils.js';
 
+/** フォルダだけを消し、同じアカウントの設定は未分類へ戻す。公開版・実行履歴は残す。 */
+export async function deleteFriendAddRuleFolder(
+  db: D1Database,
+  input: { lineAccountId: string; folderId: string },
+): Promise<'deleted' | 'not_found' | 'conflict'> {
+  const folder = await db.prepare(`SELECT name, color, updated_at FROM friend_add_rule_folders
+    WHERE id = ? AND line_account_id = ?`)
+    .bind(input.folderId, input.lineAccountId)
+    .first<{ name: string; color: string | null; updated_at: string }>();
+  if (!folder) return 'not_found';
+  try {
+    await db.batch([
+      // 改名・色変更・削除が読み取り後に入った場合は、まとめ書き全体を戻す。
+      db.prepare(`SELECT json(CASE WHEN EXISTS (
+        SELECT 1 FROM friend_add_rule_folders
+        WHERE id = ? AND line_account_id = ? AND name = ? AND color IS ? AND updated_at = ?
+      ) THEN '{}' ELSE 'FRIEND_ADD_FOLDER_CONFLICT' END)`)
+        .bind(input.folderId, input.lineAccountId, folder.name, folder.color, folder.updated_at),
+      db.prepare(`UPDATE friend_add_rules SET folder_name = NULL, lock_version = lock_version + 1, updated_at = ?
+        WHERE line_account_id = ? AND folder_name = ?`)
+        .bind(jstNow(), input.lineAccountId, folder.name),
+      db.prepare('DELETE FROM friend_add_rule_folders WHERE id = ? AND line_account_id = ?')
+        .bind(input.folderId, input.lineAccountId),
+    ]);
+  } catch (error) {
+    if (/malformed JSON|FRIEND_ADD_FOLDER_CONFLICT/i.test(String(error))) return 'conflict';
+    throw error;
+  }
+  return 'deleted';
+}
+
 export type FriendAddRuleKind = 'first_time' | 'returning';
 export type FriendAddRuleStatus = 'draft' | 'published' | 'stopped' | 'archived';
 export type FriendAddRuleVersionStatus = 'draft' | 'published' | 'retired';
 
 export interface FriendAddRuleAction {
-  type: 'add_tag' | 'remove_tag' | 'start_scenario';
+  type:
+    | 'add_tag'
+    | 'remove_tag'
+    | 'start_scenario'
+    /* F9: 友だち情報を入れる・対応マークを付ける・マイルを渡す・共通情報を使う。 */
+    | 'set_friend_field'
+    | 'add_support_mark'
+    | 'grant_mileage'
+    | 'use_common_var';
   label: string;
   targetId?: string;
+  /** set_friend_field が入れる値・use_common_var が足し引きする数（文字）。 */
+  value?: string;
+  /** grant_mileage が渡すマイル数。use_common_var の足し引きの向き。 */
+  amount?: number;
+  op?: string;
 }
 
 export interface FriendAddRuleDefinition {
@@ -210,6 +254,7 @@ export async function listFriendAddRulesPage(
     limit?: number;
     search?: string | null;
     folderName?: string | null;
+    highlightId?: string | null;
   },
 ): Promise<FriendAddRulePage> {
   const limit = Math.max(1, Math.min(input.limit ?? 20, 100));
@@ -218,7 +263,7 @@ export async function listFriendAddRulesPage(
   const clauses = [
     'r.line_account_id = ?',
     'r.friend_kind = ?',
-    'r.archived_at IS NULL',
+    input.status === 'archived' ? 'r.archived_at IS NOT NULL' : 'r.archived_at IS NULL',
   ];
   const bindings: Array<string | number> = [input.lineAccountId, input.friendKind];
   if (input.status) {
@@ -226,8 +271,29 @@ export async function listFriendAddRulesPage(
     bindings.push(input.status);
   }
   if (input.search) {
-    clauses.push("r.name LIKE ? ESCAPE '\\'");
-    bindings.push(`%${escapeLikePattern(input.search)}%`);
+    /*
+     * 「設定名・流入リンクで探す」（★V8 ）。設定名に加えて、一覧が
+     * 参照する版（下書きがあれば下書き、なければ公開版）に選ばれている
+     * 流入リンクの名前でも当たるようにする。版の取り方は RULE_SELECT と同じ。
+     */
+    clauses.push(`(
+      r.name LIKE ? ESCAPE '\\'
+      OR EXISTS (
+        SELECT 1
+          FROM friend_add_rule_versions rv
+          CROSS JOIN json_each(rv.definition_snapshot, '$.routeIds') je
+          JOIN entry_routes er ON er.id = je.value
+         WHERE rv.id = COALESCE(
+           (SELECT d.id FROM friend_add_rule_versions d
+             WHERE d.rule_id = r.id AND d.status = 'draft' LIMIT 1),
+           r.current_version_id)
+           AND er.name LIKE ? ESCAPE '\\'
+      )
+    )`);
+    bindings.push(
+      `%${escapeLikePattern(input.search)}%`,
+      `%${escapeLikePattern(input.search)}%`,
+    );
   }
   if (input.folderName) {
     if (input.folderName === FRIEND_ADD_UNCATEGORIZED_FOLDER) {
@@ -240,7 +306,12 @@ export async function listFriendAddRulesPage(
   const count = await db.prepare(
     `SELECT COUNT(*) AS total FROM friend_add_rules r WHERE ${clauses.join(' AND ')}`,
   ).bind(...bindings).first<{ total: number }>();
-  if (cursor) {
+  // 複製直後の1件を先頭に置く。次ページでは除外して、同じ行を再び出さない。
+  if (cursor && input.highlightId) {
+    clauses.push('r.id <> ?');
+    bindings.push(input.highlightId);
+  }
+  if (cursor && cursor.id !== input.highlightId) {
     clauses.push(`(
       r.priority > ? OR
       (r.priority = ? AND r.created_at > ?) OR
@@ -251,9 +322,9 @@ export async function listFriendAddRulesPage(
   const result = await db.prepare(
     `${RULE_SELECT}
       WHERE ${clauses.join(' AND ')}
-      ORDER BY r.priority ASC, r.created_at ASC, r.id ASC
+      ORDER BY ${input.highlightId ? 'CASE WHEN r.id = ? THEN 0 ELSE 1 END,' : ''} r.priority ASC, r.created_at ASC, r.id ASC
       LIMIT ?`,
-  ).bind(...bindings, limit + 1).all<FriendAddRuleRow>();
+  ).bind(...bindings, ...(input.highlightId ? [input.highlightId] : []), limit + 1).all<FriendAddRuleRow>();
   const rows = result.results ?? [];
   const items = rows.slice(0, limit);
   return {
@@ -265,13 +336,42 @@ export async function listFriendAddRulesPage(
 
 export async function getFriendAddRule(
   db: D1Database,
-  input: { lineAccountId: string; ruleId: string },
+  input: { lineAccountId: string; ruleId: string; includeArchived?: boolean },
 ): Promise<FriendAddRuleRow | null> {
   return db.prepare(
     `${RULE_SELECT}
-      WHERE r.line_account_id = ? AND r.id = ? AND r.archived_at IS NULL
+      WHERE r.line_account_id = ? AND r.id = ? ${input.includeArchived ? '' : 'AND r.archived_at IS NULL'}
       LIMIT 1`,
   ).bind(input.lineAccountId, input.ruleId).first<FriendAddRuleRow>();
+}
+
+/** 保管からはテスト未実施の下書きへ戻す。公開・配信は再開しない。 */
+export async function restoreFriendAddRule(db: D1Database, input: {
+  lineAccountId: string; ruleId: string; expectedVersion: number;
+}): Promise<FriendAddRuleRow | null> {
+  const current = await getFriendAddRule(db, { ...input, includeArchived: true });
+  if (!current || current.status !== 'archived' || current.is_unknown_route_fallback) return null;
+  const now = jstNow();
+  const statements: D1PreparedStatement[] = [];
+  if (current.version_status !== 'draft') {
+    statements.push(db.prepare(`INSERT INTO friend_add_rule_versions
+      (id, rule_id, version_number, definition_snapshot, status, created_at, updated_at)
+      SELECT ?, r.id, (SELECT COALESCE(MAX(version_number), 0) + 1 FROM friend_add_rule_versions WHERE rule_id = r.id), ?, 'draft', ?, ?
+        FROM friend_add_rules r WHERE r.id = ? AND r.line_account_id = ? AND r.status = 'archived' AND r.lock_version = ?`)
+      .bind(crypto.randomUUID(), current.definition_snapshot ?? JSON.stringify(EMPTY_FRIEND_ADD_RULE_DEFINITION), now, now, input.ruleId, input.lineAccountId, input.expectedVersion));
+  }
+  statements.push(db.prepare(`UPDATE friend_add_rule_versions
+    SET last_test_status = NULL, last_tested_at = NULL, last_tested_by_staff_id = NULL
+    WHERE rule_id = ? AND status = 'draft' AND EXISTS (
+      SELECT 1 FROM friend_add_rules WHERE id = ? AND line_account_id = ? AND status = 'archived' AND lock_version = ?)`)
+    .bind(input.ruleId, input.ruleId, input.lineAccountId, input.expectedVersion));
+  statements.push(db.prepare(`UPDATE friend_add_rules SET status = 'draft', archived_at = NULL,
+    lock_version = lock_version + 1, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND status = 'archived' AND lock_version = ? AND is_unknown_route_fallback = 0`)
+    .bind(now, input.ruleId, input.lineAccountId, input.expectedVersion));
+  const results = await db.batch(statements);
+  if (!results[results.length - 1].meta.changes) return null;
+  return getFriendAddRule(db, input);
 }
 
 export async function createFriendAddRuleDraft(
@@ -541,9 +641,98 @@ export async function archiveFriendAddRule(
 ): Promise<void> {
   const now = jstNow();
   const result = await db.prepare(
-    `UPDATE friend_add_rules SET status = 'archived', archived_at = ?, updated_at = ?
+    `UPDATE friend_add_rules SET status = 'archived', archived_at = ?, updated_at = ?, lock_version = lock_version + 1
       WHERE id = ? AND line_account_id = ?
         AND is_unknown_route_fallback = 0 AND archived_at IS NULL`,
   ).bind(now, now, input.ruleId, input.lineAccountId).run();
   if ((result.meta?.changes ?? 0) !== 1) throw new Error('FRIEND_ADD_RULE_NOT_ARCHIVED');
+}
+
+/**
+ * 並び替えの完全性チェック用。あるLINEアカウント・判定区分の、受け皿
+ * 以外の生きた設定のidを優先順位順に返す。受け皿は常に最後なので
+ * 並べ替えの対象外（`is_unknown_route_fallback` で先に絞る）。
+ */
+export async function listFriendAddRuleOrderIds(
+  db: D1Database,
+  input: { lineAccountId: string; friendKind: FriendAddRuleKind },
+): Promise<string[]> {
+  const rows = await db.prepare(
+    `SELECT id FROM friend_add_rules
+      WHERE line_account_id = ? AND friend_kind = ?
+        AND is_unknown_route_fallback = 0 AND archived_at IS NULL
+      ORDER BY priority ASC, created_at ASC, id ASC`,
+  ).bind(input.lineAccountId, input.friendKind).all<{ id: string }>();
+  return (rows.results ?? []).map((row) => row.id);
+}
+
+/**
+ * 優先順位の書き換え（★V8  のつまみ並び替え）。priority は版ではなく
+ * 行の値なので、公開中でも下書きを経ずにその場で効く（実行側は
+ * `ORDER BY is_unknown_route_fallback, priority` で読む）。同時編集への
+ * 印として lock_version を上げ、ほかの画面の下書き保存が古い順を
+ * 上書きしたら VERSION_CONFLICT で気づけるようにする。
+ */
+export async function reorderFriendAddRulePriorities(
+  db: D1Database,
+  input: { lineAccountId: string; friendKind: FriendAddRuleKind; ids: string[] },
+): Promise<void> {
+  if (input.ids.length === 0) return;
+  const now = jstNow();
+  await db.batch(
+    input.ids.map((id, index) =>
+      db.prepare(
+        `UPDATE friend_add_rules
+            SET priority = ?, lock_version = lock_version + 1, updated_at = ?
+          WHERE id = ? AND line_account_id = ? AND friend_kind = ?
+            AND is_unknown_route_fallback = 0 AND archived_at IS NULL`,
+      ).bind(index + 1, now, id, input.lineAccountId, input.friendKind),
+    ),
+  );
+}
+
+/**
+ * F8補修: 並びの版確認と全順序更新を1文で結ぶ原子的CAS。
+ * 版（受け皿以外の lock_version 合計）が expectedVersion と合うときだけ
+ * 書く。合わなければ1行も書かず FRIEND_ADD_RULE_ORDER_VERSION_CONFLICT
+ * を投げる。1文なので確認と書込のあいだへの割り込みは起きない。
+ * 順は JSON 配列で渡し、束ね数は8個に固定（D1の束ね上限に当たらない）。
+ */
+export async function reorderFriendAddRulePrioritiesCAS(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    friendKind: FriendAddRuleKind;
+    ids: string[];
+    expectedVersion: number;
+  },
+): Promise<{ updated: number }> {
+  const now = jstNow();
+  const orderJson = JSON.stringify(input.ids);
+  const result = await db.prepare(
+    `UPDATE friend_add_rules
+        SET priority = (
+              SELECT key + 1 FROM json_each(?) WHERE value = friend_add_rules.id
+            ),
+            lock_version = lock_version + 1,
+            updated_at = ?
+      WHERE line_account_id = ? AND friend_kind = ?
+        AND is_unknown_route_fallback = 0 AND archived_at IS NULL
+        AND id IN (SELECT value FROM json_each(?))
+        AND (SELECT COALESCE(SUM(lock_version), 0) FROM friend_add_rules
+              WHERE line_account_id = ? AND friend_kind = ?
+                AND is_unknown_route_fallback = 0 AND archived_at IS NULL) = ?`,
+  ).bind(
+    orderJson,
+    now,
+    input.lineAccountId,
+    input.friendKind,
+    orderJson,
+    input.lineAccountId,
+    input.friendKind,
+    input.expectedVersion,
+  ).run();
+  const changed = Number(result.meta?.changes ?? 0);
+  if (changed !== input.ids.length) throw new Error('FRIEND_ADD_RULE_ORDER_VERSION_CONFLICT');
+  return { updated: changed };
 }

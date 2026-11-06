@@ -1,3 +1,8 @@
+import { readRestaurantFollowupResourceManagement } from '../services/restaurant-followup-resource-management.js';
+import {defaultWindow} from './automation-execution-window.js';
+import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { automationTabCounts } from '../services/tab-counts.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -11,8 +16,9 @@ import {
   isOperationCapabilityStopped,
   type AutomationRunDomainStatus,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { fail } from '../lib/fail.js';
+import type { Env } from '../worker-env.js';
+import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   AutomationDraftError,
@@ -24,22 +30,23 @@ import {
   listAutomationTemplates,
   publishAutomationDraft,
   updateAutomationDraft,
-} from '../services/automation-drafts.js';
+} from '../features/automations/automation-drafts/index.js';
 import {
   AutomationDefinitionError,
   listAutomationDefinitions,
   previewAutomationAudience,
   runAutomationTest,
   updateAutomationDefinitionStatus,
-} from '../services/automation-definitions.js';
+  restoreAutomationDefinition,
+} from '../features/automations/automation-definitions/index.js';
 import {
   AutomationRunCancelError,
   AutomationRunRetryError,
   cancelAutomationRun,
   retryAutomationRun,
-} from '../services/automation-engine.js';
+} from '../features/automations/automation-engine/index.js';
 import { accountFeatureAvailability } from '../services/feature-enforcement.js';
-import { listLimit } from './list-pagination.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { automationActionLabel, automationTriggerLabel } from '@line-crm/shared';
 
 const automations = new Hono<Env>();
@@ -48,6 +55,19 @@ async function requireAutomationPermission(c: Context<Env>, next: () => Promise<
   const staff = c.get('staff');
   if (!staff || (staff.role === 'staff' && !staff.permissionKeys?.includes('/automations'))) {
     return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+  }
+  await next();
+}
+
+// 実行記録の「見るだけ」の入口。設定画面で閲覧だけを許可した担当者でも
+// 履歴の一覧・詳細を読めるよう、共通の閲覧判定（viewPermissionKeys）を使う。
+// 再試行・取消・CSV書き出しはこの後の個別権限が引き続き守る。
+async function requireAutomationViewPermission(c: Context<Env>, next: () => Promise<void>) {
+  const staff = c.get('staff');
+  if (!staff || (staff.role === 'staff'
+    && !staff.permissionKeys?.includes('/automations')
+    && !staff.viewPermissionKeys?.includes('/automations'))) {
+    return c.json({ success: false, error: 'この機能を閲覧する権限がありません' }, 403);
   }
   await next();
 }
@@ -73,7 +93,7 @@ async function requireAutomationRetryPermission(c: Context<Env>, next: () => Pro
 
 async function requireDraftAccount(c: Context<Env>): Promise<string | Response> {
   const id = c.req.query('account_id')?.trim();
-  if (!id) return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  if (!id) return inputError(c, { success: false, error: 'LINE公式アカウントを選んでください' }, 400, ["account_id"]);
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!scope.allowedAccountIds.includes(id)) {
     return c.json({ success: false, error: '対象のLINE公式アカウントが見つかりません' }, 404);
@@ -85,24 +105,24 @@ function draftErrorResponse(c: Context<Env>, error: AutomationDraftError): Respo
   const status = error.code === 'version_conflict' ? 409
     : new Set(['not_found', 'template_not_found']).has(error.code) ? 404
       : 422;
-  return c.json({
+  return inputError(c, {
     success: false,
     error: error.message,
     code: error.code,
     ...(error.field ? { field: error.field } : {}),
-  }, status);
+  }, status, []);
 }
 
 function definitionErrorResponse(c: Context<Env>, error: AutomationDefinitionError): Response {
   const status = error.code === 'version_conflict' ? 409
     : error.code === 'not_found' ? 404
       : 422;
-  return c.json({
+  return inputError(c, {
     success: false,
     error: error.message,
     code: error.code,
     ...(error.field ? { field: error.field } : {}),
-  }, status);
+  }, status, []);
 }
 
 async function definitionEndpoint<T>(c: Context<Env>, run: () => Promise<T>): Promise<Response> {
@@ -110,12 +130,7 @@ async function definitionEndpoint<T>(c: Context<Env>, run: () => Promise<T>): Pr
     return c.json({ success: true, data: await run() });
   } catch (error) {
     if (error instanceof AutomationDefinitionError) return definitionErrorResponse(c, error);
-    console.error(JSON.stringify({
-      event: 'automation_definition_api_failed',
-      path: c.req.path,
-      reason: error instanceof Error ? error.message : String(error),
-    }));
-    return c.json({ success: false, error: 'オートメーションを処理できませんでした' }, 500);
+    throw error;
   }
 }
 
@@ -128,12 +143,7 @@ async function draftEndpoint<T>(
     return c.json({ success: true, data: await run() }, successStatus as 200);
   } catch (error) {
     if (error instanceof AutomationDraftError) return draftErrorResponse(c, error);
-    console.error(JSON.stringify({
-      event: 'automation_draft_api_failed',
-      path: c.req.path,
-      reason: error instanceof Error ? error.message : String(error),
-    }));
-    return c.json({ success: false, error: 'オートメーションの下書きを処理できませんでした' }, 500);
+    throw error;
   }
 }
 
@@ -165,11 +175,11 @@ interface AutomationExecutionRun {
   automationId: string;
   automationName: string;
   automationVersionId: string;
-  /** 実行時に固定された版番号（#942 N-354）。 */
+  /** 実行時に固定された版番号。 */
   versionNumber: number;
-  /** 1人テストの実行か（#942 N-354：テスト実行の印）。 */
+  /** 1人テストの実行か（ ：テスト実行の印）。 */
   isTest: boolean;
-  /** 取りやめられるのは、まだ終わっていない実行だけ（#942 N-353）。 */
+  /** 取りやめられるのは、まだ終わっていない実行だけ。 */
   canCancel: boolean;
   friendId: string | null;
   friendName: string | null;
@@ -183,10 +193,10 @@ interface AutomationExecutionRun {
   failureReason: string | null;
   /**
    * まだ終わっていない実行が、運用停止・機能無効で動けないときの理由
-   * （#1043：停止・権限を「待っています」と区別する）。
+   * （：停止・権限を「待っています」と区別する）。
    */
   holdReason: string | null;
-  /** 実行した版がいまの公開版と同じか（#1043：現在の版と実行版の区別）。 */
+  /** 実行した版がいまの公開版と同じか（：現在の版と実行版の区別）。 */
   isCurrentVersion: boolean;
   currentVersionNumber: number | null;
 }
@@ -214,7 +224,7 @@ const COMMON_STATUS_TO_DOMAIN: Record<ExecutionRunStatus, AutomationRunDomainSta
   // （待機stepの retry_at の有無）で表示側を分けるため、retry_wait の
   // 絞り込みは待機中全体を返す意図的な近似。
   retry_wait: ['waiting'],
-  // 一部だけ成功は失敗とは別の状態として区別する（#1043）。
+  // 一部だけ成功は失敗とは別の状態として区別する。
   partial: ['partial'],
   permanent_failed: ['failed'],
   cancelled: ['cancelled'],
@@ -243,15 +253,10 @@ function safeFailureReason(code: string | null, failedAction: string | null): st
   return `${failedAction ?? '登録した処理'}を完了できませんでした`;
 }
 
-function defaultWindow() {
-  const to = new Date();
-  const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1_000);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
 
 /**
  * まだ終わっていない実行が「運用停止」「機能無効」で claim できないとき、
- * その理由をアカウントごとに人の言葉で返す（#1043）。
+ * その理由をアカウントごとに人の言葉で返す。
  *
  * 実行エンジンは停止中の実行を消さず queued のまま残し、再開後に動かす
  * 設計のため、理由は書き込みではなく読み取り時に付け足す。
@@ -316,7 +321,7 @@ function mapExecutionRun(row: {
   const failedAction = row.failed_action ? automationActionLabel(row.failed_action) : null;
   const failureReason = safeFailureReason(row.failure_code, failedAction);
   // domainの `waiting` は待機(wait)と失敗の再試行待ちを兼ねる。
-  // 待機中stepに retry_at があるときだけ再試行待ちとする（#1043）。
+  // 待機中stepに retry_at があるときだけ再試行待ちとする。
   const statusLabel: ExecutionRunStatus = row.status === 'waiting' && Number(row.has_retry_wait ?? 0) > 0
     ? 'retry_wait'
     : DOMAIN_STATUS_TO_COMMON[row.status];
@@ -399,7 +404,7 @@ function csvCell(value: string | number | null | undefined): string {
 }
 
 /**
- * 台帳の絞り込み結果をCSVにする（#942 N-353）。
+ * 台帳の絞り込み結果をCSVにする。
  *
  * 画面の検索・状態・期間の絞り込みと同じ行を出す。先頭の BOM は
  * Excelで開いたときに日本語が化けないための目印。
@@ -428,22 +433,16 @@ function executionRunsCsv(items: AutomationExecutionRun[]): string {
   return `﻿${lines.join('\r\n')}`;
 }
 
-function boundedInteger(raw: string | undefined, fallback: number, max: number): number {
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 0) return fallback;
-  return Math.min(value, max);
-}
-
 async function requireVisibleAutomation(c: Context<Env>, next: () => Promise<void>) {
   const id = c.req.param('id')!;
-  // #942: 一覧が返すidは V6 の automation_definitions。旧 automations 表の
-  // 行だけを見ると、V6の定義への操作が全部 404 になる。先にV6を見る。
+  // 一覧が返すidは の automation_definitions。旧 automations 表の
+  // 行だけを見ると、の定義への操作が全部 404 になる。先にを見る。
   const definition = await c.env.DB.prepare(
     `SELECT line_account_id FROM automation_definitions WHERE id = ?`,
   ).bind(id).first<{ line_account_id: string }>();
   if (definition) {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [definition.line_account_id])) {
-      return c.json({ success: false, error: 'Automation not found' }, 404);
+      return fail(c, 404, 'AUTOMATION_NOT_FOUND');
     }
     await next();
     return;
@@ -454,7 +453,7 @@ async function requireVisibleAutomation(c: Context<Env>, next: () => Promise<voi
     c.get('staff'),
     [item.line_account_id ?? null],
   )) {
-    return c.json({ success: false, error: 'Automation not found' }, 404);
+    return fail(c, 404, 'AUTOMATION_NOT_FOUND');
   }
   await next();
 }
@@ -473,7 +472,7 @@ automations.get(
   },
 );
 
-// #942 N-351: 下書きの作成・保存は「オートメーションを触れる人」= 権限キー
+//  下書きの作成・保存は「オートメーションを触れる人」= 権限キー
 // `/automations` を持つスタッフも通す。入口の絞り込みは
 // requireAutomationPermission が既に担うので、role で二度絞らない。
 automations.get(
@@ -491,21 +490,22 @@ automations.post(
   '/api/automation-templates/:key/drafts',
   requireAutomationPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
     /*
-     * DETAIL-13: 新規作成の操作ごとの冪等鍵。画面は1回の作成操作に1つだけ
+     * 新規作成の操作ごとの冪等鍵。画面は1回の作成操作に1つだけ
      * 鍵を振り、同じ操作の再試行（ダブルクリック・通信やり直し）だけが
      * 同じ鍵を使う。鍵が無い呼び出しは「別の操作」と見分けられず、
      * 前の下書きへ戻って上書きする道が残るので、service 側で断る。
      */
-    const body = await c.req.json<{ operationKey?: unknown }>()
-      .catch((): { operationKey?: unknown } => ({}));
+    const body = await c.req.json<{ operationKey?: unknown; folderId?: unknown }>()
+      .catch((): { operationKey?: unknown; folderId?: unknown } => ({}));
     return draftEndpoint(c, () => createAutomationDraftFromTemplate(c.env.DB, {
       templateKey: c.req.param('key'),
       lineAccountId: accountId,
       operationKey: body.operationKey,
+      folderId: body.folderId,
       createdBy: c.get('staff')?.id,
     }), 201);
   },
@@ -518,10 +518,11 @@ automations.get(
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
-    return draftEndpoint(c, () => getAutomationDraft(c.env.DB, {
-      id: c.req.param('id'),
-      lineAccountId: accountId,
-    }));
+    return draftEndpoint(c, async () => {
+      const draft=await getAutomationDraft(c.env.DB,{id:c.req.param('id'),lineAccountId:accountId});
+      const management=await readRestaurantFollowupResourceManagement(c.env.DB,'automation',[{id:draft.id,lineAccountId:accountId}]);
+      return {...draft,...(management.has(draft.id)?{followupManagement:management.get(draft.id)}:{})};
+    });
   },
 );
 
@@ -529,10 +530,11 @@ automations.put(
   '/api/automation-drafts/:id',
   requireAutomationPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
     type DraftBody = {
+      folderId?: unknown;
       expectedDraftVersionId?: unknown;
       name?: unknown;
       eventType?: unknown;
@@ -548,6 +550,7 @@ automations.put(
         lineAccountId: accountId,
         expectedDraftVersionId: body.expectedDraftVersionId,
         name: body.name,
+        folderId: body.folderId,
         eventType: body.eventType,
         triggerConfig: body.triggerConfig,
         conditions: body.conditions,
@@ -561,20 +564,31 @@ automations.put(
 automations.post(
   '/api/automation-drafts/:id/publish',
   requireAutomationPermission,
-  requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  requireRole('owner', 'admin'),
+  inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
-    const body = await c.req.json<{ expectedDraftVersionId?: unknown; activate?: unknown }>()
-      .catch((): { expectedDraftVersionId?: unknown; activate?: unknown } => ({}));
+    const body = await c.req.json<{ expectedDraftVersionId?: unknown; activate?: unknown; expectedStatus?: unknown }>()
+      .catch((): { expectedDraftVersionId?: unknown; activate?: unknown; expectedStatus?: unknown } => ({}));
     return draftEndpoint(c, () => publishAutomationDraft(c.env.DB, {
       id: c.req.param('id'),
       lineAccountId: accountId,
       expectedDraftVersionId: body.expectedDraftVersionId,
       activate: body.activate,
+      expectedStatus: body.expectedStatus,
     }));
   },
 );
+
+automations.get('/api/automations/counts', requireAutomationViewPermission, async (c) => {
+  const accountId = await requireDraftAccount(c);
+  if (accountId instanceof Response) return accountId;
+  try {
+    return c.json({ success: true, data: await automationTabCounts(c.env.DB, accountId) });
+  } catch (err) {
+    throw err;
+  }
+});
 
 automations.get(
   '/api/automations',
@@ -591,32 +605,30 @@ automations.get(
     }
     const rawLimit = c.req.query('limit');
     const rawOffset = c.req.query('offset');
-    const limit = rawLimit === undefined ? undefined : boundedInteger(rawLimit, -1, 200);
-    const offset = rawOffset === undefined ? undefined : boundedInteger(rawOffset, -1, 1_000_000);
+    const limit = rawLimit === undefined ? undefined : parseOffsetPaging({ limit: rawLimit }, { defaultLimit: -1, limitPolicy: { fallback: 'nonnegative-integer', maximum: 200 } }).limit;
+    const offset = rawOffset === undefined ? undefined : parseOffsetPaging({ offset: rawOffset }, { defaultOffset: -1, offsetPolicy: { fallback: 'nonnegative-integer', maximum: 1_000_000 } }).offset;
     if ((rawLimit !== undefined && limit === -1) || (rawOffset !== undefined && offset === -1)) {
       return c.json({ success: false, error: 'ページ指定を確認してください' }, 400);
     }
     const result = await listAutomationDefinitions(
       c.env.DB,
       requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
-      limit === undefined && offset === undefined
-        ? undefined
-        : { limit, offset },
+      { limit, offset, includeArchived: c.req.query('includeArchived') === '1' },
     );
-    return c.json({
-      success: true,
-      data: result.items,
+    const styledItems = await withStyleSampleMetadata(c.env.DB,result.items,'automation');
+    const management=await readRestaurantFollowupResourceManagement(c.env.DB,'automation',result.items.map(row=>({id:row.id,lineAccountId:row.lineAccountId})));
+    const responseItems=styledItems.map(row=>({...row,...(management.has(row.id)?{followupManagement:management.get(row.id)}:{})}));
+    return c.json(buildOffsetListResponse({ success: true,
+      data: responseItems,
       summary: result.summary,
       freshness: result.freshness,
       pagination: {
         total: result.total,
         limit: limit ?? null,
         offset: offset ?? 0,
-      },
-    });
+      }, items: responseItems, total: result.total, paging: { limit: limit ?? result.total, offset: offset ?? 0 }, sort: [{ field: 'priority', direction: 'desc' }, { field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
   } catch (err) {
-    console.error('GET /api/automations error:', err);
-    return c.json({ success: false, error: 'オートメーションを表示できませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -624,7 +636,7 @@ automations.post(
   '/api/automations/:id/audience-preview',
   requireAutomationPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
     const body = await c.req.json<{ versionId?: unknown }>()
@@ -642,25 +654,34 @@ automations.post(
   requireAutomationPermission,
   requireAutomationTestPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
-    const body = await c.req.json<{ versionId?: unknown; friendId?: unknown }>()
-      .catch((): { versionId?: unknown; friendId?: unknown } => ({}));
+    const body = await c.req.json<{
+      versionId?: unknown; friendId?: unknown; operationKey?: unknown;
+      expectedCommonActions?: unknown;
+    }>().catch((): {
+      versionId?: unknown; friendId?: unknown; operationKey?: unknown;
+      expectedCommonActions?: unknown;
+    } => ({}));
     return definitionEndpoint(c, () => runAutomationTest(c.env.DB, {
       automationId: c.req.param('id'),
       versionId: body.versionId,
       friendId: body.friendId,
       lineAccountId: accountId,
       credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+      operatorMailEnv: c.env,
+      operationKey: body.operationKey,
+      // 確認時に見せた共通アクションの版の一式。食い違えば409で送らない。
+      expectedCommonActions: body.expectedCommonActions,
     }));
   },
 );
 
-/** V6 25-1-B: 既存automation_runsを、共通実行記録契約で読む。 */
+/** 25-1-B: 既存automation_runsを、共通実行記録契約で読む。 */
 automations.get(
   '/api/automation-runs',
-  requireAutomationPermission,
+  requireAutomationViewPermission,
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
   try {
@@ -682,7 +703,7 @@ automations.get(
           : undefined;
     const wantsCsv = c.req.query('format') === 'csv';
     if (wantsCsv) {
-      // V6 §9: CSV書き出しは個別権限 `automation.run.export`。
+      // §9: CSV書き出しは個別権限 `automation.run.export`。
       // 見るだけの権限（/automations）では出せない。
       const staff = c.get('staff');
       if (staff.role === 'staff' && !staff.permissionKeys?.includes('automation.run.export')) {
@@ -692,12 +713,12 @@ automations.get(
     // CSVは画面の1頁ではなく絞り込み全体を出す。暴走だけ上限で留める。
     const limit = wantsCsv
       ? 5_000
-      : Math.max(1, boundedInteger(c.req.query('limit'), 20, 100));
-    const offset = wantsCsv ? 0 : boundedInteger(c.req.query('offset'), 0, 1_000_000);
+      : parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: { fallback: 'nonnegative-integer', minimum: 1, maximum: 100 } }).limit;
+    const offset = wantsCsv ? 0 : parseOffsetPaging({ offset: c.req.query('offset') }, { offsetPolicy: { fallback: 'nonnegative-integer', maximum: 1_000_000 } }).offset;
     const defaults = defaultWindow();
     const from = c.req.query('from') || defaults.from;
     const to = c.req.query('to') || defaults.to;
-    // テスト実行は既定で除き、切替のときだけ含める（V6 25-1-B）。
+    // テスト実行は既定で除き、切替のときだけ含める（25-1-B）。
     const includeTest = c.req.query('include_test') === '1' || c.req.query('include_test') === 'true';
 
     const result = await getAutomationExecutionRuns(c.env.DB, {
@@ -711,16 +732,24 @@ automations.get(
       offset,
     });
 
-    // 運用停止・機能無効で動けない実行に、その理由を付ける（#1043）。
+    // 運用停止・機能無効で動けない実行に、その理由を付ける。
     const holdReasons = await holdReasonByAccount(c.env.DB, result.rows);
     const items: AutomationExecutionRun[] = result.rows.map(
       (row) => mapExecutionRun(row, holdReasons.get(row.line_account_id) ?? null),
     );
     if (wantsCsv) {
+      c.set('outputAudit', { count: items.length, accountIds: allowedAccountIds, accountCounts: Object.fromEntries(allowedAccountIds.map(id => [id, items.filter(item => item.lineAccountId === id).length])) });
+      /*
+       * 上限5,000件で切れたことを黙らせない。総件数と出力件数を
+       * 応答の頭に載せ、切れたかどうかを使い手へ知らせる（画面が読む）。
+       */
       return new Response(executionRunsCsv(items), {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': 'attachment; filename="automation-runs.csv"',
+          'X-Csv-Total-Count': String(result.total),
+          'X-Csv-Returned-Count': String(items.length),
+          'X-Csv-Truncated': result.total > items.length ? '1' : '0',
         },
       });
     }
@@ -736,10 +765,9 @@ automations.get(
       items,
       pagination: { total: result.total, limit, offset },
     };
-    return c.json({ success: true, data: body });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...body, total: result.total, paging: { limit, offset }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
   } catch (err) {
-    console.error('GET /api/automation-runs error:', err);
-    return c.json({ success: false, error: '実行記録を読み込めませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -748,14 +776,14 @@ automations.post(
   requireAutomationPermission,
   requireAutomationRetryPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       const prepared = await retryAutomationRun(c.env.DB, {
         runId: c.req.param('id'),
         allowedAccountIds: scope.allowedAccountIds,
       });
-      // #736: 実行完了を待たず受け付けだけ返す。実行は既存5分cronの
+      // 実行完了を待たず受け付けだけ返す。実行は既存5分cronの
       // processDueAutomationRuns が拾う(retry は resume_at=now を入れる)。
       // 新規 queue・migration・waitUntil は作らない。
       return c.json({
@@ -768,27 +796,22 @@ automations.post(
     } catch (error) {
       if (error instanceof AutomationRunRetryError) {
         const status = error.code === 'not_found' ? 404 : 409;
-        return c.json({ success: false, error: error.message, code: error.code }, status);
+        return inputError(c, { success: false, error: error.message, code: error.code }, status, []);
       }
-      console.error(JSON.stringify({
-        event: 'automation_run_retry_failed',
-        path: c.req.path,
-        reason: error instanceof Error ? error.message : String(error),
-      }));
-      return c.json({ success: false, error: '失敗した処理を再実行できませんでした' }, 500);
+      throw error;
     }
   },
 );
 
 /**
- * #942 N-354: 1件の実行記録の詳細。
+ *  1件の実行記録の詳細。
  *
  * 版番号・テスト実行の印・処理ごとの結果（状態と試行数）を返す。
  * step の input/output は友だちの情報を含みうるため出さない。
  */
 automations.get(
   '/api/automation-runs/:id',
-  requireAutomationPermission,
+  requireAutomationViewPermission,
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
     try {
@@ -822,25 +845,24 @@ automations.get(
         },
       });
     } catch (err) {
-      console.error('GET /api/automation-runs/:id error:', err);
-      return c.json({ success: false, error: '実行記録を読み込めませんでした' }, 500);
+      throw err;
     }
   },
 );
 
 /**
- * #942 N-353: 実行の取りやめ。
+ *  実行の取りやめ。
  *
  * 待機中・実行中・再試行待ちの実行を cancelled で閉じる。
  * 終わった実行は 409、無い・範囲外は 404、取消済みはそのまま成功。
- * V6 §9: 取り消しは再実行と同じ `automation.run.retry` の個別権限。
+ * §9: 取り消しは再実行と同じ `automation.run.retry` の個別権限。
  */
 automations.post(
   '/api/automation-runs/:id/cancel',
   requireAutomationPermission,
   requireAutomationRetryPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     try {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       const result = await cancelAutomationRun(c.env.DB, {
@@ -851,14 +873,9 @@ automations.post(
     } catch (error) {
       if (error instanceof AutomationRunCancelError) {
         const status = error.code === 'not_found' ? 404 : 409;
-        return c.json({ success: false, error: error.message, code: error.code }, status);
+        return inputError(c, { success: false, error: error.message, code: error.code }, status, []);
       }
-      console.error(JSON.stringify({
-        event: 'automation_run_cancel_failed',
-        path: c.req.path,
-        reason: error instanceof Error ? error.message : String(error),
-      }));
-      return c.json({ success: false, error: '実行を取りやめられませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -866,7 +883,7 @@ automations.post(
 automations.use('/api/automations/:id', requireVisibleAutomation);
 automations.use('/api/automations/:id/*', requireVisibleAutomation);
 
-/** V6定義のアカウントを引く（requireVisibleAutomation が範囲を確かめ済み）。 */
+/** 定義のアカウントを引く（requireVisibleAutomation が範囲を確かめ済み）。 */
 async function definitionAccountId(c: Context<Env>): Promise<string | Response> {
   const row = await c.env.DB.prepare(
     `SELECT line_account_id FROM automation_definitions WHERE id = ?`,
@@ -877,12 +894,12 @@ async function definitionAccountId(c: Context<Env>): Promise<string | Response> 
   return row.line_account_id;
 }
 
-/** #942 N-352: 一覧の「編集」。公開済みの定義に改訂用の下書きをぶら下げる。 */
+/**  一覧の「編集」。公開済みの定義に改訂用の下書きをぶら下げる。 */
 automations.post(
   '/api/automations/:id/draft',
   requireAutomationPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await definitionAccountId(c);
     if (typeof accountId !== 'string') return accountId;
     return draftEndpoint(c, () => createAutomationDraftFromDefinition(c.env.DB, {
@@ -893,12 +910,12 @@ automations.post(
   },
 );
 
-/** #942 N-352: 一覧の「複製」。いま見えている版を写した新しい下書きを作る。 */
+/**  一覧の「複製」。いま見えている版を写した新しい下書きを作る。 */
 automations.post(
   '/api/automations/:id/duplicate',
   requireAutomationPermission,
   requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  inputJsonBoundary(), async (c) => {
     const accountId = await definitionAccountId(c);
     if (typeof accountId !== 'string') return accountId;
     return draftEndpoint(c, () => duplicateAutomationDefinition(c.env.DB, {
@@ -910,26 +927,26 @@ automations.post(
 );
 
 /**
- * #942 N-352: 一覧の稼働切替と「保管」。
+ *  一覧の稼働切替と「保管」。
  *
  * body は `{ status: 'active' | 'stopped' | 'archived' }`。
- * 保管は一方通行（戻すときは複製）。実行記録は残る。
+ * 保管から戻せる。戻すだけでは動かさず、実行記録は残る。
  */
 automations.post(
   '/api/automations/:id/status',
   requireAutomationPermission,
-  requireRole('owner', 'admin', 'staff'),
-  async (c) => {
+  requireRole('owner', 'admin'),
+  inputJsonBoundary(), async (c) => {
     const accountId = await definitionAccountId(c);
     if (typeof accountId !== 'string') return accountId;
     const body = await c.req.json<{ status?: unknown }>()
       .catch((): { status?: unknown } => ({}));
     const status = body.status;
     if (status !== 'active' && status !== 'stopped' && status !== 'archived') {
-      return c.json({
+      return inputError(c, {
         success: false,
         error: 'status は active / stopped / archived のどれかで送ってください',
-      }, 400);
+      }, 400, ["status"]);
     }
     return definitionEndpoint(c, () => updateAutomationDefinitionStatus(c.env.DB, {
       id: c.req.param('id'),
@@ -938,6 +955,14 @@ automations.post(
     }));
   },
 );
+
+automations.post('/api/automations/:id/restore', requireAutomationPermission, requireRole('owner', 'admin', 'staff'), denyReadOnly(), async (c) => {
+  const accountId = await definitionAccountId(c);
+  if (typeof accountId !== 'string') return accountId;
+  const requested = c.req.query('lineAccountId') ?? c.req.query('account_id');
+  if (requested && requested !== accountId) return c.json({ success: false, error: 'ルールが見つかりません' }, 404);
+  return definitionEndpoint(c, () => restoreAutomationDefinition(c.env.DB, { id: c.req.param('id'), lineAccountId: accountId }));
+});
 
 // 詳細・ログは一覧より機微度が高い（friendId・eventDataを含む）ため、
 // アカウント範囲の検査に加えて機能の権限キー検査も直接付ける。
@@ -948,7 +973,7 @@ automations.get(
   async (c) => {
   try {
     const item = await getAutomationById(c.env.DB, c.req.param('id'));
-    if (!item) return c.json({ success: false, error: 'Automation not found' }, 404);
+    if (!item) return fail(c, 404, 'AUTOMATION_NOT_FOUND');
 
     // ログも取得
     const logs = await getAutomationLogs(c.env.DB, item.id, 50);
@@ -978,17 +1003,16 @@ automations.get(
       },
     });
   } catch (err) {
-    console.error('GET /api/automations/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// 旧CRUDの作成口は削除済み（#554 点検#519中6）。
+// 旧CRUDの作成口は削除済み（ 点検中6）。
 // 旧 `automations` 表へ検証なしで直書きし、一覧・実行基盤が読む
 // `automation_definitions` 系と不整合を起こすうえ、唯一の呼び元だった
 // 画面内蔵フォームは到達不能だった。作成は下書き→公開の流れを使う。
 // 稼働切替・削除で使う PUT・DELETE は残す。
-// #736: 旧 PUT の受理は isActive boolean だけに絞る。唯一の呼び元は
+// 旧 PUT の受理は isActive boolean だけに絞る。唯一の呼び元は
 // 稼働切替の { isActive } で、eventType/actions を送る画面経路はない。
 // 未知キー・空 body・型違いは黙って無視せず 400 で拒否する。
 function parseAutomationToggle(body: unknown): { ok: true; isActive: boolean } | { ok: false; error: string } {
@@ -1010,12 +1034,12 @@ function parseAutomationToggle(body: unknown): { ok: true; isActive: boolean } |
   return { ok: true, isActive };
 }
 
-automations.put('/api/automations/:id', requireRole('owner', 'admin'), async (c) => {
+automations.put('/api/automations/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json().catch(() => undefined);
     const toggle = parseAutomationToggle(body);
-    if (!toggle.ok) return c.json({ success: false, error: toggle.error }, 400);
+    if (!toggle.ok) return inputError(c, { success: false, error: toggle.error }, 400, ['isActive']);
     await updateAutomation(c.env.DB, id, { isActive: toggle.isActive });
     const updated = await getAutomationById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
@@ -1033,8 +1057,7 @@ automations.put('/api/automations/:id', requireRole('owner', 'admin'), async (c)
       },
     });
   } catch (err) {
-    console.error('PUT /api/automations/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -1043,8 +1066,7 @@ automations.delete('/api/automations/:id', requireRole('owner', 'admin'), async 
     await deleteAutomation(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/automations/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -1057,11 +1079,9 @@ automations.get(
   async (c) => {
   try {
     const automationId = c.req.param('id');
-    const limit = listLimit(c.req.query('limit'), 100);
+    const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 100 }).limit;
     const logs = await getAutomationLogs(c.env.DB, automationId, limit);
-    return c.json({
-      success: true,
-      data: logs.map((l) => ({
+    const responseItems = logs.map((l) => ({
         id: l.id,
         automationId: l.automation_id,
         friendId: l.friend_id,
@@ -1069,11 +1089,10 @@ automations.get(
         actionsResult: l.actions_result ? JSON.parse(l.actions_result) : null,
         status: l.status,
         createdAt: l.created_at,
-      })),
-    });
+      }));
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [] }));
   } catch (err) {
-    console.error('GET /api/automations/:id/logs error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

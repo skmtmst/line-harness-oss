@@ -3,8 +3,8 @@ import type { FeatureId } from './feature-catalog.js';
 /**
  * サイドメニューの区分と項目の正本。
  *
- * 並び順の保存はサーバーがこの表と完全に同じ顔ぶれだけを受け付ける
- * （N-441）。画面側の `apps/web/src/lib/menu.ts` は表示用の情報
+ * 並び順の保存はサーバーがこの表と完全に同じ顔ぶれだけを受け付ける。
+ * 画面側の `apps/web/src/lib/menu.ts` は表示用の情報
  * （アイコン・説明・URL）をここへ足した形で持ち、両者が一致することは
  * `apps/web/src/lib/menu-catalog-parity.test.ts` が固定する。
  *
@@ -67,6 +67,19 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
     ],
   },
   {
+    id: 'booking',
+    label: '予約',
+    title: '予約',
+    items: [
+      { id: 'booking-bookings', featureKey: 'booking' },
+      { id: 'booking-menus', featureKey: 'booking' },
+      { id: 'events', featureKey: 'events' },
+      // 来店スタンプ。飲食店もサロンも使う。鍵は予約と同じ（専用の鍵は無い）。
+      { id: 'visit-stamps', featureKey: 'visit_stamps' },
+      { id: 'booking-own-shifts', featureKey: 'booking' },
+    ],
+  },
+  {
     id: 'results',
     label: '成果と分析',
     title: '成果と分析',
@@ -88,23 +101,12 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
     ],
   },
   {
-    id: 'booking',
-    label: '予約',
-    title: '予約',
-    items: [
-      { id: 'booking-bookings', featureKey: 'booking' },
-      { id: 'booking-menus', featureKey: 'booking' },
-      { id: 'events', featureKey: 'events' },
-      { id: 'booking-own-shifts', featureKey: 'booking' },
-    ],
-  },
-  {
     id: 'specialized',
     label: '専用機能',
     title: '専用機能',
     items: [
       { id: 'nen-members', featureKey: 'ec_commerce' },
-      // ★V6 37-3／37-4（2026-09-16 採用）。「投稿」と同じ photo_review の受け口。
+      // ペットの写真。「投稿」と同じ photo_review の受け口。
       { id: 'nen-pets', featureKey: 'photo_review' },
       { id: 'nen-health', featureKey: 'photo_review' },
       { id: 'photo-review', featureKey: 'photo_review' },
@@ -117,13 +119,11 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
     title: '設定',
     items: [
       { id: 'getting-started', required: true },
-      { id: 'line-accounts', required: true },
       { id: 'pools', featureKey: 'multi_store_hierarchy' },
       { id: 'staff', required: true },
       { id: 'settings', required: true },
       { id: 'emergency', required: true },
       { id: 'ec-commerce', featureKey: 'ec_commerce' },
-      { id: 'line-notifications', featureKey: 'line_notifications' },
     ],
   },
   {
@@ -131,13 +131,11 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
     label: '飲食店向け（テスト）',
     title: '飲食店向け（テスト）',
     items: [
-      { id: 'restaurant-dashboard', featureKey: 'restaurant_test' },
-      { id: 'restaurant-organization', featureKey: 'restaurant_test' },
-      { id: 'restaurant-approvals', featureKey: 'restaurant_test' },
       { id: 'restaurant-reservations', featureKey: 'restaurant_test' },
       { id: 'restaurant-tables', featureKey: 'restaurant_test' },
       { id: 'restaurant-inventory', featureKey: 'restaurant_test' },
       { id: 'restaurant-menu', featureKey: 'restaurant_test' },
+      { id: 'restaurant-delivery', featureKey: 'restaurant_test' },
       { id: 'restaurant-google', featureKey: 'restaurant_test' },
       { id: 'restaurant-line-followup', featureKey: 'restaurant_test' },
     ],

@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { emptyLayout, newBlockId, type FormLayout } from '@line-crm/shared';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 
 /**
- * フォーム回答の冪等化(N-165)の契約テスト。
+ * フォーム回答の冪等化の契約テスト。
  *
  * 外部副作用(Webhook・LINE通知)より前に scope
  * (テナント・LINEアカウント・フォーム・友だち・キー)つきの予約行を原子的に
@@ -101,11 +102,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@line-crm/db', () => ({
+  // 止まったとみなす目安は本物と同じ値にする（routes/forms.ts が参照）。
+  FORM_SUBMIT_CLAIM_STALE_MS: 60 * 1000,
   getFormAccountIds: vi.fn(async () => ['account-a']),
   listLineAccountsWithTenantStatus: vi.fn(async () => [
     { id: 'account-a', tenant_status: 'active' },
   ]),
-  // #648: 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
+  // 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
   // 呼び出し口が 500 になる。数えること自体は実DBの試験で見ている。
   recordConversionSourceEvent: vi.fn(async () => ({ matched: 0, recorded: 0, failed: 0, skipped: null })),
   getForms: vi.fn(),
@@ -151,6 +154,8 @@ vi.mock('@line-crm/db', () => ({
   getFriendFieldById: mocks.getFriendFieldById,
   countFormSubmissionsByFriend: mocks.countFormSubmissionsByFriend,
   countChoiceUsage: mocks.countChoiceUsage,
+  claimFormCapacitySlot: vi.fn(async () => true),
+  releaseFormCapacityClaims: vi.fn(async () => {}),
   applyMileageRulesForEvent: mocks.applyMileageRulesForEvent,
   jstNow: vi.fn(() => '2026-08-20T12:00:00+09:00'),
   toJstString: vi.fn((date: Date) => date.toISOString()),
@@ -160,7 +165,7 @@ vi.mock('../services/liff-auth.js', () => ({
   verifyCallerLineIdentity: mocks.verifyCallerLineIdentity,
 }));
 
-vi.mock('../services/friend-tag-attach.js', () => ({
+vi.mock('../features/friends/friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: mocks.attachTag,
 }));
 
@@ -172,8 +177,8 @@ vi.mock('../services/line-proxy-send.js', () => ({
   pushViaHarnessProxy: mocks.pushViaHarnessProxy,
 }));
 
-vi.mock('../services/form-layout-effects.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../services/form-layout-effects.js')>();
+vi.mock('../features/forms/form-layout-effects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../features/forms/form-layout-effects.js')>();
   mocks.realApplyLayout = actual.applyFormLayoutEffects as never;
   return { ...actual, applyFormLayoutEffects: mocks.applyLayout };
 });
@@ -605,9 +610,9 @@ describe('フォーム回答の冪等予約', () => {
     expect(claim.status).toBe('completed');
     const steps = readSteps(claim);
     // 粗い完了だけでなく、layout の効果ごとの記録も残る。
-    // capacity(#751): 全体上限・選択肢定員の原子的な確保も工程の1つ。
+    // capacity: 全体上限・選択肢定員の原子的な確保も工程の1つ。
     expect(steps.filter((step) => !step.startsWith('layout:')).sort()).toEqual(
-      ['answer', 'capacity', 'submit_count', 'mileage', 'layout_effects', 'reply', 'destination_status'].sort(),
+      ['answer', 'automation', 'capacity', 'submit_count', 'mileage', 'layout_effects', 'reply', 'destination_status'].sort(),
     );
     expect(steps.some((step) => step.startsWith('layout:destinations:'))).toBe(true);
     // LINE 再送キーは UUID 形の固定値。
@@ -702,6 +707,16 @@ describe('フォーム回答の冪等予約', () => {
     const body = (await replayed.json()) as { success: boolean; data: { id: string } };
     expect(body.success).toBe(true);
     expect(body.data.id).toBe(claimOf().submission_id);
+  });
+
+  test.each(['document_attachment_failed', 'document_already_submitted', 'document_attachment_conflict'])('書類の保存失敗%sは選び直す案内を返す', async code => {
+    mocks.insertFormSubmissionRecord.mockRejectedValueOnce(new Error(code));
+    const response = await app().fetch(submitRequest({ full_name: '山田' }), env());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ success: false, code: 'document_attachment_failed', error: '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください' });
+    expect(answerStore.size).toBe(0);
+    expect(claimOf().status).toBe('failed');
+    expect(mocks.pushViaHarnessProxy).not.toHaveBeenCalled();
   });
 
   test('INSERT後の件数更新に失敗したら500にし、同じキーで再開して補完する', async () => {
@@ -968,7 +983,7 @@ describe('フォーム回答の冪等予約', () => {
       body: JSON.stringify({ data: { full_name: '山田' } }),
     }), env());
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ success: false, error: 'idempotency_key_required' });
+    expect(await res.json()).toMatchObject({ success: false, code: 'idempotency_key_required' , fields: expect.any(Object), error: expect.any(String) });
     expect(mocks.getFormById).not.toHaveBeenCalled();
     expect(mocks.createFormSubmitClaim).not.toHaveBeenCalled();
   });
@@ -1043,4 +1058,25 @@ describe('フォーム回答の冪等予約', () => {
     const retried = await app().fetch(submitRequest({ full_name: '山田' }), env());
     expect(retried.status).toBe(201);
   });
+});
+
+test.each(['once','total'])('W14: 自分の保存済み回答を受付上限(%s)で拒否せず未完工程を再開する', async (kind) => {
+  const layout=simpleLayout();
+  layout.options= { ...layout.options, ...(kind==='once' ? {oncePerFriend:{enabled:true}} : {totalLimit:{enabled:true,max:1}}) };
+  mocks.getFormById.mockResolvedValue(formRow(layout));
+  failures.mileageOnce=true;
+  const first=await app().fetch(submitRequest({full_name:'山田'}),env());
+  expect(first.status).toBe(202);
+  mocks.countFormSubmissionsByFriend.mockResolvedValue(1);
+  mocks.getFormById.mockResolvedValue(formRow(layout,{submit_count:1}));
+  expect((await app().fetch(submitRequest({full_name:'山田'}),env())).status).toBe(200);
+  expect(answerStore.size).toBe(1);
+  expect(claimOf().status).toBe('completed');
+});
+
+// URL・内部 IP の検査と Webhook 通信は実物を使い、DNS だけを差し替えて実際の試行回数を数える。
+vi.mock('../features/forms/form-webhook.js', async original => {
+  const actual = await original<typeof import('../features/forms/form-webhook.js')>();
+  return { ...actual, callFormWebhook: (...[form, answers, eventId]: Parameters<typeof actual.callFormWebhook>) =>
+    actual.callFormWebhook(form, answers, eventId, { lookupHost: async () => ['93.184.216.34'] }) };
 });

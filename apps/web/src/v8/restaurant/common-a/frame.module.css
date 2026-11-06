@@ -1,0 +1,55 @@
+/*
+ * ★V8 飲食店向けの器（担当 a）。値は globals.css の `[data-theme="v8"]` の `--tpl-rt-*`。
+ * 中身 V8（CHz31）：上16・左右24・下24、段の間16。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rt-body-gap, var(--tpl-rt-body-gap));
+  padding: var(--tpl-rt-body-pad);
+  min-width: 0;
+}
+
+/*
+ * 絵の中身の上の余白が共通の16と違う板だけ、RestaurantPage の bodyPadTop で替える。
+ * 上の `padding` はひとまとめの指定なので、上だけを後から入れ直す。
+ * 渡さない板には印（data-body-pad-top）が付かないので、今までの16のまま。
+ */
+.body[data-body-pad-top] {
+  padding-top: var(--rt-body-pad-top);
+}
+
+/* 検証環境の帯（CHz31「検証環境の帯」）：薄い金色の地＋緑の札＋右の注意。間12。 */
+
+
+.boundaryBadge {
+  flex: 0 0 auto;
+  padding: var(--tpl-rt-band-badge-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.notice {
+  padding: var(--tpl-rt-notice-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.noticeError {
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+}
+
+.stateBox {
+  padding: var(--tpl-rt-state-pad);
+  border-radius: var(--tpl-rt-card-radius);
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: var(--card-shadow);
+}

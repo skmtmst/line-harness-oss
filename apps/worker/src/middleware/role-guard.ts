@@ -1,6 +1,9 @@
+import { hasStaffAccess, hasDeliveryAccess, type DeliveryFeature, type StaffFeatureOperation } from '@line-crm/shared';
+
 import type { Context, MiddlewareHandler } from 'hono';
-import type { Env } from '../index.js';
-import type { StaffRole } from './auth.js';
+import type { Env } from '../worker-env.js';
+import type { StaffRole } from './auth/principal/auth.js';
+import { readOperationPermissions } from './auth/permissions/auth.js';
 
 /**
  * 役割による門番。
@@ -26,7 +29,7 @@ export function requireRole(...allowed: StaffRole[]): MiddlewareHandler<Env> {
 }
 
 /**
- * 項目別permissionによる門番（N-411）。
+ * 項目別permissionによる門番。
  *
  * owner/admin は常に通す。staff は保存済みの権限キーで判定する:
  *   - permissionKeys … すべてのメソッドで有効（edit）
@@ -50,6 +53,17 @@ export function requirePermission(permission: string): MiddlewareHandler<Env> {
         { success: false, error: 'この操作を実行する権限がありません' },
         403,
       );
+    }
+    return next();
+  };
+}
+
+/** 表に明記された読取操作だけを、指定のいずれかの閲覧鍵で通す。 */
+export function requireReadOperationPermission(): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    const permissions = readOperationPermissions(c.req.method, c.req.path);
+    if (!permissions?.some(permission => hasStaffAccess(c.get('staff'), permission, true))) {
+      return c.json({ success: false, error: 'この操作を実行する権限がありません' }, 403);
     }
     return next();
   };
@@ -112,4 +126,14 @@ function roleLabel(role: StaffRole | undefined): string {
     default:
       return '相応の';
   }
+}
+
+/** 操作の鍵を束と共通の表から選ぶ。アカウント境界は各routeで確認する。 */
+export function requireDeliveryAccess(feature: DeliveryFeature, operation: StaffFeatureOperation = 'edit'): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    if (!hasDeliveryAccess(c.get('staff'), feature, operation)) {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
+    return next();
+  };
 }

@@ -21,7 +21,7 @@ const TTY_REQUIRED = /non[- ]?interactive|cloudflare_api_token|consent denied|au
 // Unregistered workers.dev subdomain. Wrangler prints this alongside a
 // non-interactive-context error (its registration prompt cannot be answered
 // through our pipe), so it would otherwise take the TTY-retry path below and
-// lose the message getHelp() keys on — rethrow immediately instead.
+// lose the message getHelp keys on — rethrow immediately instead.
 const WORKERS_DEV_SUBDOMAIN_UNREGISTERED = /register a workers\.dev subdomain/i;
 const RETRYABLE_NETWORK_ERROR =
   /fetch failed|connectivity issue|network connectivity|connection reset|socket hang up/i;
@@ -109,7 +109,7 @@ async function deployWorkerBundle(
     } catch (firstError) {
       // No retry can fix an unregistered subdomain — surface the original
       // WranglerError so setup's top-level catch renders the registration
-      // guidance (WranglerError.getHelp()).
+      // guidance (WranglerError.getHelp).
       if (isSubdomainUnregisteredError(firstError)) {
         throw firstError;
       }
@@ -246,7 +246,7 @@ export async function deployWorker(
 
   // Write .env for Vite build (LIFF client env vars)
   const envPath = join(workerDir, ".env");
-  const envContent = `VITE_LIFF_ID=${options.liffId}\nVITE_BOT_BASIC_ID=${options.botBasicId}\n`;
+  const envContent = `VITE_LIFF_ID=${options.liffId}\n`;
   writeFileSync(envPath, envContent);
 
   const buildSpinner = p.spinner();
@@ -274,7 +274,7 @@ export async function deployWorker(
 
     if (options.bundleWorkerJs) {
       // Deploy the OFFICIAL release Worker bytes (not the local build).
-      // Their baked-in _version.ts stamp matches the release manifest, so
+      // Their baked-in release-version.ts stamp matches the release manifest, so
       // `update`'s fork detection sees a vanilla install. The local vite
       // build above still provides dist/client (the LIFF SPA assets).
       writeReleaseArtifact(workerDir, options.bundleWorkerJs);

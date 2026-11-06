@@ -1,5 +1,7 @@
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
+import { jstDate as japanDate, jstDateOffset as japanDateOffset, jstMonthStart as japanMonthStart } from '@line-crm/shared';
 import { Hono, type Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { ACTIVITY_LABELS, DEFAULT_TREAT_LIMIT_PERCENT, getTreatLimitPercent, listFeedingProducts, planForPetRow, pickProduct, stapleProducts, type FeedingProductRow } from '../services/nen-feeding.js';
 import { petCallName, petGender } from '../services/nen-pet-name.js';
@@ -7,9 +9,9 @@ import { toPetAnimalType } from '../lib/nen-pet-species.js';
 import {
   APPETITE_LABELS, STOOL_LABELS, lastLoggedLabel, summarizePetHealth, thirtyDaySummary, type HealthLogRow,
 } from '../services/nen-health-admin.js';
-
+import { fail } from '../lib/fail.js';
 /**
- * 然-NEN- マイペット（★V6 37-3 `hetvN`）／健康日記（★V6 37-4 `mtoCA`）の管理画面。
+ * 然-NEN- マイペット（★37-3 `hetvN`）／健康日記（★37-4 `mtoCA`）の管理画面。
  *
  * ペットの正本は LINE 側（nen_pet_profiles）。お客様がマイページで登録・更新し、ここでは一覧と気づきを出す。
  * 「今日の目安」は `services/nen-feeding.ts`（NRC／FEDIAF）で表示のたびに計算する。
@@ -33,7 +35,7 @@ function accountIdFrom(c: Context<Env>): string {
 }
 
 async function requireAccount(c: Context<Env>, accountId: string): Promise<Response | null> {
-  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
@@ -125,8 +127,7 @@ function escapeLike(value: string): string {
 
 /** 健康日記（37-4）はメモリ上で絞り込んだ結果を分けるために使う。 */
 function paginate<T>(items: T[], pageParam: string | undefined, sizeParam?: string) {
-  const page = Math.max(1, Number.parseInt(pageParam ?? '1', 10) || 1);
-  const pageSize = sizeParam === 'all' ? MAX_PETS : Math.min(MAX_PETS, Math.max(1, Number.parseInt(sizeParam ?? '', 10) || PAGE_SIZE));
+  const { page, limit: pageSize } = parseOffsetPaging({ page: pageParam, limit: sizeParam === 'all' ? String(MAX_PETS) : sizeParam }, { defaultLimit: PAGE_SIZE, pagePolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1 }, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: MAX_PETS } });
   const start = (page - 1) * pageSize;
   return { page, pageSize, total: items.length, items: items.slice(start, start + pageSize) };
 }
@@ -184,11 +185,10 @@ nenPets.get('/api/nen/pets', async (c) => {
     : 'p.updated_at DESC';
 
   const wantsAll = c.req.query('pageSize') === 'all';
-  const page = Math.max(1, Number.parseInt(c.req.query('page') ?? '1', 10) || 1);
-  const pageSize = Math.min(MAX_PETS, Math.max(1, Number.parseInt(c.req.query('pageSize') ?? '', 10) || PAGE_SIZE));
+  const { page, limit: pageSize } = parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('pageSize') }, { defaultLimit: PAGE_SIZE, pagePolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1 }, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: MAX_PETS } });
 
   const kpiCutoff = new Date(today.getTime() - STALE_WEIGHT_DAYS * 86_400_000).toISOString();
-  const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)).toISOString().slice(0, 10);
+  const monthStart = japanMonthStart(today);
   const [countRow, kpiRow, planRows, pageRows] = await Promise.all([
     c.env.DB.prepare(
       `SELECT COUNT(*) AS n FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
@@ -224,7 +224,7 @@ nenPets.get('/api/nen/pets', async (c) => {
     staleWeight: Number(kpiRow?.stale_weight ?? 0),
   };
 
-  return c.json({ success: true, data: { items: views, page, pageSize: wantsAll ? total : pageSize, total, kpis, products: staples.map((p) => ({ id: p.id, name: p.name })), treatLimitPercent } });
+  return c.json({ success: true, data: buildOffsetListResponse({ items: views, page, pageSize: wantsAll ? total : pageSize, total, kpis, products: staples.map((p) => ({ id: p.id, name: p.name })), treatLimitPercent, paging: { limit: wantsAll ? total : pageSize, offset: wantsAll ? 0 : (page - 1) * pageSize }, sort: [] }) });
 });
 
 // ---------------------------------------------------------------- 健康日記（37-4）
@@ -232,7 +232,7 @@ nenPets.get('/api/nen/pets', async (c) => {
 type HealthRow = HealthLogRow & { pet_id: string };
 
 async function loadRecentLogs(db: D1Database, accountId: string, sinceDays: number): Promise<HealthRow[]> {
-  const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString().slice(0, 10);
+  const since = japanDateOffset(-sinceDays);
   const rows = await db.prepare(
     `SELECT h.pet_id, h.logged_on, h.weight_kg, h.stool_status, h.appetite, h.skin_status, h.tear_stain_status,
             h.heart_rate_bpm, h.respiratory_rate_bpm, h.note
@@ -261,14 +261,14 @@ nenPets.get('/api/nen/health', async (c) => {
   const byPet = new Map<string, HealthRow[]>();
   for (const log of logs) { const list = byPet.get(log.pet_id) ?? []; list.push(log); byPet.set(log.pet_id, list); }
 
-  const weekAgo = new Date(today.getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const weekAgo = japanDateOffset(-7, today);
   const rows = pets.filter((pet) => totals.has(pet.id)).map((pet) => {
     const summary = summarizePetHealth(byPet.get(pet.id) ?? [], today);
     const meta = totals.get(pet.id)!;
     // 直近 70 日に記録が無い場合でも「最終記録」は全期間から出す。
     if (!summary.lastLoggedOn && meta.last_logged_on) {
       summary.lastLoggedOn = meta.last_logged_on;
-      summary.daysSinceLast = Math.floor((today.getTime() - Date.parse(`${meta.last_logged_on}T00:00:00Z`)) / 86_400_000);
+      summary.daysSinceLast = Math.floor((Date.parse(japanDate(today)) - Date.parse(`${meta.last_logged_on}T00:00:00Z`)) / 86_400_000);
       if (summary.daysSinceLast >= 30 && !summary.changes.some((ch) => ch.key === 'silent')) summary.changes.push({ key: 'silent', label: '30日以上 記録なし', tone: 'faint' });
     }
     return {
@@ -308,7 +308,8 @@ nenPets.get('/api/nen/health', async (c) => {
   else if (sort === 'recent') filtered = [...filtered].sort((a, b) => (a.daysSinceLast ?? 999) - (b.daysSinceLast ?? 999));
   else if (sort === 'records_desc') filtered = [...filtered].sort((a, b) => b.count30d - a.count30d);
 
-  return c.json({ success: true, data: { ...paginate(filtered, c.req.query('page'), c.req.query('pageSize')), kpis } });
+  const pageData = paginate(filtered, c.req.query('page'), c.req.query('pageSize'));
+  return c.json({ success: true, data: buildOffsetListResponse({ ...pageData, kpis, paging: { limit: pageData.pageSize, offset: (pageData.page - 1) * pageData.pageSize }, sort: [] }) });
 });
 
 nenPets.get('/api/nen/health/:petId/summary', async (c) => {
@@ -321,8 +322,8 @@ nenPets.get('/api/nen/health/:petId/summary', async (c) => {
        FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
       WHERE p.id = ? AND f.line_account_id = ?`,
   ).bind(petId, accountId).first<{ id: string; name: string; gender: string | null; animal_type: string; breed: string | null; birthday: string | null; weight_kg: number | null; friend_id: string; owner_name: string | null }>();
-  if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
-  const since = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+  if (!pet) return fail(c, 404, 'PET_NOT_FOUND');
+  const since = japanDateOffset(-30);
   const logs = await c.env.DB.prepare(
     `SELECT pet_id, logged_on, weight_kg, stool_status, appetite, skin_status, tear_stain_status, heart_rate_bpm, respiratory_rate_bpm, note
        FROM nen_health_logs WHERE pet_id = ? AND logged_on >= ? ORDER BY logged_on DESC`,

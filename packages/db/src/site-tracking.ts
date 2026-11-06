@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 
 /**
@@ -33,7 +34,7 @@ export interface SiteVisitor {
 }
 
 /**
- * 埋め込みJSが送る同意の状態 (#818)。
+ * 埋め込みJSが送る同意の状態。
  *   granted … 「記録してよい」を選んだ。行動を記録する
  *   declined … 「記録しない」を選んだ。数えるだけ
  *   unset   … まだ選んでいない。数えるだけ
@@ -58,7 +59,7 @@ export interface SiteEvent {
 /**
  * URLから記録してよい部分だけを取り出す。
  *
- * クエリ文字列を丸ごと落とす。?email=... や ?token=... が入る事故は
+ * クエリ文字列を丸ごと落とす。?email=... や ?token=... が入ることは
  * 「たまに起きる」ではなく「必ず起きる」ので、通す判断はしない。
  * ハッシュ（#以降）も同じ理由で落とす。
  *
@@ -208,7 +209,7 @@ async function incrementConsentCounter(
   lineAccountId: string,
   field: 'suppressed' | 'granted' | 'declined',
 ): Promise<void> {
-  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const today = japanDate();
   await db
     .prepare(
       `INSERT INTO site_consent_days (line_account_id, day, ${field})
@@ -222,8 +223,8 @@ async function incrementConsentCounter(
 
 /**
  * 行動を記録する。同意が取れていない送信はここで止め、件数だけを
- * 日ごとの台帳に足す（#818 の合格条件「同意していない閲覧は
- * 1件も記録されない」）。訪問者の行そのものも立てない。
+ * 日ごとの台帳に足す（同意していない閲覧は
+ * 1件も記録しない）。訪問者の行そのものも立てない。
  */
 export async function recordSiteEvent(
   db: D1Database,
@@ -396,7 +397,7 @@ export async function getSiteTrackingSummary(
   db: D1Database,
   lineAccountId: string,
 ): Promise<SiteTrackingSummary> {
-  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const today = japanDate();
   const row = await db
     .prepare(
       `SELECT

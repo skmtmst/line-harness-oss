@@ -20,6 +20,7 @@ vi.hoisted(() => {
 
 const mocks = vi.hoisted(() => ({
   query: 'audienceId=aud-1',
+  role: 'admin',
   accountId: 'acc-1',
   accountLoading: false,
   audience: vi.fn(),
@@ -36,6 +37,9 @@ vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href }, children),
 }))
+
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => mocks.role }))
+vi.mock('@/lib/staff-capability', () => ({ canEditFeature: () => mocks.role === 'admin' }))
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: mocks.accountId, loading: mocks.accountLoading }),
@@ -76,6 +80,28 @@ async function flush() {
   })
 }
 
+// どちらの describe の mount もここで片付ける。
+// 2つ目の describe には afterEach がなく、破棄漏れの木に残った
+// 実作業が環境破棄の後に走って落ちていた。製品側のタイマーは
+// 破棄時に自前で消えるため、ここでは破棄漏れと残務の排出だけ行う。
+afterEach(async () => {
+  if (root) {
+    await act(async () => {
+      root.unmount()
+    })
+  }
+  // scheduler に残った実作業を環境が生きているうちに流し切る。
+  await act(async () => {
+    for (let round = 0; round < 5; round += 1) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0)
+      })
+    }
+  })
+  host?.remove()
+  vi.clearAllMocks()
+})
+
 const AUDIENCE = {
   id: 'aud-1',
   sourceKind: 'cross',
@@ -87,6 +113,7 @@ const AUDIENCE = {
 
 describe('配信作成への分析対象者の受け渡し(N-274)', () => {
   beforeEach(() => {
+    mocks.role = 'admin'
     mocks.query = 'audienceId=aud-1'
     mocks.accountId = 'acc-1'
     mocks.accountLoading = false
@@ -94,10 +121,14 @@ describe('配信作成への分析対象者の受け渡し(N-274)', () => {
     mocks.audience.mockResolvedValue({ success: true, data: AUDIENCE })
   })
 
-  afterEach(async () => {
-    if (root) await act(async () => { root.unmount() })
-    host?.remove()
-    vi.clearAllMocks()
+  it('閲覧のみの担当者には作成フォームを出さない', async () => {
+    mocks.role = 'staff'
+    await mount(); await flush()
+    expect(host.textContent).toContain('権限')
+    expect(host.querySelector('[data-design-node="FU2aU"]')).toBeNull()
+    // 押せない［次へ］や下書き保存も出さない（隠す）。
+    const labels = [...host.querySelectorAll('button')].map((button) => button.textContent ?? '')
+    expect(labels.some((label) => label.includes('対象設定へ') || label.includes('下書きを保存する'))).toBe(false)
   })
 
   it('有効な対象者は人数と期限を出してフォームを開く', async () => {
@@ -197,5 +228,83 @@ describe('配信作成への分析対象者の受け渡し(N-274)', () => {
     expect(mocks.audience).not.toHaveBeenCalled()
     expect(host.textContent).toContain('LINE公式アカウントを選んでください')
     expect(host.textContent).not.toContain('読み込み中')
+  })
+})
+
+describe('タグ候補の取得失敗と再試行(R581)', () => {
+  const TAGS = [
+    { id: 't-vip', name: 'VIP', color: '#e5484d', createdAt: '2026-01-01T00:00:00.000Z' },
+  ]
+
+  beforeEach(() => {
+    // 対象者の引き継ぎなしで対象者の段を直接開く。
+    mocks.query = 'step=audience'
+    mocks.accountId = 'acc-1'
+    mocks.accountLoading = false
+    mocks.audience.mockResolvedValue({ success: true, data: AUDIENCE })
+  })
+
+  async function selectTagMode() {
+    const radio = host.querySelector(
+      'input[name="broadcast-target-mode"][value="tag"]',
+    ) as HTMLInputElement | null
+    expect(radio, 'タグの選び方がありません').toBeTruthy()
+    await act(async () => {
+      radio!.click()
+    })
+    await flush()
+  }
+
+  it('候補の取得失敗は「候補なし」にせず、理由と再試行を出す', async () => {
+    mocks.tagsList.mockRejectedValue(new Error('fetch failed'))
+    await mount()
+    await flush()
+    await selectTagMode()
+    // フォームは出たまま（m23m: 画面を落とさない）。
+    expect(host.textContent).toContain('配信対象')
+    expect(host.textContent).toContain('タグを読み込めませんでした')
+    expect(host.textContent).not.toContain('タグはまだありません')
+    const retry = [...host.querySelectorAll('button')].find(
+      (item) => (item.textContent ?? '').includes('もう一度読み込む') && item.parentElement?.textContent?.includes('タグを読み込めませんでした'),
+    )
+    expect(retry, '再試行がありません').toBeTruthy()
+  })
+
+  it('再試行で復旧すると候補を選べる', async () => {
+    mocks.tagsList.mockRejectedValueOnce(new Error('fetch failed')).mockResolvedValue({
+      success: true,
+      data: TAGS,
+    })
+    await mount()
+    await flush()
+    await selectTagMode()
+    expect(host.textContent).toContain('タグを読み込めませんでした')
+    const retry = [...host.querySelectorAll('button')].find(
+      (item) => (item.textContent ?? '').includes('もう一度読み込む') && item.parentElement?.textContent?.includes('タグを読み込めませんでした'),
+    )
+    const callsBefore = mocks.tagsList.mock.calls.length
+    await act(async () => {
+      retry!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flush()
+    expect(mocks.tagsList.mock.calls.length).toBeGreaterThan(callsBefore)
+    expect(host.textContent).not.toContain('タグを読み込めませんでした')
+    const input = host.querySelector('[aria-label="どのタグ"]') as HTMLInputElement | null
+    expect(input?.disabled).toBe(false)
+    await act(async () => {
+      input!.click()
+    })
+    await flush()
+    expect(document.body.textContent).toContain('VIP')
+  })
+
+  it('真の0件は「まだありません」と作り先だけを案内する', async () => {
+    mocks.tagsList.mockResolvedValue({ success: true, data: [] })
+    await mount()
+    await flush()
+    await selectTagMode()
+    expect(host.textContent).toContain('タグはまだありません')
+    expect(host.textContent).not.toContain('タグを読み込めませんでした')
+    expect(host.querySelector('a[href="/tags"]')).toBeTruthy()
   })
 })

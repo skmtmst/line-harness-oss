@@ -18,7 +18,10 @@ describe('問い合わせ一覧の定期取得 (#630)', () => {
 
   it('初回も同じ1本に載せ、別の effect で外に走らせない', () => {
     expect(inbox).toContain('immediate: true')
-    expect(inbox).not.toContain('void loadInbox()')
+    // D014 の取り直しボタン（利用者の操作）だけ許す。effect からの
+    // 素の呼び出し（初回の二重取得）は置かない。
+    expect(inbox).toContain('onClick={() => void loadInbox()}')
+    expect(inbox.split('void loadInbox()')).toHaveLength(2)
   })
 
   it('全取得に世代ID(古い絞り込み・選択の遅い応答は捨てる)', () => {

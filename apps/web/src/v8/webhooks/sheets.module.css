@@ -1,0 +1,108 @@
+/*
+ * ★V8 外部連携「Google Sheets」（・解除の窓 ）。
+ * 枠・見出し・タブ・数の帯は型（ListPage）が持つ。本文：左のカード2枚・右 320 の気をつけること。
+ */
+.body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-wh-sheets-gap);
+  padding: var(--tpl-wh-body-pad);
+}
+.mainCol {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-wh-card-gap);
+  min-width: 0;
+}
+.spacer {
+  flex: 1 1 0;
+}
+.sideCard {
+  flex-shrink: 0;
+  width: var(--tpl-wh-sheets-side-w);
+}
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-wh-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-wh-card-title-lh);
+}
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+.careText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-care-lh);
+}
+
+/* 状態の行（左に題・右に太字の値）。 */
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+.statusLabel {
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+}
+.statusValue,
+.statusStrong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+a.statusValue:hover {
+  text-decoration: underline;
+}
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.targetForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wh-ops-gap);
+}
+.fieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+}
+.targetRow {
+  display: flex;
+  gap: var(--tpl-toolbar-gap);
+}
+
+/* 同期の記録（見出しの帯＋行。行の間はカードの間12）。 */
+.colWhen { width: var(--tpl-wh-run-when); }
+.colKind { width: var(--tpl-wh-run-kind); }
+.colWhat {
+  width: var(--tpl-wh-run-what);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.colResult { width: var(--tpl-wh-mini-ops); }
+
+.skeletonTitle { display: block; width: 40%; height: var(--tpl-rule-row-gap); }
+.skeletonRow { display: block; width: 100%; height: var(--tpl-wh-skel-bar); }

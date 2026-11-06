@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest'
  */
 
 const PAGE = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
+  + readFileSync(new URL('../../v8/inbox-chat/schedule-dialog.tsx', import.meta.url), 'utf8')
 
 describe('受信箱の応答対象照合(#962)', () => {
   it('「前のメッセージ」の応答は要求時の会話・アカウントと一致するときだけ履歴へ足す', () => {
@@ -21,7 +22,7 @@ describe('受信箱の応答対象照合(#962)', () => {
   })
 
   it('予約一覧の応答は要求時の会話・アカウントと一致するときだけ反映する', () => {
-    const loader = PAGE.match(/const loadScheduledSends = useCallback[\s\S]*?\}, \[\]\)/)
+    const loader = PAGE.match(/const loadScheduledSends = useCallback[\s\S]*?\}, \[[^\]]*\]\)/)
     expect(loader).not.toBeNull()
     const body = loader![0]
     expect(body).toContain('const requestedAccountId = detailAccountRef.current')

@@ -1,5 +1,6 @@
+import { currentRequestId, resumeInvocation, withInvocation } from '@line-crm/shared/server';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import {
   classifyCodexMonitorError,
   createCodexQueueFailureLog,
@@ -385,4 +386,12 @@ describe('Codex cloud monitor event classification', () => {
     expect(String(JSON.parse(String((fetcher.mock.calls[1]?.[1] as RequestInit).body)).text)).toContain('【受領未確認】');
     expect(current.queueSend).not.toHaveBeenCalled();
   });
+});
+
+test('既存の受領確認を予約し直しても元の依頼番号と300秒の待機を保つ', async () => {
+  const current = queueTestEnv('fallback_running');
+  const id = withInvocation('http', () => currentRequestId()!);
+  await withInvocation('queue', () => resumeInvocation(id, () => processCodexMentionMessage(current.env, inspectMessage)));
+  expect(current.queueSend).toHaveBeenCalledExactlyOnceWith({ kind: 'inspect_relay', slackEventId: 'Ev-1',
+    channelId: 'C-1', threadTs: '100.1', requestId: id }, { delaySeconds: 300 });
 });

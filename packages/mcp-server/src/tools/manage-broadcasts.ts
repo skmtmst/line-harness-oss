@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { UpdateBroadcastInput } from "@line-harness/sdk";
 import { getClient } from "../client.js";
 
 export function registerManageBroadcasts(server: McpServer): void {
@@ -11,6 +12,7 @@ export function registerManageBroadcasts(server: McpServer): void {
         .enum(["list", "get", "create_draft", "update", "send", "send_to_segment"])
         .describe("Action to perform"),
       broadcastId: z.string().optional().describe("Broadcast ID (required for get, update, send, send_to_segment)"),
+      expectedVersion: z.number().int().positive().optional().describe("Observed broadcast version, required for update"),
       title: z.string().optional().describe("Broadcast title (for create_draft, update)"),
       messageType: z.enum(["text", "image", "flex"]).optional().describe("Message type (for create_draft, update)"),
       messageContent: z.string().optional().describe("Message content (for create_draft, update)"),
@@ -18,9 +20,11 @@ export function registerManageBroadcasts(server: McpServer): void {
       targetTagId: z.string().nullable().optional().describe("Target tag ID (for create_draft, update)"),
       scheduledAt: z.string().nullable().optional().describe("ISO 8601 datetime to schedule (for create_draft, update)"),
       segmentConditions: z.string().optional().describe("JSON string of segment conditions: {operator: 'AND'|'OR', rules: [{type, value}]} (for send_to_segment)"),
+      confirmIrreversible: z.literal("broadcast-send").optional().describe("Explicit confirmation after reviewing recipients/content (send/send_to_segment)"),
+      confirmedRecipientCount: z.number().int().nonnegative().optional().describe("Reviewed recipient count for single-operator sending"),
       accountId: z.string().optional().describe("LINE account ID (uses default if omitted)"),
     },
-    async ({ action, broadcastId, title, messageType, messageContent, targetType, targetTagId, scheduledAt, segmentConditions, accountId }) => {
+    async ({ action, broadcastId, title, messageType, messageContent, targetType, targetTagId, scheduledAt, segmentConditions, accountId, confirmIrreversible, confirmedRecipientCount, expectedVersion }) => {
       try {
         const client = getClient();
 
@@ -84,7 +88,8 @@ export function registerManageBroadcasts(server: McpServer): void {
         }
 
         if (action === "update") {
-          const input: Record<string, unknown> = {};
+          if (expectedVersion === undefined) throw new Error("expectedVersion is required for update");
+          const input: UpdateBroadcastInput = { expectedVersion };
           if (title !== undefined) input.title = title;
           if (messageType !== undefined) input.messageType = messageType;
           if (messageContent !== undefined) input.messageContent = messageContent;
@@ -96,14 +101,14 @@ export function registerManageBroadcasts(server: McpServer): void {
         }
 
         if (action === "send") {
-          const broadcast = await client.broadcasts.send(broadcastId);
+          const broadcast = await client.broadcasts.send(broadcastId, { confirmIrreversible, confirmedRecipientCount });
           return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, broadcast }, null, 2) }] };
         }
 
         if (action === "send_to_segment") {
           if (!segmentConditions) throw new Error("segmentConditions (JSON string) is required for send_to_segment");
           const conditions = JSON.parse(segmentConditions);
-          const broadcast = await client.broadcasts.sendToSegment(broadcastId, conditions);
+          const broadcast = await client.broadcasts.sendToSegment(broadcastId, conditions, { confirmIrreversible, confirmedRecipientCount });
           return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, broadcast }, null, 2) }] };
         }
 

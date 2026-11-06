@@ -1,29 +1,10 @@
+export type { Affiliate } from './affiliate-record-types.js';
+import type { Affiliate } from './affiliate-record-types.js';
+import { sqlIdSet } from './id-queries.js';
+import { readFolderAssignment } from './folder-assignment.js';
 import { jstNow } from './utils.js';
 import { FRIEND_ADD_WINNER_SUBQUERY } from './affiliate-report.js';
 import { generateRefSlug } from './affiliate-links.js';
-// =============================================================================
-// Affiliates — Affiliate & Tracking System
-// =============================================================================
-
-export interface Affiliate {
-  id: string;
-  tenant_id: string;
-  line_account_id: string | null;
-  name: string;
-  code: string;
-  commission_rate: number;
-  is_active: number;
-  created_at: string;
-  friend_id: string | null;
-  /** 連絡先。報酬の連絡に使う。NULL なら未登録 */
-  email: string | null;
-  /** 成果が確定するまでの保留日数。NULL なら即確定 */
-  hold_days: number | null;
-  /** 支払いサイクルの覚書。計算には使わない */
-  payout_cycle: string | null;
-  /** 成果が出たときに本人へ知らせるか */
-  notify_on_conversion: number;
-}
 
 /** 認証利用者が読める紹介者の所属範囲。tenant と account の両方を必須にする。 */
 export interface AffiliateScope {
@@ -41,9 +22,9 @@ function affiliateScopeSql(scope: AffiliateScope, alias = ''): {
   const binds: unknown[] = [scope.tenantId];
   if (scope.allowedLineAccountIds.length > 0) {
     accountParts.push(
-      `${column('line_account_id')} IN (${scope.allowedLineAccountIds.map(() => '?').join(', ')})`,
+      `${column('line_account_id')} IN (${sqlIdSet(scope.allowedLineAccountIds).sql})`,
     );
-    binds.push(...scope.allowedLineAccountIds);
+    binds.push(...(scope.allowedLineAccountIds.length ? sqlIdSet(scope.allowedLineAccountIds).binds : []));
   }
   if (scope.includeUnassigned) accountParts.push(`${column('line_account_id')} IS NULL`);
   return {
@@ -99,23 +80,31 @@ export async function getAffiliateByCode(
 }
 
 export interface CreateAffiliateInput {
+  folderId?: string | null;
   tenantId: string;
   lineAccountId: string;
   name: string;
   code: string;
   commissionRate?: number;
+  rewardMode?: 'none' | 'fixed' | 'rate';
   /** Optional LINE friend UUID to bind for self-serve (LIFF) affiliates. */
   friendId?: string | null;
   /**
-   * Stable per-attempt UUID from the client (#686). When the create commits
+   * Stable per-attempt UUID from the client. When the create commits
    * but the response is lost, the client retries with the SAME operationId;
    * this lets the retry recover the original row instead of creating a
    * duplicate affiliate.
    */
   operationId?: string | null;
+  /**
+   * 作った直後の稼働状態。「すぐに計測を始める」をオフで登録したら
+   * 最初のINSERTから停止(0)で作る。オンのまま2段階目が失敗しても稼働で
+   * 残る——という取り違えを、作り口で断つ。省略時は稼働(1)のまま。
+   */
+  isActive?: boolean;
 }
 
-/** Look up a prior create by its client-supplied operation UUID (idempotent replay, #686). */
+/** Look up a prior create by its client-supplied operation UUID (idempotent replay). */
 async function findAffiliateByOperationId(
   db: D1Database,
   tenantId: string,
@@ -144,6 +133,7 @@ export async function createAffiliate(
     if (existing) return existing;
   }
 
+  const folderId=await readFolderAssignment(db,'affiliate',input.lineAccountId,input.folderId);
   const id = crypto.randomUUID();
   const now = jstNow();
 
@@ -151,8 +141,8 @@ export async function createAffiliate(
     await db
       .prepare(
         `INSERT INTO affiliates
-           (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id)
-         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+           (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id, reward_mode, folder_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -161,9 +151,13 @@ export async function createAffiliate(
         input.name,
         input.code,
         input.commissionRate ?? 0,
+        // 計測オフの登録は最初から停止で作る（省略時は稼働）。
+        input.isActive === false ? 0 : 1,
         now,
         input.friendId ?? null,
         input.operationId ?? null,
+        input.rewardMode ?? ((input.commissionRate ?? 0) > 0 ? 'rate' : 'fixed'),
+        folderId ?? null,
       )
       .run();
   } catch (err) {
@@ -179,14 +173,18 @@ export async function createAffiliate(
 }
 
 export interface CreateAffiliateWithRandomCodeInput {
+  folderId?: string | null;
   tenantId: string;
   lineAccountId: string;
   name: string;
   commissionRate?: number;
+  rewardMode?: 'none' | 'fixed' | 'rate';
   /** Optional LINE friend UUID to bind (enforced 1:1 by the partial UNIQUE index). */
   friendId?: string | null;
-  /** See CreateAffiliateInput.operationId (#686). */
+  /** See CreateAffiliateInput.operationId. */
   operationId?: string | null;
+  /** See CreateAffiliateInput.isActive. */
+  isActive?: boolean;
 }
 
 /**
@@ -212,6 +210,7 @@ export async function createAffiliateWithRandomCode(
     if (existing) return existing;
   }
 
+  const folderId=await readFolderAssignment(db,'affiliate',input.lineAccountId,input.folderId);
   const id = crypto.randomUUID();
   const now = jstNow();
 
@@ -225,8 +224,8 @@ export async function createAffiliateWithRandomCode(
       await db
         .prepare(
           `INSERT INTO affiliates
-             (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id)
-           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+             (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id, reward_mode, folder_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -235,9 +234,13 @@ export async function createAffiliateWithRandomCode(
           input.name,
           code,
           input.commissionRate ?? 0,
+          // 計測オフの登録は最初から停止で作る（省略時は稼働）。
+          input.isActive === false ? 0 : 1,
           now,
           input.friendId ?? null,
           input.operationId ?? null,
+          input.rewardMode ?? ((input.commissionRate ?? 0) > 0 ? 'rate' : 'fixed'),
+          folderId ?? null,
         )
         .run();
 
@@ -268,11 +271,13 @@ export type UpdateAffiliateInput = Partial<
     Affiliate,
     | 'name'
     | 'commission_rate'
+    | 'reward_mode'
     | 'is_active'
     | 'email'
     | 'hold_days'
     | 'payout_cycle'
     | 'notify_on_conversion'
+    | 'folder_id'
   >
 >;
 
@@ -281,10 +286,30 @@ export async function updateAffiliate(
   id: string,
   updates: UpdateAffiliateInput,
   scope?: AffiliateScope,
+  expected?: UpdateAffiliateInput,
 ): Promise<Affiliate | null> {
+  if(updates.folder_id!==undefined) {
+    const current=await getAffiliateById(db,id,scope);if(!current)return null;
+    updates = { ...updates, folder_id: await readFolderAssignment(db,'affiliate',current.line_account_id,updates.folder_id) };
+  }
   const fields: string[] = [];
   const values: unknown[] = [];
+  if(updates.folder_id!==undefined){fields.push('folder_id = ?');values.push(updates.folder_id);}
 
+  if (updates.reward_mode !== undefined || updates.commission_rate !== undefined) {
+    const current = await getAffiliateById(db, id, scope);
+    if (!current) return null;
+    // 根拠のない過去承認を現在額で再計算しない。確定額の照合が済むまで方式変更を止める。
+    const unknown = await db.prepare(`SELECT 1 AS missing FROM conversion_events ce
+      WHERE ce.affiliate_id = ? AND ce.approval_status = 'approved'
+        AND ce.approval_amount_minor IS NULL
+        AND NOT EXISTS (SELECT 1 FROM affiliate_reward_calculations calc WHERE calc.conversion_event_id = ce.id)
+        AND NOT EXISTS (SELECT 1 FROM affiliate_reward_entries entry WHERE entry.conversion_event_id = ce.id AND entry.entry_type = 'credit')
+      LIMIT 1`).bind(id).first();
+    if (unknown) throw new Error('APPROVED_REWARD_SNAPSHOT_MISSING');
+    fields.push('reward_mode = ?');
+    values.push(updates.reward_mode ?? current.reward_mode ?? ((updates.commission_rate ?? current.commission_rate) > 0 ? 'rate' : 'fixed'));
+  }
   if (updates.name !== undefined) {
     fields.push('name = ?');
     values.push(updates.name);
@@ -320,13 +345,28 @@ export async function updateAffiliate(
 
   const scoped = scope ? affiliateScopeSql(scope) : null;
   values.push(id, ...(scoped?.binds ?? []));
-  await db
+  const conditions: string[] = [];
+  // 比較と更新を同じSQLで行い、読み取り後に入った他の保存も上書きしない。
+  for (const column of ['name', 'commission_rate', 'reward_mode', 'is_active', 'email', 'hold_days', 'payout_cycle', 'notify_on_conversion', 'folder_id'] as const) {
+    if (expected?.[column] === undefined) continue;
+    // APIで補完される旧い行の報酬方式は、画面が読んだ値と同じ意味で比べる。
+    const expression = column === 'reward_mode' && expected[column] !== null
+      ? "COALESCE(reward_mode, CASE WHEN commission_rate > 0 THEN 'rate' ELSE 'fixed' END)"
+      : column;
+    conditions.push(`${expression} IS ?`);
+    values.push(expected[column]);
+  }
+  const result = await db
     .prepare(
-      `UPDATE affiliates SET ${fields.join(', ')} WHERE id = ?${scoped ? ` AND ${scoped.sql}` : ''}`,
+      `UPDATE affiliates SET ${fields.join(', ')} WHERE id = ?${scoped ? ` AND ${scoped.sql}` : ''}${conditions.length ? ` AND ${conditions.join(' AND ')}` : ''}`,
     )
     .bind(...values)
     .run();
 
+  if (conditions.length && result.meta.changes === 0) {
+    if (!await getAffiliateById(db, id, scope)) return null;
+    throw new Error('AFFILIATE_VERSION_CONFLICT');
+  }
   return getAffiliateById(db, id, scope);
 }
 

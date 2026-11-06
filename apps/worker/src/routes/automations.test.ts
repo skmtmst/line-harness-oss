@@ -1,10 +1,9 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 
-// We assert on the SQL/binds the route forwards to D1. The DB-helper path
-// (no lineAccountId query) is mocked separately on @line-crm/db.
+// アカウント指定時は D1 へ渡る SQL と引数を検証し、未指定時の DB ヘルパ経路は別に差し替える。
 const dbMocks = {
   getAutomations: vi.fn(),
   getAutomationById: vi.fn(),
@@ -23,7 +22,7 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
-// #1043: 止まっている理由を付けるために feature 状態を読む。
+// 止まっている理由を付けるために feature 状態を読む。
 // 既定は「有効」にして、止まる試験だけ個別に差し替える。
 const featureMocks = vi.hoisted(() => ({
   accountFeatureAvailability: vi.fn(async () => ({
@@ -39,9 +38,9 @@ vi.mock('../services/feature-enforcement.js', async (importOriginal) => ({
 const { automations } = await import('./automations.js');
 
 /*
- * #942: requireVisibleAutomation は先に V6 の automation_definitions を
+ * requireVisibleAutomation は先に の automation_definitions を
  * db.prepare で引く。旧テストは `{}` を渡していたため prepare が無く 500
- * になった。ここでは「V6には無い」= null を返す最小のD1を用意し、
+ * になった。ここでは「には無い」= null を返す最小のD1を用意し、
  * 旧 automations 表のモック（getAutomationById）へ落ちる経路を残す。
  */
 const fakeD1 = () => ({
@@ -83,6 +82,10 @@ function setupApp(db: D1Database, staff?: Partial<AuthenticatedStaff>) {
 
 const STAFF_WITHOUT_KEY = { role: 'staff', permissionKeys: [] } as Partial<AuthenticatedStaff>;
 const STAFF_WITH_KEY = { role: 'staff', permissionKeys: ['/automations'] } as Partial<AuthenticatedStaff>;
+// 設定画面で「閲覧だけ」を許可した担当者。変更のキーは持たない。
+const STAFF_WITH_VIEW_KEY = {
+  role: 'staff', permissionKeys: [], viewPermissionKeys: ['/automations'],
+} as Partial<AuthenticatedStaff>;
 const STAFF_WITH_EXPORT_KEY = {
   role: 'staff', permissionKeys: ['/automations', 'automation.run.export'],
 } as Partial<AuthenticatedStaff>;
@@ -138,7 +141,7 @@ describe('GET /api/automation-runs', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
     expect(body.data.items[0]).toMatchObject({
-      // #1043: 一部だけ成功は失敗とは別の状態で返す。
+      // 一部だけ成功は失敗とは別の状態で返す。
       ownerKind: 'automation', status: 'partial', subject: '田中さん', accountLabel: '本店',
       triggerLabel: 'メッセージが届いたとき', detail: 'メッセージを送信。外部連携先が応答しませんでした',
       durationMs: 1200, canRetry: true,
@@ -186,7 +189,7 @@ describe('GET /api/automation-runs', () => {
   });
 
   /*
-   * #1043: 「待っています」と「止まっています」を区別する。
+   * 「待っています」と「止まっています」を区別する。
    * 運用停止・機能無効で claim できない実行は queued のまま残るが、
    * 理由を人の言葉で detail / holdReason に出す。
    */
@@ -337,6 +340,45 @@ describe('権限キー検査（#554 点検#519中4・中5）', () => {
     expect(res.status).toBe(200);
   });
 
+  // 「閲覧だけ」の権限で保存した担当者が履歴を読めなかった不具合。
+  // 一覧・詳細は読めるが、書き出し・再試行・取消は従来どおり拒否する。
+  test('閲覧だけの権限のstaffは一覧・詳細を読め、変更系は拒否される', async () => {
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [],
+      total: 0,
+      summary: { total: 0, executed: 0, skipped: 0, failed: 0, most_run_name: null, most_run_count: null },
+    });
+    const list = await setupApp(fakeD1(), STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1');
+    expect(list.status).toBe(200);
+
+    dbMocks.getAutomationExecutionRun.mockResolvedValue(runRow({
+      id: 'run-1', status: 'success', version_number: 2,
+      completed_at: '2026-08-28T01:00:01.000Z', duration_ms: 1000,
+    }));
+    dbMocks.getAutomationExecutionRunSteps.mockResolvedValue([]);
+    const detail = await setupApp(fakeD1(), STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs/run-1');
+    expect(detail.status).toBe(200);
+
+    // CSV書き出しは automation.run.export が別途要る。
+    const csv = await setupApp(fakeD1(), STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(csv.status).toBe(403);
+  });
+
+  test('閲覧だけの権限のstaffは再試行・取消を実行できない', async () => {
+    const testDb = realAutomationDb();
+    addRun(testDb.raw, { id: 'run-1', status: 'failed' });
+    addRun(testDb.raw, { id: 'run-2', status: 'waiting' });
+    const retry = await setupApp(testDb.db, STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs/run-1/retry', { method: 'POST' });
+    expect(retry.status).toBe(403);
+    const cancel = await setupApp(testDb.db, STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs/run-2/cancel', { method: 'POST' });
+    expect(cancel.status).toBe(403);
+  });
+
   test('詳細は権限キーのないstaffに403を返す（アカウント範囲内でも）', async () => {
     dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: 'acc-1' });
     const res = await setupApp(fakeD1(), STAFF_WITHOUT_KEY)
@@ -382,7 +424,7 @@ function runRow(overrides: Record<string, unknown> = {}) {
 describe('GET /api/automation-runs/:id（#942 N-354 実行の詳細）', () => {
   test('版番号・テスト印・取消可否と、処理ごとの結果・試行数を返す', async () => {
     dbMocks.getAutomationExecutionRun.mockResolvedValue(runRow({
-      // 待機中stepに retry_at があるときだけ再試行待ち（#1043）。
+      // 待機中stepに retry_at があるときだけ再試行待ち。
       status: 'waiting', has_retry_wait: 1, version_number: 4, is_test: 1,
       successful_actions: null, completed_at: null, duration_ms: null,
     }));
@@ -470,7 +512,7 @@ describe('CSV書き出し（#942 N-353）', () => {
     expect(res.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
     expect(res.headers.get('Content-Disposition')).toContain('automation-runs.csv');
     // Excelで日本語が化けない先頭の目印（BOM）は生のバイト列で確かめる
-    // （Response.text() はUTF-8のBOMを読み飛ばすため）。
+    // （Response.text はUTF-8のBOMを読み飛ばすため）。
     const bytes = new Uint8Array(await res.arrayBuffer());
     expect(Array.from(bytes.slice(0, 3))).toEqual([0xEF, 0xBB, 0xBF]);
     const lines = new TextDecoder().decode(bytes.subarray(3)).split('\r\n');
@@ -520,7 +562,7 @@ describe('CSV書き出し（#942 N-353）', () => {
   });
 
   /*
-   * #1043 / V6 §9: CSV書き出しは個別権限 `automation.run.export`。
+   *  / §9: CSV書き出しは個別権限 `automation.run.export`。
    * 見るだけ（/automations）では出せず、export キーで出せる。
    */
   test('見るだけの権限ではCSVを出せず、書き出し権限のstaffは出せる', async () => {
@@ -538,6 +580,35 @@ describe('CSV書き出し（#942 N-353）', () => {
       .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
     expect(allowed.status).toBe(200);
     expect(allowed.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
+  });
+
+  test('R495: 上限で切れたら総件数・出力件数・切れた印を頭に載せる', async () => {
+    // 総件数5,001件・出力5,000件の境界を、行の数ではなく頭の数で見る。
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [runRow({ id: 'run-1' }), runRow({ id: 'run-2' })],
+      total: 5001,
+      summary: { total: 5001, executed: 5001, skipped: 0, failed: 0, most_run_name: '予約案内', most_run_count: 5001 },
+    });
+    const res = await setupApp(fakeD1(), STAFF_WITH_EXPORT_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Csv-Total-Count')).toBe('5001');
+    expect(res.headers.get('X-Csv-Returned-Count')).toBe('2');
+    expect(res.headers.get('X-Csv-Truncated')).toBe('1');
+  });
+
+  test('R495: 切れていないときは切れた印を立てない', async () => {
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [runRow({ id: 'run-1' })],
+      total: 1,
+      summary: { total: 1, executed: 1, skipped: 0, failed: 0, most_run_name: '予約案内', most_run_count: 1 },
+    });
+    const res = await setupApp(fakeD1(), STAFF_WITH_EXPORT_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Csv-Total-Count')).toBe('1');
+    expect(res.headers.get('X-Csv-Returned-Count')).toBe('1');
+    expect(res.headers.get('X-Csv-Truncated')).toBe('0');
   });
 });
 
@@ -621,7 +692,7 @@ describe('POST /api/automation-runs/:id/cancel（#942 N-353）', () => {
     const denied = await setupApp(testDb.db, STAFF_WITHOUT_KEY)
       .request('/api/automation-runs/run-1/cancel', { method: 'POST' });
     expect(denied.status).toBe(403);
-    // #1043 / V6 §9: 取り消しは automation.run.retry の個別権限。
+    //  / §9: 取り消しは automation.run.retry の個別権限。
     // 見るだけの権限（/automations）では取りやめられない。
     const viewOnly = await setupApp(testDb.db, STAFF_WITH_KEY)
       .request('/api/automation-runs/run-1/cancel', { method: 'POST' });
@@ -749,9 +820,7 @@ describe('POST /api/automations/:id/draft・duplicate・status（#942 N-352）',
   });
 
   /*
-   * AUTOMATION-05: 一覧の「編集」は、止めている・下書き・動いているの
-   * どの状態でも同じidで編集面へ進めなければならない。以前は下書きの
-   * 指し先が壊れた定義で「編集用の下書きを作れませんでした」が出た。
+   * 停止中・下書き・稼働中のどの状態でも、同じ定義 ID から編集へ進めることを確かめる。
    */
   test('止めているルールの「編集」も同じidの下書きを返し、状態は止めたまま', async () => {
     const testDb = realAutomationDb();

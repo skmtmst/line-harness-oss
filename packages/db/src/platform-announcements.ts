@@ -1,7 +1,10 @@
-import { jstNow } from './utils.js';
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { bumpAuthThrottle } from './auth-email.js';
+import { sqlIdSet } from './id-queries.js';
+import { jstNow, nextVersionToken } from './utils.js';
 
 /**
- * 運営からのお知らせ配信 ★V6 37-7 と契約者専用LINE（migration 429）。
+ * 運営からのお知らせ配信 ★37-7 と契約者専用LINE（migration 429）。
  */
 
 export const ANNOUNCEMENT_AUDIENCES = ['all', 'plan', 'tenants'] as const;
@@ -120,9 +123,16 @@ export interface AnnouncementInput {
 
 export async function createPlatformAnnouncement(
   db: D1Database,
-  input: AnnouncementInput & { status: 'draft' | 'scheduled'; createdByStaffId: string; createdByName: string },
+  input: AnnouncementInput & {
+    status: 'draft' | 'scheduled'; createdByStaffId: string; createdByName: string;
+    /*
+     * M512: 二重押し止めの再実行キーをそのまま行IDにする（broadcasts と同じ
+     * 決めごと）。省略時は従来どおり採番する。migration なしで冪等にする。
+     */
+    id?: string;
+  },
 ): Promise<PlatformAnnouncement> {
-  const id = crypto.randomUUID();
+  const id = input.id ?? crypto.randomUUID();
   const now = jstNow();
   await db
     .prepare(`INSERT INTO platform_announcements
@@ -139,15 +149,24 @@ export async function updatePlatformAnnouncement(
   db: D1Database,
   id: string,
   input: AnnouncementInput & { status: 'draft' | 'scheduled' },
+  /*
+   * M513: 古い画面からの保存を止める版。渡されたときだけ updated_at の一致
+   * も条件に入れる。当たらなければ null を返し、呼び出し側が読み直して
+   * 404・配信済み・競合を区別する。省略時は従来どおり。
+   */
+  expectedUpdatedAt?: string | null,
 ): Promise<PlatformAnnouncement | null> {
-  await db
+  const result = await db
     .prepare(`UPDATE platform_announcements
                  SET subject = ?, body = ?, audience_kind = ?, audience_plans = ?, audience_tenant_ids = ?, channels = ?,
                      status = ?, publish_at = ?, updated_at = ?
-               WHERE id = ? AND status IN ('draft', 'scheduled')`)
+               WHERE id = ? AND status IN ('draft', 'scheduled')
+                 AND (? IS NULL OR updated_at = ?)`)
     .bind(input.subject, input.body, input.audienceKind, JSON.stringify(input.audiencePlans), JSON.stringify(input.audienceTenantIds),
-      JSON.stringify(input.channels), input.status, input.publishAt, jstNow(), id)
+      JSON.stringify(input.channels), input.status, input.publishAt, nextVersionToken(expectedUpdatedAt), id,
+      expectedUpdatedAt ?? null, expectedUpdatedAt ?? null)
     .run();
+  if ((result.meta?.changes ?? 0) === 0) return null;
   return getPlatformAnnouncement(db, id);
 }
 
@@ -235,8 +254,8 @@ export async function resolveAnnouncementAudience(
     where.push(`(${parts.join(' OR ')})`);
   } else if (input.audienceKind === 'tenants') {
     if (input.tenantIds.length === 0) return [];
-    where.push(`t.id IN (${input.tenantIds.map(() => '?').join(',')})`);
-    binds.push(...input.tenantIds);
+    where.push(`t.id IN (${sqlIdSet(input.tenantIds).sql})`);
+    binds.push(...(input.tenantIds.length ? sqlIdSet(input.tenantIds).binds : []));
   }
   const { results } = await db
     .prepare(`SELECT sm.id AS staff_id, sm.name AS staff_name, sm.email AS staff_email, t.id AS tenant_id, t.name AS tenant_name,
@@ -333,7 +352,7 @@ export async function issueStaffLineLinkCode(db: D1Database, staffId: string, tt
     .bind(staffId, now)
     .first<{ code: string; expires_at: string }>();
   if (existing) return { code: existing.code, expiresAt: existing.expires_at };
-  const expiresAt = new Date(Date.now() + ttlMs + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+  const expiresAt = japanCalendar(new Date(Date.now() + ttlMs)).toISOString().replace('Z', '+09:00');
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = randomCode();
     try {
@@ -354,6 +373,9 @@ export async function consumeStaffLineLinkCode(
   db: D1Database,
   input: { code: string; friendId: string },
 ): Promise<{ staffId: string; staffName: string } | null> {
+  const senderAttempts = await bumpAuthThrottle(db, `notice-link:friend:${input.friendId}`, 15 * 60_000);
+  const globalAttempts = await bumpAuthThrottle(db, 'notice-link:global', 15 * 60_000);
+  if (senderAttempts > 5 || globalAttempts > 25) return null;
   const now = jstNow();
   const row = await db
     .prepare(`SELECT c.code, c.staff_id, sm.name FROM staff_line_link_codes c JOIN staff_members sm ON sm.id = c.staff_id
@@ -361,11 +383,11 @@ export async function consumeStaffLineLinkCode(
     .bind(input.code, now)
     .first<{ code: string; staff_id: string; name: string }>();
   if (!row) return null;
-  await db.batch([
-    db.prepare(`UPDATE staff_line_link_codes SET used_at = ? WHERE code = ?`).bind(now, row.code),
-    db.prepare(`UPDATE staff_members SET notice_friend_id = ?, notice_linked_at = ? WHERE id = ?`).bind(input.friendId, now, row.staff_id),
+  const results = await db.batch([
+    db.prepare(`UPDATE staff_line_link_codes SET used_at = ? WHERE code = ? AND used_at IS NULL AND expires_at > ?`).bind(now, row.code, now),
+    db.prepare(`UPDATE staff_members SET notice_friend_id = ?, notice_linked_at = ? WHERE id = ? AND changes() = 1`).bind(input.friendId, now, row.staff_id),
   ]);
-  return { staffId: row.staff_id, staffName: row.name };
+  return results[0].meta.changes === 1 ? { staffId: row.staff_id, staffName: row.name } : null;
 }
 
 export async function countNoticeLinkedStaff(db: D1Database, excludeTenantId: string): Promise<{ linked: number; total: number }> {

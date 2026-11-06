@@ -192,7 +192,7 @@ describe('GET /api/analytics/ref/:refCode/orders (IDEA-18)', () => {
       // スコープは友だち側(f.line_account_id)に掛かる。注文は帰属した
       // 友だちの所属に引きずられるので、友だちと同じ条件でよい。
       expect(q.sql).toContain('f.line_account_id');
-      expect(q.binds).toContain('account-a');
+      expect(q.binds).toContain(JSON.stringify(['account-a']));
     }
   });
 });

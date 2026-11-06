@@ -1,6 +1,7 @@
+import { ApiError } from '@/lib/api'
 import { describe, expect, it } from 'vitest'
 import type { ReactElement } from 'react'
-import { formatDate, formatDateTime, planStatusChip, tenantUseStatusChip } from './ops-ui'
+import { formatDate, formatDateTime, planStatusChip, tenantUseStatusChip, opsErrorMessage } from './ops-ui'
 
 /**
  * 監査 R153（利用状態と請求状態を別の札で出す）と R160（運営画面の日時は
@@ -29,15 +30,29 @@ describe('契約先の状態の札（R153）', () => {
 describe('運営画面の日時は日本時間固定（R160）', () => {
   it('UTC の同じ瞬間を、端末のタイムゾーンに関係なく日本時間で表示する', () => {
     // 2026-09-27T12:36:00Z は日本時間の 21:36。実行環境が UTC でも JST でも同じ結果。
-    expect(formatDateTime('2026-09-27T12:36:00.000Z')).toBe('2026-09-27 21:36')
-    expect(formatDate('2026-09-27T12:36:00.000Z')).toBe('2026-09-27')
+    expect(formatDateTime('2026-09-27T12:36:00.000Z')).toBe('09/27 21:36')
+    expect(formatDate('2026-09-27T12:36:00.000Z')).toBe('09/27')
     // 日またぎも日本時間で切る
-    expect(formatDateTime('2026-09-27T15:30:00.000Z')).toBe('2026-09-28 00:30')
+    expect(formatDateTime('2026-09-27T15:30:00.000Z')).toBe('09/28 00:30')
   })
 
   it('空と読めない値の扱いは今までどおり', () => {
     expect(formatDateTime(null)).toBe('—')
     expect(formatDateTime(undefined)).toBe('—')
     expect(formatDateTime('not-a-date')).toBe('not-a-date')
+  })
+})
+
+
+describe('運営の失敗は原因と次の操作を残す', () => {
+  it.each([
+    [503, 'この機能はいまの環境では使えません（設定が未完了です）'],
+    [504, '処理が時間内に終わりませんでした。手で進めるか、少し待ってからもう一度お試しください'],
+  ])('HTTP%sは内部本文を捨てても運営専用の案内を保つ', (status, expected) => {
+    expect(opsErrorMessage(new ApiError(status as number, '設定の失敗 D1_ERROR SELECT secret FROM tenant'))).toBe(expected)
+  })
+  it('安全な409の戻り先は残し、SQL混じりは出さない', () => {
+    expect(opsErrorMessage(new ApiError(409, '別の担当者が変更しました。一覧を読み直してください。'))).toBe('別の担当者が変更しました。一覧を読み直してください。')
+    expect(opsErrorMessage(new ApiError(409, '変更の失敗 D1_ERROR SELECT secret FROM tenant'))).not.toMatch(/D1_ERROR|SELECT|secret/)
   })
 })

@@ -1,9 +1,9 @@
 import { LineClient } from '@line-crm/line-sdk';
 
-import type { Env } from '../index.js';
-import { renderMailHtml } from './mail-html.js';
-import { fetchQuota } from './broadcast-quota-guard.js';
+import type { Env } from '../worker-env.js';
+import { fetchQuotaDetails } from '../features/broadcasts/broadcast-quota-guard/index.js';
 import { sendOperationEmail } from './operation-notifications.js';
+import { renderMailHtml } from './mail-html.js';
 
 type OutboxRow = {
   id: string;
@@ -81,7 +81,7 @@ export async function processOperationAlertNotificationOutbox(
   const leaseExpiresAt = new Date(Date.parse(now) + OPERATION_ALERT_NOTIFICATION_LEASE_MS).toISOString();
   const freshnessCutoff = new Date(Date.parse(now) - LINE_ALERT_MAX_AGE_MS).toISOString();
   const month = jstMonthBoundsUtc(new Date(now));
-  const quotaByAccount = new Map<string, ReturnType<typeof fetchQuota>>();
+  const quotaByAccount = new Map<string, ReturnType<typeof fetchQuotaDetails>>();
   // 設定をオフにする前に積まれた行も送らない。削除して再試行対象から外す。
   await env.DB.prepare(
     `DELETE FROM operation_alert_notification_outbox
@@ -129,14 +129,15 @@ export async function processOperationAlertNotificationOutbox(
   for (const row of rows.results ?? []) {
     if (row.channel === 'line') {
       if (!row.channel_access_token) continue;
-      const quotaPromise = quotaByAccount.get(row.line_account_id) ?? fetchQuota(row.channel_access_token);
+      const quotaPromise = quotaByAccount.get(row.line_account_id) ?? fetchQuotaDetails(row.channel_access_token);
       quotaByAccount.set(row.line_account_id, quotaPromise);
       const quota = await quotaPromise;
       // 使用数を確認できない場合は運用アラートを送らず、顧客向けの枠を優先する。
-      // この版のquota APIは「無制限」と取得失敗を区別しないので、上限不明なら安全側で止める。
-      if (quota.used === null || quota.limit === null) continue;
-      const reserve = Math.max(1, Math.ceil(quota.limit * 0.1));
-      if (quota.used >= quota.limit - reserve) continue;
+      if (quota.used === null || quota.failures.length > 0) continue;
+      if (quota.limit !== null) {
+        const reserve = Math.max(1, Math.ceil(quota.limit * 0.1));
+        if (quota.used >= quota.limit - reserve) continue;
+      }
     }
     const claimed = await env.DB.prepare(
       `UPDATE operation_alert_notification_outbox

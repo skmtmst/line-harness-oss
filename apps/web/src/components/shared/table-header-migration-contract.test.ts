@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -6,16 +6,22 @@ import { countDebt, totals } from '../../../scripts/design-debt.mjs'
 import { readDesignImpactBaseline } from '../../../scripts/design-impact-baseline.mjs'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const WEB = join(SRC, '..')
 const baseline = readDesignImpactBaseline()
 const targets = baseline.tableHeaderMigrationTargets
 const nativeHeaderExceptions = new Set(baseline.nativeTableHeaderExceptions)
+// V8で作り直した画面のローカル部品にある表見出し。
+// 旧管理画面のTh移行対象へ戻さず、確認済みの件数を上限として見張る。
+const v8NativeHeaders: Record<string, number> = {
+  'app/accounts/migration.tsx': 8,
+  'app/duplicates/page.tsx': 12,
+  // 'app/templates/page.tsx' は 2026-10-06 に新しい一覧（src/v8/templates）へ移り、直書き th が 0 になったので外した。
+}
 const sources = Object.fromEntries(
   targets.map((path) => [path, readFileSync(join(SRC, path), 'utf8')]),
 )
 
-describe('表見出しの第1段階移行', () => {
-  it('一覧に登録した画面のV6標準見出しを共通Thで維持する', () => {
+describe('共通化済みの表見出しに直書きと重複指定を戻さない', () => {
+  it('一覧に登録した画面の標準見出しを共通Thで維持する', () => {
     const migrated = Object.values(sources).reduce(
       (sum, source) => sum + (source.match(/<Th\b/g)?.length ?? 0),
       0,
@@ -25,36 +31,50 @@ describe('表見出しの第1段階移行', () => {
     // 2026-09-04: テンプレートに「置き場」列を足して66（台帳 #124。
     // フォルダへ入れる口ができたので、行から直接移せるようにした）。
     // 2026-09-06: リマインダ一覧を正本 M1EXwB の6列へ合わせ、旧9列から3列減らした。
-    // 2026-09-06: 機能16の案件・成果承認をV6の6列へまとめ直し、
+    // 2026-09-06: 機能16の案件・成果承認を管理画面の6列へまとめ直し、
     // 重複していた9見出しを減らした。減少後の実測値へ締め直す。
     expect(migrated).toBeGreaterThan(0)
 
     for (const [path, source] of Object.entries(sources)) {
+      if (path in v8NativeHeaders) continue // V8の専用見出しは下で数を検査する。
       // 見出しだけでなく行・セルまで共通化した画面は、同じ入口から
       // { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } の形で入れる。
       expect(source, `${path} が共通表部品をimportしていない`).toMatch(
         /import \{[^}]*\bTh\b[^}]*\} from '@\/components\/shared\/table'/,
       )
-      expect(source, `${path} が見出し行を共通化していない`).toContain('<TableHeadRow>')
+      // V8のリマインダは専用の見出し行（tr）内に共通Thを置く。
+      expect(source, `${path} に表見出しの行がない`).toMatch(/<(?:TableHeadRow|thead)\b/)
       expect(source.match(/<Th\b/g), `${path} に共通Thの利用箇所が無い`).not.toBeNull()
     }
   })
 
   it('移行したセルに旧色・旧余白・大文字化を重ねない', () => {
-    const handledByPart =
-      /(?:px-[234]|py-3|text-(?:left|right|center|xs|\[11px\]|ink-faint|gray-500)|font-(?:medium|semibold)|uppercase|tracking-wider|whitespace-nowrap)/
+    // V8 移行 ①: 直書き th を共通 Th へ置き換える際、画面の見た目を変えない
+    // ために寸法・文字サイズの上書きクラスは残す。禁止するのは .cell が持つ
+    // 値（余白・色・太さ・揃え・折り返し）と同じクラスの再指定だけ。
+    // 動的 className（${} 入り）は条件付きの意図的な上書きなので対象外。
+    const duplicatesCell =
+      /\b(?:px-3|py-0|text-left|text-right|text-center|text-ink-faint|text-caption|font-semibold|whitespace-nowrap|uppercase|tracking-wider)\b/
 
     for (const [path, source] of Object.entries(sources)) {
       for (const opening of source.match(/<Th\b[^>]*>/gs) ?? []) {
-        expect(opening, `${path} が共通Thへ旧指定を重ねている`).not.toMatch(handledByPart)
+        const cls = /className="([^"]*)"/.exec(opening)?.[1]
+        if (!cls) continue
+        expect(cls, `${path} が共通Thへ .cell と同値の指定を重ねている`).not.toMatch(
+          duplicatesCell,
+        )
       }
     }
   })
 
   // 全ソース走査(countDebt)を含むため、CIの並列負荷で5秒を超えることがある。
-  it('一覧に登録した詳細内テーブルだけ直書きthを許す', { timeout: 30000 }, () => {
-    for (const path of targets.filter((path) => !nativeHeaderExceptions.has(path))) {
+  it('登録した詳細・V8専用テーブルだけ直書きthを許す', { timeout: 120000 }, () => {
+    for (const path of targets.filter((path) => !nativeHeaderExceptions.has(path) && !(path in v8NativeHeaders))) {
       expect(sources[path]).not.toMatch(/<th\b/)
+    }
+    for (const [path, limit] of Object.entries(v8NativeHeaders)) {
+      expect(targets).toContain(path)
+      expect(sources[path].match(/<th\b/g)?.length ?? 0, `${path} の専用見出しを増やさない`).toBe(limit)
     }
     for (const path of nativeHeaderExceptions) {
       expect(targets, `${path} は表見出しの監視対象にありません`).toContain(path)
@@ -63,7 +83,7 @@ describe('表見出しの第1段階移行', () => {
 
     const debt = totals(countDebt().counts) as Record<string, number>
     // 2026-08-29: 統合ユーザー一覧の見出し6つを共通 `Th` へ寄せ、
-    // V6の7列へ増やしても直書きを残さなかった。
+    // 管理画面の7列へ増やしても直書きを残さなかった。
     // 分析の死んだ旧UIから直書き見出し15個を削除した。現在画面の見出しは
     // 共通の `Th` を通すため、この数へは戻さない。
     // シナリオ一覧と友だち情報欄に加え、対応マークの見出しも共通 `Th` へ寄せた。
@@ -79,26 +99,5 @@ describe('表見出しの第1段階移行', () => {
     // 2026-09-06: 機能18のサイト集計・広告送信履歴・友だち一覧を
     // 共通Thへ寄せ、直書き見出しを7つ減らした。217 → 210。
     expect(debt['direct-th']).toBeGreaterThan(0)
-  })
-
-  it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {
-    const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
-    const part = contract.parts.table
-
-    expect(part.status).toBe('active')
-    expect(part.routes.v5).toEqual({ '/tags': 'PbCvb' })
-    expect(part.routes.v6).toEqual({
-      '/reminders': 'kAnOQ',
-      '/templates': 'W7LBc',
-      '/affiliates': 'BaLte',
-      '/conversions': 'Bw4fy',
-      '/inflow-links': 'EQS0v',
-    })
-    expect(part.migration).toEqual({
-      directThBefore: 378,
-      migratedInThisPr: 75,
-      directThRemaining: 303,
-    })
-    expect(part.visualVerification.status).toBe('unverified')
   })
 })

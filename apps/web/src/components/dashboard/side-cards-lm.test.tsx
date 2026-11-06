@@ -36,6 +36,7 @@ let root: Root | null = null
 let container: HTMLDivElement | null = null
 
 afterEach(() => {
+  vi.useRealTimers()
   act(() => { root?.unmount() })
   container?.remove()
   root = null
@@ -89,7 +90,7 @@ describe('UpcomingCard（今後の予定）', () => {
     const links = [...el.querySelectorAll('a')] as HTMLAnchorElement[]
     expect(links.map((a) => a.getAttribute('href'))).toEqual(['/reminders', '/broadcasts', '/booking/bookings?view=list'])
     expect(el.textContent).toContain('配信')
-    expect(el.textContent).toContain('リマインダー')
+    expect(el.textContent).toContain('リマインダ')
     expect(el.textContent).toContain('予約')
   })
 
@@ -102,9 +103,10 @@ describe('UpcomingCard（今後の予定）', () => {
 
   it('旧Workerでは予約だけの表示へ戻る', async () => {
     apiMocks.upcoming.mockRejectedValue(new Error('not found'))
-    // 予約の絞り込みは実際の時計と比べるため、固定日時だとその日を過ぎた時点で落ちる。
+    // 表示は実時刻より後の予約だけを残す。固定の日付を書くと、その日が
+    // 過ぎた時点でこのテストが落ちるので、いまより後ろの時刻を作る。
     const bookings = [
-      { id: 'bk-9', menu_name: '相談', friend_name: 'あおい', starts_at: new Date(Date.now() + 86_400_000).toISOString(), status: 'confirmed' },
+      { id: 'bk-9', menu_name: '相談', friend_name: 'あおい', starts_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), status: 'confirmed' },
     ]
     const el = mount(<UpcomingCard accountId="acc-1" bookings={bookings as never} loading={false} />)
     await flush()
@@ -156,10 +158,14 @@ describe('DeliveryFailuresCard（今日の配信の失敗）', () => {
     expect(el.textContent).toContain('読み込めませんでした')
   })
 
-  it('読込中は骨組みを出す', () => {
+  it('読込中は骨組みを出す', async () => {
     apiMocks.deliveryFailureOrigins.mockReturnValue(new Promise(() => {}))
+    // 待ちは偽の時計で進める（本物の時間を待たない）。骨組みの 0.3 秒は描いた瞬間から数えるので、描く前に替える。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     const el = mount(<DeliveryFailuresCard accountId="acc-1" />)
-    expect(el.querySelector('.animate-pulse')).not.toBeNull()
+    /* ★管理画面 仕上げ §3: 骨組みは 0.3 秒待ってから出る。 */
+    await act(async () => { await vi.advanceTimersByTimeAsync(350) })
+    expect(el.querySelector('[data-skeleton]')).not.toBeNull()
     expect(el.textContent).not.toContain('読み込めませんでした')
   })
 })

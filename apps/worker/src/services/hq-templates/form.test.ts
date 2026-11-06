@@ -1,4 +1,6 @@
 import { beforeEach, afterEach, describe, expect, test } from 'vitest';
+import { emptyLayout } from '@line-crm/shared';
+import { applyFormLayoutEffects } from '../../features/forms/form-layout-effects';
 import { publishFormVersion, updateForm } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
 import { createFormHqTemplateAdapter, inspectFormTemplate, formTemplatePublicUrl, formTemplateSnapshot, formTemplateSnapshotToken, parseFormTemplateDefinition, type FormTemplateDependencies } from './form.js';
@@ -36,6 +38,31 @@ beforeEach(() => {
 });
 afterEach(() => fixture.raw.close());
 describe('HQ form atomic plans', () => {
+    test('店情報は配布先の同名キーだけを検査し、値を持ち出さず下書きへ結ぶ', async () => {
+        for (const account of ['a1', 'a2']) fixture.raw.prepare(`INSERT INTO common_vars(id,line_account_id,name,var_key,value)
+          VALUES(?,?,'お店の名前','public_name',?)`).run(`var-${account}`, account, `${account}のお店`);
+        const layout = emptyLayout();
+        layout.header = [{ id: 'store', kind: 'text', text: '' }];
+        layout.references = [{ blockId: 'store', kind: 'store_information', fields: { displayName: { varKey: 'public_name' } } }];
+        const source = { ...input, definitionJson: JSON.stringify({ ...definition, form: { ...definition.form, layout } }) };
+        const { context } = await preflight('a1', 'create', source);
+        const id = await commit(await plan(context, source));
+        const stored = fixture.raw.prepare('SELECT layout,is_active FROM forms WHERE id=?').get(id) as { layout: string; is_active: number };
+        expect(JSON.parse(stored.layout).references).toEqual(layout.references);
+        expect(stored.is_active).toBe(0);
+        expect(stored.layout).not.toContain('a1のお店');
+        await expect(preflight('a3', 'create', source)).rejects.toMatchObject({ code: 'FORM_STORE_REFERENCE_UNAVAILABLE' });
+        fixture.raw.prepare("UPDATE common_vars SET value='変わった値',version=version+1 WHERE line_account_id='a1'").run();
+        await expect(plan(context, source)).rejects.toMatchObject({ code: 'VERSION_CONFLICT' });
+    });
+    test('登録画像があるフォームは事前確認で理由つきに止め、元IDを配らない', async () => {
+        const layout = emptyLayout();
+        layout.header = [{ id: 'photo', kind: 'image', mediaUrl: '' }];
+        layout.references = [{ blockId: 'photo', kind: 'image', mediaId: 'source-only', versionNo: 1, alt: '写真' }];
+        const source = { ...input, definitionJson: JSON.stringify({ ...definition, form: { ...definition.form, layout } }) };
+        await expect(preflight('a1', 'create', source)).rejects.toMatchObject({ code: 'PUBLIC_IMAGE_REFERENCE_UNSUPPORTED' });
+        expect(rows()).toEqual([]);
+    });
     test('three destination drafts have new stable URLs and local tag/scenario references', async () => {
         const urls = [];
         for (const account of ['a1', 'a2', 'a3']) {
@@ -58,7 +85,7 @@ describe('HQ form atomic plans', () => {
         const { context } = await preflight('a1', 'overwrite');
         await commit(await plan(context));
         expect(rows()).toHaveLength(1);
-        expect(rows()[0]).toMatchObject({ id, content_revision: 2, is_active: 0, submit_count: 7 });
+        expect(rows()[0]).toMatchObject({ id, content_revision: 2, is_active: 1, submit_count: 7 });
         expect(fixture.raw.prepare('SELECT * FROM form_submissions').get()).toEqual(answer);
         expect(await formTemplatePublicUrl(fixture.db, authority, 'a1', id)).toBe(url);
         expect((await updateForm(fixture.db, id, { description: '古い編集' }, 1)).kind).toBe('conflict');
@@ -101,7 +128,7 @@ describe('HQ form atomic plans', () => {
     });
     const modes = ['create', 'overwrite', 'alias'] as const;
     test.each(modes.flatMap(selectionMode => modes.map(contextMode => ({ selectionMode, contextMode }))))('plan mode $contextMode must match selected operation $selectionMode', async ({ selectionMode, contextMode }) => {
-        // Make the selected operation valid independently of the envelope mode.
+        // 包装形式とは独立に、選んだ操作自体を有効にして試す。
         const existingId = selectionMode === 'create' ? null : await commit(await plan((await preflight('a1')).context));
         const { context } = await preflight('a1', selectionMode);
         const before = rows();
@@ -237,4 +264,82 @@ describe('HQ form atomic plans', () => {
         await updateForm(fixture.db, id, { name: '変更' }, 1);
         expect(await formTemplateSnapshotToken(await formTemplateSnapshot(fixture.db, 'a1'))).not.toBe(before);
     });
+});
+
+test.each([0, 1])('上書き配布は店の公開状態 %s を保つ', async (isActive) => {
+    const id = await commit(await plan((await preflight('a1')).context));
+    await publishFormVersion(fixture.db, id, 1);
+    fixture.raw.prepare('UPDATE forms SET is_active=? WHERE id=?').run(isActive, id);
+    await commit(await plan((await preflight('a1', 'overwrite')).context));
+    expect(fixture.raw.prepare('SELECT is_active FROM forms WHERE id=?').get(id)).toEqual({ is_active: isActive });
+});
+
+test('HQ fixed fields and public image survive distribution and answers save into the destination friend', async () => {
+  const layout=emptyLayout();
+  layout.sections[0].blocks=[
+    {id:'name',kind:'input',type:'text',name:'name',label:'名前',fixedField:'name'},
+    {id:'img',kind:'image',mediaUrl:'https://cdn.example.test/images/banner.png',size:'full',alt:'案内'},
+  ];
+  const source={...input,definitionJson:JSON.stringify({schemaVersion:1,form:{name:'基本登録',fields:[],layout}})};
+  const {context}=await preflight('a1','create',source);
+  const id=await commit(await plan(context,source));
+  const row = fixture.raw.prepare('SELECT layout FROM forms WHERE id=?').get(id) as { layout: string };
+  const saved=JSON.parse(row.layout);
+  expect(saved.sections[0].blocks[1]).toMatchObject({mediaUrl:'https://cdn.example.test/images/banner.png',alt:'案内',size:'full'});
+  fixture.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES ('fixed-friend','line-fixed','a1')");
+  const result=await applyFormLayoutEffects({db:fixture.db,layout:saved,friendId:'fixed-friend',formId:id,answers:{name:'配布先の名前'}});
+  expect(result.failedEffects).toEqual([]);
+  expect(fixture.raw.prepare("SELECT value,source_id FROM friend_field_values WHERE friend_id='fixed-friend' AND field_id='fixed-name'").get()).toEqual({value:'配布先の名前',source_id:id});
+});
+
+test('複数アレルギー・本人確認書類は配布先へ入り、デザインは店を引き継ぐ',async()=>{
+ const layout=emptyLayout();layout.options.customerDesign={mode:'account',preset:'line'};
+ layout.sections[0].blocks=[{id:'a',kind:'input',type:'checkbox',name:'allergy',label:'アレルギー',fixedField:'allergy',choices:[{id:'egg',label:'卵'},{id:'other',label:'そのほか',isOther:true}]},{id:'id',kind:'input',type:'file',name:'identity',label:'本人確認書類',fileKind:'identity',fileBothSides:true}];
+ const source={...input,definitionJson:JSON.stringify({schemaVersion:1,form:{name:'基本登録',layout,fields:[],save_to_metadata:true}})};
+ const id=await commit(await plan((await preflight('a1','create',source)).context,source));
+ const stored=JSON.parse(String((fixture.raw.prepare('SELECT layout FROM forms WHERE id=?').get(id) as any).layout));
+ expect(stored.options.customerDesign.mode).toBe('account');expect(stored.sections[0].blocks).toMatchObject([{fixedField:'allergy',type:'checkbox'},{fileKind:'identity',fileBothSides:true}]);
+ const {applyAccountAllergyOptions}=await import('../allergy-options.js');const {saveVersionedAccountSetting}=await import('@line-crm/db');
+ await saveVersionedAccountSetting(fixture.db,{accountId:'a1',key:'friend.allergy_options_v1',expectedVersion:0,data:['キウイ']});
+ expect((await applyAccountAllergyOptions(fixture.db,'a1',stored)).sections[0].blocks[0]).toMatchObject({choices:[{label:'キウイ'},{isOther:true}]});
+ const {formTemplateWarnings}=await import('./form.js');layout.sections[0].blocks.push({id:'seat',kind:'input',type:'text',name:'seat',label:'席の好み',fixedField:'seat_preference'});
+ expect(await formTemplateWarnings(fixture.db,'a1',{...source,definitionJson:JSON.stringify({schemaVersion:1,form:{name:'基本登録',layout,fields:[]}})})).toHaveLength(1);
+ layout.options.customerDesign={mode:'fixed',preset:'night'};expect(parseFormTemplateDefinition({...source,definitionJson:JSON.stringify({schemaVersion:1,form:{name:'基本登録',layout,fields:[]}})}).form.layout?.options.customerDesign).toEqual({mode:'fixed',preset:'night'});
+});
+
+test('組5: 予約ブロックを店の同名メニューと担当へ写し、保存した2つのつまみも保持する',async()=>{
+ for(const account of ['a1','a2']) {
+  fixture.raw.prepare("INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES (?,?,'相談',60,0)").run('menu-'+account,account);
+  fixture.raw.prepare("INSERT INTO staff(id,line_account_id,name,display_name) VALUES (?,?,'担当','担当')").run('staff-'+account,account);
+ }
+ const layout=emptyLayout();layout.sections[0].blocks=[{id:'booking',kind:'input',type:'booking',name:'visit',label:'予約',booking:{menuId:'menu-a1',staffId:'staff-a1',daysAhead:14,allowMenuSelection:true,requireApproval:true}}];
+ const source={...input,definitionJson:JSON.stringify({schemaVersion:1,form:{name:'予約',layout,fields:[]}})};
+ const {context}=await preflight('a2','create',source);const id=await commit(await plan(context,source));
+ const result=JSON.parse((fixture.raw.prepare('SELECT layout FROM forms WHERE id=?').get(id) as {layout:string}).layout);
+ expect(result.sections[0].blocks[0].booking).toMatchObject({menuId:'menu-a2',staffId:'staff-a2',allowMenuSelection:true,requireApproval:true});
+ const p=await preflight('a2','alias',source);fixture.raw.exec("UPDATE menus SET is_active=0 WHERE id='menu-a2'");
+ await expect(plan(p.context,source)).rejects.toThrow('VERSION_CONFLICT');
+ await expect(preflight('a3','create',source)).rejects.toThrow('REFERENCE_UNAVAILABLE');
+});
+
+
+test('席予約フォームは同じ統括の配布先の店舗とコースに置き換え、曖昧なコース・他統括・並行編集を拒む',async()=>{
+ fixture.raw.exec("INSERT INTO rt_organizations(id,account_id,tenant_id,name) VALUES('org','a1','tenant-a','統括');");
+ for(const account of ['a1','a2','b1']) {
+  fixture.raw.prepare("INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES(?,'org',?,?,?)").run('store-'+account,account,account,account);
+  fixture.raw.prepare("INSERT INTO rt_menu_items(id,store_id,kind,name,price,status) VALUES(?,?,'course','夕食',3000,'active')").run('course-'+account,'store-'+account);
+ }
+ const layout={version:2,header:[],sections:[{id:'main',name:'予約',blocks:[{id:'booking',kind:'input',type:'booking',name:'booking',label:'予約',required:true,booking:{kind:'seats',storeId:'store-a1',courseId:'course-a1',menuId:''}}]}],options:{}};
+ const source={...input,definitionJson:JSON.stringify({...definition,form:{...definition.form,layout}})};
+ const ready=await preflight('a2','create',source);
+ const planned=await plan(ready.context,source);
+ fixture.raw.prepare("UPDATE rt_menu_items SET name='変更' WHERE id='course-a2'").run();
+ await expect(commit(planned)).rejects.toThrow();expect(rows()).toHaveLength(0);
+ fixture.raw.prepare("UPDATE rt_menu_items SET name='夕食' WHERE id='course-a2'").run();
+ await commit(await plan((await preflight('a2','create',source)).context,source));
+ const stored=JSON.parse(rows()[0]!.layout as string);expect(stored.sections[0].blocks[0].booking).toMatchObject({storeId:'store-a2',courseId:'course-a2'});
+ const foreign=JSON.parse(source.definitionJson);foreign.form.layout.sections[0].blocks[0].booking.storeId='store-b1';foreign.form.layout.sections[0].blocks[0].booking.courseId='course-b1';
+ await expect(preflight('a1','create',{...source,definitionJson:JSON.stringify(foreign)})).rejects.toMatchObject({code:'REFERENCE_UNAVAILABLE'});
+ fixture.raw.prepare("INSERT INTO rt_menu_items(id,store_id,kind,name,price,status) VALUES('duplicate','store-a2','course','夕食',3000,'active')").run();
+ await expect(preflight('a2','overwrite',source)).rejects.toMatchObject({code:'REFERENCE_UNAVAILABLE'});
 });

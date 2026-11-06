@@ -2,8 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { getBroadcastById } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { processQueuedBroadcasts, processBroadcastSend } from './broadcast.js';
-import { getBroadcastAudiencePreview } from './broadcast-audience-preview.js';
+import { processQueuedBroadcasts, processBroadcastSend } from '../features/broadcasts/broadcast.js';
+import { getBroadcastAudiencePreview } from '../features/broadcasts/broadcast-audience-preview.js';
 
 const send = vi.hoisted(() => vi.fn(async (_target: string | string[]) => ({ requestId: 'isolated' })));
 vi.mock('@line-crm/line-sdk', async original => ({ ...await original<Record<string, unknown>>(),
@@ -12,7 +12,7 @@ vi.mock('@line-crm/line-sdk', async original => ({ ...await original<Record<stri
 vi.mock('./send-entitlements.js', async original => ({ ...await original<Record<string, unknown>>(),
   getSendPermissionForAccount: vi.fn(async () => ({ allowed: true })),
 }));
-vi.mock('./broadcast-quota-guard.js', async original => ({ ...await original<Record<string, unknown>>(),
+vi.mock('../features/broadcasts/broadcast-quota-guard.js', async original => ({ ...await original<Record<string, unknown>>(),
   fetchQuota: vi.fn(async () => ({ limit: 100000, used: 0 })),
 }));
 vi.mock('./stealth.js', async original => ({ ...await original<Record<string, unknown>>(), sleep: vi.fn(async () => {}) }));
@@ -65,8 +65,13 @@ it.each(['new','failed','claimed'])('NULLタグは既存の台帳や再送でも
   fixture.raw.prepare("UPDATE broadcasts SET line_account_id=NULL,target_type='tag',target_tag_id='all-tag',segment_conditions=NULL,status='draft' WHERE id='boundary'").run();
   if(state!=='new') for(const id of ['own-friend','foreign-friend','unassigned']) fixture.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state) VALUES ('boundary',?,NULL,1,?)").run(id,state);
   await processBroadcastSend(fixture.db,client as never,'boundary');
-  expect(attempted()).toEqual(['Uown-friend','Uunassigned']);
-  expect(fixture.raw.prepare("SELECT total_count FROM broadcasts WHERE id='boundary'").get()).toEqual({total_count:2});
+  // The new ledger freezes the audience before dispatch. Rows from a previous
+  // attempt remain for audit, while an ineligible friend must never be sent.
+  expect(attempted()).not.toContain('Uforeign-friend');
+  if (state === 'new') expect(attempted()).toEqual(['Uown-friend','Uunassigned']);
+  if (state === 'failed') expect(attempted()).toEqual([]);
+  if (state === 'claimed') expect(attempted()).toEqual(['Uown-friend','Uunassigned']);
+  if (state === 'new') expect(fixture.raw.prepare("SELECT total_count FROM broadcasts WHERE id='boundary'").get()).toEqual({total_count:2});
 });
 
 it('差込の1人目の後で所属が変わったら、次の送信と台帳書込を止める',async()=>{
@@ -78,7 +83,9 @@ it('差込の1人目の後で所属が変わったら、次の送信と台帳書
   });
   await processQueuedBroadcasts(fixture.db,client as never);
   expect(attempted()).toEqual(['Uown-friend']);
-  expect(fixture.raw.prepare("SELECT friend_id FROM broadcast_send_claims WHERE friend_id='second-own'").all()).toEqual([]);
+  await processQueuedBroadcasts(fixture.db,client as never);
+  expect(attempted()).toEqual(['Uown-friend']);
+  expect(fixture.raw.prepare("SELECT state,error_code FROM broadcast_send_claims WHERE friend_id='second-own'").get()).toEqual({state:'failed',error_code:'recipient_unavailable'});
 });
 it.each(['segment','tag'])('束の間の所属変更も送信直前に再確認する: %s',async target=>{
   for(let i=0;i<500;i++){
@@ -87,9 +94,10 @@ it.each(['segment','tag'])('束の間の所属変更も送信直前に再確認�
     fixture.raw.prepare("INSERT INTO friend_tags(friend_id,tag_id) VALUES (?,'all-tag')").run(id);
   }
   if(target==='tag')fixture.raw.prepare("UPDATE broadcasts SET target_type='tag',target_tag_id='all-tag',segment_conditions=NULL,status='draft' WHERE id='boundary'").run();
-  // Select all 501 first. Change the one left for the second batch after the first dispatch.
+  // The new ledger fixes all 501 recipients first. Change the only recipient
+  // still awaiting dispatch after the first batch.
   send.mockImplementationOnce(async()=>{
-    const remaining=fixture.raw.prepare("SELECT id FROM friends WHERE line_account_id='own' AND id NOT IN(SELECT friend_id FROM broadcast_send_claims WHERE broadcast_id='boundary')").all() as Array<{id:string}>;
+    const remaining=fixture.raw.prepare("SELECT f.id FROM friends f JOIN broadcast_send_claims c ON c.friend_id=f.id WHERE f.line_account_id='own' AND c.broadcast_id='boundary' AND c.dispatched_at IS NULL").all() as Array<{id:string}>;
     expect(remaining).toHaveLength(1);
     fixture.raw.prepare("UPDATE friends SET line_account_id='other' WHERE id=?").run(remaining[0].id);
     return {requestId:'isolated-first'};
@@ -97,7 +105,8 @@ it.each(['segment','tag'])('束の間の所属変更も送信直前に再確認�
   if(target==='tag')await processBroadcastSend(fixture.db,client as never,'boundary');
   else await processQueuedBroadcasts(fixture.db,client as never);
   expect(attempted()).toHaveLength(500);
-  expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id='boundary'").get()).toEqual({n:500});
+  expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id='boundary' AND state='sent'").get()).toEqual({n:500});
+  expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id='boundary' AND state='failed' AND error_code='recipient_unavailable'").get()).toEqual({n:1});
 });
 
 it.each([{account:'own',fields:false},{account:'own',fields:true},{account:null,fields:false},{account:null,fields:true}])('150人の差込でも所属確認を間引かず問い合わせ予算に収まる: %j',async({account,fields})=>{
@@ -130,7 +139,9 @@ it('メッセージの記録があれば台帳が無くても二度送らず、�
   await processQueuedBroadcasts(fixture.db,client as never);
   expect(send).not.toHaveBeenCalled();
   fixture.raw.prepare("UPDATE messages_log SET delivery_type='test' WHERE id='prior'").run();
-  fixture.raw.prepare("UPDATE broadcasts SET status='sending',batch_offset=0,sent_at=NULL WHERE id='boundary'").run();
+  // Start a fresh attempt without the previous frozen delivery ledger.
+  fixture.raw.prepare("DELETE FROM broadcast_send_claims WHERE broadcast_id='boundary'").run();
+  fixture.raw.prepare("UPDATE broadcasts SET status='sending',batch_offset=0,total_count=0,success_count=0,send_attempt_no=1,sent_at=NULL WHERE id='boundary'").run();
   await processQueuedBroadcasts(fixture.db,client as never);
   expect(attempted()).toEqual(['Uown-friend']);
 });

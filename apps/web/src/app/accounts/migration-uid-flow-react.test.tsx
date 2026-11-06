@@ -1,9 +1,12 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AccountMigration from './migration'
+import UidMigrationV8 from '@/v8/friends/migrations/uid'
+import { SESSION_LOST_EVENT } from '@/lib/session-events'
+import { MIGRATION_STEPS } from './use-uid-migration'
 
 /**
  * Issue #1012 FRIEND-14/15/16/33/36 の回帰試験。
@@ -35,12 +38,13 @@ const net = vi.hoisted(() => ({
   /** run id ごとの対応表応答を差し替える。 */
   detailResponders: new Map<string, () => Promise<Response>>(),
   /** 自分自身（実行権限の案内に使う）。 */
-  me: { id: 'owner-2', role: 'owner' } as { id: string; role: string } | null,
+  me: { id: 'owner-2', role: 'owner' } as { id: string; role: string; readOnly?: boolean; roleBundle?: string } | null,
   /** TECH-07: 通信断・応答喪失を再現する。'network' で fetch が投げる。 */
   failItemPatch: null as null | 'network' | { status: number; error: string },
   failExecute: null as null | 'network' | { status: number; error: string },
   failRollback: null as null | 'network',
   /** 対応表GETの回数（結果不明時の読み直しを見る）。 */
+  accountRows: null as Array<Record<string, unknown>> | null,
   detailGets: 0,
   /** 一覧GETの失敗再現。'network' で fetch が投げる。 */
   failList: null as null | 'network',
@@ -100,7 +104,7 @@ function installFetch() {
     const path = url.pathname
     const method = init?.method ?? 'GET'
     net.calls.push({ path: path + url.search, method })
-    if (path === '/api/line-accounts') return json(ACCOUNTS)
+    if (path === '/api/line-accounts') return json(net.accountRows ?? ACCOUNTS)
     if (path === '/api/staff/me') {
       return net.me ? json(net.me) : new Response(JSON.stringify({ success: false, error: 'x' }), { status: 500 })
     }
@@ -143,9 +147,11 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme='v8'
   fixture.push.mockClear()
   fixture.replace.mockClear()
   net.calls.length = 0
+  net.accountRows = null
   net.runs = [runFixture()]
   net.detailResponders = new Map()
   net.me = { id: 'owner-2', role: 'owner' }
@@ -164,6 +170,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
+  document.documentElement.removeAttribute('data-theme')
   document.body.innerHTML = ''
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
@@ -180,6 +187,8 @@ async function flush() {
 }
 
 function buttonByText(text: string, scope: ParentNode = document.body): HTMLButtonElement {
+  if(text==='開く') text='詳細'
+  if(text==='本移行を実行' && scope===document.body) text='本移行へ進む'
   const found = Array.from(scope.querySelectorAll('button')).find((button) => button.textContent?.trim() === text)
   if (!found) throw new Error(`button "${text}" not found`)
   return found
@@ -188,6 +197,7 @@ function buttonByText(text: string, scope: ParentNode = document.body): HTMLButt
 /** 履歴行のように、目的の文字列を中に含むボタンを拾う。 */
 function buttonContaining(text: string, scope: ParentNode = document.body): HTMLButtonElement {
   const found = Array.from(scope.querySelectorAll('button')).find((button) => button.textContent?.includes(text))
+    ?? Array.from(scope.querySelectorAll('tr')).find(row=>row.textContent?.includes(text))?.querySelector('button')
   if (!found) throw new Error(`button containing "${text}" not found`)
   return found
 }
@@ -200,11 +210,50 @@ function openDialog(): HTMLElement {
 
 const writes = () => net.calls.filter((call) => call.method !== 'GET')
 
+it('照合の帯は各分類の実値と単位を読み、表示だけでは更新しない', async () => {
+  net.runs = [runFixture()]
+  await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+  await flush()
+  const band = within(host).getByRole('group', { name: '照合の内訳' })
+  expect(band.hasAttribute('data-kpi-strip')).toBe(true)
+  expect(within(band).getByText('自動で一致')).toBeTruthy()
+  expect(within(band).getAllByText('0')).toHaveLength(3)
+  expect(within(band).getByText('1')).toBeTruthy()
+  expect(within(band).getAllByText('人')).toHaveLength(4)
+  expect(writes()).toEqual([])
+})
+
+describe('完了した移行履歴の表示と操作', () => {
+  it('完了履歴に選択面を付けず、現在の履歴と切り戻しの確認を残す', async () => {
+    net.runs = [runFixture({ status: 'completed', rollbackable: true })]
+    await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+    await flush()
+    const history = host.querySelector('[aria-labelledby="uid-history"]')!
+    const current = history.querySelector('button[aria-current="true"]')!
+    expect(current).not.toBeNull()
+    expect(current.closest('tr')?.getAttribute('aria-selected')).toBeNull()
+    expect(host.textContent).toContain('照合の結果')
+    fireEvent.click(buttonByText('切り戻す', history))
+    await flush()
+    expect(openDialog().textContent).toContain('切り戻す')
+    expect(writes()).toHaveLength(0)
+  })
+
+  it('判断中の履歴は今の移行をボタンで示し、行に塗りは付けない（Z0jHp）', async () => {
+    await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+    await flush()
+    const current = host.querySelector('[aria-labelledby="uid-history"] button[aria-current="true"]')!
+    expect(current).not.toBeNull()
+    expect(current.closest('tr')?.getAttribute('aria-selected')).toBeNull()
+    expect(writes()).toHaveLength(0)
+  })
+})
+
 describe('UID移行の詳細確認（FRIEND-14）', () => {
-  it('「詳細を見る」は読み取り専用で、更新APIを呼ばない', async () => {
+  it('「開く」は読み取り専用で、更新APIを呼ばない', async () => {
     await render()
     await flush()
-    fireEvent.click(buttonByText('詳細を見る'))
+    fireEvent.click(buttonByText('開く'))
     await flush()
     const dialog = openDialog()
     expect(dialog.textContent).toContain('UOLD-1')
@@ -215,7 +264,7 @@ describe('UID移行の詳細確認（FRIEND-14）', () => {
   it('承認だけが対象itemへ1回書き込む', async () => {
     await render()
     await flush()
-    fireEvent.click(buttonByText('詳細を見る'))
+    fireEvent.click(buttonByText('開く'))
     await flush()
     fireEvent.click(buttonByText('この組合せを承認', openDialog()))
     await flush()
@@ -227,7 +276,7 @@ describe('UID移行の詳細確認（FRIEND-14）', () => {
   it('閉じるだけなら書き込まない', async () => {
     await render()
     await flush()
-    fireEvent.click(buttonByText('詳細を見る'))
+    fireEvent.click(buttonByText('開く'))
     await flush()
     // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
     fireEvent.click(openDialog().querySelector<HTMLButtonElement>('button[aria-label="閉じる"]')!)
@@ -269,19 +318,19 @@ describe('UID移行の本実行（FRIEND-33）', () => {
     expect(net.calls.some((call) => call.path.endsWith('/execute'))).toBe(false)
   })
 
-  it('作成者本人には確定ボタンを出さず理由を示す', async () => {
+  it('作成者本人の入口は状態理由でdisabledとなり、確認も書込も始めない', async () => {
     net.me = { id: 'owner-1', role: 'owner' }
     await render()
     await flush()
-    fireEvent.click(buttonByText('本移行を実行'))
+    const entry = buttonByText('本移行を実行')
+    expect(entry.disabled).toBe(true)
+    expect(entry.hasAttribute('data-permission-locked')).toBe(false)
+    expect(document.body.textContent).toContain('別のownerが実行してください')
+    fireEvent.click(entry)
     await flush()
-    const dialog = openDialog()
-    expect(dialog.textContent).toContain('別のownerが実行してください')
-    const confirms = Array.from(dialog.querySelectorAll('button')).filter((button) => button.textContent?.trim() === '本移行を実行')
-    expect(confirms).toHaveLength(0)
+    expect(document.body.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
     expect(net.calls.some((call) => call.path.endsWith('/execute'))).toBe(false)
-  })
-})
+  })})
 
 describe('UID移行の切り戻し（FRIEND-36/15）', () => {
   it('完了履歴は「実データはまだ変更していません」と言わず切り戻しへ進める', async () => {
@@ -292,7 +341,7 @@ describe('UID移行の切り戻し（FRIEND-36/15）', () => {
     await render()
     await flush()
     expect(document.body.textContent).not.toContain('実データはまだ変更していません')
-    expect(document.body.textContent).toContain('本移行と照合が完了しています')
+    expect(document.body.textContent).toContain('本移行と照合が終わりました')
     fireEvent.click(buttonByText('この移行を切り戻す'))
     await flush()
     const dialog = openDialog()
@@ -349,7 +398,7 @@ describe('通信例外の結果不明（TECH-07 / FRIEND-33/34）', () => {
     net.failItemPatch = 'network'
     await render()
     await flush()
-    fireEvent.click(buttonByText('詳細を見る'))
+    fireEvent.click(buttonByText('開く'))
     await flush()
     const getsBefore = net.detailGets
     fireEvent.click(buttonByText('この組合せを承認', openDialog()))
@@ -369,7 +418,7 @@ describe('通信例外の結果不明（TECH-07 / FRIEND-33/34）', () => {
     net.failItemPatch = { status: 500, error: 'internal error' }
     await render()
     await flush()
-    fireEvent.click(buttonByText('詳細を見る'))
+    fireEvent.click(buttonByText('開く'))
     await flush()
     const getsBefore = net.detailGets
     fireEvent.click(buttonByText('この組合せを承認', openDialog()))
@@ -408,7 +457,9 @@ describe('通信例外の結果不明（TECH-07 / FRIEND-33/34）', () => {
     await flush()
     const dialog = openDialog()
     expect(dialog.textContent).not.toContain('応答を確認できませんでした')
-    expect(dialog.textContent).toContain('already executing')
+    // 英語の内部の文はそのまま出さず、日本語の案内にする（リリース前点検 2026-10-07）。
+    expect(dialog.textContent).not.toContain('already executing')
+    expect(dialog.textContent).toContain('本移行を実行できませんでした')
   })
 
   it('切り戻しの通信断も結果不明を示して履歴を読み直す', async () => {
@@ -432,7 +483,7 @@ describe('通信例外の結果不明（TECH-07 / FRIEND-33/34）', () => {
 })
 
 /**
- * カード間隔そろえ（★V7 gap-4・2026-09-26）の描画試験。
+ * カード間隔そろえ（★管理画面 gap-4・2026-09-26）の描画試験。
  * 空（履歴なし）・読み込み中・失敗・正常の主な状態を押さえる。
  */
 describe('UID移行の空と履歴のカード表示', () => {
@@ -443,11 +494,14 @@ describe('UID移行の空と履歴のカード表示', () => {
     const emptyTitle = Array.from(document.body.querySelectorAll('p')).find((node) => node.textContent === 'テスト移行はまだありません')
     expect(emptyTitle).toBeTruthy()
     // 灰色の1枚ではなく、白地・枠・角丸のカード（section）の中にある。
-    const card = emptyTitle!.closest('section.bg-canvas')
+    const card = emptyTitle!.closest('section')
     expect(card).toBeTruthy()
-    expect(card!.querySelector('h2')?.textContent).toBe('テスト移行の結果')
+    expect(card!.querySelector('h3')?.textContent).toBe('テスト移行の結果')
     // 履歴側の空カードも同じ形で出す。
     expect(document.body.textContent).toContain('移行履歴はまだありません')
+    // A-28：絞り込み用の既定文ではなく、移行の履歴用の説明を出す。
+    expect(document.body.textContent).toContain('移行を実行すると、ここに履歴が表示されます。')
+    expect(document.body.textContent).not.toContain('条件を変えるか、新しく作成してください。')
   })
 
   it('履歴なしでも下の履歴節へ飛ぶだけのボタンは出さない', async () => {
@@ -456,7 +510,9 @@ describe('UID移行の空と履歴のカード表示', () => {
     await flush()
     expect(document.body.querySelector('a[href="#migration-history"]')).toBeNull()
     // 別画面への導線は残す。
-    expect(document.body.querySelector('a[href="/friends/migrations"]')).toBeTruthy()
+    fireEvent.click(buttonByText('データ管理'))
+    fireEvent.click(buttonByText('CSVで書き出す'))
+    expect(fixture.push).toHaveBeenCalledWith('/friends/migrations')
   })
 
   it('読み込み中は1枚だけ出す', async () => {
@@ -473,12 +529,12 @@ describe('UID移行の空と履歴のカード表示', () => {
     net.failList = 'network'
     await render()
     await flush()
-    expect(document.body.textContent).toContain('UID移行を表示できませんでした')
+    expect(document.body.textContent).toContain('UID移行を読み込めませんでした')
     // 登録した履歴が消えたように見せない文言を出す。
     expect(document.body.textContent).toContain('登録した移行履歴は消えていません')
     // 再読み込みで直る。
     net.failList = null
-    fireEvent.click(buttonByText('再読み込み'))
+    fireEvent.click(buttonByText('もう一度読み込む'))
     await flush()
     expect(document.body.textContent).toContain('テスト移行はまだありません')
   })
@@ -486,8 +542,8 @@ describe('UID移行の空と履歴のカード表示', () => {
   it('対応表あり（正常）は結果カードと履歴節を両方出す', async () => {
     await render()
     await flush()
-    expect(document.body.textContent).toContain('テスト移行の状態')
-    expect(document.body.textContent).toContain('移行履歴')
+    expect(document.body.textContent).toContain('要確認の判断')
+    expect(document.body.textContent).toContain('移行の履歴')
     expect(document.body.querySelector('a[href="#migration-history"]')).toBeNull()
   })
 })
@@ -528,4 +584,200 @@ describe('R398 一部反映の500で「未変更」と残さない', () => {
     await flush()
     expect(openDialog().textContent).toContain('実行結果を確認できませんでした')
   })
+})
+
+describe('UID移行の閲覧のみ', () => {
+  it('一括確認を開いた後に本人確認が失効しても内容を残し、普通disabledで確定0', async () => {
+    await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+    await flush()
+    fireEvent.click(buttonByText('要確認をまとめて「結び付ける」'))
+    await flush()
+    expect(buttonByText('結び付ける', openDialog())).toBeTruthy()
+    await act(async () => { window.dispatchEvent(new Event(SESSION_LOST_EVENT)) })
+    await flush()
+    const confirm = buttonByText('結び付ける', openDialog())
+    expect(confirm.disabled).toBe(true)
+    expect(confirm.hasAttribute('data-permission-locked')).toBe(false)
+    fireEvent.click(confirm)
+    await flush()
+    expect(writes()).toHaveLength(0)
+  })
+  it.each(['legacy', 'v8'])('確認窓の本人確認が失効しても内容と操作を残し、普通disabledで保存0: %s', async entry => {
+    await act(async () => { root.render(entry === 'v8' ? <UidMigrationV8 initialRunId="run-1" /> : <AccountMigration />) })
+    await flush()
+    fireEvent.click(entry === 'v8' ? buttonContaining('UOLD-1') : buttonByText('開く'))
+    await flush()
+    expect(buttonByText('この組合せを承認', openDialog())).toBeTruthy()
+    await act(async () => { window.dispatchEvent(new Event(SESSION_LOST_EVENT)) })
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('UOLD-1')
+    for (const label of ['この組合せを承認', '除外する']) {
+      const action = buttonByText(label, dialog)
+      expect(action.disabled).toBe(true)
+      expect(action.hasAttribute('data-permission-locked')).toBe(false)
+      fireEvent.click(action)
+    }
+    await flush()
+    expect(writes()).toHaveLength(0)
+  })
+  it.each([
+    { id: 'owner-2', role: 'owner', readOnly: true },
+    { id: 'owner-2', role: 'owner', roleBundle: 'view_only' },
+  ])('履歴は読めて変更の入口は灰色で残り、書き込まない: %j', async identity => {
+    net.me = identity
+    await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+    await flush()
+    expect(host.querySelector('[aria-labelledby="uid-history"]')).toBeTruthy()
+    expect(host.textContent).toContain('閲覧のみで見ています')
+    for (const label of ['新しい移行を作る', '本移行へ進む', '要確認をまとめて「結び付ける」']) {
+      const action = buttonByText(label)
+      expect(action.disabled).toBe(false)
+      expect(action.getAttribute('aria-disabled')).toBe('true')
+      expect(action.hasAttribute('data-permission-locked')).toBe(true)
+      fireEvent.click(action)
+    }
+    expect(buttonByText('表示中をCSVで書き出す').disabled).toBe(false)
+    await flush()
+    expect(net.calls.filter(call => call.method !== 'GET')).toHaveLength(0)
+  })
+})
+
+describe('UID移行の対応表の読み方', () => {
+  const detailGetPaths = () => net.calls.filter((call) => call.method === 'GET' && /^\/api\/friends\/migrations\/run-1\?/.test(call.path)).map((call) => call.path)
+
+  it('対応表は20件ずつ読み、次のページで続きを読む', async () => {
+    net.detailResponders.set('run-1', async () => json({ ...detailFixture(runFixture()), itemTotal: 25 }))
+    await render()
+    await flush()
+    expect(detailGetPaths().at(-1)).toContain('limit=20&offset=0')
+    fireEvent.click(document.body.querySelector<HTMLButtonElement>('button[aria-label="次のページ"]')!)
+    await flush()
+    expect(detailGetPaths().at(-1)).toContain('limit=20&offset=20')
+  })
+
+  it('分類の絞り込みと「未判断のみ」を持ち、未判断のみは口へ伝える', async () => {
+    await render()
+    await flush()
+    expect(document.body.querySelector('[aria-label="分類で絞り込む"]')).toBeTruthy()
+    const pending = within(document.body).getByRole('checkbox', { name: '未判断のみ' })
+    fireEvent.click(pending)
+    await flush()
+    expect(detailGetPaths().at(-1)).toContain('pendingOnly=1')
+  })
+
+  it('一致先なしの行には「結び付ける」「新しく作る」を出さない', async () => {
+    net.detailResponders.set('run-1', async () => json({
+      ...detailFixture(runFixture()),
+      items: [{ ...ITEM, id: 'item-u', oldUid: 'U-NOMATCH', newUid: null, candidateName: null, classification: 'unmatched' }],
+    }))
+    await render()
+    await flush()
+    fireEvent.click(document.body.querySelector<HTMLButtonElement>('button[aria-label="U-NOMATCH の引き継ぎ方"]')!)
+    await flush()
+    const options = [...document.body.querySelectorAll('[role="option"]')].map((option) => option.textContent?.trim())
+    expect(options).toContain('除く')
+    expect(options).not.toContain('新しく作る')
+    expect(options).not.toContain('結び付ける')
+  })
+})
+
+describe('UID移行の現在地と入力欄', () => {
+  it('Z0jHp の枠に、データ管理の現在地「UID移行」を出す', async () => {
+    await render()
+    await flush()
+    expect(host.querySelector('[data-design-node="Z0jHp"]')).toBeTruthy()
+    const crumbs = within(host).getByRole('navigation', { name: 'データ管理の中の現在地' })
+    expect(crumbs.querySelector('[aria-current="page"]')?.textContent).toBe('UID移行')
+  })
+
+  it('移行元・移行先は選び欄で選び、利用目的は入力欄で書く', async () => {
+    net.runs = []
+    await render()
+    await flush()
+    expect(host.querySelector('[aria-label="移行元アカウント"]')).toBeTruthy()
+    expect(host.querySelector('[aria-label="移行先アカウント"]')).toBeTruthy()
+    const label = [...host.querySelectorAll('span')].find((node) => node.textContent === '利用目的')
+    const input = label?.parentElement?.querySelector('input') as HTMLInputElement
+    expect(input).toBeTruthy()
+    fireEvent.input(input, { target: { value: '店舗統合' } })
+    expect(input.value).toBe('店舗統合')
+  })
+})
+
+describe('UID移行の5段階の表示', () => {
+  const stepNav = () => within(host).getByRole('navigation', { name: '移行の手順' })
+  const states = () => [...stepNav().querySelectorAll('[data-step-state]')].map((item) => item.getAttribute('data-step-state'))
+
+  it('手順は5段を共通の帯で出す', async () => {
+    await render()
+    await flush()
+    const names = [...stepNav().querySelectorAll('ol > li [data-step-name]')]
+    expect(names.map((name) => name.textContent?.trim())).toEqual([...MIGRATION_STEPS])
+  })
+
+  it('本移行を待つ移行は「本移行と照合」の段を今の段にする', async () => {
+    await render()
+    await flush()
+    expect(stepNav().querySelector('[aria-current="step"]')?.textContent).toContain('本移行と照合')
+    expect(states().slice(0, 4).every((state) => state === 'done')).toBe(true)
+  })
+
+  it('判断が残っている移行は「要確認の判断」を今の段にする', async () => {
+    net.runs = [runFixture({ status: 'review' })]
+    net.detailResponders.set('run-1', async () => json({ ...detailFixture(runFixture({ status: 'review' })), unresolved: 1 }))
+    await render()
+    await flush()
+    expect(stepNav().querySelector('[aria-current="step"]')?.textContent).toContain('要確認の判断')
+    expect(states().at(-1)).not.toBe('done')
+  })
+
+  it('完了・切り戻し済みは全段を済みにし、今の段を指さない', async () => {
+    net.runs = [runFixture({ status: 'completed', rollbackable: true })]
+    await render()
+    await flush()
+    expect(stepNav().querySelector('[aria-current="step"]')).toBeNull()
+    expect(states()).toEqual(MIGRATION_STEPS.map(() => 'done'))
+    expect(host.textContent).toContain('一致先なし')
+  })
+
+  it('失敗した移行は全段を済みにしない', async () => {
+    net.runs = [runFixture({ status: 'failed', rollbackable: true, failureReason: '一部失敗', counts: { total: 2, auto: 0, review: 0, unmatched: 0, conflict: 0, applied: 1, failed: 1 } })]
+    await render()
+    await flush()
+    expect(states().at(-1)).not.toBe('done')
+  })
+})
+
+
+it.each(['legacy', 'v8'])('移行先を未選択で開き、候補の状態とIDを示し、CSVなしでは送れない: %s', async entry => {
+  net.runs = []
+  net.accountRows = [
+    { id: 'archive-id', name: '同じ名前の店', isActive: false, archivedAt: '2026-10-01' },
+    { id: 'active-id', name: '同じ名前の店', isActive: true, archivedAt: null },
+  ]
+  await act(async () => { root.render(entry === 'v8' ? <UidMigrationV8 initialRunId={null} /> : <AccountMigration />) })
+  await flush()
+  const target = host.querySelector('[aria-label="移行先アカウント"]') as HTMLButtonElement
+  expect(target.closest('[data-choice-field]')?.textContent).toContain('移行先アカウントを選択')
+  expect(buttonByText('テスト移行を実行').disabled).toBe(true)
+  fireEvent.click(target)
+  await flush()
+  const dialog = openDialog()
+  const text = dialog.textContent ?? ''
+  expect(text).toContain('保管済み · ID: archive-id')
+  expect(text).toContain('現役 · ID: active-id')
+  expect(text.indexOf('現役 · ID: active-id')).toBeLessThan(text.indexOf('保管済み · ID: archive-id'))
+  expect(within(dialog).queryByRole('radio', { name: '移行先アカウントを選択' })).toBeNull()
+  const choose = within(dialog).getByRole('button', { name: '選ぶ', exact: true }) as HTMLButtonElement
+  expect(choose.disabled).toBe(true)
+  const candidates = within(dialog).getAllByRole('radio')
+  expect(candidates).toHaveLength(2)
+  fireEvent.click(candidates[0])
+  await flush()
+  expect(choose.disabled).toBe(false)
+  fireEvent.click(choose)
+  await flush()
+  expect(target.closest('[data-choice-field]')?.textContent).toContain('同じ名前の店')
+  expect(writes()).toEqual([])
 })

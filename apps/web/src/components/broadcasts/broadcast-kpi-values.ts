@@ -1,7 +1,8 @@
 import type { BroadcastListKpis, BroadcastStats } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 /**
- * 一斉配信の一覧に出す帯の 4 枚（設計 `q76C35` ★V6 6-1）。
+ * 一斉配信の一覧に出す帯の 4 枚（設計 `q76C35` ★管理画面 6-1）。
  *
  * **画面から切り離してあるのは、未取得と実測 0 の区別を直に試せるようにするため。**
  * 部品の中で組み立てていたころは、文字列の一致を見る契約テストでしか
@@ -14,7 +15,7 @@ import type { BroadcastListKpis, BroadcastStats } from '@/lib/api'
 /** 帯の副題に出す数。数が無いなら `—` にして、単位も付けない。 */
 export function countText(value: unknown, unit: string): string {
   return typeof value === 'number' && Number.isFinite(value)
-    ? `${value.toLocaleString('ja-JP')}${unit}`
+    ? `${formatNumber(value)}${unit}`
     : '—'
 }
 
@@ -55,7 +56,7 @@ export function buildBroadcastKpiCards(stats: BroadcastStats | BroadcastListKpis
       value: numberOrNull(stats?.drafts),
       unit: '件',
       /* 同上。**0件と書くと「下書きは無い」という別の意味になる。** */
-      detail: stats?.drafts == null ? '編集途中 ・ 未取得' : '編集途中',
+      detail: stats?.drafts == null ? '編集途中・未取得' : '編集途中',
     },
     {
       title: '今月の配信',

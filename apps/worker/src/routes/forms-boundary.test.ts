@@ -1,4 +1,4 @@
-/* N-170 直接試験: 実route＋実SQLite。/form-submissions 鍵のstaffが操作できること。 */
+/*  直接試験: 実route＋実SQLite。/form-submissions 鍵のstaffが操作できること。 */
 import { Hono } from 'hono';
 import { expect, test } from 'vitest';
 
@@ -11,7 +11,7 @@ const TENANT_B = 'tenant-B';
 const KEY = '/form-submissions';
 
 function setup() {
-  const t = createTestD1();
+  const t = createTestD1({ loginPolicy: 'off' });
   const raw = t.raw;
   raw.prepare('INSERT OR IGNORE INTO tenants (id, name) VALUES (?, ?), (?, ?)')
     .run(DEFAULT_TENANT_ID, '既定', TENANT_B, '支社');
@@ -52,7 +52,7 @@ async function createAs(req: any, J: any, key: string, accountId: string, name =
   return r;
 }
 
-test('N-170 鍵持ちstaffは作成・下書き・更新・公開ができる', async () => {
+test('N-170 鍵持ちstaffは作成・下書き・更新まででき、公開は管理者が行う', async () => {
   const { t, req, J } = setup();
   const created = await createAs(req, J, 'key-staff', 'acc-a');
   expect(created.status).toBe(201);
@@ -68,7 +68,11 @@ test('N-170 鍵持ちstaffは作成・下書き・更新・公開ができる', 
   const pub = await req(`/api/forms/${id}/publish?account_id=acc-a`, 'key-staff', {
     method: 'POST', headers: J, body: JSON.stringify({ expectedContentRevision: 2 }),
   });
-  expect(pub.status).toBe(200);
+  expect(pub.status).toBe(403);
+  const published = await req(`/api/forms/${id}/publish?account_id=acc-a`, 'key-owner', {
+    method: 'POST', headers: J, body: JSON.stringify({ expectedContentRevision: 2 }),
+  });
+  expect(published.status).toBe(200);
   t.raw.close();
 });
 
@@ -120,4 +124,103 @@ test('N-170 未割当legacyの更新は鍵持ちstaffに許可しない', async 
   });
   expect(r.status).toBe(404);
   t.raw.close();
+});
+
+
+test('配信の編集鍵を持つstaffだけが削除前の影響を確認できる', async () => {
+  const { t, req, J } = setup();
+  try {
+    const created = await createAs(req, J, 'key-staff', 'acc-a');
+    const id = ((await created.json()) as any).data.id;
+    const path = `/api/forms/${id}/delete-impact?account_id=acc-a`;
+    expect((await req(path, 'key-staff')).status).toBe(200);
+    expect((await req(path, 'key-nokey')).status).toBe(403);
+    expect((await req(path, 'key-ro')).status).toBe(403);
+    expect((await req(`/api/forms/${id}/delete-impact?account_id=acc-a2`, 'key-scoped')).status).toBe(404);
+  } finally { t.raw.close(); }
+});
+
+test('下書きの同じ作成操作は同じIDと作成時の版を返し、店ごとに分かれる', async () => {
+  const { raw, req, J } = setup();
+  const key = crypto.randomUUID();
+  const create = (accountId: string) => req('/api/forms/drafts', 'key-owner', {
+    method: 'POST', headers: { ...J, 'Idempotency-Key': key }, body: JSON.stringify({ accountId }),
+  });
+  try {
+    const first = await create('acc-a');
+    expect(first.status).toBe(201);
+    const id = (await first.json() as { data: { id: string } }).data.id;
+    raw.prepare('UPDATE forms SET content_revision=4 WHERE id=?').run(id);
+    const replay = await create('acc-a');
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({ data: { id, isActive: false, contentRevision: 1, replayed: true } });
+    expect(raw.prepare('SELECT COUNT(*) n FROM forms').get()).toEqual({ n: 1 });
+    const other = await create('acc-a2');
+    expect(other.status).toBe(201);
+    expect((await other.json() as { data: { id: string } }).data.id).not.toBe(id);
+  } finally { raw.close(); }
+});
+
+test('同じ作成操作が同時に届いても、下書きと操作記録は一件ずつになる', async () => {
+  const { raw, req, J } = setup();
+  const key = crypto.randomUUID();
+  try {
+    const replies = await Promise.all(Array.from({ length: 4 }, () => req('/api/forms/drafts', 'key-staff', {
+      method: 'POST', headers: { ...J, 'Idempotency-Key': key }, body: JSON.stringify({ accountId: 'acc-a' }),
+    })));
+    expect(replies.map(reply => reply.status).sort()).toEqual([200, 200, 200, 201]);
+    const bodies = await Promise.all(replies.map(reply => reply.json() as Promise<{ data: { id: string } }>));
+    expect(new Set(bodies.map(body => body.data.id)).size).toBe(1);
+    expect(raw.prepare('SELECT COUNT(*) n FROM forms WHERE is_active=0').get()).toEqual({ n: 1 });
+    expect(raw.prepare('SELECT COUNT(*) n FROM form_accounts').get()).toEqual({ n: 1 });
+    expect(raw.prepare('SELECT COUNT(*) n FROM operation_request_receipts').get()).toEqual({ n: 1 });
+  } finally { raw.close(); }
+});
+
+test('同じ操作番号の別の内容と、使えなくなった下書きの再作成を拒む', async () => {
+  const { raw, req, J } = setup();
+  const key = crypto.randomUUID();
+  const create = (name: string) => req('/api/forms/drafts', 'key-owner', {
+    method: 'POST', headers: { ...J, 'Idempotency-Key': key }, body: JSON.stringify({ accountId: 'acc-a', name }),
+  });
+  try {
+    const id = (await (await create('元の名前')).json() as { data: { id: string } }).data.id;
+    const changed = await create('違う名前');
+    expect(changed.status).toBe(409);
+    expect(await changed.json()).toMatchObject({ code: 'idempotency_conflict' });
+    expect(raw.prepare('SELECT name FROM forms WHERE id=?').get(id)).toEqual({ name: '元の名前' });
+    raw.prepare("UPDATE forms SET status='archived' WHERE id=?").run(id);
+    expect((await create('元の名前')).status).toBe(410);
+    expect(raw.prepare('SELECT COUNT(*) n FROM forms').get()).toEqual({ n: 1 });
+  } finally { raw.close(); }
+});
+
+test('作成の操作番号があっても権限と店の範囲を省略せず、正しくない番号では書き込まない', async () => {
+  const { raw, req, J } = setup();
+  const create = (actor: string, accountId: string, key = crypto.randomUUID()) => req('/api/forms/drafts', actor, {
+    method: 'POST', headers: { ...J, 'Idempotency-Key': key }, body: JSON.stringify({ accountId }),
+  });
+  try {
+    expect((await create('key-ro', 'acc-a')).status).toBe(403);
+    expect((await create('key-nokey', 'acc-a')).status).toBe(403);
+    expect((await create('key-scoped', 'acc-a2')).status).toBe(404);
+    expect((await create('key-staff', 'acc-t2')).status).toBe(404);
+    expect((await create('key-owner', 'acc-a', 'bad')).status).toBe(400);
+    expect(raw.prepare('SELECT COUNT(*) n FROM forms').get()).toEqual({ n: 0 });
+    expect(raw.prepare('SELECT COUNT(*) n FROM operation_request_receipts').get()).toEqual({ n: 0 });
+  } finally { raw.close(); }
+});
+
+test('作成の記録を書けなければフォームと所属もまとめて戻す', async () => {
+  const { raw, req, J } = setup();
+  raw.exec("CREATE TEMP TRIGGER fail_draft_receipt BEFORE INSERT ON operation_request_receipts BEGIN SELECT RAISE(ABORT,'simulated storage failure'); END;");
+  try {
+    const response = await req('/api/forms/drafts', 'key-owner', {
+      method: 'POST', headers: { ...J, 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ accountId: 'acc-a' }),
+    });
+    expect(response.status).toBe(500);
+    expect(raw.prepare('SELECT COUNT(*) n FROM forms').get()).toEqual({ n: 0 });
+    expect(raw.prepare('SELECT COUNT(*) n FROM form_accounts').get()).toEqual({ n: 0 });
+    expect(raw.prepare('SELECT COUNT(*) n FROM operation_request_receipts').get()).toEqual({ n: 0 });
+  } finally { raw.close(); }
 });

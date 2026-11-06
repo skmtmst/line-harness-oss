@@ -1,20 +1,7 @@
-/*
- * N-072 / N-077 / N-078: 一覧の実配線と名前の上限。
- *
- * 実SQLite（bootstrap.sql を流した better-sqlite3）に実物の reminders
- * ルートと実物の認証を当てる。
- *
- * 直す前:
- * - N-072 … 一覧の「表示件数」「並び順」は選択肢が1つしかない飾りで、
- *   「基準日」は実データに対応しない固定の日付入力だった。
- * - N-077 … 「名前・内容で検索」と書きながら、通知本文（reminder_steps /
- *   reminder_version_steps の message_content）は検索していなかった。
- * - N-078 … 名前の60文字上限は画面の maxLength だけで、作成・更新・
- *   下書き保存のどの口もサーバー側で止めていなかった。
- */
+/** ページ件数・並び順・基準日・本文検索を実データへ接続し、名前の60文字上限を保存側でも守ることを実 route・認証・SQLite で確かめる。 */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
@@ -174,7 +161,7 @@ function list(query: string, apiKey = KEY_OWNER) {
 }
 
 beforeEach(async () => {
-  sqlite = createTestD1();
+  sqlite = createTestD1({ loginPolicy: 'off' });
   seed(sqlite.raw);
   ({ reminders: remindersRoute } = await import('./reminders.js'));
 });

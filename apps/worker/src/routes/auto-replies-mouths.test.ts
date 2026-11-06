@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { autoReplies } from './auto-replies.js';
 
@@ -88,7 +88,7 @@ function insertRule(
   })));
 }
 
-describe('V6 自動応答の一覧・競合・下書き保存口', () => {
+describe('自動応答の一覧・競合・下書き保存口', () => {
   let testDb: SqliteD1;
 
   beforeEach(() => {
@@ -103,6 +103,20 @@ describe('V6 自動応答の一覧・競合・下書き保存口', () => {
     ).run();
     insertRule(testDb.raw, 'rule-1', '予約', 1);
     insertRule(testDb.raw, 'rule-2', '予約変更', 2);
+  });
+
+  it('通知先が未選択なら下書きを残せるが公開できず、別所属の通知を保存しない',async()=>{
+    const target=app(testDb.db);
+    const config={notificationRuleId:'',notificationRuleVersion:0,message:'受信箱を確認してください'};
+    const created=await target.instance.request('/api/auto-replies/drafts',request('POST',settings({actions:[{actionType:'notify_staff',config,onFailure:'stop'}]})),target.bindings);
+    expect(created.status).toBe(201);
+    const body=await created.json() as any;
+    const id=body.data.id ?? body.data.autoReplyId;
+    const validation=await target.instance.request(`/api/auto-replies/${id}/validate`,{method:'POST'},target.bindings);
+    expect((await validation.json() as any).data).toMatchObject({valid:false,errors:expect.arrayContaining(['担当者通知の通知先を選んでください'])});
+    testDb.raw.exec(`INSERT INTO notification_rules(id,name,event_type,conditions,channels,line_account_id,is_active,version) VALUES('other-rule','notify','message_received','{}','["dashboard"]','account-2',1,1)`);
+    const invalid=await target.instance.request('/api/auto-replies/drafts',request('POST',settings({actions:[{actionType:'notify_staff',config:{...config,notificationRuleId:'other-rule',notificationRuleVersion:1}}]})),target.bindings);
+    expect(invalid.status).toBe(400);
   });
 
   it('一覧へ成功アクション数と要確認の競合数を実測で返す', async () => {
@@ -246,7 +260,8 @@ describe('V6 自動応答の一覧・競合・下書き保存口', () => {
     expect(saved.status).toBe(200);
     await expect(saved.json()).resolves.toMatchObject({
       data: {
-        versionNumber: 2,
+        // m26c : 保存ごとに版が進む。同じ版の後続保存は競合になる。
+        versionNumber: 3,
         settings: {
           receiveSources: ['line', 'email'],
           internalMemo: '担当者だけが読むメモ',
@@ -258,13 +273,13 @@ describe('V6 自動応答の一覧・競合・下書き保存口', () => {
 
     const stale = await target.instance.request(
       '/api/auto-replies/rule-1/draft',
-      request('PUT', { ...settings(), expectedVersion: 1 }),
+      request('PUT', { ...settings(), expectedVersion: 2 }),
       target.bindings,
     );
     expect(stale.status).toBe(409);
     await expect(stale.json()).resolves.toMatchObject({
       code: 'VERSION_CONFLICT',
-      data: { currentVersion: 2 },
+      data: { currentVersion: 3 },
     });
   });
 });

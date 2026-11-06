@@ -1,0 +1,181 @@
+/*
+ * ★V8 登録メディア一覧。頭・数の帯・フォルダの列・道具の段・本文の置き場は型（ListPage）が持つ。
+ * ここは案内の段・札の格子（4列・間12・札の余白12）・表の下・見るだけの帯・名前を変える欄だけ。
+ */
+
+.noticeRow {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+}
+.chipGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.otherBox {
+  width: var(--tpl-ev-ls-saved-w);
+}
+.otherBox :global(*) { max-width: 100%; }
+.otherBox :global(button) { width: 100%; }
+.moreNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.thumbButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--tpl-ev-md-thumb-h);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: var(--color-canvas-sunken);
+  cursor: pointer;
+}
+.thumbNarrow {
+  width: var(--tpl-ev-md-thumb-narrow-w);
+  height: auto;
+  flex-shrink: 0;
+}
+.thumbImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.thumbLabel {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+.cardBody,
+.rowBody {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+}
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+}
+.nameDot {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.fileName {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-fm-cell-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.archivedBadge {
+  flex-shrink: 0;
+  padding: var(--tpl-fm-badge-pad);
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-nano);
+}
+.meta {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usageIdle { color: var(--color-ink-faint); }
+.usageUsed { color: var(--color-ink-secondary); }
+.menuWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.renameBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+}
+.renameInput {
+  width: 100%;
+  height: var(--tpl-fm-control-h);
+  padding: var(--tpl-fm-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+  font-size: var(--text-caption);
+}
+.renameError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+.renameActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-toolbar-gap);
+}
+.moveField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wh-ops-gap);
+  min-width: 0;
+}
+.moveLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+/* 表の下。 */
+.footBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+}
+.helpNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-rule-row-gap);
+}
+.footLeft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+  min-width: 0;
+}
+
+/* 見るだけの人の帯（見出しの下・数の帯の上）。 */
+.roBand { margin: 0 0 var(--tpl-fm-band-after); }

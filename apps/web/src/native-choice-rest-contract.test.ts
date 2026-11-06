@@ -5,16 +5,29 @@
  * `input[type="radio"]`・`input[type="checkbox"]` を直接書かない。
  * 共通の RadioCard・Checkbox を使う。1件でも素に戻すと赤になる。
  *
- * 例外: app/scenarios/mode/page.tsx の比較カード1件は、表入りの見比べを
- * 残すため素のまま（使いやすさ優先の判断。詳細は報告に書く）。
+ * 旧比較カード（app/scenarios/mode-v8.tsx）は残存コードの例外。実際に描く
+ * V8の方式選択（v8/scenarios/create.tsx）は共通RadioCardを使う。
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import {readdirSync,  statSync} from 'node:fs'
+import { readUiSource as readFileSync } from '../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)))
-const EXCEPTIONS = new Set(['app/scenarios/mode/page.tsx'])
+const EXCEPTIONS = new Set([
+  /*
+   * リマインダV8の選ぶカード（ChoiceCardV8）は共通 RadioCard が持たない
+   * 「アイコン左上・丸右上」の形。丸は本物の input[type=radio] で、
+   * 意味は保ったまま。★V8板（等）の見た目を守るために残す。
+   */
+  'v8/reminders/wizard-ui.tsx',
+  /*
+   * イベント変更確認V8の開催回選択は表の行内の単一選択。共通 RadioCard は
+   * カード型で表のセルに入らず、共通 Checkbox は複数選択の意味になる。
+   * 本物の input[type=radio]（name 群・aria-label 付き）で意味を保つ。
+   */
+])
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -43,8 +56,11 @@ describe('m21u: 素の選ぶ入力は残っていない', () => {
     expect(offenders).toEqual([])
   })
 
-  it('例外の比較カードは使いやすさのために残している', () => {
-    const body = readFileSync(join(SRC, 'app/scenarios/mode/page.tsx'), 'utf8')
-    expect(body).toContain('type="radio"')
+  it('V8の配信方式は共通の選択カードで両方式を選べる', () => {
+    const body = readFileSync(join(SRC, 'v8/scenarios/create.tsx'), 'utf8')
+    expect(body).toContain('<RadioCardGroup legend="配信方式"')
+    expect(body.match(/<RadioCard\s/g)).toHaveLength(2)
+    // 方式を選べる動きは作成画面の実描画試験で両方向を確かめる。
+    expect(body).not.toContain('type="radio"')
   })
 })

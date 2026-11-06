@@ -1,8 +1,9 @@
 import { fetchApi } from './api'
 import type { ApiResponse } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /**
- * 然-NEN- マイペット（★V6 37-3）／健康日記（★V6 37-4）。
+ * 然-NEN- マイペット（★管理画面 37-3）／健康日記（★管理画面 37-4）。
  * Worker `apps/worker/src/routes/nen-pets.ts`。ペットの正本は LINE 側（お客様がマイページで登録・更新）。
  */
 
@@ -141,7 +142,7 @@ export function headCountLabel(total: number, page: number, pageSize: number): s
   if (total === 0) return '0頭'
   const from = (page - 1) * pageSize + 1
   const to = Math.min(total, page * pageSize)
-  return `${total.toLocaleString('ja-JP')}頭中 ${from}〜${to}頭`
+  return `${formatNumber(total)}頭中 ${from}〜${to}頭`
 }
 
 function qs(params: Record<string, string | number | undefined>): string {
@@ -155,7 +156,7 @@ function qs(params: Record<string, string | number | undefined>): string {
 export const nenPetsApi = {
   pets: (accountId: string, params: { q?: string; species?: string; product?: string; weight?: NenPetWeightFilter; sort?: NenPetSort; page?: number; pageSize?: number | 'all' } = {}) =>
     fetchApi<ApiResponse<NenPetListData>>(`/api/nen/pets?${qs({ accountId, ...params })}`),
-  health: (accountId: string, params: { q?: string; change?: NenHealthChangeFilter; last?: NenHealthLastFilter; sort?: NenHealthSort; page?: number } = {}) =>
+  health: (accountId: string, params: { q?: string; change?: NenHealthChangeFilter; last?: NenHealthLastFilter; sort?: NenHealthSort; page?: number; pageSize?: number } = {}) =>
     fetchApi<ApiResponse<NenHealthListData>>(`/api/nen/health?${qs({ accountId, ...params })}`),
   healthSummary: (accountId: string, petId: string) =>
     fetchApi<ApiResponse<NenHealthSummaryData>>(`/api/nen/health/${encodeURIComponent(petId)}/summary?${qs({ accountId })}`),

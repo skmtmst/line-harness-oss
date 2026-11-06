@@ -1,16 +1,16 @@
 /*
- * N-023: 個別送信の失敗台帳と安全な再試行。
+ * 個別送信の失敗台帳と安全な再試行。
  * 実Hono route + 実SQLite(bootstrap.sql)へ当て、LINE clientだけを止める。
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const mocks = vi.hoisted(() => ({ pushMessage: vi.fn() }));
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({ pushMessage: mocks.pushMessage })),
+  LineClient: vi.fn().mockImplementation(function () { return ({ pushMessage: mocks.pushMessage }); }),
 }));
 
 const { chats } = await import('./chats.js');

@@ -1,5 +1,6 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 const lineClientMocks = vi.hoisted(() => ({
   getProfile: vi.fn(),
@@ -33,16 +34,19 @@ vi.mock('../middleware/auth.js', () => ({
   authenticateApiToken: vi.fn(async () => null),
 }));
 
+vi.mock('../services/feature-enforcement.js', () => ({
+  accountFeatureAvailability: vi.fn(),
+}));
+
 vi.mock('@line-crm/line-sdk', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/line-sdk')>('@line-crm/line-sdk');
   return {
     ...actual,
-    LineClient: vi.fn().mockImplementation(() => lineClientMocks),
+    LineClient: vi.fn().mockImplementation(function () { return lineClientMocks; }),
   };
 });
 
-// Keep the real shape of messageToLogPayload without dragging in the whole
-// step-delivery dependency graph.
+// 配信全体の依存を読まずに検証できるよう、messageToLogPayload と同じ入出力だけを保つ。
 vi.mock('../services/step-delivery.js', () => ({
   messageToLogPayload: (message: { type: string; text?: string }) =>
     message.type === 'text'
@@ -64,19 +68,18 @@ import {
   getStaffAccountScopeIds,
 } from '@line-crm/db';
 import { authenticateApiToken } from '../middleware/auth.js';
+import { accountFeatureAvailability } from '../services/feature-enforcement.js';
 import { lineProxy } from './line-proxy.js';
 
 type Exec = { sql: string; params: unknown[] };
 
 const U = (n: number) => `U${n.toString(16).padStart(32, '0')}`;
 
-/**
- * Minimal D1 stub. `friendsByUserId` feeds the IN (...) lookup used by
- * multicast; `broadcastFriendIds` feeds the is_following SELECTs.
- */
+/** multicast の IN 照会は friendsByUserId、全体送信のフォロー状態は broadcastFriendIds で試す。 */
 function fakeDb(opts: {
   friendsByUserId?: Record<string, { id: string; line_user_id: string }>;
   broadcastFriendIds?: string[];
+  suppressed?: boolean;
 } = {}) {
   const executed: Exec[] = [];
   const db = {
@@ -103,6 +106,11 @@ function fakeDb(opts: {
           return { results: (opts.broadcastFriendIds ?? []).map((id) => ({ id })) };
         },
         async first() {
+          if(sql.includes('AS delivery_suppressed')) {
+            const friend = await getFriendByLineUserIdForAccount(db as unknown as D1Database, String(stmt.params[2]), String(stmt.params[0]));
+            return friend ? {...friend, delivery_suppressed: opts.suppressed ? 1 : 0} : null;
+          }
+          if(sql.includes('friend_delivery_consents'))return opts.suppressed?{suppressed:1}:null;
           return null;
         },
       };
@@ -116,7 +124,7 @@ function fakeDb(opts: {
   return { db: db as unknown as D1Database, executed };
 }
 
-/** Flatten multi-row messages_log INSERTs into logical rows (8 params each). */
+/** 複数行の送信履歴 INSERT を、1行8引数の論理行へ展開して検証する。 */
 function loggedRows(executed: Exec[]) {
   const rows: { friendId: unknown; messageType: unknown; content: unknown; deliveryType: unknown; source: unknown; lineAccountId: unknown }[] = [];
   for (const e of executed) {
@@ -198,6 +206,11 @@ beforeEach(() => {
   vi.mocked(authenticateApiToken).mockResolvedValue(null as never);
   // clearAllMocks は実装を戻さないので、停止状態は各テストで明示的に立てる。
   vi.mocked(isOperationCapabilityStopped).mockResolvedValue(false as never);
+  vi.mocked(accountFeatureAvailability).mockResolvedValue({
+    featureId: 'broadcasts', contractAvailable: true, companyEnabled: true,
+    dependenciesEnabled: true, effectiveEnabled: true, reason: null,
+    message: null, disabledDependencies: [],
+  });
 });
 
 afterEach(() => {
@@ -217,6 +230,102 @@ function pushRequest(
     body: JSON.stringify(body),
   });
 }
+
+describe('account feature availability', () => {
+  test.each([
+    '/v2/bot/message/broadcast',
+    `/v2/bot/user/${USER_A}/richmenu/rm-1`,
+  ])('unregistered environment channel cannot update account-scoped feature %s', async path => {
+    vi.mocked(getLineAccounts).mockResolvedValue([]);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(`/line-api${path}`, {
+      method: 'POST', headers: { Authorization: 'Bearer env-token' },
+    }, env(db));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: 'LINE_ACCOUNT_REQUIRED' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(executed).toEqual([]);
+  });
+
+  test.each([
+    ['POST', '/v2/bot/richmenu'],
+    ['POST', '/v2/bot/user/all/richmenu/rm-1'],
+    ['DELETE', '/v2/bot/user/all/richmenu'],
+    ['POST', `/v2/bot/user/${USER_A}/richmenu/rm-1`],
+    ['DELETE', `/v2/bot/user/${USER_A}/richmenu`],
+  ])('disabled rich menus reject %s %s before upstream communication', async (method, path) => {
+    const { db, executed } = fakeDb();
+    vi.mocked(accountFeatureAvailability).mockResolvedValue({
+      featureId: 'rich_menus', contractAvailable: true, companyEnabled: false,
+      dependenciesEnabled: true, effectiveEnabled: false, reason: 'company_disabled',
+      message: 'この機能は設定でオフになっています', disabledDependencies: [],
+    });
+    const res = await setupApp().request(`/line-api${path}`, {
+      method, headers: { Authorization: 'Bearer acc-token' },
+    }, env(db));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'FEATURE_DISABLED', featureId: 'rich_menus' });
+    expect(accountFeatureAvailability).toHaveBeenCalledWith(db, 'acc-1', 'rich_menus');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(executed).toEqual([]);
+  });
+
+  test('enabled rich menu assignment forwards the channel request', async () => {
+    const { db } = fakeDb();
+    const res = await setupApp().request(`/line-api/v2/bot/user/${USER_A}/richmenu/rm-1`, {
+      method: 'POST', headers: { Authorization: 'Bearer acc-token' },
+    }, env(db));
+    expect(res.status).toBe(200);
+    expect(accountFeatureAvailability).toHaveBeenCalledWith(db, 'acc-1', 'rich_menus');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['broadcast', 'multicast', 'narrowcast'] as const)('disabled %s stops before upstream communication', async endpoint => {
+    const { db, executed } = fakeDb();
+    vi.mocked(accountFeatureAvailability).mockResolvedValue({
+      featureId: 'broadcasts', contractAvailable: true, companyEnabled: false,
+      dependenciesEnabled: true, effectiveEnabled: false, reason: 'company_disabled',
+      message: 'この機能は設定でオフになっています', disabledDependencies: [],
+    });
+    const res = await setupApp().request(`/line-api/v2/bot/message/${endpoint}`, {
+      method: 'POST', headers: { Authorization: 'Bearer acc-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: [USER_A], messages: [{ type: 'text', text: 'fixture message' }] }),
+    }, env(db));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'FEATURE_DISABLED', featureId: 'broadcasts' });
+    expect(accountFeatureAvailability).toHaveBeenCalledWith(db, 'acc-1', 'broadcasts');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(executed).toEqual([]);
+  });
+
+  test('staff permission does not replace the account feature switch', async () => {
+    const { db } = fakeDb();
+    vi.mocked(authenticateApiToken).mockResolvedValue({
+      id: 'operator', name: 'Fixture', role: 'staff', readOnly: false,
+      tenantId: DEFAULT_TENANT_ID, permissionKeys: ['/broadcasts'],
+    } as never);
+    vi.mocked(accountFeatureAvailability).mockResolvedValue({
+      featureId: 'broadcasts', contractAvailable: false, companyEnabled: true,
+      dependenciesEnabled: true, effectiveEnabled: false, reason: 'contract_unavailable',
+      message: 'ご契約ではこの機能を利用できません', disabledDependencies: [],
+    });
+    const res = await setupApp().request('/line-api/v2/bot/message/broadcast', {
+      method: 'POST', headers: { Authorization: 'Bearer harness-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ type: 'text', text: 'fixture message' }] }),
+    }, env(db));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'FEATURE_NOT_ENTITLED' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('core one-to-one push remains independent of the broadcast switch', async () => {
+    const { db } = fakeDb();
+    const res = await setupApp().request(pushRequest('acc-token'), {}, env(db));
+    expect(res.status).toBe(200);
+    expect(accountFeatureAvailability).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('auth', () => {
   test('no Authorization header → 401, upstream not called', async () => {
@@ -383,6 +492,100 @@ describe('harness API key auth', () => {
   });
 });
 
+describe('legacy environment account authorization', () => {
+  beforeEach(() => {
+    vi.mocked(getLineAccounts).mockResolvedValue([]);
+    vi.mocked(authenticateApiToken).mockResolvedValue({
+      id: 'staff-legacy', name: 'Operator', role: 'staff', readOnly: false,
+      permissionKeys: ['/chats'], tenantId: DEFAULT_TENANT_ID,
+    });
+  });
+
+  test.each(['foreign tenant', 'assigned accounts', 'feature scope'] as const)(
+    '%s cannot use the environment channel through either proxy', async (restriction) => {
+      if (restriction === 'foreign tenant') {
+        vi.mocked(authenticateApiToken).mockResolvedValue({
+          id: 'foreign-staff', name: 'Operator', role: 'staff', readOnly: false,
+          permissionKeys: ['/chats'], tenantId: 'other-tenant',
+        });
+      } else if (restriction === 'assigned accounts') {
+        vi.mocked(getStaffById).mockResolvedValueOnce({ account_scope: 'accounts' } as never);
+        vi.mocked(getStaffAccountScopeIds).mockResolvedValueOnce(['acc-1']);
+      } else {
+        vi.mocked(authenticateApiToken).mockResolvedValue({
+          id: 'feature-staff', name: 'Operator', role: 'staff', readOnly: false,
+          permissionKeys: ['/chats'], tenantId: DEFAULT_TENANT_ID,
+          featureEnabledLineAccountIds: ['acc-1'],
+        });
+      }
+      const { db, executed } = fakeDb();
+      for (const request of [
+        pushRequest('staff-key'),
+        new Request('http://worker.test/line-api-data/v2/bot/message/message-1/content', {
+          headers: { Authorization: 'Bearer staff-key' },
+        }),
+      ]) {
+        const res = await setupApp().request(request, {}, env(db));
+        expect(res.status).toBe(404);
+        expect(await res.json()).toEqual({ message: 'LINE account not found' });
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(executed).toEqual([]);
+    },
+  );
+
+  test.each([
+    { is_active: 0, tenant_status: 'active', directStatus: 401 },
+    { is_active: 1, tenant_status: 'suspended', directStatus: 403 },
+    { is_active: 1, tenant_status: 'archived', directStatus: 403 },
+  ])('registered unavailable default $is_active/$tenant_status cannot fall back to legacy', async (state) => {
+    const registered = { ...ACCOUNT, ...state, channel_access_token: 'env-token' };
+    vi.mocked(getLineAccounts).mockResolvedValue([registered] as never);
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([registered] as never);
+    vi.mocked(authenticateApiToken).mockImplementation(async (_c, token) => token === 'staff-key'
+      ? { id: 'staff-legacy', name: 'Operator', role: 'staff', readOnly: false,
+        permissionKeys: ['/chats'], tenantId: DEFAULT_TENANT_ID }
+      : null);
+    const { db, executed } = fakeDb();
+    for (const [token, status] of [['staff-key', 404], ['env-token', state.directStatus]] as const) {
+      const res = await setupApp().request(pushRequest(token), {}, env(db));
+      expect(res.status).toBe(status);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(executed).toEqual([]);
+  });
+
+  test.each(['staff-legacy', 'env-owner'])(
+    'authorized default-tenant %s retains unregistered environment access', async (id) => {
+      vi.mocked(authenticateApiToken).mockResolvedValue({
+        id, name: 'Operator', role: id === 'env-owner' ? 'owner' : 'staff', readOnly: false,
+        permissionKeys: ['/chats'], tenantId: DEFAULT_TENANT_ID,
+      });
+      const { db, executed } = fakeDb();
+      const res = await setupApp().request(pushRequest('staff-key'), {}, env(db));
+      expect(res.status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://api.line.me/v2/bot/message/push',
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: 'Bearer env-token' }),
+        }),
+      );
+      expect(loggedRows(executed)[0].lineAccountId).toBeNull();
+    },
+  );
+
+  test('an active registered environment token keeps its account identity', async () => {
+    vi.mocked(getLineAccounts).mockResolvedValue([
+      { ...ACCOUNT, channel_access_token: 'env-token' },
+    ] as never);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(pushRequest('env-token'), {}, env(db));
+    expect(res.status).toBe(200);
+    expect(loggedRows(executed)[0].lineAccountId).toBe('acc-1');
+    expect(authenticateApiToken).not.toHaveBeenCalled();
+  });
+});
+
 describe('push', () => {
   test('forwards to api.line.me and logs source=external', async () => {
     const { db, executed } = fakeDb();
@@ -422,7 +625,7 @@ describe('push', () => {
   });
 
   /*
-   * R381: 同じ送信キー（X-Line-Retry-Key）の再送は履歴を二重に書かない。
+   * 同じ送信キー（X-Line-Retry-Key）の再送は履歴を二重に書かない。
    * 初回の200で履歴の保存が落ちても、LINEが「受理済み」を返す409の再送で
    * 同じ決まったIDの行へ補完する。
    */
@@ -582,10 +785,19 @@ describe('push', () => {
   });
 
   test('logging failure does not break the 200 response', async () => {
+    const { db } = fakeDb();
+    vi.spyOn(db, 'batch').mockRejectedValueOnce(new Error('db down'));
+    const res = await setupApp().request(pushRequest('acc-token'), {}, env(db));
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  test('同意を確認できなければ上流へ送らず止める', async () => {
     vi.mocked(getFriendByLineUserIdForAccount).mockRejectedValue(new Error('db down'));
     const { db } = fakeDb();
     const res = await setupApp().request(pushRequest('acc-token'), {}, env(db));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(500);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
@@ -644,7 +856,7 @@ describe('multicast', () => {
     );
 
     expect(res.status).toBe(200);
-    // 1 known + 20 created (cap) = 21 logged; 5 skipped with a warning
+    // 既知1人と上限内の新規20人だけを記録し、超過5人は警告とともに除く。
     expect(loggedRows(executed)).toHaveLength(21);
     expect(upsertFriend).toHaveBeenCalledTimes(20);
   });
@@ -673,7 +885,7 @@ describe('broadcast', () => {
     expect(rows[0].deliveryType).toBeNull();
   });
 
-  test('single account install + env token: unscoped (all following friends)', async () => {
+  test('single registered account does not claim an unrelated environment channel', async () => {
     const { db, executed } = fakeDb({ broadcastFriendIds: ['f1', 'f2'] });
     const res = await setupApp().request(
       new Request('http://worker.test/line-api/v2/bot/message/broadcast', {
@@ -684,10 +896,10 @@ describe('broadcast', () => {
       {},
       env(db),
     );
-    expect(res.status).toBe(200);
-    const select = executed.find((e) => e.sql.includes('SELECT id FROM friends'));
-    expect(select!.sql).not.toContain('line_account_id');
-    expect(loggedRows(executed)).toHaveLength(2);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: 'LINE_ACCOUNT_REQUIRED' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(executed).toEqual([]);
   });
 
   test('multi-account: scoped to the sending account', async () => {
@@ -709,7 +921,7 @@ describe('broadcast', () => {
     expect(loggedRows(executed)).toHaveLength(2);
   });
 
-  test('multi-account + unregistered env token: forwarded but NOT logged (no fabrication)', async () => {
+  test('multi-account + unregistered env token requires a registered channel for broadcast', async () => {
     vi.mocked(getLineAccounts).mockResolvedValue([ACCOUNT, ACCOUNT_2] as never);
     const { db, executed } = fakeDb({ broadcastFriendIds: ['f1', 'f2'] });
     const res = await setupApp().request(
@@ -721,7 +933,9 @@ describe('broadcast', () => {
       {},
       env(db),
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: 'LINE_ACCOUNT_REQUIRED' });
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(loggedRows(executed)).toHaveLength(0);
   });
 });
@@ -833,7 +1047,7 @@ describe('reply and passthrough', () => {
 });
 
 /*
- * #960 — broadcast_dispatch 緊急停止はプロキシ送信経路にも効く。
+ *  — broadcast_dispatch 緊急停止はプロキシ送信経路にも効く。
  * 停止中の一斉送信系 (broadcast/multicast/narrowcast/自動push) は上流へ
  * fetch しない。例外は reply と manual 明示の 1:1 push。
  */
@@ -928,7 +1142,7 @@ describe('emergency stop (broadcast_dispatch)', () => {
   });
 
   /*
-   * #1050 — X-Line-Harness-Capability で送信経路ごとの停止対象を名乗る。
+   *  — X-Line-Harness-Capability で送信経路ごとの停止対象を名乗る。
    * 停止中は上流へ一切出さず 409 を返す。値が無い・知らない値の自動送信は
    * 従来どおり broadcast_dispatch (安全側) で止める。
    */
@@ -1021,4 +1235,18 @@ describe('emergency stop (broadcast_dispatch)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(isOperationCapabilityStopped).not.toHaveBeenCalled();
   });
+});
+
+
+describe('配信停止・同意の送信直前検査',()=>{
+ test.each(['/v2/bot/message/push','/v2/bot/message/multicast','/v2/bot/message/broadcast','/v2/bot/message/narrowcast'])('停止対象を含む%sは上流へ出さない',async path=>{
+  const {db}=fakeDb({suppressed:true});
+  const response=await setupApp().request(new Request('http://worker.test/line-api'+path,{method:'POST',headers:{Authorization:'Bearer acc-token','Content-Type':'application/json'},body:JSON.stringify({to:path.endsWith('/multicast')?[USER_A]:USER_A,messages:[{type:'text',text:'案内'}]})}),{},env(db));
+  expect(response.status).toBe(409);expect(fetchMock).not.toHaveBeenCalled();
+ });
+ test('manualの個別返信は配信停止中でも担当者が送れる',async()=>{
+  const {db}=fakeDb({suppressed:true});
+  const response=await setupApp().request(pushRequest('acc-token',undefined,{'X-Line-Harness-Source':'manual'}),{},env(db));
+  expect(response.status).toBe(200);expect(fetchMock).toHaveBeenCalledOnce();
+ });
 });

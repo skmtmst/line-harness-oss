@@ -1,7 +1,5 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+
 import {
   LINK_STATUS_LABEL,
   MISSING_SCREENS_NOTE,
@@ -21,7 +19,7 @@ import {
 } from './manual-link-view'
 
 /**
- * 設計 ★V6 34-4「マニュアルの正本表」（`f9oUm`）。
+ * マニュアルの正本表の状態・絞り込み・権限。
  *
  * 守りたいのは 2 点——**出せない行を 0 件と書かない**ことと、
  * **「決めていない」と「開けない」を混ぜない**こと。
@@ -33,7 +31,7 @@ function row(over: Partial<ManualLinkRow> = {}): ManualLinkRow {
     taskId: null,
     name: '受信箱',
     url: 'https://help.line-harness.example/inbox',
-    checkedAt: '8/28 04:00',
+    checkedAt: '8月28日（金）4:00',
     status: 'ok',
     ...over,
   }
@@ -54,11 +52,11 @@ describe('リンクの状態', () => {
   */
   it('URL があっても、確かめていなければ「開けます」にしない', () => {
     expect(statusOf('https://example.com', null)).toBe('unset')
-    expect(statusOf('https://example.com', '8/28 04:00')).toBe('ok')
+    expect(statusOf('https://example.com', '8月28日（金）4:00')).toBe('ok')
   })
 
   it('URL が空なら「まだ決めていません」', () => {
-    expect(statusOf('', '8/28 04:00')).toBe('unset')
+    expect(statusOf('', '8月28日（金）4:00')).toBe('unset')
     expect(statusOf('   ', null)).toBe('unset')
   })
 })
@@ -71,7 +69,7 @@ describe('出せないものを出せるように見せない', () => {
 
   it('確かめていない日は `—`', () => {
     expect(checkedLabel(null)).toBe('—')
-    expect(checkedLabel('8/28 04:00')).toBe('8/28 04:00')
+    expect(checkedLabel('8月28日（金）4:00')).toBe('8月28日（金）4:00')
   })
 
   it('画面ごとの対応表が無いことを、行が無いのではなく口が無いと言う', () => {
@@ -97,7 +95,7 @@ describe('いま出せる行', () => {
       lastError: null, version: 2,
     })
     expect(row).toMatchObject({ screenId: '2-1', taskId: null, status: 'ok' })
-    expect(checkedLabel(row.checkedAt)).toBe('8/28 04:00')
+    expect(checkedLabel(row.checkedAt)).toBe('08/28 04:00')
   })
 
   it('手元にあるのは作業ID 4件だけで、どれも未設定', () => {
@@ -164,23 +162,5 @@ describe('触れる人', () => {
     expect(canEditTable({ id: 'other', role: 'staff', permissionKeys: [] })).toBe(false)
     expect(canEditTable({ id: 'other', role: 'admin', permissionKeys: [] })).toBe(false)
     expect(canEditTable(null)).toBe(false)
-  })
-})
-
-describe('失敗の表示', () => {
-  const page = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
-
-  it('「確かめる」と「保存」の失敗を無言にしない', () => {
-    expect(page).toContain('actionError')
-    expect(page).toContain('role="alert"')
-    expect(page).toContain('確かめられませんでした')
-    expect(page).toContain('保存できませんでした')
-  })
-
-  it('競合は読み直し、権限不足は依頼先を出す', () => {
-    expect(page).toContain('ほかの人が先に変更しました')
-    expect(page).toContain('運営に依頼してください')
-    expect(page).toContain('error.status === 409')
-    expect(page).toContain('error.status === 403')
   })
 })

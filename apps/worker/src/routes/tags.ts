@@ -1,5 +1,9 @@
+import {tagDefinitionError} from './tag-definition-error.js';
+import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
+  restoreTag,
+  ArchiveRestoreError,
   getTags,
   getTagsWithUsage,
   getTagDeleteImpact,
@@ -8,7 +12,6 @@ import {
   createTagsBulk,
   deleteTag,
   updateTagMileageSettings,
-  enqueueHistoricTagMileage,
   getTagRetroactiveMileagePreview,
   type TagRetroactiveMileagePreview,
   getTagGroups,
@@ -28,6 +31,8 @@ import {
   TagArchiveError,
 } from '@line-crm/db';
 import type { Tag as DbTag, TagGroup as DbTagGroup, TagWithUsage } from '@line-crm/db';
+import { fail } from '../lib/fail.js';
+
 import type {
   TagCsvImportInputRow,
   TagCsvImportPreview,
@@ -35,9 +40,10 @@ import type {
   TagCsvImportRowResult,
   TagCsvImportSummary,
 } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import type { Env } from '../worker-env.js';
+import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { listResponse } from '../lib/list-etag.js';
 import {
   CommonActionValidationError,
   validateActionShape,
@@ -60,10 +66,8 @@ function serializeTag(row: DbTag & Partial<TagWithUsage>) {
     id: row.id,
     name: row.name,
     /*
-     * 印の色は「属するフォルダの色」。tags.color は 115 以前の名残で、
-     * 読まない（画面からも書かない）。フォルダを JOIN していない読み方
-     * （作成・更新の戻り）では undefined になるので、そのときは灰色。
-     * 一覧を読み直した時点で正しい色に入れ替わる。
+     * 印はフォルダの色を使い、tags.color は読まない。
+     * 作成・更新の戻りなどフォルダを JOIN しない経路は灰色とし、一覧の再取得で所属フォルダの色を反映する。
      */
     color: row.folder_color ?? TAG_NEUTRAL_COLOR,
     // 099以降はfoldersが正本。group_idは旧tag_groups時代の互換列で、
@@ -146,7 +150,7 @@ async function visibleTag(c: Context<Env>, id: string): Promise<DbTag | Response
 }
 
 /**
- * N-048(#803): 旧作成・CSV一括の作り先所属を決める。
+ * 旧作成・CSV一括の作り先所属を決める。
  *
  * 要求の自己申告だけを信じない。明示IDは許可scopeで検証し、指定なしは
  * 割当が1件に絞れるときだけ自動確定する。所属なし・既定統括への補完は作らない。
@@ -165,7 +169,7 @@ async function resolveLegacyTagAccount(
   if (scope.allowedAccountIds.length === 1) {
     return { accountId: scope.allowedAccountIds[0] };
   }
-  return { error: c.json({ success: false, error: 'lineAccountId is required' }, 400) };
+  return { error: fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]) };
 }
 
 async function visibleTagFolder(c: Context<Env>, id: string, accountId?: string | null): Promise<Response | null> {
@@ -179,24 +183,6 @@ async function visibleTagFolder(c: Context<Env>, id: string, accountId?: string 
   return null;
 }
 
-function tagDefinitionError(c: Context<Env>, error: unknown): Response | null {
-  if (error instanceof TagDefinitionError) {
-    const status = error.code === 'not_found' || error.code === 'folder_not_found' ? 404 : 409;
-    return c.json({ success: false, code: error.code, error: error.message }, status);
-  }
-  if (error instanceof CommonActionValidationError) {
-    return c.json({
-      success: false,
-      code: error.code,
-      error: error.message,
-      ...(error.field ? { field: error.field } : {}),
-    }, 422);
-  }
-  if (error instanceof Error && error.message.includes('UNIQUE constraint')) {
-    return c.json({ success: false, code: 'name_conflict', error: '同じ名前のタグがあります' }, 409);
-  }
-  return null;
-}
 
 function text(value: unknown): string | undefined {
   return typeof value === 'string' ? value.trim() : undefined;
@@ -260,7 +246,7 @@ function tagDefinitionResponse(detail: Awaited<ReturnType<typeof getTagDefinitio
   };
 }
 
-// ─── 既存友だちへの遡及マイル：事前計算と照合（N-047）──────────────
+// ─── 既存友だちへの遡及マイル：事前計算と照合──────────────
 //
 // 「既存の友だちにも適用する」を付けて保存するとき、クライアントが数えた
 // 人数・合計マイルではなくサーバー側で数えた結果を画面に出し、その結果と
@@ -316,20 +302,20 @@ async function requireRetroactivePreviewMatch(
   token: unknown,
 ): Promise<Response | null> {
   if (typeof token !== 'string' || token.trim() === '') {
-    return c.json({
+    return inputError(c, {
       success: false,
       code: 'RETROACTIVE_PREVIEW_REQUIRED',
       error: '遡及の前に対象と合計マイルを再計算して確認してください。',
-    }, 422);
+    }, 422, ["retroactivePreviewToken"]);
   }
   const parts = token.split('.');
   const expiresAtMs = Number(parts[1]);
   if (parts.length !== 3 || parts[0] !== RETROACTIVE_TOKEN_PREFIX || !Number.isFinite(expiresAtMs)) {
-    return c.json({
+    return inputError(c, {
       success: false,
       code: 'RETROACTIVE_PREVIEW_REQUIRED',
       error: '遡及の前に対象と合計マイルを再計算して確認してください。',
-    }, 422);
+    }, 422, ["retroactivePreviewToken"]);
   }
   if (expiresAtMs < Date.now()) {
     return c.json({
@@ -519,7 +505,7 @@ async function loadTagImportPlan(
   lineAccountId: string,
 ): Promise<PlannedTagImportRow[]> {
   const [allTags, groups] = await Promise.all([
-    getTags(db),
+    getTags(db, { allowedAccountIds: [lineAccountId], canSeeUnassigned: true }),
     getTagGroups(db, { allowedAccountIds: [lineAccountId], canSeeUnassigned: false }),
   ]);
   // 同名の衝突先は作り先所属と所属なし(全体一意のため)だけを見る。
@@ -563,34 +549,30 @@ tags.get('/api/tag-groups', async (c) => {
     });
     return c.json({ success: true, data: items.map(serializeTagGroup) });
   } catch (err) {
-    console.error('GET /api/tag-groups error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/tag-groups
-tags.post('/api/tag-groups', requireRole('owner', 'admin'), async (c) => {
+tags.post('/api/tag-groups', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ name?: unknown; sortOrder?: unknown; color?: unknown }>();
     const name = typeof body.name === 'string' ? body.name.trim() : '';
-    if (!name) return c.json({ success: false, error: 'name is required' }, 400);
+    if (!name) return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
     let color: string | null = null;
     if (body.color !== undefined && body.color !== null && body.color !== '') {
       const raw = String(body.color);
       if (!GROUP_COLOR_PATTERN.test(raw)) {
-        return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
+        return inputError(c, { success: false, error: '色は #RRGGBB の形で指定してください' }, 400, ["color"]);
       }
       color = raw;
     }
     if (name.length > 60) {
-      return c.json({ success: false, error: 'name must be 60 characters or fewer' }, 400);
+      return inputError(c, { success: false, error: 'name must be 60 characters or fewer' }, 400, ["name"]);
     }
     const sortOrder = body.sortOrder === undefined ? 0 : Number(body.sortOrder);
     if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 10_000) {
-      return c.json(
-        { success: false, error: 'sortOrder must be an integer between 0 and 10000' },
-        400,
-      );
+      return inputError(c, { success: false, error: 'sortOrder must be an integer between 0 and 10000' }, 400, ["sortOrder"]);
     }
     const accountId = requestedLineAccountId(c, body as Record<string, unknown>);
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -600,13 +582,12 @@ tags.post('/api/tag-groups', requireRole('owner', 'admin'), async (c) => {
     const group = await createTagGroup(c.env.DB, { name, sortOrder, color, ...(accountId ? { accountId } : {}) });
     return c.json({ success: true, data: serializeTagGroup(group) }, 201);
   } catch (err) {
-    console.error('POST /api/tag-groups error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// PATCH /api/tag-groups/:id
-tags.patch('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
+
+tags.patch('/api/tag-groups/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ name?: unknown; sortOrder?: unknown; color?: unknown }>();
     const patch: { name?: string; sortOrder?: number; color?: string | null } = {};
@@ -617,26 +598,23 @@ tags.patch('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
       } else {
         const value = String(raw);
         if (!GROUP_COLOR_PATTERN.test(value)) {
-          return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
+          return inputError(c, { success: false, error: '色は #RRGGBB の形で指定してください' }, 400, ["color"]);
         }
         patch.color = value;
       }
     }
     if (body.name !== undefined) {
       const name = typeof body.name === 'string' ? body.name.trim() : '';
-      if (!name) return c.json({ success: false, error: 'name must not be empty' }, 400);
+      if (!name) return inputError(c, { success: false, error: 'name must not be empty' }, 400, ["name"]);
       if (name.length > 60) {
-        return c.json({ success: false, error: 'name must be 60 characters or fewer' }, 400);
+        return inputError(c, { success: false, error: 'name must be 60 characters or fewer' }, 400, ["name"]);
       }
       patch.name = name;
     }
     if (body.sortOrder !== undefined) {
       const sortOrder = Number(body.sortOrder);
       if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 10_000) {
-        return c.json(
-          { success: false, error: 'sortOrder must be an integer between 0 and 10000' },
-          400,
-        );
+        return inputError(c, { success: false, error: 'sortOrder must be an integer between 0 and 10000' }, 400, ["sortOrder"]);
       }
       patch.sortOrder = sortOrder;
     }
@@ -646,13 +624,11 @@ tags.patch('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
     if (!group) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeTagGroup(group) });
   } catch (err) {
-    console.error('PATCH /api/tag-groups/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// DELETE /api/tag-groups/:id
-// 属していたタグは消えず「未分類」に戻る（tags.folder_id は ON DELETE SET NULL）。
+// フォルダを消してもタグは残り、ON DELETE SET NULL で未分類へ戻る。
 tags.delete('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const denied = await visibleTagFolder(c, c.req.param('id'), requestedLineAccountId(c) ?? undefined);
@@ -660,13 +636,12 @@ tags.delete('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
     if (!(await deleteFolder(c.env.DB, c.req.param('id')))) return c.json({ success: false, error: 'folder_scope_conflict' }, 409);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error('DELETE /api/tag-groups/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // PATCH /api/tags/:id/group - move one tag into a group (null = 未分類)
-tags.patch('/api/tags/:id/group', requireRole('owner', 'admin'), async (c) => {
+tags.patch('/api/tags/:id/group', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ groupId?: unknown }>();
     const raw = body.groupId;
@@ -683,16 +658,13 @@ tags.patch('/api/tags/:id/group', requireRole('owner', 'admin'), async (c) => {
   } catch (err) {
     // 存在しない分類を指定した場合。500 にすると原因が分からない。
     if (err instanceof Error && err.message.includes('FOREIGN KEY constraint')) {
-      return c.json({ success: false, error: 'group not found' }, 400);
+      return fail(c, 400, 'GROUP_NOT_FOUND', {}, ["groupId"]);
     }
-    console.error('PATCH /api/tags/:id/group error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// GET /api/tags - list all tags
-// ?withCounts=1 adds friendCount and usage aggregates — admin UI only, so
-// the many picker/filter consumers keep the cheap plain SELECT.
+// 件数と利用集計は管理画面の withCounts=1 だけで取得し、多数の選択欄や絞込は軽い一覧のままにする。
 tags.get('/api/tags', async (c) => {
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -701,50 +673,53 @@ tags.get('/api/tags', async (c) => {
       return c.json({ success: false, error: '対象のLINE公式アカウントが見つかりません' }, 404);
     }
     const withCounts = c.req.query('withCounts') === '1';
+    const readScope = {
+      allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
+      canSeeUnassigned: !requestedAccountId && scope.canSeeUnassigned,
+    };
     const items = withCounts
-      ? await getTagsWithUsage(c.env.DB)
-      : await getTags(c.env.DB);
+      ? await getTagsWithUsage(c.env.DB, readScope)
+      : await getTags(c.env.DB, readScope);
     const allowedIds = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds;
     const visibleItems = items.filter((item) => item.line_account_id == null
       ? !requestedAccountId && scope.canSeeUnassigned
       : allowedIds.includes(item.line_account_id));
-    return c.json({ success: true, data: visibleItems.map(serializeTag) });
+    // 同じ中身なら304（list-etag）。
+    return listResponse(c, { success: true, data: visibleItems.map(serializeTag) });
   } catch (err) {
-    console.error('GET /api/tags error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/tags/import/preview - CSVから読み取った行を保存せずに検査する
-tags.post('/api/tags/import/preview', requireRole('owner', 'admin'), async (c) => {
+tags.post('/api/tags/import/preview', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
-    // N-048(#803): 確認だけでも作り先所属を確定し、所属なし行の計画を作らない。
+    // 確認だけでも作り先所属を確定し、所属なし行の計画を作らない。
     const resolved = await resolveLegacyTagAccount(c);
     if ('error' in resolved) return resolved.error;
     const input = await readImportRows(c);
     if (!input.ok) {
-      return c.json({ success: false, error: input.error }, input.status);
+      return inputError(c, { success: false, error: input.error }, input.status, []);
     }
     const planned = await loadTagImportPlan(c.env.DB, input.rows, resolved.accountId);
     const rows = planned.map(publicImportRow);
     const data: TagCsvImportPreview = { summary: importSummary(rows), rows };
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('POST /api/tags/import/preview error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/tags/import - 検査をやり直し、登録可能な行だけを登録する
-tags.post('/api/tags/import', requireRole('owner', 'admin'), async (c) => {
+tags.post('/api/tags/import', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
-    // N-048(#803): 作り先所属を確定し、所属なし行を作らない。
+    // 作り先所属を確定し、所属なし行を作らない。
     const resolved = await resolveLegacyTagAccount(c);
     if ('error' in resolved) return resolved.error;
     const importAccountId = resolved.accountId;
     const input = await readImportRows(c);
     if (!input.ok) {
-      return c.json({ success: false, error: input.error }, input.status);
+      return inputError(c, { success: false, error: input.error }, input.status, []);
     }
     const planned = await loadTagImportPlan(c.env.DB, input.rows, importAccountId);
     const readyRows = planned.filter((row) => row.status === 'ready');
@@ -805,8 +780,7 @@ tags.post('/api/tags/import', requireRole('owner', 'admin'), async (c) => {
     const data: TagCsvImportResult = { summary, rows, outcome: importOutcome(summary) };
     return c.json({ success: true, data });
   } catch (err) {
-    console.error('POST /api/tags/import error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -823,15 +797,14 @@ tags.get(
         const denied = await requireVisibleLineAccount(c, lineAccountId);
         if (denied) return denied;
       }
-      // 保管済み(archived)タグも削除影響は確認できる必要がある(#710)。
+      // 保管済み(archived)タグも削除影響は確認できる必要がある。
       const impact = lineAccountId
         ? await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true })
         : await getTagDeleteImpact(c.env.DB, c.req.param('id'));
       if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
       return c.json({ success: true, data: impact });
     } catch (err) {
-      console.error('GET /api/tags/:id/delete-impact error:', err);
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   },
 );
@@ -841,11 +814,11 @@ tags.get('/api/tags/:id/dependencies', requireRole('owner', 'admin'), async (c) 
   try {
     const lineAccountId = requestedLineAccountId(c);
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     }
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
-    // 編集画面(archived タグでも開く。#710)がここを読むため、除外しない。
+    // 編集画面(archived タグでも開く。)がここを読むため、除外しない。
     const impact = await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true });
     if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
@@ -857,8 +830,7 @@ tags.get('/api/tags/:id/dependencies', requireRole('owner', 'admin'), async (c) 
       },
     });
   } catch (error) {
-    console.error('GET /api/tags/:id/dependencies error:', error);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 });
 
@@ -867,13 +839,13 @@ tags.get('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const lineAccountId = requestedLineAccountId(c);
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     }
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
-    // 編集画面が保管済みタグでも開けるよう、除外しない(#710)。
+    // 編集画面が保管済みタグでも開けるよう、除外しない。
     const detail = await getTagDefinition(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true });
-    if (!detail) return c.json({ success: false, error: 'tag not found' }, 404);
+    if (!detail) return fail(c, 404, 'TAG_NOT_FOUND');
     return c.json({
       success: true,
       data: c.req.query('withActions') === '1'
@@ -881,8 +853,7 @@ tags.get('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
         : serializeTag(detail.tag),
     });
   } catch (error) {
-    console.error('GET /api/tags/:id error:', error);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 });
 
@@ -892,18 +863,18 @@ tags.get('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
  * 経路が /api/tags/:id より前にあるのは、:id に "reorder" として
  * 食われないようにするため。/api/tag-groups を分けているのと同じ理由。
  */
-tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), async (c) => {
+tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ ids?: unknown }>();
     if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
-      return c.json({ success: false, error: 'ids must be an array of tag ids' }, 400);
+      return inputError(c, { success: false, error: 'ids must be an array of tag ids' }, 400, ["ids"]);
     }
     // 画面に出ている数より極端に多い並びは受けない。取り違えか壊れた要求。
     if (body.ids.length > 500) {
-      return c.json({ success: false, error: 'too many ids' }, 400);
+      return inputError(c, { success: false, error: 'too many ids' }, 400, ["ids"]);
     }
     if (new Set(body.ids).size !== body.ids.length) {
-      return c.json({ success: false, error: 'ids must not contain duplicates' }, 400);
+      return inputError(c, { success: false, error: 'ids must not contain duplicates' }, 400, ["ids"]);
     }
     for (const id of body.ids as string[]) {
       const current = await visibleTag(c, id);
@@ -912,20 +883,19 @@ tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), async (c) => {
     await reorderTags(c.env.DB, body.ids as string[], await getVisibleLineAccountScope(c.env.DB, c.get('staff')));
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
-    console.error('PATCH /api/tags/reorder error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 /**
  * POST /api/tags/:id/retroactive-preview — 遡及実行の前に対象を数える。
  *
- * N-047: 「既存の友だちにも適用」を付ける前に、対象人数・付与済み除外・
+ * 「既存の友だちにも適用」を付ける前に、対象人数・付与済み除外・
  * 紹介者対象・合計マイルをサーバー側で計算して返す。返す previewToken は
  * PATCH /api/tags/:id や /mileage で applyToExisting を実行するときの
  * 引き換え券で、実行時に同じ計算をやり直して一致しないと止める。
  */
-tags.post('/api/tags/:id/retroactive-preview', requireRole('owner', 'admin'), async (c) => {
+tags.post('/api/tags/:id/retroactive-preview', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
     const detail = await visibleTag(c, c.req.param('id'));
@@ -965,8 +935,7 @@ tags.post('/api/tags/:id/retroactive-preview', requireRole('owner', 'admin'), as
     // mileage の値が不正なら422で返す（PATCHと同じ扱い）。
     const handled = tagDefinitionError(c, err);
     if (handled) return handled;
-    console.error('POST /api/tags/:id/retroactive-preview error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -980,17 +949,17 @@ tags.post('/api/tags/:id/retroactive-preview', requireRole('owner', 'admin'), as
  * 分類の付け替えは /group、マイルは /mileage が持っている。ここでは
  * 触らない。
  */
-tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
+tags.patch('/api/tags/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
     // タグ自身は色を持たない(115以前の名残)。受けて保存すると読む側は無視するので
     // 「保存したのに出ない」になる。版の有無にかかわらず400で案内する（従来どおり）。
     if (body.color !== undefined && body.color !== null) {
-      return c.json({ success: false, error: 'tag color is not supported; set the folder color instead' }, 400);
+      return inputError(c, { success: false, error: 'tag color is not supported; set the folder color instead' }, 400, ["color"]);
     }
-    // expectedVersion は必須(#715)。無し・不正は400、古い版は409。
-    // 保管済み(archived)タグの保護(#710)は updateTagDefinition 側（変更なし）。
-    // 順序は秘匿が先(#715差し戻し)。範囲外・不在は404で伏せ、許可対象にだけ
+    // expectedVersion は必須。無し・不正は400、古い版は409。
+    // 保管済み(archived)タグの保護は updateTagDefinition 側（変更なし）。
+    // 順序は秘匿が先(差し戻し)。範囲外・不在は404で伏せ、許可対象にだけ
     // 版の400を返す。版を先にすると範囲外のIDの有無が400/404で見分けられる。
     {
       const lineAccountId = requestedLineAccountId(c, body);
@@ -1002,35 +971,36 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
         if (current instanceof Response) return current;
       }
       if (body.expectedVersion === undefined) {
-        return c.json({ success: false, error: 'expectedVersion is required' }, 400);
+        return inputError(c, { success: false, error: 'expectedVersion is required' }, 400, ["expectedVersion"]);
       }
       const expectedVersion = Number(body.expectedVersion);
       if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
-        return c.json({ success: false, error: 'expectedVersion must be a positive integer' }, 400);
+        return inputError(c, { success: false, error: 'expectedVersion must be a positive integer' }, 400, ["expectedVersion"]);
       }
       // 版付き経路は従来どおり担当必須。ここへ来るのは範囲内の対象だけ。
       if (!lineAccountId) {
-        return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+        return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
       }
       const name = text(body.name);
       if (body.name !== undefined && (!name || name.length > 80)) {
-        return c.json({ success: false, error: 'name must be between 1 and 80 characters' }, 400);
+        return inputError(c, { success: false, error: 'name must be between 1 and 80 characters' }, 400, ["name"]);
       }
-      // レガシー分岐の廃止(#715)で落とさない。改行入りタグが一覧・CSVの表示を崩す。
+      // レガシー分岐の廃止で落とさない。改行入りタグが一覧・CSVの表示を崩す。
       if (name !== undefined && TAG_NAME_CONTROL_CHARACTER_PATTERN.test(name)) {
-        return c.json({ success: false, error: 'name must not contain control characters' }, 400);
+        return inputError(c, { success: false, error: 'name must not contain control characters' }, 400, ["name"]);
       }
+      if(body.manualAssignmentAllowed===true&&await c.env.DB.prepare('SELECT id FROM member_rank_tiers WHERE tag_id=?').bind(c.req.param('id')).first())return c.json({success:false,error:'rank_tag_managed'},403);
       const reapplyPolicy = body.reapplyPolicy;
       if (reapplyPolicy !== undefined
         && reapplyPolicy !== 'first_only'
         && reapplyPolicy !== 'every_time') {
-        return c.json({ success: false, error: 'reapplyPolicy is invalid' }, 400);
+        return inputError(c, { success: false, error: 'reapplyPolicy is invalid' }, 400, ["reapplyPolicy"]);
       }
       const actions = parseActions(
         body.actions ?? (body.automationDraft as Record<string, unknown> | undefined)?.actions,
       );
       if (actions) await validateTagAddedActionResources(c.env.DB, lineAccountId, actions);
-      // 遡及実行は事前計算の照合を必須にする(N-047)。確認画面で出した
+      // 遡及実行は事前計算の照合を必須にする。確認画面で出した
       // 対象・合計とズレていれば保存も遡及もせず409で止める。
       const applyToExisting = body.applyToExisting === true;
       const mileage = body.mileage === undefined ? null : parseMileage(body.mileage, true)!;
@@ -1041,7 +1011,17 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
         );
         if (blocked) return blocked;
       }
-      const detail = await updateTagDefinition(c.env.DB, {
+      // 応答消失後の再送に備え、要求キーがあれば保存済みの結果を返す。
+      // 任意（付けない呼び出しは従来どおり版だけで守る）。空・長すぎは400。
+      const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
+      if (idempotencyKey.length > 128) {
+        return inputError(c, { success: false, code: 'INVALID_IDEMPOTENCY_KEY', error: 'Idempotency-Keyは128文字以内で指定してください' }, 400, []);
+      }
+      const enqueueRetroactive = applyToExisting && mileage !== null
+        && (mileage.self > 0 || mileage.referrer > 0);
+      // タグの保存と遡及キューの投入は同じバッチで確定する。
+      // 投入だけ落ちたら保存も巻き戻り、同版での再送でやり直せる。
+      const saved = await updateTagDefinition(c.env.DB, {
         tagId: c.req.param('id'),
         lineAccountId,
         expectedVersion,
@@ -1065,13 +1045,13 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
           : body.automationDraftVersion === null ? null : String(body.automationDraftVersion),
         actions,
         actorId: c.get('staff')?.id ?? null,
+      }, {
+        enqueueRetroactive,
+        ...(idempotencyKey ? { idempotencyKey } : {}),
       });
-      const queued = applyToExisting && mileage && (mileage.self > 0 || mileage.referrer > 0)
-        ? await enqueueHistoricTagMileage(c.env.DB, detail.tag.id)
-        : 0;
       return c.json({
         success: true,
-        data: { ...tagDefinitionResponse(detail), queued },
+        data: { ...tagDefinitionResponse(saved.detail), queued: saved.queued, replayed: saved.replayed },
       });
     }
   } catch (err) {
@@ -1081,13 +1061,12 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'tag name already exists' }, 409);
     }
-    console.error('PATCH /api/tags/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// PATCH /api/tags/:id/mileage - configure a one-time tag reward and/or tier multiplier.
-tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), async (c) => {
+
+tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{
       rewardMiles?: unknown;
@@ -1105,23 +1084,23 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), async (c) => 
     const multiplierPriority = Number(body.multiplierPriority ?? 0);
     const applyToExisting = body.applyToExisting === true;
     if (!Number.isInteger(rewardMiles) || rewardMiles < 0 || rewardMiles > 1_000_000) {
-      return c.json({ success: false, error: 'rewardMiles must be an integer between 0 and 1000000' }, 400);
+      return inputError(c, { success: false, error: 'rewardMiles must be an integer between 0 and 1000000' }, 400, ["rewardMiles"]);
     }
     if (!Number.isInteger(referralRewardMiles) || referralRewardMiles < 0 || referralRewardMiles > 1_000_000) {
-      return c.json({ success: false, error: 'referralRewardMiles must be an integer between 0 and 1000000' }, 400);
+      return inputError(c, { success: false, error: 'referralRewardMiles must be an integer between 0 and 1000000' }, 400, ["referralRewardMiles"]);
     }
     if (multiplierBps !== null && (
       !Number.isInteger(multiplierBps) || multiplierBps < 1000 || multiplierBps > 100000
     )) {
-      return c.json({ success: false, error: 'multiplierBps must be null or an integer between 1000 and 100000' }, 400);
+      return inputError(c, { success: false, error: 'multiplierBps must be null or an integer between 1000 and 100000' }, 400, ["multiplierBps"]);
     }
     if (!Number.isInteger(multiplierPriority) || multiplierPriority < 0 || multiplierPriority > 1000) {
-      return c.json({ success: false, error: 'multiplierPriority must be an integer between 0 and 1000' }, 400);
+      return inputError(c, { success: false, error: 'multiplierPriority must be an integer between 0 and 1000' }, 400, ["multiplierPriority"]);
     }
 
     const current = await visibleTag(c, c.req.param('id'));
     if (current instanceof Response) return current;
-    // 遡及実行は事前計算の照合を必須にする(N-047)。確認画面で出した
+    // 遡及実行は事前計算の照合を必須にする。確認画面で出した
     // 対象・合計とズレていれば保存も遡及もせず止める。
     if (applyToExisting && (rewardMiles > 0 || referralRewardMiles > 0)) {
       const blocked = await requireRetroactivePreviewMatch(
@@ -1130,27 +1109,27 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), async (c) => 
       );
       if (blocked) return blocked;
     }
-    const tag = await updateTagMileageSettings(c.env.DB, c.req.param('id'), {
+    // マイル設定の更新と遡及キューの投入は同じバッチで確定する。
+    // 投入だけ落ちたら更新も巻き戻る。
+    const { tag, queued } = await updateTagMileageSettings(c.env.DB, c.req.param('id'), {
       rewardMiles,
       referralRewardMiles,
       multiplierBps,
       multiplierPriority,
+    }, {
+      enqueueRetroactive: applyToExisting && (rewardMiles > 0 || referralRewardMiles > 0),
     });
     if (!tag) return c.json({ success: false, error: 'Not found' }, 404);
     // 保存しただけで既存ユーザーへ付与しない。運用中アカウントでは影響が
     // 大きいため、画面で遡及を明示したときだけキューへ積む。
-    const queued = applyToExisting && (rewardMiles > 0 || referralRewardMiles > 0)
-      ? await enqueueHistoricTagMileage(c.env.DB, tag.id)
-      : 0;
     return c.json({ success: true, data: { tag: serializeTag(tag), queued } });
   } catch (err) {
-    console.error('PATCH /api/tags/:id/mileage error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // POST /api/tags - create tag
-tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
+tags.post('/api/tags', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
 
@@ -1162,20 +1141,20 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
       || body.automationDraft !== undefined;
     if (usesV6Contract) {
       if (!lineAccountId) {
-        return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+        return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
       }
       const denied = await requireVisibleLineAccount(c, lineAccountId);
       if (denied) return denied;
       const name = text(body.name) ?? '';
       if (!name || name.length > 80) {
-        return c.json({ success: false, error: 'name must be between 1 and 80 characters' }, 400);
+        return inputError(c, { success: false, error: 'name must be between 1 and 80 characters' }, 400, ["name"]);
       }
       const reapplyPolicy = body.reapplyPolicy ?? 'first_only';
       if (reapplyPolicy !== 'first_only' && reapplyPolicy !== 'every_time') {
-        return c.json({ success: false, error: 'reapplyPolicy is invalid' }, 400);
+        return inputError(c, { success: false, error: 'reapplyPolicy is invalid' }, 400, ["reapplyPolicy"]);
       }
       if (body.applyToExisting === true) {
-        return c.json({ success: false, error: 'new tags cannot be applied retroactively' }, 400);
+        return inputError(c, { success: false, error: 'new tags cannot be applied retroactively' }, 400, ["applyToExisting"]);
       }
       const automationDraft = body.automationDraft && typeof body.automationDraft === 'object'
         && !Array.isArray(body.automationDraft)
@@ -1198,28 +1177,28 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
         actions,
         actorId: c.get('staff')?.id ?? null,
       });
-      return c.json({ success: true, data: tagDefinitionResponse(detail) }, 201);
+      return c.json({ success: true, data: { ...tagDefinitionResponse(detail), color: detail.tag.color } }, 201);
     }
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) {
-      return c.json({ success: false, error: 'name is required' }, 400);
+      return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
     }
-    // V6経路と同じ決まり。長い・改行入りタグが一覧・CSV・他画面の表示を崩す。
+    // 経路と同じ決まり。長い・改行入りタグが一覧・CSV・他画面の表示を崩す。
     if (name.length > 80) {
-      return c.json({ success: false, error: 'name must be between 1 and 80 characters' }, 400);
+      return inputError(c, { success: false, error: 'name must be between 1 and 80 characters' }, 400, ["name"]);
     }
     if (TAG_NAME_CONTROL_CHARACTER_PATTERN.test(name)) {
-      return c.json({ success: false, error: 'name must not contain control characters' }, 400);
+      return inputError(c, { success: false, error: 'name must not contain control characters' }, 400, ["name"]);
     }
 
     // タグ自身は色を持たない(115以前の名残)。受けて保存すると、
     // 読む側は無視するので「保存したのに出ない」になる。400で案内する。
     if (body.color !== undefined && body.color !== null) {
-      return c.json({ success: false, error: 'tag color is not supported; set the folder color instead' }, 400);
+      return inputError(c, { success: false, error: 'tag color is not supported; set the folder color instead' }, 400, ["color"]);
     }
 
-    // N-048(#803): 所属はstaffの許可scopeから確定し、所属なし行を作らない。
+    // 所属はstaffの許可scopeから確定し、所属なし行を作らない。
     const resolved = await resolveLegacyTagAccount(c, body);
     if ('error' in resolved) return resolved.error;
     const legacyAccountId = resolved.accountId;
@@ -1247,31 +1226,25 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
     const tag = await c.env.DB.prepare('SELECT * FROM tags WHERE id = ?')
       .bind(createdTag.id).first<DbTag>();
     if (!tag) {
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw new Error('created_tag_missing');
     }
 
-    return c.json({ success: true, data: serializeTag(tag) }, 201);
+    return c.json({ success: true, data: { ...serializeTag(tag), color: tag.color } }, 201);
   } catch (err) {
     const handled = tagDefinitionError(c, err);
     if (handled) return handled;
-    // Legacy name / scoped normalized-name uniqueness conflicts return 409.
+    // 保存済みの名前と所属内の正規化名の一意制約は、どちらも409で返す。
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'tag name already exists' }, 409);
     }
     if (err instanceof Error && err.message.includes('FOREIGN KEY constraint')) {
-      return c.json({ success: false, error: 'group not found' }, 400);
+      return fail(c, 400, 'GROUP_NOT_FOUND', {}, ["groupId"]);
     }
-    console.error('POST /api/tags error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-// DELETE /api/tags/:id - delete tag
-// 画面を通さず直接APIを呼ばれても、運用設定から参照中のタグは消さない。
-// friend_tags rows cascade via FK (ON DELETE CASCADE) and do not block deletion;
-// the delete-impact response still reports their count as a warning.
-// The FK error remains a second guard for references created between this check
-// and the DELETE, or references that are not yet covered by the impact query.
+// 画面を通さなくても参照中のタグは削除させない。友だち付与は連動削除されるため件数を警告に出す。事前確認後の新しい参照や未対応の参照も、外部キーで二重に守る。
 tags.delete('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -1279,7 +1252,7 @@ tags.delete('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
     if (current instanceof Response) return current;
     const impact = await getTagDeleteImpact(c.env.DB, id);
     if (!impact) {
-      return c.json({ success: false, error: 'tag not found' }, 404);
+      return fail(c, 404, 'TAG_NOT_FOUND');
     }
     if (!impact.canDelete) {
       return c.json({
@@ -1301,32 +1274,31 @@ tags.delete('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
         409,
       );
     }
-    console.error('DELETE /api/tags/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
-tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), async (c) => {
+tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<Record<string, unknown>>();
     const lineAccountId = requestedLineAccountId(c, body);
-    if (!lineAccountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    if (!lineAccountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
     if (!idempotencyKey || idempotencyKey.length > 128) {
-      return c.json({ success: false, error: 'Idempotency-Key is required' }, 400);
+      return inputError(c, { success: false, error: 'Idempotency-Key is required' }, 400, []);
     }
     /*
      * この Idempotency-Key は、**受け取って検査しているが、保存も照合もしていない。**
      * つまりこの口は冪等ではない。必須にしておきながら冪等でないのは、呼び出し側へ
      * 「ここは冪等だ」と言っているのと同じで、無いものを有るように見せてしまう。
-     * #709 で扱う（別票）。
+     *  で扱う（別票）。
      */
     const expectedVersion = Number(body.expectedVersion);
     const impactRevision = typeof body.impactRevision === 'string' ? body.impactRevision.trim() : '';
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1 || !impactRevision) {
-      return c.json({ success: false, error: 'expectedVersion and impactRevision are required' }, 400);
+      return inputError(c, { success: false, error: 'expectedVersion and impactRevision are required' }, 400, ["expectedVersion","impactRevision"]);
     }
     const result = await archiveTag(c.env.DB, {
       tagId: c.req.param('id'),
@@ -1342,20 +1314,34 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), async (c) => {
     if (err instanceof TagArchiveError) {
       /*
        * already_archived は「もう着いている」であって失敗ではない。画面は code で
-       * 分岐して、赤い失敗ではなく成功と同じ通知にする（#708 の裁定）。
+       * 分岐して、赤い失敗ではなく成功と同じ通知にする（ の裁定）。
        * version_conflict / impact_changed と同じ 409 に混ぜると画面が「版が古い」と
        * 誤解するので、code は分けたまま返す。
        */
       const error = err.code === 'already_archived'
         ? 'このタグはすでに整理されています。'
         : err.message;
-      return c.json(
-        { success: false, code: err.code, error },
-        err.code === 'not_found' ? 404 : 409,
-      );
+      return inputError(c, { success: false, code: err.code, error }, err.code === 'not_found' ? 404 : 409, []);
     }
-    console.error('POST /api/tags/:id/archive error:', err);
-    return c.json({ success: false, error: 'タグをアーカイブできませんでした' }, 500);
+    throw err;
+  }
+});
+
+tags.post('/api/tags/:id/restore', requireRole('owner', 'admin'), denyReadOnly(), async (c) => {
+  try {
+    const accountId = requestedLineAccountId(c);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
+    const denied = await requireVisibleLineAccount(c, accountId);
+    if (denied) return denied;
+    const body = await c.req.json<Record<string, unknown>>().catch((): Record<string, unknown> => ({}));
+    const expectedVersion = body.expectedVersion;
+    if (typeof expectedVersion !== 'number' || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      return c.json({ success: false, error: 'expectedVersion is required', fields: { expectedVersion: '最新の版を読み込んでください' } }, 400);
+    }
+    return c.json({ success: true, data: await restoreTag(c.env.DB, { id: c.req.param('id'), lineAccountId: accountId, expectedVersion, actorId: c.get('staff').id }) });
+  } catch (error) {
+    if (error instanceof ArchiveRestoreError) return c.json({ success: false, code: error.code, error: error.code === 'not_found' ? '対象が見つかりません' : '状態が変わりました。もう一度読み込んでください' }, error.code === 'not_found' ? 404 : 409);
+    throw error;
   }
 });
 

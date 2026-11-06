@@ -1,21 +1,24 @@
-// main.tsx — Affiliate self-serve React entry. Loaded via dynamic import from
-// the LIFF orchestrator (apps/worker/src/client/main.ts) on ?page=affiliate.
-// Caller passes an already-initialized LIFF context; the LINE access token
-// authenticates every /api/liff/affiliate/* call server-side.
-//
-// NOTE: this mirrors apps/liff/src/pages/Affiliate.tsx, but that page imports
-// `@line/liff` and calls liff.getAccessToken() itself. The worker client never
-// bundles @line/liff (the orchestrator uses a `declare const liff` global), so
-// we re-home the same UI here and take the access token via ctx instead.
+import { formatYen } from '@line-crm/shared';
+import { liffErrorMessage } from '../../../../liff/src/lib/api-error.js';
+// @line/liff を二重に組み込まないよう、共通入口が初期化した ctx からトークンを受け取り、アフィリエイト API で認証する。
 
 import React, { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import './styles.css';
+import '../../../../liff/src/embedded.css';
+import LoadErrorView from '../../../../liff/src/components/LoadErrorView.js';
+import LiffLookScope from '../../../../liff/src/components/LiffLookScope.js';
+import { LOAD_FAILED_MESSAGE } from '../../../../liff/src/lib/user-message.js';
+import MileageRewards from '../../../../liff/src/components/MileageRewards.js';
+import AffiliatePayments from '../../../../liff/src/components/AffiliatePayments.js';
+import { setLiffContext } from '../../../../liff/src/lib/liff-auth.js';
+import { setAffiliateAccessToken } from '../../../../liff/src/lib/affiliate-self-api.js';
 
 export interface AffiliateContext {
   liffId: string;
+  idToken?: string;
   lineUserId: string;
-  /** LINE access token (liff.getAccessToken()); auth for the affiliate API. */
+  /** アフィリエイト API の認証に使う LINE アクセストークン。 */
   lineAccessToken: string;
 }
 
@@ -55,7 +58,8 @@ interface OfferData {
 interface MileageData {
   programId: string;
   programName: string;
-  available: number;
+  available: number | null;
+  balanceSource?: 'ec' | 'musubo';
   pending: number;
   lifetimeEarned: number;
   spent: number;
@@ -124,7 +128,7 @@ async function fetchMe(
   if (res.status === 404) return { registered: false };
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   const data = (await res.json()) as { affiliate: AffiliateData; links: AffiliateLinkData[] };
   return { registered: true, affiliate: data.affiliate, links: data.links };
@@ -133,7 +137,7 @@ async function fetchMe(
 async function fetchOffers(token: string): Promise<OfferData[]> {
   const url = `/api/liff/affiliate/offers?lineAccessToken=${encodeURIComponent(token)}`;
   const res = await fetch(url);
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error('案件を読み込めませんでした。');
   const data = (await res.json()) as { offers: OfferData[] };
   return data.offers;
 }
@@ -145,7 +149,7 @@ async function fetchMileage(
   const res = await fetch(url);
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   return (await res.json()) as MileageWalletData;
 }
@@ -158,7 +162,7 @@ async function postEnrollOffer(token: string, offerId: string): Promise<Affiliat
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   const data = (await res.json()) as { link: AffiliateLinkData };
   return data.link;
@@ -174,7 +178,7 @@ async function postRegister(
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   return (await res.json()) as { affiliate: AffiliateData; links: AffiliateLinkData[] };
 }
@@ -191,7 +195,7 @@ async function postAddLink(
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   const data = (await res.json()) as { link: AffiliateLinkData };
   return data.link;
@@ -199,15 +203,9 @@ async function postAddLink(
 
 // ─── Clipboard ──────────────────────────────────────────
 
-/**
- * Copy `text` with graceful degradation for LIFF WebViews:
- *   1. navigator.clipboard.writeText  — modern, needs secure context + permission
- *   2. document.execCommand('copy')   — legacy textarea-select fallback
- *   3. neither worked → caller shows the URL selected for manual copy
- * Returns true only when the browser confirms the copy succeeded.
- */
+/** LIFF WebView の制限に対応するため、Clipboard API、選択した textarea の execCommand、手動コピーの順で代替する。ブラウザがコピー成功を確認した場合だけ true を返す。 */
 async function copyText(text: string): Promise<boolean> {
-  // 1. Async Clipboard API (may reject in insecure context / denied permission).
+  // 安全な接続や権限がない場合、Clipboard API は拒否される。
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text);
@@ -217,11 +215,11 @@ async function copyText(text: string): Promise<boolean> {
     // fall through to execCommand
   }
 
-  // 2. Legacy execCommand('copy') via an off-screen, selected textarea.
+  // Clipboard API が使えない環境では、選択可能な textarea からコピーする。
   try {
     const ta = document.createElement('textarea');
     ta.value = text;
-    // Keep it out of view but still selectable (display:none breaks selection).
+    // display:none では選択できないため、選択可能なまま画面外へ置く。
     ta.style.position = 'fixed';
     ta.style.top = '-9999px';
     ta.style.left = '-9999px';
@@ -289,7 +287,7 @@ function CopyButton({ url, urlRef }: { url: string; urlRef: React.RefObject<HTML
 }
 
 const rewardText = (amount: number) =>
-  amount > 0 ? `1件 ¥${amount.toLocaleString()}` : '報酬未設定';
+  amount > 0 ? `1件 ${formatYen(amount)}` : '報酬未設定';
 
 function formatMileageDate(value: string): string {
   const parsed = new Date(value.includes('T') ? value : value.replace(' ', 'T'));
@@ -327,18 +325,19 @@ function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
         <div>
           <p className="text-xs font-semibold opacity-80">{mileage.programName}</p>
           <p className="mt-1 text-4xl font-bold tracking-tight">
-            {mileage.available.toLocaleString()}
+            {mileage.available == null ? '—' : mileage.available.toLocaleString()}
             <span className="ml-1 text-sm font-semibold opacity-80">mile</span>
           </p>
-          <p className="mt-1 text-xs opacity-75">現在利用できるマイル</p>
+          <p className="mt-1 text-xs opacity-75">{mileage.balanceSource === 'ec' ? 'ECと同期したマイル' : '現在利用できるマイル'}</p>
         </div>
-        {mileage.pending > 0 && (
+        {mileage.balanceSource !== 'ec' && mileage.pending > 0 && (
           <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold">
             確定待ち {mileage.pending.toLocaleString()}
           </span>
         )}
       </div>
 
+      {mileage.balanceSource === 'ec' && <p className="text-xs opacity-75">以下はmusubo側の記録です</p>}
       <div className="af-mileage-grid">
         <div>
           <span>累計獲得</span>
@@ -373,7 +372,7 @@ function MileageHistoryAccordion({ wallet }: { wallet: MileageWalletData }) {
     <details className="af-card af-history-accordion">
       <summary className="af-history-summary">
         <div className="min-w-0">
-          <h2 className="text-sm font-bold text-gray-900">マイル履歴</h2>
+          <h2 className="text-sm font-bold text-gray-900">{wallet.mileage.balanceSource === 'ec' ? 'musubo側のマイル履歴' : 'マイル履歴'}</h2>
           <p className="text-[11px] text-gray-400 mt-0.5">行動後、定期集計で反映されます</p>
         </div>
         <div className="flex items-center gap-2">
@@ -530,10 +529,7 @@ function ReferralSummary({ links }: { links: AffiliateLinkData[] }) {
   );
 }
 
-/**
- * One issued link inside an offer card (or the "その他のリンク" section).
- * Shows the label, URL, copy button, and the per-link performance counters.
- */
+
 function LinkRow({ link }: { link: AffiliateLinkData }) {
   const urlRef = useRef<HTMLInputElement>(null);
 
@@ -560,12 +556,7 @@ function LinkRow({ link }: { link: AffiliateLinkData }) {
   );
 }
 
-/**
- * Inline "この案件用のリンクを追加" form. Rendered inside an enrolled offer card
- * so the user's mental model is「案件があって、案件に対してリンクを作る」.
- * A blank label falls back to the offer name server-side is not required — the
- * placeholder guides users toward per-SNS labels (X用 / Instagram用 …).
- */
+/** 案件ごとにリンクを作ることが分かるよう、参加中の案件内に追加フォームを置く。用途別の名前は入力例で案内する。 */
 function AddOfferLinkForm({
   token,
   offerId,
@@ -640,13 +631,11 @@ function AddOfferLinkForm({
   );
 }
 
-/**
- * An offer card. Enrolled offers show their scoped links + the add-link form.
- * Unenrolled offers show the pitch (description + reward) and a 参加する CTA.
- */
+
 function OfferCard({
   offer,
   offerLinks,
+  showMileageReward,
   token,
   atLimit,
   onEnrolled,
@@ -654,6 +643,7 @@ function OfferCard({
 }: {
   offer: OfferData;
   offerLinks: AffiliateLinkData[];
+  showMileageReward: boolean;
   token: string;
   atLimit: boolean;
   onEnrolled: (link: AffiliateLinkData) => void;
@@ -689,10 +679,10 @@ function OfferCard({
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className="af-badge" style={{ background: '#ecfdf5', color: '#06C755' }}>
+          <span className="af-badge" style={{ background: '#ecfdf5', color: 'var(--customer-primary, #06C755)' }}>
             {rewardText(offer.rewardAmount)}
           </span>
-          {offer.rewardMiles > 0 && (
+          {showMileageReward && offer.rewardMiles > 0 && (
             <span className="af-badge" style={{ background: '#fff7ed', color: '#d97706' }}>
               +{offer.rewardMiles.toLocaleString()} mile
             </span>
@@ -733,9 +723,7 @@ function App({ ctx }: { ctx: AffiliateContext }) {
   const [state, setState] = useState<State>({ phase: 'loading' });
   const [wallet, setWallet] = useState<MileageWalletData | null>(null);
   const [registerBusy, setRegisterBusy] = useState(false);
-  // registerCalledRef guards against a double-tap firing two POSTs while the
-  // first is in flight. It is released in `finally` so that a *failed* register
-  // can be retried — the button intentionally becomes clickable again on error.
+  // 二重 POST を防ぐため実行中は登録を抑止する。失敗後に再試行できるよう finally で解除する。
   const registerCalledRef = useRef(false);
 
   const loadMe = useCallback(async () => {
@@ -744,15 +732,14 @@ function App({ ctx }: { ctx: AffiliateContext }) {
       const [result, mileageResult] = await Promise.all([fetchMe(token), fetchMileage(token)]);
       setWallet(mileageResult);
       if (result.registered) {
-        // Fetch offers in parallel; fall back to [] on error so a transient
-        // offers failure never blocks the main registered view.
-        const offers = await fetchOffers(token).catch(() => []);
+        // 案件の一時的な取得失敗が登録済み画面を妨げないよう、並列取得して失敗時は空配列へ戻す。
+        const offers = await fetchOffers(token);
         setState({ phase: 'registered', affiliate: result.affiliate, links: result.links, offers });
       } else {
         setState({ phase: 'not_registered' });
       }
     } catch (e) {
-      setState({ phase: 'error', message: e instanceof Error ? e.message : String(e) });
+      setState({ phase: 'error', message: LOAD_FAILED_MESSAGE });
     }
   }, [token]);
 
@@ -766,14 +753,12 @@ function App({ ctx }: { ctx: AffiliateContext }) {
     setRegisterBusy(true);
     try {
       const data = await postRegister(token);
-      const offers = await fetchOffers(token).catch(() => []);
+      const offers = await fetchOffers(token);
       setState({ phase: 'registered', affiliate: data.affiliate, links: data.links, offers });
     } catch (e) {
-      setState({ phase: 'error', message: e instanceof Error ? e.message : String(e) });
+      setState({ phase: 'error', message: LOAD_FAILED_MESSAGE });
     } finally {
-      // Release on both success and failure: success repaints to the registered
-      // view (button gone), failure repaints to the error view whose retry path
-      // re-runs loadMe → not_registered, so allowing another attempt is correct.
+      // 成功時は登録画面へ進み、失敗時は再試行できるため、どちらでも実行中の抑止を解除する。
       setRegisterBusy(false);
       registerCalledRef.current = false;
     }
@@ -788,16 +773,7 @@ function App({ ctx }: { ctx: AffiliateContext }) {
     );
   }
 
-  if (state.phase === 'error') {
-    return (
-      <div className="af-fade-in max-w-md mx-auto p-4">
-        <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm">{state.message}</div>
-        <button onClick={loadMe} className="mt-3 text-sm af-line-green-text font-semibold underline">
-          再読み込み
-        </button>
-      </div>
-    );
-  }
+  if (state.phase === 'error') return <LiffLookScope className="min-h-screen bg-canvas"><LoadErrorView message={state.message} onRetry={() => void loadMe()} /></LiffLookScope>;
 
   if (state.phase === 'not_registered') {
     return (
@@ -826,12 +802,11 @@ function App({ ctx }: { ctx: AffiliateContext }) {
     );
   }
 
-  // registered
+
   const { links, offers } = state;
   const atLimit = links.length >= 20;
 
-  // Newest-first from the API; render oldest-first inside each offer so a stable
-  // reading order matches issuance order.
+  // 発行順に安定して読めるよう、API の新しい順を案件内では古い順へ並べる。
   const orderedLinks = [...links].reverse();
   const linksByOffer = new Map<string, AffiliateLinkData[]>();
   const genericLinks: AffiliateLinkData[] = [];
@@ -868,7 +843,7 @@ function App({ ctx }: { ctx: AffiliateContext }) {
   }
 
   return (
-    <div className="af-fade-in max-w-md mx-auto p-4 pb-12 space-y-5" style={{ background: '#f7f8fa', minHeight: '100vh' }}>
+    <div className="af-fade-in max-w-md mx-auto p-4 pb-12 space-y-5" style={{ background: 'var(--customer-background, #f7f8fa)', minHeight: '100vh' }}>
       <div>
         <h1 className="text-lg font-bold text-gray-900">マイル・紹介</h1>
         <p className="text-xs text-gray-500 mt-1">あなたの活動と紹介成果をまとめて確認できます</p>
@@ -876,8 +851,10 @@ function App({ ctx }: { ctx: AffiliateContext }) {
 
       {wallet && <MileageSummaryCard wallet={wallet} />}
 
-      {wallet && <MileageOpportunities items={wallet.opportunities} />}
+      {wallet && wallet.mileage.balanceSource === 'musubo' && <MileageOpportunities items={wallet.opportunities} />}
 
+      <MileageRewards onChanged={loadMe} />
+      <AffiliatePayments editable={state.affiliate.isActive} />
       <ReferralSummary links={links} />
 
       {/* 参加中の案件 — 案件ごとにリンクをまとめる */}
@@ -890,6 +867,7 @@ function App({ ctx }: { ctx: AffiliateContext }) {
             <OfferCard
               key={offer.id}
               offer={offer}
+              showMileageReward={wallet?.mileage.balanceSource === 'musubo'}
               offerLinks={linksByOffer.get(offer.id) ?? []}
               token={token}
               atLimit={atLimit}
@@ -910,6 +888,7 @@ function App({ ctx }: { ctx: AffiliateContext }) {
             <OfferCard
               key={offer.id}
               offer={offer}
+              showMileageReward={wallet?.mileage.balanceSource === 'musubo'}
               offerLinks={[]}
               token={token}
               atLimit={atLimit}
@@ -948,9 +927,9 @@ function App({ ctx }: { ctx: AffiliateContext }) {
 // ─── Mount ──────────────────────────────────────────────
 
 export function mountAffiliate(container: HTMLElement, ctx: AffiliateContext): void {
-  // body.af-active gates the namespaced preflight reset + #app inline override.
-  // Add it synchronously before createRoot so the first paint isn't the browser
-  // default (black button borders, list disc) — same rationale as salon-booking.
+  // 初回描画から意図した見た目にするため、createRoot より先に body.af-active で共通リセットと #app の調整を有効にする。
+  if (ctx.idToken) setLiffContext({ ...ctx, idToken: ctx.idToken });
+  setAffiliateAccessToken(ctx.lineAccessToken);
   document.body.classList.add('af-active');
 
   if (_root) {
@@ -971,5 +950,6 @@ export function unmountAffiliate(): void {
     _root.unmount();
     _root = null;
   }
+  setAffiliateAccessToken(null);
   document.body.classList.remove('af-active');
 }

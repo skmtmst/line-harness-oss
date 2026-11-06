@@ -1,7 +1,7 @@
 import { jstNow } from './utils.js';
 
 /**
- * 統括の課金（★V6 36-2）。tenants の課金列と、Stripe Webhook の重複防止。
+ * 統括の課金（★36-2）。tenants の課金列と、Stripe Webhook の重複防止。
  */
 
 export const TENANT_PLAN_STATUSES = ['exempt', 'trialing', 'active', 'past_due', 'canceled'] as const;
@@ -27,7 +27,7 @@ export async function getTenantBilling(db: D1Database, tenantId: string): Promis
 }
 
 /**
- * LINEアカウントの所属統括の課金行を1往復で読む(#633)。
+ * LINEアカウントの所属統括の課金行を1往復で読む。
  *
  * 「アカウントの tenant_id を読んでから tenants を読む」と2往復になるため、
  * 機能可否判定のように両方を連続で使う呼び出しではこの結合読取を使う。
@@ -66,6 +66,19 @@ export async function updateTenantBilling(
   tenantId: string,
   patch: Partial<Pick<TenantBilling, 'plan_key' | 'plan_status' | 'trial_ends_at' | 'stripe_customer_id' | 'stripe_subscription_id' | 'current_period_ends_at'>>,
 ): Promise<TenantBilling | null> {
+  const statement = prepareTenantBillingUpdate(db, tenantId, patch);
+  if (statement) await statement.run();
+  return getTenantBilling(db, tenantId);
+}
+
+export interface BillingWriteCondition { sql: string; values: unknown[] }
+
+/** Build a mutation so webhook effects and completion can share one transaction. */
+export function prepareTenantBillingUpdate(
+  db: D1Database, tenantId: string,
+  patch: Parameters<typeof updateTenantBilling>[2],
+  condition?: BillingWriteCondition,
+): D1PreparedStatement | null {
   const sets: string[] = [];
   const values: unknown[] = [];
   for (const key of ['plan_key', 'plan_status', 'trial_ends_at', 'stripe_customer_id', 'stripe_subscription_id', 'current_period_ends_at'] as const) {
@@ -74,12 +87,24 @@ export async function updateTenantBilling(
       values.push(patch[key]);
     }
   }
-  if (sets.length === 0) return getTenantBilling(db, tenantId);
+  if (sets.length === 0) return null;
   const now = jstNow();
+  if (patch.plan_status === 'canceled') {
+    // 解約が反映された時刻を、顧客データの保存期限を数え始める起点にする。
+    // すでに起点があれば動かさない。解約後にも invoice.voided や期末の
+    // subscription.updated が届くので、その度に起点が後ろへずれると
+    // 削除がいつまでも始まらない。
+    sets.push('retention_anchor_at = COALESCE(retention_anchor_at, ?)');
+    values.push(now);
+  } else if (patch.plan_status !== undefined) {
+    // 契約が戻ったので削除の予定を取り消す。削除済みの印も消して、
+    // 次に解約した時にもう一度削除できるようにする（実績は監査表に残る）。
+    sets.push('retention_anchor_at = NULL', 'purge_requested_at = NULL', 'data_purged_at = NULL');
+  }
   sets.push('plan_updated_at = ?', 'updated_at = ?');
   values.push(now, now, tenantId);
-  await db.prepare(`UPDATE tenants SET ${sets.join(', ')} WHERE id = ?`).bind(...values).run();
-  return getTenantBilling(db, tenantId);
+  return db.prepare(`UPDATE tenants SET ${sets.join(', ')} WHERE id = ?${condition ? ` AND (${condition.sql})` : ''}`)
+    .bind(...values, ...(condition?.values ?? []));
 }
 
 /**

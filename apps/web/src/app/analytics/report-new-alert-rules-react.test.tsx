@@ -1,5 +1,7 @@
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
+import { within } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ReportNewPage from './reports/new/page'
@@ -32,13 +34,13 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => ({ get: (key: string) => (key === 'id' ? fixture.editId : null) }),
   usePathname: () => '/analytics/reports/new',
   useRouter: () => ({ push: (url: string) => { fixture.pushes.push(url) }, replace: () => undefined, back: () => undefined }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
   usePageChrome: () => ({ title: null, fullWidth: false }),
 }))
@@ -155,10 +157,7 @@ function button(label: string): HTMLButtonElement {
 }
 
 function sectionCheckbox(title: string): HTMLInputElement {
-  const strong = Array.from(host.querySelectorAll('strong')).find((item) => item.textContent?.trim() === title)
-  const input = strong?.closest('label')?.querySelector('input[type="checkbox"]') as HTMLInputElement | null
-  if (!input) throw new Error(`「${title}」のチェックが見つかりません`)
-  return input
+  return within(host).getByRole('checkbox', { name: new RegExp(`^${title}`) }) as HTMLInputElement
 }
 
 function numberInput(ariaLabel: string): HTMLInputElement {
@@ -180,20 +179,22 @@ async function typeNumber(ariaLabel: string, value: string) {
 const writeCalls = (method: string) => net.calls.filter((call) => call.method === method)
 
 describe('定期レポートの「入れる項目」(N-284)', () => {
-  it('数字を出せない「マイルと紹介」は新規には選べず、理由を添える', async () => {
+  it('数字を出せない「マイル」は新規には選べず、理由を添える', async () => {
     await render()
 
-    const mileage = sectionCheckbox('マイルと紹介')
+    const mileage = sectionCheckbox('マイル')
     expect(mileage.disabled).toBe(true)
     expect(mileage.checked).toBe(false)
-    expect(host.textContent).toContain('まだ接続されていません')
+    // 48: 理由は短く、名前の横に灰の札「未集計」。
+    expect(host.textContent).toContain('集計ができたら選べます')
+    expect(host.textContent).not.toContain('まだ集計できません')
+    expect(within(host).getByText('未集計')).toBeTruthy()
 
     // ほかの節はふつうに選べる。
     expect(sectionCheckbox('友だちの増減').disabled).toBe(false)
 
     // 宛先を選んで作っても、マイルは本文へ入らない。
-    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find((item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト')) as HTMLInputElement
-    await act(async () => { personCheck.click(); await Promise.resolve() })
+    await pickEntities('レポートを受け取る人', ['テスト'])
     await act(async () => { button('つくって動かす').click(); await Promise.resolve() })
     const post = writeCalls('POST').at(-1)
     expect((post?.body as { sections: string[] }).sections).not.toContain('mileage')
@@ -204,14 +205,14 @@ describe('定期レポートの「入れる項目」(N-284)', () => {
     fixture.editId = 'report-1'
     await render()
 
-    const mileage = sectionCheckbox('マイルと紹介')
+    const mileage = sectionCheckbox('マイル')
     expect(mileage.disabled).toBe(false)
     expect(mileage.checked).toBe(true)
 
     // 外すと保存できる。外したあとはもう付け直せない。
     await act(async () => { mileage.click(); await Promise.resolve() })
-    expect(sectionCheckbox('マイルと紹介').checked).toBe(false)
-    expect(sectionCheckbox('マイルと紹介').disabled).toBe(true)
+    expect(sectionCheckbox('マイル').checked).toBe(false)
+    expect(sectionCheckbox('マイル').disabled).toBe(true)
 
     await act(async () => { button('変更を保存する').click(); await Promise.resolve() })
     const put = writeCalls('PUT').at(-1)
@@ -222,8 +223,7 @@ describe('定期レポートの「入れる項目」(N-284)', () => {
 describe('定期レポートの「知らせの決めごと」(N-285)', () => {
   it('既定の3条件はそのままPOSTされる', async () => {
     await render()
-    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find((item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト')) as HTMLInputElement
-    await act(async () => { personCheck.click(); await Promise.resolve() })
+    await pickEntities('レポートを受け取る人', ['テスト'])
     await act(async () => { button('つくって動かす').click(); await Promise.resolve() })
 
     const post = writeCalls('POST').at(-1)
@@ -256,8 +256,7 @@ describe('定期レポートの「知らせの決めごと」(N-285)', () => {
     expect(toggle).not.toBeNull()
     await act(async () => { toggle!.click(); await Promise.resolve() })
 
-    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find((item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト')) as HTMLInputElement
-    await act(async () => { personCheck.click(); await Promise.resolve() })
+    await pickEntities('レポートを受け取る人', ['テスト'])
     await act(async () => { button('つくって動かす').click(); await Promise.resolve() })
 
     const post = writeCalls('POST').at(-1)
@@ -276,8 +275,7 @@ describe('定期レポートの「知らせの決めごと」(N-285)', () => {
       const toggle = host.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement
       await act(async () => { toggle.click(); await Promise.resolve() })
     }
-    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find((item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト')) as HTMLInputElement
-    await act(async () => { personCheck.click(); await Promise.resolve() })
+    await pickEntities('レポートを受け取る人', ['テスト'])
 
     await act(async () => { button('つくって動かす').click(); await Promise.resolve() })
     expect(host.textContent).toContain('知らせる条件を1つ以上えらぶか')
@@ -313,8 +311,7 @@ describe('定期レポートの「知らせの決めごと」(N-285)', () => {
 
 describe('定期レポートの作成後(R76)', () => {
   async function selectRecipient() {
-    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find((item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト')) as HTMLInputElement
-    await act(async () => { personCheck.click(); await Promise.resolve() })
+    await pickEntities('レポートを受け取る人', ['テスト'])
   }
 
   it('新規作成の成功後は作りたての編集画面へ移す（再操作で増やさない）', async () => {
@@ -333,6 +330,7 @@ describe('定期レポートの作成後(R76)', () => {
     await render()
     await selectRecipient()
     await act(async () => { button('今すぐ1回だけ送る').click(); await Promise.resolve(); await Promise.resolve() })
+    await act(async () => { [...document.querySelectorAll<HTMLButtonElement>('[role=dialog] button')].find(el => el.textContent?.trim() === 'この宛先へ1回だけ送る')!.click(); await Promise.resolve(); await Promise.resolve() })
 
     expect(writeCalls('POST')).toHaveLength(1)
     expect((writeCalls('POST').at(-1)?.body as { sendOnce: boolean }).sendOnce).toBe(true)
@@ -353,16 +351,13 @@ describe('定期レポートの宛先(R228)', () => {
   }
 
   async function selectStaffRecipient() {
-    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find(
-      (item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト'),
-    ) as HTMLInputElement
-    await act(async () => { personCheck.click(); await Promise.resolve() })
+    await pickEntities('レポートを受け取る人', ['テスト'])
   }
 
   it('形の合わないメール宛先は行のそばで理由を出し、送信しない', async () => {
     await render()
     await selectStaffRecipient()
-    await act(async () => { button('宛先を足す').click(); await Promise.resolve() })
+    await act(async () => { button('メールだけの宛先を足す').click(); await Promise.resolve() })
     await typeInto('宛先のメールアドレス 1行目', 'not-an-address')
 
     // どの行がなぜ止まったかが、その行に出る。
@@ -376,7 +371,7 @@ describe('定期レポートの宛先(R228)', () => {
   it('直すか消すと送れる。直した宛先は本文へ残る', async () => {
     await render()
     await selectStaffRecipient()
-    await act(async () => { button('宛先を足す').click(); await Promise.resolve() })
+    await act(async () => { button('メールだけの宛先を足す').click(); await Promise.resolve() })
     await typeInto('宛先のメールアドレス 1行目', 'broken')
     await typeInto('宛先のメールアドレス 1行目', 'ops@example.com')
 
@@ -392,7 +387,7 @@ describe('定期レポートの宛先(R228)', () => {
   it('行の「消す」で不備のある宛先だけ外せる', async () => {
     await render()
     await selectStaffRecipient()
-    await act(async () => { button('宛先を足す').click(); await Promise.resolve() })
+    await act(async () => { button('メールだけの宛先を足す').click(); await Promise.resolve() })
     await typeInto('宛先のメールアドレス 1行目', 'broken')
     expect(button('つくって動かす').disabled).toBe(true)
 

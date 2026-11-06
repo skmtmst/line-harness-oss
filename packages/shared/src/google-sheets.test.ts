@@ -30,7 +30,7 @@ describe("isGoogleSheetsConnectionPayload", () => {
   });
 
   it("包みなしの古い形・壊れた値は受け入れない（画面は読み込めなかった表示へ）", () => {
-    // 口が data を返さない（事故の形）。undefined のまま読むと止まる。
+    // 口が data を返さない形。undefined のまま読むと止まる。
     expect(isGoogleSheetsConnectionPayload(undefined)).toBe(false);
     expect(isGoogleSheetsConnectionPayload(null)).toBe(false);
     expect(isGoogleSheetsConnectionPayload({})).toBe(false);

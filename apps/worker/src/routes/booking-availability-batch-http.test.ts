@@ -3,10 +3,10 @@ import { resolve } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { Miniflare } from 'miniflare';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /*
- * #1060: カレンダーがメニュー数ぶん往復していた空き枠取得を、
+ * カレンダーがメニュー数ぶん往復していた空き枠取得を、
  * `menu_ids` 一括モードで1要求へまとめた口の試験。
  * 単独 `menu_id` の従来応答は変えない。
  */

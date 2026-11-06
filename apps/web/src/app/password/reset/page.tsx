@@ -5,22 +5,31 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
+import PasswordRequirements from '@/components/auth/password-requirements'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { authRequest, confirmError, passwordError } from '@/lib/auth-email'
 
 /**
- * 新しいパスワードを設定。★V6 36-6-B（`KN3y1`、カード `fWkBE`）。
+ * 新しいパスワードを設定。★管理画面 36-6-B（`KN3y1`、カード `fWkBE`）。
  *
  * メールの URL（`?token=`）から開く。設定するとその人のログインはすべて解除され、
  * 新しいパスワードでログインし直す。
  */
 export default function PasswordResetPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ResetPending />}>
       <ResetInner />
     </Suspense>
+  )
+}
+
+function ResetPending() {
+  return (
+    <AuthCard node="KN3y1" cardNode="fWkBE" title="新しいパスワードを設定" description="URL を確かめています">
+      <ListState kind="loading" title="URL を確かめています" />
+    </AuthCard>
   )
 }
 
@@ -62,27 +71,21 @@ function ResetInner() {
     const res = await authRequest<{ email: string }>('/api/auth/password/reset', { token, password })
     if (!res.ok || !res.data) {
       if (res.errors) setMessages((current) => ({ ...current, ...res.errors }))
-      setError(res.error || '設定できませんでした')
+      setError(res.error || '設定できませんでした。時間をおいて、もう一度お試しください。')
       setBusy(false)
       return
     }
     setCheck({ state: 'done', email: res.data.email })
   }
 
-  if (check.state === 'checking') {
-    return (
-      <AuthCard node="KN3y1" cardNode="fWkBE" title="新しいパスワードを設定" description="URL を確かめています">
-        <ListState kind="loading" title="URL を確かめています" />
-      </AuthCard>
-    )
-  }
+  if (check.state === 'checking') return <ResetPending />
   if (check.state === 'bad') {
     return (
       <AuthCard node="KN3y1" cardNode="fWkBE" title="新しいパスワードを設定" description={check.message}>
-        <Button href="/password/forgot" variant="primary" className="w-full">
+        <Button fullWidth href="/password/forgot" variant="primary" className="w-full">
           もう一度メールを送る
         </Button>
-        <Button href="/login" className="w-full">
+        <Button fullWidth href="/login" className="w-full">
           ログインへ
         </Button>
       </AuthCard>
@@ -91,7 +94,7 @@ function ResetInner() {
   if (check.state === 'done') {
     return (
       <AuthCard node="KN3y1" cardNode="fWkBE" title="パスワードを設定しました" description="新しいパスワードでログインしてください。ほかの端末のログインは解除されています。">
-        <Button href="/login" variant="primary" className="w-full">
+        <Button fullWidth href="/login" variant="primary" className="w-full">
           ログインへ
         </Button>
       </AuthCard>
@@ -115,14 +118,14 @@ function ResetInner() {
             <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-accent-deep" />
           </div>
         </AuthField>
-        <AuthField label="パスワード" hint="8文字以上・英字と数字" htmlFor="reset-password" error={messages.password}>
+        <AuthField label="パスワード" htmlFor="reset-password" error={messages.password}>
           <PasswordField id="reset-password" value={password} onChange={setPassword} invalid={Boolean(messages.password)} autoComplete="new-password" />
+          <PasswordRequirements value={password} />
         </AuthField>
         <AuthField label="パスワード（確認）" htmlFor="reset-confirm" error={messages.confirm}>
           <PasswordField id="reset-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(messages.confirm)} autoComplete="new-password" />
         </AuthField>
-        <Button type="submit" variant="primary" disabled={busy} className="w-full">
-          {busy ? '設定しています…' : 'パスワードを設定してログインへ'}
+        <Button fullWidth type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="設定しています…">パスワードを設定してログインへ
         </Button>
       </form>
     </AuthCard>

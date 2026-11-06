@@ -14,7 +14,7 @@ vi.mock('../services/account-access.js', () => ({
 vi.mock('../services/nen-tag-sync.js', () => ({ syncNenPetTags: vi.fn() }));
 
 type Friend = { id: string; line_account_id: string; display_name: string; line_user_id: string };
-type Pet = { id: string; friend_id: string; customer_id: string | null; name: string; animal_type: string; gender: string; birthday: string | null };
+type Pet = { id: string; friend_id: string; customer_id: string | null; name: string; animal_type: string; gender: string; birthday: string | null; archived_at?: string };
 
 const friends: Friend[] = [
   { id: 'friend-a', line_account_id: 'account-a', display_name: 'Owner A', line_user_id: 'line-a' },
@@ -25,6 +25,9 @@ let pets: Pet[];
 
 function database(): D1Database {
   return {
+    async batch(statements: D1PreparedStatement[]) {
+      return Promise.all(statements.map((statement) => statement.run()));
+    },
     prepare(sql: string) {
       let binds: unknown[] = [];
       const statement = {
@@ -32,7 +35,7 @@ function database(): D1Database {
         async all() {
           if (!sql.includes('FROM nen_pet_profiles p JOIN friends f')) return { results: [] };
           const selectedAccountId = String(binds[0]);
-          return { results: pets.filter((pet) => selectedAccountId === friends.find((f) => f.id === pet.friend_id)!.line_account_id).map((pet) => {
+          return { results: pets.filter((pet) => !pet.archived_at && selectedAccountId === friends.find((f) => f.id === pet.friend_id)!.line_account_id).map((pet) => {
             const friend = friends.find((f) => f.id === pet.friend_id)!;
             return { ...pet, display_name: friend.display_name, line_user_id: friend.line_user_id };
           }) };
@@ -40,7 +43,7 @@ function database(): D1Database {
         async first() {
           if (sql.includes('FROM friends WHERE id = ?')) return friends.find((f) => f.id === binds[0]) ?? null;
           if (sql.includes('FROM nen_pet_profiles p JOIN friends f')) {
-            const pet = pets.find((p) => p.id === binds[0]);
+            const pet = pets.find((p) => !p.archived_at && p.id === binds[0]);
             if (!pet) return null;
             const friend = friends.find((f) => f.id === pet.friend_id)!;
             return { friend_id: pet.friend_id, line_account_id: friend.line_account_id };
@@ -50,6 +53,9 @@ function database(): D1Database {
         async run() {
           if (sql.includes('INSERT INTO nen_pet_profiles')) {
             pets.push({ id: String(binds[0]), friend_id: String(binds[1]), customer_id: binds[2] as string | null, name: String(binds[3]), animal_type: String(binds[4]), gender: String(binds[5]), birthday: binds[6] as string | null });
+          } else if (sql.includes('UPDATE nen_pet_profiles SET archived_at=')) {
+            const pet = pets.find((p) => p.id === binds[2]);
+            if (pet) pet.archived_at = String(binds[0]);
           } else if (sql.includes('UPDATE nen_pet_profiles')) {
             // WHERE id = ? は最後のbind。列構成が変わっても末尾がid。
             const pet = pets.find((p) => p.id === binds[binds.length - 1]);
@@ -130,6 +136,8 @@ describe('A-10 NEN pet account scope', () => {
     expect((await instance.request(`/api/nen-campaigns/pets/${data.id}?lineAccountId=account-a`, request('PUT', { name: 'Updated Pet' }), env)).status).toBe(200);
     expect(pets.find((pet) => pet.id === data.id)?.name).toBe('Updated Pet');
     expect((await instance.request(`/api/nen-campaigns/pets/${data.id}?lineAccountId=account-a`, request('DELETE'), env)).status).toBe(200);
-    expect(pets.some((pet) => pet.id === data.id)).toBe(false);
+    expect(pets.find((pet) => pet.id === data.id)).toMatchObject({ name: 'Updated Pet', archived_at: expect.any(String) });
+    const listed = await instance.request('/api/nen-campaigns/pets?lineAccountId=account-a', request(), env);
+    expect((await listed.json<{ data: Pet[] }>()).data.some((pet) => pet.id === data.id)).toBe(false);
   });
 });

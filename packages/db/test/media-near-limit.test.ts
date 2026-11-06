@@ -1,5 +1,5 @@
 /**
- * N-198/N-204 (#796):「上限に近い」絞り込みが契約上限への圧迫で動くこと。
+ * 「上限に近い」絞り込みが契約上限への圧迫で動くこと。
  *
  * 実SQLite(bootstrap.sql再生)に実物の getMedia/countMedia を当て、
  * 同じ計算元 getMediaStorageQuota の使用率79%・80%・100%・上限行なし・
@@ -11,8 +11,8 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { countMedia, getMedia, MEDIA_NEAR_LIMIT_SHARE } from '../src/media.js';
-import { getMediaStorageQuota } from '../src/media-uploads.js';
+import { countMedia, getMedia, MEDIA_NEAR_LIMIT_SHARE } from '../src/media/index.js';
+import { getMediaStorageQuota } from '../src/media/uploads.js';
 import { asD1 } from './d1-test-helper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

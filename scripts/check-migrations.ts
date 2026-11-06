@@ -40,6 +40,7 @@
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argv, exit, stderr, stdout } from 'node:process';
@@ -173,6 +174,42 @@ const REBUILD_MARKER = /--\s*migration-policy:\s*table-rebuild\b/i;
  * ここに無い `*_backup` の DROP は今までどおり止まる。
  */
 const SIDECAR_BACKUP_TABLES: Record<string, ReadonlySet<string>> = {
+  '736_line_account_tag_color_check.sql': new Set([
+    'migration_736_account_folder_refs_backup',
+    'migration_736_account_tag_links_backup',
+  ]),
+  // イメージマップ種類追加：D1のCASCADE履歴とログの参照を退避・復元する。
+  '595_imagemap_message_kinds.sql': new Set([
+    'migration_595_broadcast_after_action_runs_backup',
+    'migration_595_broadcast_approval_events_backup',
+    'migration_595_broadcast_insights_backup',
+    'migration_595_broadcast_lifecycle_events_backup',
+    'migration_595_broadcast_send_claims_backup',
+    'migration_595_broadcast_tracked_links_backup',
+    'migration_595_scenario_actions_backup',
+    'migration_595_scenario_action_fires_backup',
+    'migration_595_message_refs_backup',
+    'migration_595_template_versions_backup',
+    'migration_595_template_references_backup',
+    'migration_595_template_publish_keys_backup',
+    'migration_595_auto_replies_template_refs_backup',
+    'migration_595_scenario_steps_template_refs_backup',
+  ]),
+  // 予約の受付元に「来店（walk_in）」を足す作り直しで、来店印を退避・復元する。
+  '596_restaurant_walk_in.sql': new Set([
+    'migration_596_seat_visit_marks_backup',
+  ]),
+  // 媒体の種類を増やす作り直しで、予約・取り込みメール・日次件数の参照を退避・復元する。
+  '597_restaurant_media_links.sql': new Set([
+    'migration_597_reservations_media_backup',
+    'migration_597_inbound_emails_backup',
+    'migration_597_email_digests_backup',
+  ]),
+  // 予約媒体のCHECK制約拡張で、既存予約と日次件数の参照を退避・復元する。
+  '545_restaurant_channels.sql': new Set([
+    'migration_545_media_links_backup',
+    'migration_545_digests_backup',
+  ]),
   '382_tags_account_name_scope.sql': new Set([
     'migration_382_tag_refs_backup',
     'migration_382_friend_tags_backup',
@@ -240,7 +277,7 @@ const GRANDFATHERED_REBUILDS = new Set([
   '135_step_message_kinds_rename.sql',
   '139_step_carousel_swap.sql',
   '140_step_carousel_rename.sql',
-  // 2026-09-03 に棚卸しで見つけた4本。いずれも印が付く前に検証・本番へ当てた
+  // 次の4本はいずれも印が付く前に検証・本番へ当てた
   // 作り直しで、release.yml の安全検査を毎回落としていた。
   '189_analytics_cross.sql',
   '192_inbox_v6_foundation.sql',
@@ -253,6 +290,23 @@ const GRANDFATHERED_REBUILDS = new Set([
   // 自体は弱めない。これ以降の追加はしないこと（新規は印を使う）。
   '354_analytics_cross_lease_generation.sql',
 ]);
+
+/**
+ * Staging applied the original bytes before the D1 LIKE limit check existed.
+ * Production applied the shorter, D1-compatible corrections. Accept only
+ * these exact, already-applied variants; the original variant alone needs the
+ * LIKE exception. Any further edit is rejected.
+ */
+const APPLIED_LONG_LIKE_SHA256: Readonly<Record<string, { original: string; production: string }>> = {
+  '382_tags_account_name_scope.sql': {
+    original: '90e8d8998269a87d5be65271a77bcc655cabc5d4946c6b7e663e928232c566d4',
+    production: 'f1213cf781708271d1e76570e6a8cf83b49edef68eccd12419c1103fe34a9152',
+  },
+  '440_conversion_draft_and_ingest.sql': {
+    original: 'fd33d639fdf098bc11ef52874b93a976a9365da23aef18b93f41ed55bd2b7784',
+    production: '2dacb561e95cc40a332751e089d8df6dc2e6f3449c8e3a53097d64aa5b625c26',
+  },
+};
 
 export function checkMigration(sql: string, fileName?: string): CheckResult {
   const stripped = stripLineComments(sql);
@@ -270,7 +324,13 @@ export function checkMigration(sql: string, fileName?: string): CheckResult {
     };
   }
 
-  const longPattern = tooLongLikePattern(stripped);
+  const appliedVariants = fileName ? APPLIED_LONG_LIKE_SHA256[fileName] : undefined;
+  const sqlHash = appliedVariants ? createHash('sha256').update(sql).digest('hex') : undefined;
+  if (appliedVariants && sqlHash !== appliedVariants.original && sqlHash !== appliedVariants.production) {
+    return { ok: false, violation: '適用済みの migration を変更できません' };
+  }
+  const exactAppliedSql = appliedVariants && sqlHash === appliedVariants.original;
+  const longPattern = exactAppliedSql ? null : tooLongLikePattern(stripped);
   if (longPattern) {
     return {
       ok: false,
@@ -298,7 +358,7 @@ export function checkMigration(sql: string, fileName?: string): CheckResult {
  *
  * これを超えると `LIKE or GLOB pattern too complex: SQLITE_ERROR` で落ち、
  * ファイル全体が中止される。本番で 382 が、未適用のまま 440 も同じ形で
- * 引っかかっていた（2026-09-29）。50文字までは通り、51文字から落ちることを
+ * 引っかかった。50文字までは通り、51文字から落ちることを
  * 本番D1で実測した。
  *
  * エラー文からは「どの条件が不成立か」が分からないので、アサーションを書く側が

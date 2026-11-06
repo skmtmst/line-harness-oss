@@ -16,9 +16,15 @@ const SRC = join(__dirname, '..', '..')
 const GLOBALS = readFileSync(join(SRC, 'app', 'globals.css'), 'utf8')
 
 function token(name: string): string {
-  const match = GLOBALS.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{6});`))
+  // 別の色を指す変数（補足の灰色など）は、指す先の値まで読む。
+  const alias = GLOBALS.match(new RegExp(`--color-${name}:\\s*var\\(--color-([a-z0-9-]+)\\);`))
+  if (alias) return token(alias[1])
+  const match = GLOBALS.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?);`))
   if (!match) throw new Error(`--color-${name} が見つからない`)
-  return match[1]
+  const hex = match[1]
+  if (hex.length === 7) return hex
+  const alpha = parseInt(hex.slice(7, 9), 16) / 255
+  return '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * alpha + 255 * (1 - alpha)).toString(16).padStart(2, '0')).join('')
 }
 
 function luminance(hex: string): number {
@@ -43,7 +49,7 @@ function files(dir: string, test: (name: string) => boolean, out: string[] = [])
   return out
 }
 
-const SURFACES = ['canvas', 'canvas-sunken', 'surface-pearl', 'shell', 'surface-chrome', 'accent-soft', 'success-bg']
+const SURFACES = ['canvas', 'canvas-sunken', 'surface-pearl', 'shell', 'shell-gray', 'accent-soft', 'success-bg']
 
 describe('文字色は、置かれる面の上で 4.5:1 以上', () => {
   for (const text of ['ink-faint', 'ink-secondary', 'success', 'accent-deep']) {
@@ -55,7 +61,7 @@ describe('文字色は、置かれる面の上で 4.5:1 以上', () => {
   }
 })
 
-describe('LINE の緑は文字色に使わない', () => {
+describe('LINE の緑は管理画面の文字色に使わない（LINEの写しは正本どおり）', () => {
   it('画面のクラスに text-accent・text-accent-hover（-deep・-soft 以外）が無い', () => {
     const hits = files(SRC, (n) => /\.tsx?$/.test(n))
       .flatMap((path) => readFileSync(path, 'utf8').split('\n').map((line, i) => ({ path, line, i })))
@@ -66,7 +72,15 @@ describe('LINE の緑は文字色に使わない', () => {
 
   it('CSS の文字色に var(--color-accent) を使わない', () => {
     const hits = files(SRC, (n) => n.endsWith('.css'))
-      .filter((path) => /(?<![\w-])color:\s*var\(--color-accent\s*[,)]/.test(readFileSync(path, 'utf8')))
+      .filter((path) => {
+        let css = readFileSync(path, 'utf8')
+        // cfVyj は LINE アプリの写し。V8 の商品操作だけは正本のLINE緑を使う。
+        // 管理画面のボタン・リンクや、管理画面には例外を広げない。
+        if (path === join(SRC, 'components/shared/line-preview.module.css')) {
+          css = css.replace(/:root \.productAction \{[^}]*\}/g, '')
+        }
+        return /(?<![\w-])color:\s*var\(--color-accent\s*[,)]/.test(css)
+      })
       .map((path) => path.replace(SRC, ''))
     expect(hits, 'var(--color-accent-deep) にしてください').toEqual([])
   })

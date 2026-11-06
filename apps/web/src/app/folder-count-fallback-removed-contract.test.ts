@@ -1,19 +1,36 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import ts from 'typescript'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
 
-const SCENARIOS = read('scenarios', 'page.tsx')
-const REMINDERS = read('reminders', 'page.tsx')
+/* 完全切り替え：管理画面 page は捨て、V8 を見る。シナリオの入口は src/v8/scenarios/list.tsx（古い list-v8 はもう描かれない）。 */
+const SCENARIOS = read('..', 'v8', 'scenarios', 'list.tsx')
+const REMINDERS = read("../v8/reminders/list.tsx")
 const BROADCASTS = read('broadcasts', 'page.tsx')
 const AUTO_REPLIES = read('auto-replies', 'page.tsx')
 const TEMPLATES = read('templates', 'page.tsx')
 const CONTENTS = read('contents', 'page.tsx')
 const VARS = read('contents', 'vars', 'page.tsx')
 const RICHMENUS = read('rich-menus', 'page.tsx')
+
+/** 子の作るボタンの > / /> で切らず、共通欄の属性だけを見る。 */
+function managedPanel(source: string): string {
+  const file = ts.createSourceFile('screen.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let attributes = ''
+  function visit(node: ts.Node) {
+    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && node.tagName.getText(file) === 'ManagedFolderPanel') {
+      attributes = node.attributes.properties.map(property => property.getText(file)).join('\n')
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(file)
+  return attributes
+}
 
 /**
  * フォルダ件数の `??` フォールバック（現在ページの行だけを数える）が
@@ -31,7 +48,10 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
 
   it('reminders: reminders.filter(...).length でフォルダ件数を数えていない', () => {
     expect(REMINDERS).not.toMatch(/reminders\.filter\(.*folderId.*\)\.length/)
-    expect(REMINDERS).toContain('folder.itemCount')
+    // フォルダの件数は共通のフォルダの列（ManagedFolderPanel）が既定でサーバーの itemCount を出す。
+    const panel = managedPanel(REMINDERS)
+    expect(panel).toContain('kind="reminder"')
+    expect(panel).not.toContain('countOf=')
     // 型に無い itemCount を独自キャストで足していた拡張型を消した(#631)。
     // 型に足せば、来ていない経路は型エラーになる。
     expect(REMINDERS).not.toContain('VisualFolder')
@@ -49,8 +69,8 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
     expect(AUTO_REPLIES).not.toMatch(/\.itemCount \?\? items\.filter/)
     expect(AUTO_REPLIES).not.toMatch(/items\.filter\(\(r\) => r\.folderId === f\.id\)\.length/)
     expect(AUTO_REPLIES).not.toMatch(/items\.filter\(\(r\) => !r\.folderId\)\.length/)
-    expect(AUTO_REPLIES).toContain('f.itemCount')
-    expect(AUTO_REPLIES).toContain('unfiledCount')
+    const panel = managedPanel(AUTO_REPLIES)
+    expect(panel).toContain('kind="auto_reply"')
   })
 
   it('templates: 現在ページの行数でフォルダ件数を数えていない(#721)', () => {
@@ -68,7 +88,9 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
     expect(CONTENTS).toContain('folder.itemCount')
     expect(VARS).not.toMatch(/items\.filter\(\(item\) => item\.folderId === folder\.id\)\.length/)
     expect(VARS).not.toMatch(/items\.filter\(\(item\) => item\.folderId === null\)\.length/)
-    expect(VARS).toContain('folder.itemCount')
+    expect(VARS).toContain("managedFolderNavRows('common_var', folders")
+    const panel = VARS.match(/<ManagedFolderPanel[\s\S]*?\/>/)?.[0] ?? ''
+    expect(panel).not.toContain('countOf=')
   })
 
   it('media・common_var・rich_menu: 選択中の1件に閉じた母集団で数えるよう、folders APIへ選択中IDを渡す(#730)', () => {
@@ -76,7 +98,7 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
     // 一覧と母集団がずれる。未割当NULL行は一覧に出ないため件数へ入れない。
     expect(CONTENTS).toContain(`api.folders.list('media', accountAtRequest)`)
     expect(VARS).toContain(`api.folders.list('common_var', accountAtRequest)`)
-    expect(RICHMENUS).toContain(`api.folders.list('rich_menu', accountId)`)
+    expect(RICHMENUS).toContain(`api.folders.list('rich_menu', selectedAccount?.id ?? undefined)`)
   })
 
   it('3画面とも「未分類」の件数はAPIから来た値(unfiledCount)を使い、現在ページのフィルタ計算をしていない', () => {
