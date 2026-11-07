@@ -6,6 +6,23 @@ import InfoTab from './info-tab'
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/components/shared/list-navigation',()=>({default:({children,...props}:React.ComponentProps<'a'>)=><a {...props}>{children}</a>}))
 afterEach(cleanup)
+test('飲食の項目を分類で選べ、個人情報は分類ごとにまとめて示す',()=>{
+ const fields=[{id:'name',name:'名前',fixedKey:'name',type:'text',value:'花子',isPersonal:true},{id:'email',name:'メール',fixedKey:'email',type:'text',value:'',isPersonal:true},{id:'anniversary',name:'記念日',fixedKey:'anniversary',type:'date',value:'',isPersonal:true},{id:'seats',name:'席の希望',fixedKey:'seat_preference',type:'text',value:'',isPersonal:false},{id:'pet',name:'ペット',folderId:'pets',type:'text',value:'',isPersonal:false}];
+ const data={fields,values:Object.fromEntries(fields.map(field=>[field.id,field.value])),fieldsStatus:'ready',fieldFolders:[{id:'pets',name:'ペット'}],fieldFoldersStatus:'ready',hiddenPersonalCount:0,warnings:[],setValues:vi.fn()};
+ const props={friendId:'f',data:data as never,perms:{canEditField:()=>false} as never};
+ const view=render(<InfoTab {...props} group="all"/>);
+ const dining=screen.getByRole('link',{name:'飲食 2'}); expect(dining.getAttribute('href')).toContain('group=__dining__');
+ const basics=screen.getByRole('region',{name:'基本'});
+ expect(within(basics).getByText('名前や連絡先などの基本情報')).toBeTruthy();
+ expect(within(basics).getAllByText('個人情報')).toHaveLength(1);
+ const diningSection=screen.getByRole('region',{name:'飲食の情報'});
+ expect(within(diningSection).getByText('個人情報').closest('label')?.textContent).toContain('記念日');
+ view.rerender(<InfoTab {...props} group="__dining__"/>);
+ expect(screen.getByRole('region',{name:'飲食の情報'})).toBeTruthy();
+ expect(screen.queryByRole('region',{name:'基本'})).toBeNull();
+ expect(screen.getByLabelText('記念日の値')).toBeTruthy();
+ expect(screen.getByLabelText('席の希望')).toBeTruthy();
+})
 test('基本8欄は先頭、古い名前を読み替え、店の欄を分類し、出どころと満年齢を示す',()=>{
  const fields=[...BASIC_FRIEND_FIELDS.map(spec=>({id:spec.key,name:spec.key==='name'?'本名':spec.key==='birthday'?'誕生日':spec.label,fixedKey:spec.key,folderId:null,type:spec.key==='birthday'?'date':'text',value:spec.key==='birthday'?'2000-01-01':spec.key==='name'?'山田':null})),{id:'pet',name:'ペットの名前',type:'text',folderId:'pets',value:'もも'},{id:'anniversary',name:'記念日',type:'date',fixedKey:'anniversary',value:'2026-01-01'}];
  const data={fields,values:Object.fromEntries(fields.map(field=>[field.id,field.value??''])),fieldsStatus:'ready',fieldFolders:[{id:'pets',name:'ペット'}],fieldFoldersStatus:'ready',hiddenPersonalCount:0,warnings:[],setValues:vi.fn()};

@@ -41,6 +41,7 @@ vi.mock('@/components/scenarios/scenario-reference-data', () => ({
 }))
 
 import ScenarioResultsV8 from './results'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
 const scenario = {
   id: 'sc-1', name: '新規登録7日間フォロー', description: null, triggerType: 'friend_add', triggerTagId: null,
@@ -51,7 +52,7 @@ const scenario = {
 const stats = { enrolledTotal: 3, activeNow: 2, completed: 1, paused: 0, steps: [{ stepOrder: 1, reachedCount: 3, reachRate: 1 }] }
 const metric = (value: number | null) => ({ value, state: value === null ? 'unavailable' : 'available', reason: null })
 const sub = (id: string, friendName: string) => ({
-  id, friendId: `f-${id}`, friendName, status: 'active', currentStepOrder: 1, startedAt: '2026-09-01T00:00:00.000Z',
+  id, friendId: `f-${id}`, friendName, status: 'active', confirmationRevision: 4, currentStepOrder: 1, startedAt: '2026-09-01T00:00:00.000Z',
   nextDeliveryAt: '2026-10-04T01:00:00.000Z', pauseReason: null, updatedAt: '2026-09-01T00:00:00.000Z',
 })
 const runsBody = (subs: ReturnType<typeof sub>[], extra: { total?: number; nextCursor?: string | null } = {}) => ({
@@ -102,6 +103,23 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+})
+
+test('移動する購読の確認版と状態を送る', async () => {
+  let sent: unknown
+  handler = (url, init) => {
+    if (url.pathname === '/api/scenarios') return json({success:true,data:{items:[scenario,{...scenario,id:'sc-2',name:'移動先'}]}})
+    if (url.pathname === '/api/folders') return json({success:true,data:[]})
+    if (url.pathname === '/api/scenario-subscriptions/s1/move') { sent=JSON.parse(String(init?.body)); return json({success:true,data:{}}) }
+    return base(url)
+  }
+  render(<ScenarioResultsV8 />)
+  await screen.findByText('高橋 直人')
+  fireEvent.click(screen.getByRole('button',{name:'高橋 直人のその他の操作'}))
+  fireEvent.click(screen.getByRole('menuitem',{name:'別のシナリオへ移す'}))
+  await pickEntity('移し先のシナリオ','移動先')
+  fireEvent.click(screen.getByRole('button',{name:'このシナリオへ移す'}))
+  await waitFor(()=>expect(sent).toEqual({targetScenarioId:'sc-2',expectedConfirmationRevision:4,expectedStatus:'active'}))
 })
 
 describe('読み込みの状態', () => {

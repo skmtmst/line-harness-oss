@@ -175,6 +175,14 @@ export async function runSixHourlyHeavyJobs(
       },
     },
     {
+      name: 'registration application retention',
+      run: async () => {
+        const { purgeExpiredRegistrationApplications } = await import('../services/registration-application-retention.js');
+        const deleted = await purgeExpiredRegistrationApplications(env.DB, new Date(event.scheduledTime));
+        if (deleted) logger.log('registration_application_retention');
+      },
+    },
+    {
       // Googleビジネス: Googleから受け取った内容の保存期限（暦日30日）を守る掃除。
       // 機能スイッチでゲートしない。機能をoffにした店舗の古いコピーが残り続けるほうが
       // ポリシー違反になるため、スイッチと関係なく毎回走らせる。

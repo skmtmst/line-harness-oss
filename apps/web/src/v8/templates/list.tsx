@@ -700,15 +700,11 @@ export default function TemplatesListV8() {
     const lock = {}; bulkLock.current = lock; setBulkDeleting(true)
     setBulkDeleteError('')
     try {
-      let failed = 0
-      for (const t of pendingBulkDelete) {
-        if (!current()) return
-        const result = await api.templates.delete(t.id)
-        if (!current()) return
-        if (!result.success) failed += 1
-      }
-      if (failed > 0) {
-        setBulkDeleteError(`${formatNumber(failed)} 件を削除できませんでした。状態を読み直してからお試しください。`)
+      if (pendingBulkDelete.some(t => !Number.isSafeInteger(t.confirmationRevision) || !t.confirmationRevision || t.confirmationRevision < 1)) throw new Error('確認した版を読み直してください')
+      const result = await api.templates.bulkDelete(pendingBulkDelete.map(t => ({ id: t.id, expectedRevision: t.confirmationRevision! })))
+      if (!current()) return
+      if (!result.success) {
+        setBulkDeleteError(`${formatNumber(pendingBulkDelete.length)} 件を削除できませんでした。状態を読み直してからお試しください。`)
         await Promise.all([load(), loadFolders()])
         return
       }

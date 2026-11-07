@@ -105,7 +105,12 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
-  const [publishTarget, setPublishTarget] = useState<{ accountId: string; allAccounts: boolean; generation: number } | null>(null)
+  const publishFormKey = JSON.stringify([name, category, folderId, question])
+  const publishFormScope = useRef({ key: publishFormKey })
+  if (publishFormScope.current.key !== publishFormKey) publishFormScope.current = { key: publishFormKey }
+  const [publishTarget, setPublishTarget] = useState<{ accountId: string; allAccounts: boolean; generation: number; version: { expectedVersion: number; expectedDraftRevision: number }; form: typeof publishFormScope.current } | null>(null)
+  const publishTicket = useRef<object | null>(null)
+  const renderedPublishTicket = publishTicket.current
   const canMutate = useFeatureAccess('templates')
   const canMutateRef = useRef(canMutate)
   canMutateRef.current = canMutate
@@ -185,7 +190,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionDraftSnapshot])
 
-  const save = async (questionStatus: 'draft' | 'published'): Promise<boolean> => {
+  const save = async (questionStatus: 'draft' | 'published', confirmedVersion?: { expectedVersion: number; expectedDraftRevision: number }): Promise<boolean> => {
     if (host) {
       if (fields.submit().length > 0) { setError(''); return false }
       setError('')
@@ -208,7 +213,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       folderId,
     }
     try {
-      const result = id ? await api.templates.update(id, { ...payload, ...editVersion.current }) : await api.templates.create(payload)
+      const result = id ? await api.templates.update(id, { ...payload, ...(confirmedVersion ?? editVersion.current) }) : await api.templates.create(payload)
       if (!result.success) { setError(result.error || '保存できませんでした。時間をおいて、もう一度お試しください。'); return false }
       editVersion.current = { expectedVersion: result.data.publishedVersion, expectedDraftRevision: result.data.draftRevision }
       return true
@@ -230,8 +235,11 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const onPublish = async () => {
     if (id && templateAccountId && templateAccountId !== selectedAccountId) return
     if (id && usageCount > 0) {
+      const version = editVersion.current
       if (!selectedAccountId || !canMutateRef.current || loadedScope.current !== scope.current.generation) return
-      setPublishTarget({ accountId: templateAccountId ?? '', allAccounts: templateAccountKnown && templateAccountId === null, generation: scope.current.generation })
+      if (!version || !Number.isSafeInteger(version.expectedVersion) || !Number.isSafeInteger(version.expectedDraftRevision)) { setError('質問の版を確認できません。読み直してから公開してください。'); return }
+      publishTicket.current = {}
+      setPublishTarget({ accountId: templateAccountId ?? '', allAccounts: templateAccountKnown && templateAccountId === null, generation: scope.current.generation, version: { ...version }, form: publishFormScope.current })
       return
     }
     setPublishing(true)
@@ -398,18 +406,20 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         description={`この質問は ${usageCount}か所で使われています。公開すると、シナリオや一斉配信へ新しい内容が届きます。`}
         confirmLabel="公開する"
         busy={saving}
+        confirmDisabled={publishTarget !== null && publishTarget.form !== publishFormScope.current}
+        confirmDisabledReason="内容が変わりました。閉じて確認し直してください。"
         error={error || undefined}
         designNode="cuR8I"
         onConfirm={async () => {
-          if (!alive.current || !canMutateRef.current || !publishTarget || publishTarget.generation !== scope.current.generation) return
+          if (!alive.current || !canMutateRef.current || !publishTarget || !renderedPublishTicket || renderedPublishTicket !== publishTicket.current || publishTarget.generation !== scope.current.generation || publishTarget.form !== publishFormScope.current) return
           setPublishing(true)
           try {
-            if (await save('published')) { setPublishTarget(null); leaveToList() }
+            if (await save('published', publishTarget.version)) { publishTicket.current = null; setPublishTarget(null); leaveToList() }
           } finally {
             setPublishing(false)
           }
         }}
-        onCancel={() => setPublishTarget(null)}
+        onCancel={() => { publishTicket.current = null; setPublishTarget(null) }}
       >{publishTarget ? <OperationTargetSummary allAccounts={publishTarget.allAccounts} accounts={publishTarget.allAccounts ? [] : [{ id: publishTarget.accountId }]} /> : null}</ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="質問への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </></SaveErrorScope>

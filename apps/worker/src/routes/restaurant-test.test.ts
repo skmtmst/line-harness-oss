@@ -1,3 +1,4 @@
+import { registerRestaurantMenuConfirmationTests } from '../test-utils/restaurant-menu-confirmation.js';
 import { seedRestaurantFixture as seedRestaurantData } from '../test-utils/restaurant-fixture.js';
 import { publishScenarioVersion } from '@line-crm/db';
 import { checkRestaurantMenuMedia, checkRestaurantMenuPrice } from '../test-utils/restaurant-menu-media.js';
@@ -97,7 +98,6 @@ async function createAdminSession(token = 'restaurant-session'): Promise<string>
 }
 
 const ADMIN_SESSION_PREFIX = 'lh_session:';
-
 beforeEach(() => {
   authMocks.getStaffByApiKey.mockReset();
   authMocks.getStaffByApiKey.mockResolvedValue(null);
@@ -1207,8 +1207,8 @@ describe('V8-B 卓から出す予約枠と週の営業時間', () => {
 describe('R2-18 飲食メニューの説明と登録画像', () => {
   it('登録済み画像と説明を保存し、読み直せる', () => checkRestaurantMenuMedia({ testDb, seedRestaurantFixture, request, requestWithMethod }));
 });
-describe('V8-B メニューの価格確定', () => {
-  const menuPath = '/api/restaurant-test/menus/menu-ginza?account_id=account-1';
+describe('V8-B メニューの価格確定', () => { const menuPath = '/api/restaurant-test/menus/menu-ginza?account_id=account-1';
+  registerRestaurantMenuConfirmationTests({testDb:()=>testDb,env:()=>env,seedRestaurantFixture,request,requestWithMethod,rawDelete:(path,body)=>app().request(path,{method:'DELETE',headers:{Authorization:'Bearer owner-key','Content-Type':'text/plain'},body},env)});
   it('価格の上限は作成と更新の両方で守る', () => checkRestaurantMenuPrice({ testDb, seedRestaurantFixture, request, requestWithMethod }));
   it('権限者の保存で価格を即時確定し、二重承認を受け付けない', async () => {
     seedRestaurantFixture();
@@ -1253,7 +1253,7 @@ describe('V8-B メニューの価格確定', () => {
     const token = await createAdminSession();
     expect((await requestAs('/api/restaurant-test/stores/store-yokohama/select?account_id=account-1', token, {})).status).toBe(200);
     expect((await requestWithMethod(menuPath, 'PATCH', { price: 9999 }, token)).status).toBe(404);
-    expect((await requestWithMethod(menuPath, 'DELETE', undefined, token)).status).toBe(404);
+    expect((await requestWithMethod(menuPath, 'DELETE', undefined, token)).status).toBe(404); expect((await requestWithMethod(menuPath, 'PATCH', { status:'archived', expectedVersion:999 }, token)).status).toBe(404); expect((await requestWithMethod(menuPath, 'DELETE', { expectedVersion:999 }, token)).status).toBe(404);
   });
 });
 

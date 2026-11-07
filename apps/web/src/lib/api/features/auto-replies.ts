@@ -98,7 +98,7 @@ export const autoRepliesMethods = {
      * 機能08 点検 E-01: 専用の停止口。理由（任意）を添えて止めると、
      * いつ・誰が・なぜ止めたかが残る。確認キーは呼び出し側で都度振る。
      */
-    stop: (id: string, body: { reason?: string | null }, idempotencyKey: string) =>
+    stop: (id: string, body: { reason?: string | null; expectedVersion?: number }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{
         id: string;
         isActive: boolean;
@@ -192,6 +192,7 @@ export const autoRepliesMethods = {
         templateId: string | null;
         lineAccountId: string | null;
         isActive: boolean;
+        confirmationRevision: number;
         activeFrom: string | null;
         activeUntil: string | null;
         cooldownMinutes: number | null;

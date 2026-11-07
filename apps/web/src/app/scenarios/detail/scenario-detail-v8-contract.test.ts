@@ -49,7 +49,7 @@ vi.mock('@/lib/api', async (original) => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); resultFixture.account = 'account-a' })
 
 const SUBSCRIPTIONS = [
-  { id: 'sub-active', friendId: 'f-1', friendName: '進行 一郎', status: 'active', pauseReason: null, currentStepOrder: 1, startedAt: '2026-10-01T01:00:00Z', nextDeliveryAt: null },
+  { id: 'sub-active', friendId: 'f-1', friendName: '進行 一郎', status: 'active', confirmationRevision: 4, pauseReason: null, currentStepOrder: 1, startedAt: '2026-10-01T01:00:00Z', nextDeliveryAt: null },
   { id: 'sub-paused', friendId: 'f-2', friendName: '停止 二郎', status: 'paused', pauseReason: 'manual', currentStepOrder: 1, startedAt: '2026-10-01T01:00:00Z', nextDeliveryAt: null },
   { id: 'sub-failed', friendId: 'f-3', friendName: '失敗 三郎', status: 'paused', pauseReason: 'delivery_failed', currentStepOrder: 1, startedAt: '2026-10-01T01:00:00Z', nextDeliveryAt: null },
 ]
@@ -159,7 +159,7 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
     fireEvent.click(within(picker).getByRole('button', { name: '選ぶ' }))
     await waitFor(() => expect(screen.queryAllByRole('dialog').includes(picker)).toBe(false))
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'このシナリオへ移す' })) })
-    await waitFor(() => expect(resultFixture.ops.move).toHaveBeenCalledWith('sub-active', 'sc-2', expect.stringMatching(/^[0-9a-f-]{36}$/)))
+    await waitFor(() => expect(resultFixture.ops.move).toHaveBeenCalledWith('sub-active', 'sc-2', expect.stringMatching(/^[0-9a-f-]{36}$/), { revision: 4, status: 'active' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '進行 一郎 を別のシナリオへ移す' })).toBeNull())
   })
 

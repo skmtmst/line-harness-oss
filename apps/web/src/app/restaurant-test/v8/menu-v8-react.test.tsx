@@ -23,9 +23,9 @@ const data = {
   memberships: [],
   tables: [],
   menuItems: [
-    { id: 'm1', store_id: 'store-1', kind: 'course', name: '秋の鹿肉コース', price: 8800, tax_mode: 'tax_included', allergens_json: '["小麦","乳"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'active' },
-    { id: 'm2', store_id: 'store-1', kind: 'a_la_carte', name: '鹿肉のロースト', price: 2400, tax_mode: 'tax_included', allergens_json: '[]', service_periods_json: '["lunch","dinner"]', duration_minutes: null, status: 'active' },
-    { id: 'm3', store_id: 'store-1', kind: 'course', name: '夏の冷製コース', price: 6600, tax_mode: 'tax_included', allergens_json: '["小麦"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'archived' },
+    { id: 'm1', store_id: 'store-1', kind: 'course', name: '秋の鹿肉コース', price: 8800, tax_mode: 'tax_included', allergens_json: '["小麦","乳"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'active', confirmation_revision: 1 },
+    { id: 'm2', store_id: 'store-1', kind: 'a_la_carte', name: '鹿肉のロースト', price: 2400, tax_mode: 'tax_included', allergens_json: '[]', service_periods_json: '["lunch","dinner"]', duration_minutes: null, status: 'active', confirmation_revision: 1 },
+    { id: 'm3', store_id: 'store-1', kind: 'course', name: '夏の冷製コース', price: 6600, tax_mode: 'tax_included', allergens_json: '["小麦"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'archived', confirmation_revision: 1 },
   ],
   reservations: [], reservationTotal: 0, inventory: [],
   approvals: [{ id: 'a1', store_id: 'store-1', kind: 'menu_change', title: '価格改定', status: 'pending', requested_by: null, review_comment: null, payload_json: null }],
@@ -80,7 +80,7 @@ describe('MJoJR メニュー管理のV8', () => {
     render(<MenuEditV8 />)
     fireEvent.change(await screen.findByDisplayValue('秋の鹿肉コース'), { target: { value: '冬の鹿肉コース' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ name: '冬の鹿肉コース' })))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ name: '冬の鹿肉コース', expectedVersion: 1 })))
   })
 
   it('説明と店舗の登録画像を選び、保存時に送る', async () => {
@@ -91,7 +91,7 @@ describe('MJoJR メニュー管理のV8', () => {
     fireEvent.click(await screen.findByRole('option', { name: /架空.png/ }))
     expect(screen.getByText('選択中の画像名を確認しています')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1','m1',expect.objectContaining({ description:'季節の説明', imageMediaId:'media-test' })))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1','m1',expect.objectContaining({ description:'季節の説明', imageMediaId:'media-test', expectedVersion: 1 })))
   })
 
   it('画像の実体を読めない場合は画像なしと表示する', async () => {
