@@ -462,6 +462,7 @@
 
 ## 反映履歴
 
+- [座席図の卓プレビュー・タブ並び替え・拡大移動の修正](release-log/unreleased/2099-masato-seat-map-ux.md)
 - [Instagramの同一統括内での複数アカウント接続](release-log/unreleased/2080-masato-instagram-shared-accounts.md)
 - [座席・卓管理のPenデザイン反映](release-log/unreleased/2074-masato-table-pen.md)
 - [Googleビジネスのパフォーマンス取得](release-log/unreleased/2026-11-04-masato-google-performance-sync.md)
