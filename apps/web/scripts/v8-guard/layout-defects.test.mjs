@@ -81,7 +81,7 @@ test('種類ごとに実物を壊し、検出・終了コード1・修復後0を
     assert.equal(run.status,1,run.stdout+run.stderr)
     for (const kind of Object.keys(cases)) {
       assert.match(run.stdout,new RegExp('崩れ 1152 /fixture/'+kind+': 新規[1-9]'))
-      assert.match(run.stdout,new RegExp('  '+kind+' '))
+      assert.match(run.stdout,new RegExp('  (新規|要確認) '+kind+' '))
     }
     writeFileSync(manifest,JSON.stringify(Object.fromEntries(Object.entries(repairs).map(([k,v])=>[k,shell(v)]))))
     const fixed = spawnSync(process.execPath,['apps/web/scripts/v8-guard/layout-defects.mjs','--fixtures',manifest],{encoding:'utf8',timeout:60000})
