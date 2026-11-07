@@ -258,7 +258,7 @@ describe('BERxg 座席・卓管理', () => {
     fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
     const editor = screen.getByRole('dialog')
-    fireEvent.click(within(editor).getByRole('button', { name: '変更 ›' }))
+    fireEvent.click(within(editor).getByRole('button', { name: '席の条件を変更 ›' }))
     fireEvent.click(within(editor).getByRole('button', { name: '停止中' }))
     fireEvent.click(within(editor).getByRole('button', { name: '変更を保存' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledTimes(1))
