@@ -201,6 +201,19 @@ describe('卓の停止と予約移動の一括確認', () => {
     expect(await response.json()).toMatchObject({ code: 'linked_seat_review', reservationIds: ['stop-l1'], reason: expect.any(String) });
     expect(state()).toEqual(before);
   });
+  it('止める卓が連結席の主卓なら、移した先に合わせて連結のリンクも付け替わり、止めた卓へのリンクは残らない', async () => {
+    const body = fixture();
+    testDb.raw.exec("UPDATE rt_tables SET join_group='g1' WHERE id='table-1'; INSERT INTO rt_tables (id, store_id, code, label, seat_type, min_capacity, max_capacity, is_active, join_group) VALUES ('table-3','store-s','T3','テーブル3','table',1,2,1,'g1')");
+    testDb.raw.prepare(`INSERT INTO rt_reservations (id, store_id, source, customer_name, guest_count, starts_at, ends_at, table_id, status)
+      VALUES ('stop-r3','store-s','manual','予約客',4,'2099-01-02T10:00:00Z','2099-01-02T11:00:00Z','table-1','confirmed')`).run();
+    const links = () => testDb.raw.prepare("SELECT table_id FROM rt_reservation_table_links WHERE reservation_id='stop-r3' ORDER BY table_id").all();
+    expect(links()).toEqual([{ table_id: 'table-1' }, { table_id: 'table-3' }]);
+    body.reservations.push({ id: 'stop-r3', expectedRevision: 1, targetTableId: 'table-2' });
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(200);
+    expect(links()).toEqual([{ table_id: 'table-2' }]);
+    expect(testDb.raw.prepare("SELECT COUNT(*) n FROM rt_reservation_table_links WHERE table_id='table-1'").get()).toEqual({ n: 0 });
+  });
   it.each([[-20 * 60_000, '確認してから時間がたった'], [5 * 60_000, '未来の時刻']])('確認の時刻がサーバー時刻とずれる（%s ms・%s）と、何も変えずに409を返す', async (offset) => {
     const body = { ...fixture(), asOf: new Date(Date.now() + offset).toISOString() }; const before = state();
     const response = await post('/api/restaurant-test/tables/table-1/stop', body);
