@@ -454,3 +454,10 @@ html:root .button[data-permission-locked][aria-pressed='true']:not(:focus-visibl
 }
 /* 同じ操作の段では、部品の小型指定より共通の高さを優先する。 */
 html:root :is([data-toolbar-row], [data-control-row]) .button { height: var(--control-h); min-height: var(--control-h); }
+
+html:root .button.button[data-presentation='hours'] { font-size:13px; font-weight:600; line-height:20px; }
+html:root .button.button.secondary[data-presentation='hours']:not([data-permission-locked]) { background:var(--color-canvas); outline:1px solid var(--hours-button-border); outline-offset:-1px; border-radius:10px; box-shadow:var(--hours-button-shadow); }
+html:root .button.button.primary[data-presentation='hours']:not([data-permission-locked]) { background:var(--color-accent-deep); border-radius:8px; box-shadow:var(--hours-button-shadow); }
+html:root .button.button.text[data-presentation='hours'] { font-weight:600; }
+
+html:root .button.button[data-presentation='hours']:focus-visible { outline:var(--polish-focus-width) solid var(--polish-focus); outline-offset:var(--polish-focus-offset); }

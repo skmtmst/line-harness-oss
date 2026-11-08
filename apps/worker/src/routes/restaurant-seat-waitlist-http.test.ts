@@ -146,6 +146,18 @@ describe('卓の停止と予約移動の一括確認', () => {
     return { table: testDb.raw.prepare("SELECT is_active, confirmation_revision FROM rt_tables WHERE id='table-1'").get(),
       reservations: testDb.raw.prepare("SELECT id,table_id,confirmation_revision FROM rt_reservations WHERE id LIKE 'stop-r%' ORDER BY id").all() };
   }
+  it('古い卓の版では予約も卓も変更せず409を返す', async () => {
+    const body = fixture(); const before = state(); body.expectedTableRevision = 2;
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409); expect(state()).toEqual(before);
+  });
+  it('同じ件数でも確認した卓とは別の予約が混じれば409を返す', async () => {
+    const body = fixture(); seedReservation('stop-r3', 'confirmed', 'table-2');
+    testDb.raw.prepare("UPDATE rt_reservations SET starts_at='2099-01-01T14:00:00Z', ends_at='2099-01-01T15:00:00Z' WHERE id='stop-r3'").run();
+    body.reservations[1].id = 'stop-r3'; const before = state();
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409); expect(state()).toEqual(before);
+  });
   it('古い予約の版では何も変更せず409を返す', async () => {
     const body = fixture(); const before = state(); body.reservations[1].expectedRevision = 2;
     const response = await post('/api/restaurant-test/tables/table-1/stop', body);

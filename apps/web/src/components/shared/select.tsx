@@ -48,6 +48,7 @@ export default function Select({
   showChevron = true,
   iconOnly = false,
   options: suppliedOptions,
+  textSize,
   size = 'standard',
   pageSizeControl = false,
   value,
@@ -303,6 +304,7 @@ export default function Select({
         data-tone={treatment === 'pill' ? selected?.tone ?? 'neutral' : undefined}
         data-filter-active={filterState === 'active' || undefined}
         data-value-align={valueAlign}
+        data-text-size={textSize}
         data-chevron={!iconOnly || undefined}
         data-icon-only={iconOnly || undefined}
         title={lockedReason ? undefined : iconOnly ? ariaLabel : undefined}
@@ -326,7 +328,7 @@ export default function Select({
           </span>
         ) : null}
         {/* 省略表示（…）のとき、ホバーで全文を確認できる（#640）。 */}
-        <span className={styles.value} hidden={iconOnly} data-select-value title={selected?.label ?? undefined}>
+        <span className={styles.value} hidden={iconOnly} data-select-value data-text-size={textSize} title={selected?.label ?? undefined}>
           {valueHead ? <SelectValueText head={valueHead} value={selected ? heads.labelOf(selected) : ''} filterState={filterState} /> : selected?.label ?? ''}
         </span>
         {!iconOnly && (open ? (
@@ -336,7 +338,7 @@ export default function Select({
         ))}
       </Trigger>
       {open ? (
-        <SelectMenu
+        <SelectMenu textSize={textSize}
           open={open}
           getAnchor={() => triggerRef.current}
           onClose={() => setOpen(false)}

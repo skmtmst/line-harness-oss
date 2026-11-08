@@ -25,7 +25,7 @@ export default function Radio({
    * 'small' は脇のパネル内（★BG-B `z14gEG` 人物2択：文 12/17）。
    * 丸の 18 と間隔 8 はどちらも同じ。v8 だけで効く。
    */
-  size?: 'medium' | 'small'
+  size?: 'medium' | 'small' | 'body'
   /** 一覧行の名前を省略できるよう、ラベルを残りの幅に収める。 */
   fill?: boolean
   rowHeight?: 'comfortable'

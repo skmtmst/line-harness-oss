@@ -54,6 +54,7 @@ export interface SelectProps {
   name?: string
   onChange: (value: string) => void
   options: SelectOption[]
+  textSize?: 'body'
   size?: 'standard' | 'page-size' | 'full' | 'content'
   /** 表示の幅をcontentへ変えても、一覧の表示件数の役目は保つ。 */
   pageSizeControl?: boolean
