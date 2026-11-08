@@ -189,6 +189,73 @@ describe('卓の停止と予約移動の一括確認', () => {
     expect(response.status).toBe(200);
     expect(state().reservations).toEqual([{ id: 'stop-r1', table_id: 'table-2', confirmation_revision: 2 }, { id: 'stop-r2', table_id: null, confirmation_revision: 2 }]);
   });
+  it('止める卓を連結席として使う予約があれば、何も変えずに付け替えを頼む409を返す', async () => {
+    const body = fixture();
+    testDb.raw.exec("UPDATE rt_tables SET join_group='g1' WHERE id='table-1'; INSERT INTO rt_tables (id, store_id, code, label, seat_type, min_capacity, max_capacity, is_active, join_group) VALUES ('table-3','store-s','T3','テーブル3','table',1,2,1,'g1')");
+    testDb.raw.prepare(`INSERT INTO rt_reservations (id, store_id, source, customer_name, guest_count, starts_at, ends_at, table_id, status)
+      VALUES ('stop-l1','store-s','manual','予約客',4,'2099-01-02T10:00:00Z','2099-01-02T11:00:00Z','table-3','confirmed')`).run();
+    expect(testDb.raw.prepare("SELECT table_id FROM rt_reservation_table_links WHERE reservation_id='stop-l1' ORDER BY table_id").all()).toEqual([{ table_id: 'table-1' }, { table_id: 'table-3' }]);
+    const before = state();
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'linked_seat_review', reservationIds: ['stop-l1'], reason: expect.any(String) });
+    expect(state()).toEqual(before);
+  });
+  it.each([[-20 * 60_000, '確認してから時間がたった'], [5 * 60_000, '未来の時刻']])('確認の時刻がサーバー時刻とずれる（%s ms・%s）と、何も変えずに409を返す', async (offset) => {
+    const body = { ...fixture(), asOf: new Date(Date.now() + offset).toISOString() }; const before = state();
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'stale_confirmation', reason: expect.any(String) });
+    expect(state()).toEqual(before);
+  });
+  it('確認の時刻ちょうどに終わる予約は止める対象に入らない', async () => {
+    const asOf = new Date(Date.now() - 1000).toISOString();
+    const body = { ...fixture(), asOf };
+    testDb.raw.prepare(`INSERT INTO rt_reservations (id, store_id, source, customer_name, guest_count, starts_at, ends_at, table_id, status)
+      VALUES ('stop-b1','store-s','manual','予約客',2,?,?,'table-1','confirmed')`).run(new Date(Date.parse(asOf) - 3600_000).toISOString(), asOf);
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(200);
+    expect(state().table).toEqual({ is_active: 0, confirmation_revision: 2 });
+  });
+  it('確認の時刻の1秒あとに終わる予約は止める対象に入り、確認に無ければ409を返す', async () => {
+    const asOf = new Date(Date.now() - 1000).toISOString();
+    const body = { ...fixture(), asOf };
+    testDb.raw.prepare(`INSERT INTO rt_reservations (id, store_id, source, customer_name, guest_count, starts_at, ends_at, table_id, status)
+      VALUES ('stop-b2','store-s','manual','予約客',2,?,?,'table-1','confirmed')`).run(new Date(Date.parse(asOf) - 3600_000).toISOString(), new Date(Date.parse(asOf) + 1000).toISOString());
+    const before = state();
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409); expect(state()).toEqual(before);
+  });
+  it('移す先の卓に本物の臨時休業があれば、何も変えずに理由付き409を返す', async () => {
+    const body = fixture(); body.reservations[0].targetTableId = 'table-2';
+    testDb.raw.prepare("INSERT INTO rt_closures(id,store_id,start_date,end_date,all_day,start_time,end_time,kind,table_ids_json,periods_json) VALUES('stop-closure','store-s','2099-01-01','2099-01-01',0,'18:30','19:30','other',?,?)")
+      .run('["table-2"]', '[{"startsAt":"2099-01-01T09:30:00Z","endsAt":"2099-01-01T10:30:00Z"}]');
+    const before = state();
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'closure_conflict', reason: expect.any(String) });
+    expect(state()).toEqual(before);
+  });
+  it('移す先の卓に重なる本物の予約があれば、何も変えずに理由付き409を返す', async () => {
+    const body = fixture(); body.reservations[0].targetTableId = 'table-2';
+    seedReservation('stop-o1', 'confirmed', 'table-2');
+    testDb.raw.prepare("UPDATE rt_reservations SET starts_at='2099-01-01T10:30:00Z', ends_at='2099-01-01T11:30:00Z' WHERE id='stop-o1'").run();
+    const before = state();
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'move_target_conflict', reason: expect.any(String) });
+    expect(state()).toEqual(before);
+  });
+  it('卓を移して止めても予約の数は変わらず、席の数だけ止めた卓の分が減る', async () => {
+    const body = fixture(); body.reservations[0].targetTableId = 'table-2';
+    testDb.raw.exec("INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity) VALUES('stop-slot','store-s','2099-01-01T10:00:00Z',8)");
+    const slot = () => testDb.raw.prepare("SELECT reserved_count,total_capacity FROM rt_inventory_slots WHERE id='stop-slot'").get() as { reserved_count: number; total_capacity: number };
+    const before = slot();
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(200);
+    // 予約は消えずに移っただけなので、予約の数はそのまま。席の数は残る卓（テーブル2の6席）だけになる。
+    expect(slot()).toEqual({ reserved_count: before.reserved_count, total_capacity: 6 });
+  });
   it('確認後に予約が追加されるとすべて保ったまま409になる', async () => {
     const body = fixture(); seedReservation('stop-r3');
     testDb.raw.prepare("UPDATE rt_reservations SET starts_at='2099-01-01T14:00:00Z', ends_at='2099-01-01T15:00:00Z' WHERE id='stop-r3'").run();
