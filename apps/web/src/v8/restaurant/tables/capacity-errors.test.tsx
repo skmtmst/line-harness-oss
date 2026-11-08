@@ -10,7 +10,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {},
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (value: string | null) => value === 'owner' || value === 'admin' }))
-vi.mock('@/lib/api/helpers/reservation-board', () => ({ reservationBoardApi: { floors: vi.fn().mockResolvedValue({ success: true, data: [] }) } }))
+vi.mock('@/lib/api/helpers/reservation-board', () => ({ reservationBoardApi: { floors: vi.fn().mockResolvedValue({ success: true, data: [{id:'floor-store-1',storeId:'store-1',name:'1階',width:500,height:500,version:1,outline:[],fixtures:[],tables:[]}] }),saveFloor:vi.fn() } }))
 
 import TablesPage from './tables'
 import { snapshotOf } from '../booking-kit/test-data'
@@ -21,8 +21,8 @@ const submit = () => fireEvent.click(within(screen.getByRole('dialog')).getByRol
 const invalid = (label: string) => screen.getByLabelText(label).getAttribute('aria-invalid') === 'true'
 async function openNew() {
   render(<TablesPage />)
-  await screen.findByText('卓の詳細')
-  fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
+  await screen.findByText('卓一覧')
+  fireEvent.click(await screen.findByRole('button', { name: /卓を作る/ }))
   change('卓番', 'T5'); change('表示名', '窓側')
 }
 function ApiReasons({ fields }: { fields: Record<string, string> }) {
@@ -83,7 +83,7 @@ describe('卓の人数の理由', () => {
   })
   it.each([['maxCapacity', '最小人数', '5', maxReason], ['minCapacity', '最大人数', '6', minReason]])('APIの明示した%sの理由は他方の修正で消さない', async (field, label, value, reason) => {
     render(<ApiReasons fields={{ [field]: reason, label: 'APIで表示名を確認してください。' }} />)
-    await screen.findByText('卓の詳細'); fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
+    await screen.findByText('卓一覧'); fireEvent.click(await screen.findByRole('button', { name: /卓を作る/ }))
     fireEvent.click(screen.getByText('APIの理由を受ける'))
     expect(screen.queryAllByText(reason)).toHaveLength(1); change(label, value)
     expect(screen.queryAllByText(reason)).toHaveLength(1); expect(screen.getByText('APIで表示名を確認してください。')).toBeTruthy()
@@ -92,7 +92,7 @@ describe('卓の人数の理由', () => {
   it('修正後の追加は最新の人数と既存の送信項目で1回だけ行う', async () => {
     await openNew(); change('最小人数', '5'); submit(); change('最大人数', '6'); submit()
     await waitFor(() => expect(api.createTable).toHaveBeenCalledTimes(1))
-    expect(api.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', floorId: 'floor-store-1', expectedTargetVersion: undefined, expectedVersion: 1, code: 'T5', label: '窓側', seatType: 'table', minCapacity: 5, maxCapacity: 6, floorX: undefined, floorY: undefined, joinGroup: null, shape: 'rectangle', smokingPolicy: 'non_smoking', shoesAllowed: true, visibleOnMap: true }))
+    expect(api.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', floorId: 'floor-store-1', expectedTargetVersion: 1, expectedVersion: 1, code: 'T5', label: '窓側', seatType: 'table', minCapacity: 5, maxCapacity: 6, floorX: 30, floorY: 168, width: 80, height: 80, joinGroup: null, shape: 'rectangle', smokingPolicy: 'non_smoking', shoesAllowed: true, visibleOnMap: true }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
   it('新規を閉じ直すと初期人数と理由なしへ戻る', async () => {
@@ -111,7 +111,7 @@ describe('卓の人数の理由', () => {
     expect(api.createTable).not.toHaveBeenCalled()
   })
   it.each(['staff', null])('権限%sでは作成も変更も行わない', async value => {
-    role.value = value; render(<TablesPage />); await screen.findByText('卓の詳細')
+    role.value = value; render(<TablesPage />); await screen.findByText('卓一覧')
     const create = screen.queryByRole('button', { name: /卓を作る/ }); if (create) expect(create).toHaveProperty('disabled', true)
     expect(screen.queryByRole('dialog')).toBeNull(); expect(api.createTable).not.toHaveBeenCalled(); expect(api.updateTable).not.toHaveBeenCalled()
   })

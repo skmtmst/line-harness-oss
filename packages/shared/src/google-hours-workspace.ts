@@ -14,7 +14,7 @@ export type HoursWorkspace = {
   notes: Record<string, string>;
   draft: { weekly: OpeningWeek | null; days: OpeningDate[]; holidayChanged: boolean; serviceIds: string[]; reviewIds: string[] };
 };
-export type HoursWorkspaceEvent = { at: string; staffName: string; summary: string };
+export type HoursWorkspaceEvent = { at: string; staffName: string; summary: string; description?: string; googleState?: 'draft' | 'sent' };
 export type HoursWorkspaceData = { version: number; data: HoursWorkspace; history: HoursWorkspaceEvent[]; holidays: Array<{ date: string; name: string }>; serviceTypes: Array<{ id: string; label: string }> };
 
 export function emptyHoursWorkspace(): HoursWorkspace {

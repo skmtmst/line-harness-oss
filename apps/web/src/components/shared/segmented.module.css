@@ -231,3 +231,4 @@ html:root .root[data-equal-width][data-segmented-fit='content'] { grid-auto-colu
   html:root .root[data-appearance='intake-stop'] .thumb { display: none; }
   html:root .root[data-appearance='intake-stop'][data-sliding] .selected { background: var(--color-selection-bg); outline-color: var(--color-selection-border); }
 }
+html:root .root[data-size='hours'] .item { font-size:13px; font-weight:600; }

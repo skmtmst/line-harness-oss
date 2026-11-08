@@ -464,6 +464,7 @@
 ## 反映履歴
 
 - [配信の取り消しとテナント削除の安全性](release-log/unreleased/2094-kenta-train-1102q.md)
+- [座席図の卓プレビュー・タブ並び替え・拡大移動の修正](release-log/unreleased/2099-masato-seat-map-ux.md)
 - [Instagramの同一統括内での複数アカウント接続](release-log/unreleased/2080-masato-instagram-shared-accounts.md)
 - [座席・卓管理のPenデザイン反映](release-log/unreleased/2074-masato-table-pen.md)
 - [Googleビジネスのパフォーマンス取得](release-log/unreleased/2026-11-04-masato-google-performance-sync.md)
@@ -1167,6 +1168,11 @@
 - [営業時間のPen照合と操作確認](testing/google-hours-pen-qa.md) — 承認済み18画面と営業時間タブの検査。
 
 - [Googleビジネスの営業時間タブ](release-log/unreleased/2082-masato-google-hours.md) — 営業時間の設定と確認の反映履歴。
+- [Google営業時間のPen再照合](release-log/unreleased/2092-masato-google-hours-pen.md) — 編集パネルと実記録に基づく履歴表示の修正。
 - [検証用 Google 投稿先の切替](release-log/unreleased/2086-masato-test2-google-post-test.md) — 反映履歴、確認 2026-11-04。
 - [Instagram投稿先IDの保存修正](release-log/unreleased/2088-masato-instagram-id-precision.md) — 反映履歴、確認 2026-11-04。
 - [TEST2投稿テスト後の検証設定復旧](release-log/unreleased/2089-masato-restore-google-test-gate.md) — 反映履歴、確認 2026-11-04。
+- [座席・卓管理を最新Penデザインにそろえる](release-log/unreleased/2091-masato-table-pen-design.md) — 卓の作成・複製、座席図と一覧の反映履歴。
+- [共有検証への反映順序と巻き戻し防止](release-log/unreleased/2090-masato-ordered-staging-delivery.md) — 反映履歴、確認 2026-11-05。
+- [本番候補の検証配備証拠の確認方法](release-log/unreleased/2093-masato-production-staging-proof.md) — 反映履歴、確認 2026-11-05。
+- [座席図の表示を最新Penに合わせる](release-log/unreleased/2098-masato-table-pen-visual.md) — 卓マーク、選択枠、保存表示の修正履歴。確認 2026-11-06。

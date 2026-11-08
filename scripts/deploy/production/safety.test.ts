@@ -9,7 +9,11 @@ import { assertResponse } from './responses.js';
 const sha = 'a'.repeat(40), repository = 'owner/repository';
 const context = { GITHUB_REPOSITORY: repository, GITHUB_SHA: sha, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main` };
 const run = { repository: { full_name: repository }, head_repository: { full_name: repository }, path: '.github/workflows/deploy-cloudflare-staging.yml', head_sha: sha, status: 'completed', conclusion: 'success', event: 'workflow_dispatch' };
-const jobs = { jobs: [{ conclusion: 'success', steps: [{ name: 'Verify public source revisions', conclusion: 'success' }] }] };
+const jobs = { jobs: [{ conclusion: 'success', steps: [
+  { name: 'Deploy Worker to staging', conclusion: 'success' },
+  { name: 'Deploy Admin Panel to staging', conclusion: 'success' },
+  { name: 'Verify public source revisions', conclusion: 'success' },
+] }] };
 
 describe('approved production source and staging proof', () => {
   it('requires the full current main revision and the authorized parent', () => {
@@ -19,11 +23,15 @@ describe('approved production source and staging proof', () => {
     expect(() => assertReleaseSource(sha, mergedMain, sha, { ...context, GITHUB_SHA: mergedMain })).toThrow();
     for (const [candidate, main, actual, env] of [[sha.slice(0, 12), sha, sha, context], [sha, 'b'.repeat(40), sha, context], [sha, sha, 'b'.repeat(40), context], [sha, sha, sha, { ...context, GITHUB_REF: 'refs/heads/feature' }], [sha, sha, sha, { ...context, GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/other.yml@refs/heads/main` }]] as const) expect(() => assertReleaseSource(candidate, main, actual, env)).toThrow();
   });
-  it('does not accept a staging dry-run/replay, old SHA, foreign repo or failed public verification', () => {
+  it('does not accept a partial staging run, dry-run, old SHA, foreign repo or failed public verification', () => {
     expect(() => assertStagingRun(run, jobs, sha, repository)).not.toThrow();
     for (const mutation of [{ head_sha: 'b'.repeat(40) }, { conclusion: 'failure' }, { status: 'in_progress' }, { path: '.github/workflows/other.yml' }, { head_repository: { full_name: 'attacker/fork' } }]) expect(() => assertStagingRun({ ...run, ...mutation }, jobs, sha, repository)).toThrow();
     expect(() => assertStagingRun(run, { jobs: [{ conclusion: 'success', steps: [] }] }, sha, repository)).toThrow();
-    expect(() => assertStagingRun(run, { jobs: [{ conclusion: 'success', steps: [{ ...jobs.jobs[0].steps[0], conclusion: 'skipped' }] }] }, sha, repository)).toThrow();
+    for (const name of ['Deploy Worker to staging', 'Deploy Admin Panel to staging', 'Verify public source revisions']) {
+      const partial = { jobs: [{ conclusion: 'success', steps: jobs.jobs[0].steps.map(step => step.name === name ? { ...step, conclusion: 'skipped' } : step) }] };
+      expect(() => assertStagingRun(run, partial, sha, repository)).toThrow();
+    }
+    expect(() => assertStagingRun(run, { jobs: jobs.jobs[0].steps.map(step => ({ conclusion: 'success', steps: [step] })) }, sha, repository)).toThrow();
   });
   it('fails closed if the environment has no actual approval reviewers', () => {
     expect(() => assertProductionApproval({ protection_rules: [{ type: 'required_reviewers', reviewers: [{ type: 'User' }] }] })).not.toThrow();

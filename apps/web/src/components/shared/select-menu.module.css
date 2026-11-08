@@ -221,3 +221,5 @@
   cursor: not-allowed;
   opacity: var(--polish-disabled-opacity);
 }
+
+html:root .inner[data-text-size='body'] .label { font-size:14px; font-weight:500; }

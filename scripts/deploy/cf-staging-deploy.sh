@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 #
+# この入口はplan専用。applyは共通Actionsの順番待ちへ統一する。
+# 以下の旧apply経路は入口で停止し、DB・Workerへ到達しない。
 # Cloudflare 側の Git 連携（Workers Builds）から呼ばれる、検証環境（nen-line-stg）
 # の配備コマンド。GitHub Actions も手元のターミナルも使わない経路のために置く。
 #
@@ -48,6 +50,11 @@ case "$MODE" in
     exit 1
     ;;
 esac
+
+if [ "$MODE" = "apply" ]; then
+  echo "[停止] 共有検証環境への配備は共通Actionsの順番待ちを使用してください。Workers Buildsからのapplyは禁止です。" >&2
+  exit 1
+fi
 
 step() { printf '\n=== %s ===\n' "$1"; }
 

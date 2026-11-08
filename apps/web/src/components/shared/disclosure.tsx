@@ -29,7 +29,7 @@ export default function Disclosure({
   /** 閉じている時に右へ出す要約。開くと消える。 */
   hint?: ReactNode
   defaultOpen?: boolean
-  size?: 'standard' | 'compact'
+  size?: 'standard' | 'compact' | 'body'
   appearance?: 'card' | 'inset' | 'section'
   /** 選択中の欄を見出し左の緑印で示す。 */
   selected?: boolean
@@ -48,6 +48,7 @@ export default function Disclosure({
       onBlur={onBlur}
       id={id}
       data-appearance={appearance}
+      data-size={size}
       onToggle={onToggle ? (event) => onToggle(event.currentTarget.open) : undefined}
       open={defaultOpen || undefined}
       className={[styles.root, size === 'compact' ? styles.compact : '', className].filter(Boolean).join(' ')}
