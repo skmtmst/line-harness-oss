@@ -114,8 +114,8 @@ test('移動する購読の確認版と状態を送る', async () => {
     return base(url)
   }
   render(<ScenarioResultsV8 />)
-  await screen.findByText('高橋 直人')
-  fireEvent.click(screen.getByRole('button',{name:'高橋 直人のその他の操作'}))
+  await screen.findByText('見本 16')
+  fireEvent.click(screen.getByRole('button',{name:'見本 16のその他の操作'}))
   fireEvent.click(screen.getByRole('menuitem',{name:'別のシナリオへ移す'}))
   await pickEntity('移し先のシナリオ','移動先')
   fireEvent.click(screen.getByRole('button',{name:'このシナリオへ移す'}))

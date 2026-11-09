@@ -105,7 +105,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     const props = { reservation: today[0], accountId: 'account-1', tables: data.tables, courses: data.menuItems, busy: false, canWrite: true, onClose: () => {}, onCancel: () => {}, onRestore: () => {}, onEdit: () => {}, onAttendance: attendance, onReload: reload }
     const view = render(<ReservationDetailDialog {...props} />)
-    const dialog = screen.getByRole('dialog', { name: '鈴木 真理さん・4名' })
+    const dialog = screen.getByRole('dialog', { name: '見本 182さん・4名' })
     fireEvent.click(within(dialog).getByRole('button', { name: '来店にする' }))
     expect(await within(dialog).findByText('保存しましたが、最新の予約を読み込めませんでした。読み直してから続けてください。')).toBeTruthy()
     expect((within(dialog).getByRole('button', { name: '来店にする' }) as HTMLButtonElement).disabled).toBe(true)
