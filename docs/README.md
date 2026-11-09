@@ -414,6 +414,7 @@
 - [Lステップで確認できなかった箇所と、置いた想定](lstep-unverified-assumptions.md)
 - [musubo マニュアルサイトのCloudflare Pages初回設定](manual-site-pages-setup.md)
 - [D1 マイグレーション手順書](migration-runbook.md)
+- [テナント削除の保護と設計](tenant-purge-trigger-759-design.md)
 - [musubo サービスサイト（Xserver）](musubo-service-site.md)
 - [ランク削除時の会員別EC送信](nen-member-rank-sync.md)
 - [受信処理の再開と入力不足時の停止](operations/inbound-recovery.md)
@@ -462,6 +463,7 @@
 
 ## 反映履歴
 
+- [配信の取り消しとテナント削除の安全性](release-log/unreleased/2094-kenta-train-1102q.md)
 - [座席図の卓プレビュー・タブ並び替え・拡大移動の修正](release-log/unreleased/2099-masato-seat-map-ux.md)
 - [Instagramの同一統括内での複数アカウント接続](release-log/unreleased/2080-masato-instagram-shared-accounts.md)
 - [座席・卓管理のPenデザイン反映](release-log/unreleased/2074-masato-table-pen.md)
