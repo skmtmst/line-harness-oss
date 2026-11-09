@@ -272,6 +272,26 @@ describe('BERxg 座席・卓管理', () => {
     expect(fixture.updateReservation).not.toHaveBeenCalled()
   })
 
+  it('卓の変更のあと読み込みに失敗したら、理由と読み直しを出し、読み直せたら止める確認を開く', async () => {
+    fixture.snapshot.mockResolvedValueOnce({ data: snapshotOf({ reservations: [] }) })
+      .mockRejectedValueOnce(new Error('network down'))
+    render(<TablesPage />)
+    await screen.findByText('T3 · 窓側4人卓')
+    fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
+    const editor = screen.getByRole('dialog')
+    fireEvent.click(within(editor).getByRole('button', { name: '席の条件を変更 ›' }))
+    fireEvent.click(within(editor).getByRole('button', { name: '停止中' }))
+    fireEvent.click(within(editor).getByRole('button', { name: '変更を保存' }))
+    const notice = await screen.findByText(/止める確認を開けていません/)
+    expect(screen.queryByRole('dialog', { name: /を止めますか/ })).toBeNull()
+    const fresh = snapshotOf({ tables: tables.map(table => table.id === 't3' ? { ...table, confirmation_revision: 2 } : table), reservations: [{ ...upcoming[0], confirmation_revision: 3 }] })
+    fixture.snapshot.mockResolvedValueOnce({ data: fresh })
+    fireEvent.click(within(notice.closest('[role="alert"]') as HTMLElement).getByRole('button', { name: 'もう一度読み込む' }))
+    const dialog = await screen.findByRole('dialog', { name: /卓「T3・窓側4人卓」を止めますか/ })
+    expect(dialog.textContent).toContain('これから先の予約が 1 件')
+  })
+
   it('止めるときは先の予約を出し、入る卓へ移し、入らない予約は未配席にしてから止める', async () => {
     render(<TablesPage />)
     await screen.findByText('T3 · 窓側4人卓')

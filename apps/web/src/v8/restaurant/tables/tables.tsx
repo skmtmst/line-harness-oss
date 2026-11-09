@@ -346,6 +346,12 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <KpiCard title="受付中の定員" value={activeRows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="名" detail="最大人数の合計" icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="個室" value={rows.filter((item) => item.partition_type === 'private').length} unit="卓" detail="個室の卓数" icon={<Inbox size={16} aria-hidden />} presentation="band" />
       </StatRow>
+      {/* 卓の変更を保存したあと最新の状態を読めないと、止める確認を開けない。理由と読み直しを出し、読めたら確認を開く。 */}
+      {pendingStop && !busy && !tableDefinition ? (
+        <Notice tone="warn" role="alert" action={<Button variant="text" size="inline" onClick={() => void ctx.reload()}>もう一度読み込む</Button>}>
+          卓の変更は保存しました。最新の予約を読み込めなかったため、止める確認を開けていません。
+        </Notice>
+      ) : null}
       <DetailColumns variant="restaurant-tables" asideLabel="卓一覧を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title="卓一覧" headerActions={<RestaurantTableHeaderActions statusFilter={statusFilter} onStatusFilter={setStatusFilter}/>}>
           <ul className={styles.detailList}>
             {visibleRows.map((item) => (
