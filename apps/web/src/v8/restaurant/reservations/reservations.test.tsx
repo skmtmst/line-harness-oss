@@ -10,6 +10,9 @@ const fixture = vi.hoisted(() => ({
   attendance: vi.fn(),
 }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
+const detailAttendance = vi.hoisted(() => ({ current: null as null | ((id: string, action: 'visited') => unknown), close: null as null | (() => void) }))
+const mutationEntry = vi.hoisted(() => ({ enabled: false, called: vi.fn() }))
+const notifications = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api/helpers/reservation-board',async importOriginal=>{const original=await importOriginal<typeof import('@/lib/api/helpers/reservation-board')>();return {...original,reservationBoardApi:{...original.reservationBoardApi,floors:fixture.floors}}})
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/reservations', useSearchParams: () => new URLSearchParams() }))
@@ -17,6 +20,25 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'restaurant' }, stale: false }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
+vi.mock('@/v8/restaurant-reservations/index', async original => {
+  const actual = await original<typeof import('@/v8/restaurant-reservations/index')>()
+  return { ...actual, ReservationDetailDialog: (props: React.ComponentProps<typeof actual.ReservationDetailDialog>) => {
+    if (props.reservation?.id === 'r1' && props.onAttendance) { detailAttendance.current = props.onAttendance; detailAttendance.close = props.onClose }
+    return <actual.ReservationDetailDialog {...props} />
+  } }
+})
+vi.mock('@/components/shared/toast', async original => {
+  const actual = await original<typeof import('@/components/shared/toast')>()
+  return { ...actual, notifyToast: (...args: Parameters<typeof actual.notifyToast>) => { notifications(...args); return actual.notifyToast(...args) } }
+})
+vi.mock('@/v8/restaurant/booking-kit/public/shell/index', async original => {
+  const actual = await original<typeof import('@/v8/restaurant/booking-kit/public/shell/index')>()
+  return { ...actual, RestaurantShell: (props: React.ComponentProps<typeof actual.RestaurantShell>) => {
+    if (!mutationEntry.enabled || !props.children) return <actual.RestaurantShell {...props} />
+    const children = props.children
+    return <actual.RestaurantShell {...props}>{ctx => children({ ...ctx, mutate: (...args) => { mutationEntry.called(); return ctx.mutate(...args) } })}</actual.RestaurantShell>
+  } }
+})
 
 import ReservationsPage from './reservations'
 import { ApiError } from '@/lib/api'
@@ -35,6 +57,11 @@ const reservationsToday = () => [
 let today: ReturnType<typeof reservationsToday>
 
 beforeEach(() => {
+  detailAttendance.current = null
+  detailAttendance.close = null
+  notifications.mockClear()
+  mutationEntry.enabled = false
+  mutationEntry.called.mockClear()
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   today = reservationsToday()
@@ -497,4 +524,42 @@ it('来店の競合は詳細の中に示してから予約を読み直す', asyn
   fireEvent.click(within(dialog).getByRole('button', { name: '読み直す' }))
   await waitFor(() => expect(fixture.snapshot.mock.calls.length).toBeGreaterThan(beforeSnapshot))
   await waitFor(() => expect(fixture.reservationsDay.mock.calls.length).toBeGreaterThan(beforeDay))
+})
+
+it('現在の詳細と違う予約IDの来店を受け付けない', async () => {
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  await screen.findByRole('dialog')
+  expect(detailAttendance.current).toBeTypeOf('function')
+  await act(async () => { await detailAttendance.current!('r2', 'visited') })
+  expect(fixture.attendance).not.toHaveBeenCalled()
+})
+
+it('別の予約へ切り替えた後に古い来店操作を受け付けない', async () => {
+  mutationEntry.enabled = true
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  const previous = detailAttendance.current!
+  expect(previous).toBeTypeOf('function')
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  fireEvent.click(await screen.findByRole('button', { name: /^山田 太郎 4名/ }))
+  await screen.findByRole('dialog')
+  await act(async () => { await previous('r1', 'visited') })
+  expect(fixture.attendance).not.toHaveBeenCalled()
+  expect(mutationEntry.called).not.toHaveBeenCalled()
+})
+
+it('詳細を閉じた後に古い来店の成功が届いても成功通知しない', async () => {
+  let finish!: (result: unknown) => void
+  fixture.attendance.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  await screen.findByRole('dialog')
+  act(() => { void detailAttendance.current!('r1', 'visited') })
+  await waitFor(() => expect(fixture.attendance).toHaveBeenCalledOnce())
+  act(() => detailAttendance.close!())
+  notifications.mockClear()
+  await act(async () => { finish({ success: true, data: { stamp: { status: 'recorded', count: 3 } } }) })
+  expect(notifications).not.toHaveBeenCalled()
 })

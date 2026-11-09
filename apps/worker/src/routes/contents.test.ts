@@ -171,7 +171,7 @@ const del = vi.fn().mockResolvedValue(undefined);
 const head = vi.fn();
 const get = vi.fn();
 const env = {
-  DB: { prepare: () => ({ bind: () => ({ first: async () => null, all: async () => ({ results: [] }) }) }) } as unknown as D1Database,
+  DB: { prepare: () => ({ bind: () => ({ first: async () => null, all: async () => ({ results: [] }), run: async () => ({ meta: { changes: 1 } }) }) }), batch: async () => [] } as unknown as D1Database,
   IMAGES: { put, delete: del, head, get } as unknown as R2Bucket,
   WORKER_URL: 'https://api.example.com',
   CF_ACCOUNT_ID: 'cf-account',
@@ -924,7 +924,6 @@ describe('メディアの削除', () => {
       },
     });
   });
-
   it('R34: 表が無い読み口があっても503にせず、未確認として返す', async () => {
     scanMocks.scanSingleMediaUsage.mockResolvedValueOnce({ scanned: 1, matched: 0, pruned: 0, skippedTables: ['webinars'] });
     mocks.getMediaDeleteImpactSnapshot.mockResolvedValueOnce({ impact: DELETE_IMPACT, usages: [] });
@@ -939,7 +938,6 @@ describe('メディアの削除', () => {
       },
     });
   });
-
   it('走査が途中で使用先を更新しても、同じsnapshotのIDだけを一覧へ結合する', async () => {
     mocks.getMediaDeleteImpactSnapshot.mockResolvedValue({
       impact: {
@@ -959,7 +957,6 @@ describe('メディアの削除', () => {
     // 旧実装なら二度目の読込でこの別IDをindex結合してしまう。
     mocks.getMediaUsages.mockResolvedValue([{ media_id: 'md-1', ref_kind: 'broadcast', ref_id: 'newer-row' }]);
     mocks.getMediaUsageReferenceStates.mockResolvedValue([{ mode: 'pinned', versionNo: 1 }]);
-
     const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET');
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
@@ -967,7 +964,6 @@ describe('メディアの削除', () => {
     });
     expect(mocks.getMediaUsages).not.toHaveBeenCalled();
   });
-
   it('影響を取得できないときは0件を作らず503', async () => {
     scanMocks.scanSingleMediaUsage.mockRejectedValueOnce(new Error('D1 unavailable'));
     const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET');
@@ -1031,11 +1027,15 @@ describe('メディアの削除', () => {
     expect(mocks.deleteMedia).not.toHaveBeenCalled();
   });
 
-  it('DBの行を先に消す', async () => {
-    // 逆にすると「行はあるが実体が無い」状態になる。この順なら
-    // 孤児のファイルが残るだけで、画面には出てこない。
+  it('実体の削除後に、占有した操作としてDBの行を消す', async () => {
     await req('/api/media/md-1?accountId=account-1', 'DELETE');
-    expect(mocks.deleteMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1');
+    expect(mocks.deleteMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', expect.objectContaining({ lockId: 'file-scan-delete:media:md-1', r2Key: MEDIA.r2_key }));
+    expect(del.mock.invocationCallOrder[0]).toBeLessThan(mocks.deleteMedia.mock.invocationCallOrder[0]);
+  });
+  it('検査ファイルの削除と競合した素材は保管庫に触れない', async () => {
+    const batch = vi.spyOn(env.DB, 'batch').mockRejectedValueOnce(new Error('malformed JSON'));
+    const res = await req('/api/media/md-1?accountId=account-1', 'DELETE'); batch.mockRestore();
+    expect(res.status).toBe(409); expect(del).not.toHaveBeenCalled(); expect(mocks.deleteMedia).not.toHaveBeenCalled();
   });
 });
 

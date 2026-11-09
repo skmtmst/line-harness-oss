@@ -209,7 +209,10 @@ describe('日付で席予約を閉じる',()=>{
   const p=await post(closurePath+'/preview',closureInput);expect(p.status).toBe(200);const preview=(await p.json() as any).data;
   expect(testDb.raw.prepare('SELECT COUNT(*) n FROM rt_closures').get()).toEqual({n:0});
   const saved=await create();expect(saved.status).toBe(201);
-  const {closure,...impact}=saved.body.data;expect(impact).toEqual(preview);expect(impact.waitlistCount).toBe(1);
+  const {confirmationSnapshot,...previewImpact}=preview;
+  expect(typeof confirmationSnapshot).toBe('string');
+  expect(saved.body.data).not.toHaveProperty('confirmationSnapshot');
+  const {closure,...impact}=saved.body.data;expect(impact).toEqual(previewImpact);expect(impact.waitlistCount).toBe(1);
   expect(impact.reservations).toEqual([expect.objectContaining({id:'r-existing',startsAt:SLOT,guestCount:2,customerName:'予約客',source:'manual',friendId:'friend',isLineFriend:true})]);
   expect(testDb.raw.prepare("SELECT status FROM rt_reservations WHERE id='r-existing'").get()).toEqual({status:'confirmed'});
   expect((await patch('/api/restaurant-test/reservations/r-existing',{note:'連絡済み'})).status).toBe(200);
