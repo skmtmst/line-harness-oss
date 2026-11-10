@@ -62,28 +62,33 @@ it('数の帯の対応待ちの補足は1行に収まる短さにする', async 
   expect(screen.queryByText(/枠を閉じる/)).toBeNull()
 })
 
-it('飲食の数字は初期設定の取得を待たずに表示し、設定は後から反映する', async () => {
+it('飲食は初期設定の取得中に数字を先に見せず、案内と一緒に出す', async () => {
   let release!: (value: unknown) => void
   state.items.mockReturnValue(new Promise(resolve => { release = resolve }))
-  render(<StyleDashboard style="restaurant" />)
+  const view = render(<StyleDashboard style="restaurant" />)
+  await waitFor(() => expect(state.summary).toHaveBeenCalled())
+  await waitFor(() => expect(state.items).toHaveBeenCalled())
   const kpi = await screen.findByText('未配席 1・枠閉じ 2')
-  expect(kpi.closest('[aria-hidden="true"]')).toBeNull()
-  expect(kpi.closest('[inert]')).toBeNull()
+  expect(kpi.closest('[data-pending="true"][aria-hidden="true"][inert]')).not.toBeNull()
   expect(screen.queryByRole('heading', { name: 'はじめにやること' })).toBeNull()
-  expect(state.items).toHaveBeenCalled()
   await act(async () => { release({ success: true, data: { items: [] } }) })
   expect(await screen.findByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
+  expect(await screen.findByText('未配席 1・枠閉じ 2')).toBeTruthy()
+  expect(view.container.querySelector('[data-pending="true"]')).toBeNull()
 })
 
-it('飲食の数字は最初の案内の取得も待たずに表示する', async () => {
+it('飲食は最初の案内の取得中に数字を先に見せず、案内と一緒に出す', async () => {
   firstRun.status = 'loading'
   const view = render(<StyleDashboard style="restaurant" />)
+  await waitFor(() => expect(state.summary).toHaveBeenCalled())
   const kpi = await screen.findByText('未配席 1・枠閉じ 2')
-  expect(kpi.closest('[aria-hidden="true"]')).toBeNull()
+  expect(kpi.closest('[data-pending="true"][aria-hidden="true"][inert]')).not.toBeNull()
   expect(screen.queryByRole('heading', { name: 'はじめにやること' })).toBeNull()
   firstRun.status = 'ready'
   view.rerender(<StyleDashboard style="restaurant" />)
   expect(await screen.findByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
+  expect(await screen.findByText('未配席 1・枠閉じ 2')).toBeTruthy()
+  expect(view.container.querySelector('[data-pending="true"]')).toBeNull()
 })
 
 it('サロンの対応待ちの補足も1行に収まる短さにする', async () => {
@@ -164,17 +169,16 @@ it('設定の取得失敗を未設定にせず、同じ口を読み直せる', a
   await waitFor(() => expect(state.warnings).toHaveBeenCalledTimes(2))
 })
 
-it('選んだ機能の設定が遅れたときは数を先に表示し、後から設定を出す', async () => {
+it('選んだ機能の設定が遅れたときは案内と数字を一緒に出す', async () => {
   let resolve!: (value: unknown) => void
   state.warnings.mockImplementationOnce(() => new Promise(done => { resolve = done }))
   const view = render(<StyleDashboard style="restaurant" />)
   await waitFor(() => expect(state.warnings).toHaveBeenCalled())
-  const kpi = await screen.findByText('未配席 1・枠閉じ 2')
-  expect(kpi.closest('[aria-hidden="true"]')).toBeNull()
-  expect(screen.queryByRole('heading', { name: '選んだ機能の設定' })).toBeNull()
+  await waitFor(() => expect(view.container.querySelector('[data-pending="true"]')).not.toBeNull())
   await act(async () => resolve({ success: true, data: { items: [] } }))
   await waitFor(() => expect(view.container.querySelector('[data-pending="true"]')).toBeNull())
   expect(await screen.findByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
+  expect(await screen.findByText('未配席 1・枠閉じ 2')).toBeTruthy()
 })
 
 it.each(['restaurant', 'salon', 'consult', 'lesson'].flatMap(style => ['0', 'summary'].map(step => [style, step])))('%sはsetup=%sを同じ専用画面で開き、閉じても期間を残す', async (style, step) => {
