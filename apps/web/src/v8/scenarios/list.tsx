@@ -1421,7 +1421,7 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
                 value={panelRow.name}
                 label="シナリオ名"
                 onSave={(next) => renameScenario(panelRow.id, next)}
-                maxLength={80}
+                maxLength={60}
                 disabled={editDisabled}
                 lockedReason={editAccess.reason}
                 canSaveNow={canWriteHere}

@@ -28,7 +28,7 @@ const net = vi.hoisted(() => ({
   create: vi.fn(),
 }))
 const accountState = vi.hoisted(() => ({
-  selectedAccountId: 'account-a',
+  selectedAccountId: 'account-a' as string | null,
   accounts: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '二号店' }],
   loading: false,
 }))
@@ -114,6 +114,14 @@ function openMenu(name: string, item: string) {
 function kpiNumbers() {
   return [...host.querySelectorAll('[data-kpi-number]')].map((node) => node.textContent)
 }
+
+it('全アカウントでは停止状態を推測せず、見えている有効なルールを案内する', async () => {
+  accountState.selectedAccountId = null
+  renderList(); await flush()
+  expect(host.textContent).toContain('確認できる自動応答に、有効なルールがあります。')
+  expect(host.textContent).not.toContain('自動応答全体の送信状態を確認できません。')
+  expect(net.summary).not.toHaveBeenCalled()
+})
 
 beforeEach(() => {
   verifiedStaffRole('owner'); forgetSessionSnapshot()

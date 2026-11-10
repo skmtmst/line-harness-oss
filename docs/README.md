@@ -463,6 +463,7 @@
 
 ## 反映履歴
 
+- [予約と友だち情報の表示・操作の改善](release-log/unreleased/2097-kenta-train-1102r.md)
 - [配信の取り消しとテナント削除の安全性](release-log/unreleased/2094-kenta-train-1102q.md)
 - [座席図の卓プレビュー・タブ並び替え・拡大移動の修正](release-log/unreleased/2099-masato-seat-map-ux.md)
 - [Instagramの同一統括内での複数アカウント接続](release-log/unreleased/2080-masato-instagram-shared-accounts.md)

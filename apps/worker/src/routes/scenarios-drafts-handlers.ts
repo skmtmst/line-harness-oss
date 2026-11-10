@@ -259,6 +259,9 @@ export const post__api_scenarios_6 = async (c: Context<Env, "/api/scenarios">) =
     if (!body.name || !body.triggerType) {
       return inputError(c, { success: false, error: 'name and triggerType are required' }, 400, ["name","triggerType"]);
     }
+    if (body.name.length > 60) {
+      return inputError(c, { success: false, error: 'シナリオ名は60文字以内で入力してください' }, 400, ['name']);
+    }
 
     if (body.lineAccountId
       && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
@@ -332,6 +335,16 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
     if (body.expectedSubscriptions !== undefined && (body.expectedContentRevision === undefined || !validSubscriptionSummary(body.expectedSubscriptions))) {
       return inputError(c, { success: false, error: 'invalid_confirmation_subscriptions' }, 400, ['expectedSubscriptions']);
     }
+    let name = body.name;
+    if (name !== undefined && name.length > 60) {
+      const existing = await getScenarioById(c.env.DB, id);
+      if (!existing) return fail(c, 404, 'SCENARIO_NOT_FOUND');
+      if (existing.name !== name) {
+        return inputError(c, { success: false, error: 'シナリオ名は60文字以内で入力してください' }, 400, ['name']);
+      }
+      // 未変更の長いシナリオ名を送らず、同時編集による上書きを防ぐ。
+      name = undefined;
+    }
     if (body.reason !== undefined && (
       body.isActive !== false
       || typeof body.reason !== 'string'
@@ -392,7 +405,7 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
     }
 
     const updated = await updateScenario(c.env.DB, id, {
-      name: body.name,
+      name,
       description: body.description,
       trigger_type: body.triggerType,
       trigger_tag_id: body.triggerTagId,

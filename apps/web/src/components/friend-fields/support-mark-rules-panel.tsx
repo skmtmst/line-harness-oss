@@ -5,6 +5,8 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import ListState from '@/components/shared/list-state'
 import { ApiError, api, type SupportMarkAutomationEvent, type SupportMarkAutomationRule } from '@/lib/api'
 import {
@@ -68,10 +70,12 @@ export default function SupportMarkRulesPanel({
   accountId,
   markId,
   markName,
+  onCloseGuard,
 }: {
   accountId: string | null
   markId: string | null
   markName: string
+  onCloseGuard?: (guard: ((action: () => void) => void) | null) => void
 }) {
   const saveErrors = useSaveFormErrors()
 
@@ -85,6 +89,9 @@ export default function SupportMarkRulesPanel({
   const [pendingArchive, setPendingArchive] = useState<{ rule: SupportMarkAutomationRule; accountId: string; markId: string; markName: string; epoch: number } | null>(null)
   const scope = useRef({ accountId, markId, markName, epoch: 0 })
   if (scope.current.accountId !== accountId || scope.current.markId !== markId || scope.current.markName !== markName) scope.current = { accountId, markId, markName, epoch: scope.current.epoch + 1 }
+  const baseline = useRef(JSON.stringify(EMPTY_DRAFT))
+  const guard = useUnsavedGuard({ dirty: editingId !== null && JSON.stringify(draft) !== baseline.current, busy: saving, subject: '自動変更ルール', onDiscard: () => { setEditingId(null); setDraft(EMPTY_DRAFT); setFailure(null) } })
+  useEffect(() => { onCloseGuard?.(guard.guarded); return () => onCloseGuard?.(null) }, [guard.guarded, onCloseGuard])
 
   /*
     **遅い返事を別のマークへ映さない。**
@@ -173,20 +180,23 @@ export default function SupportMarkRulesPanel({
   const errorFor = (field: 'name' | 'priority' | 'manualProtectionMinutes') =>
     touched ? errors.find((e) => e.field === field)?.message : undefined
 
-  const openNew = () => {
+  const openNew = () => guard.guarded(() => {
+    baseline.current = JSON.stringify(EMPTY_DRAFT)
     setEditingId('new')
     setDraft(EMPTY_DRAFT)
     setFailure(null)
     setTouched(false)
     ruleKeyRef.current = crypto.randomUUID()
-  }
+  })
 
-  const openEdit = (rule: SupportMarkAutomationRule) => {
+  const openEdit = (rule: SupportMarkAutomationRule) => guard.guarded(() => {
+    const next = draftOf(rule)
+    baseline.current = JSON.stringify(next)
     setEditingId(rule.id)
-    setDraft(draftOf(rule))
+    setDraft(next)
     setFailure(null)
     setTouched(false)
-  }
+  })
 
   const save = async () => {
     if (!accountId || !markId || errors.length > 0) return
@@ -200,6 +210,7 @@ export default function SupportMarkRulesPanel({
         ? await api.supportMarks.updateAutomationRule(call.ruleId, accountId, call.expectedVersion, body)
         : await api.supportMarks.createAutomationRule(markId, accountId, body, ruleKeyRef.current)
       if (!res.success) throw new Error('failed')
+      guard.disarm()
       setEditingId(null)
       await load()
     } catch (err) {
@@ -399,7 +410,7 @@ export default function SupportMarkRulesPanel({
           >このルールを動かす</Checkbox></SaveErrorField>
 
           <div className={styles.formActions}>
-            <Button onClick={() => { setEditingId(null); setFailure(null) }} disabled={saving}>
+            <Button onClick={() => guard.guarded(() => { setEditingId(null); setFailure(null) })} disabled={saving}>
               キャンセル
             </Button>
             <Button
@@ -429,6 +440,7 @@ export default function SupportMarkRulesPanel({
         error={failure?.message} onSuccess={() => setPendingArchive(null)} onConfirm={() => archive()}
         onCancel={() => { if (!saving) setPendingArchive(null) }}
       ><OperationTargetSummary accounts={[{ id: pendingArchive?.accountId ?? '' }]} externalTarget={{ label: '対応マーク', name: pendingArchive?.markName }} /></ConfirmDialog>
+      <UnsavedLeaveDialog subject="自動変更ルールへの変更" open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </section></SaveErrorScope>
   )
 }

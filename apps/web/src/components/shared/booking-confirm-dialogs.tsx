@@ -97,7 +97,7 @@ export function RefundDialog({ open, subtitle, facts, paidAmount, testMode, busy
   testMode?: boolean
   /** 手順 2 の「返金先」（例「カード（•••• 4242）」）。 */
   destination?: string
-  /** 手順 2 の「記録」に残る名前（例「河野 健太（オーナー）」）。 */
+  /** 手順 2 の「記録」に残る名前（例「見本 太郎（オーナー）」）。 */
   actorLabel?: string
   /** 手順 2 に出す、お客さまに送る LINE の文（PpBzn・v6mT4f）。 */
   messageFor?: (input: RefundInput) => string

@@ -10,7 +10,7 @@ const cancelGroup = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: { cancelGroup } }))
 const { default: PartySection } = await import('./party-section')
 
-const party: BookingParty = { groupId: 'g1', ownerName: '山田 花子', version: 2, members: [
+const party: BookingParty = { groupId: 'g1', ownerName: '見本 143', version: 2, members: [
   { bookingId: 'b1', label: 'チョコ', menuName: '爪切り', staffName: 'Kenta', startsAt: '2026-10-01T04:30:00.000Z', endsAt: '2026-10-01T04:45:00.000Z', status: 'confirmed', version: 1 },
   { bookingId: 'b2', label: 'マロン', menuName: 'トリミング（中型犬）', staffName: '佐々木', startsAt: '2026-10-01T04:00:00.000Z', endsAt: '2026-10-01T05:30:00.000Z', status: 'confirmed', version: 1 },
 ] }

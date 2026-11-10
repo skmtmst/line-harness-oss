@@ -875,7 +875,7 @@ describe('飲食店向けテストAPI', () => {
     const first = await request('/api/restaurant-test/reservations/manual?account_id=account-1', body);
     expect(first.status).toBe(201);
     const second = await request('/api/restaurant-test/reservations/manual?account_id=account-1', {
-      ...body, customerName: '重複 次郎', tableId: 'table-2seat',
+      ...body, customerName: '見本 23', tableId: 'table-2seat',
     });
     expect(second.status).toBe(409);
     const count = testDb.raw.prepare(
@@ -1033,7 +1033,7 @@ describe('飲食店向けテストAPI', () => {
     const second = await request('/api/restaurant-test/inbound/reservations?account_id=account-1', {
       storeId: store.id, provider: 'restaurant_board', eventId: 'event-seat-b',
       reservation: {
-        externalId: 'RB-SEAT-B', customerName: '後客 次郎', guestCount: 2,
+        externalId: 'RB-SEAT-B', customerName: '見本 24', guestCount: 2,
         startsAt: '2026-10-20T10:00:00.000Z', endsAt: '2026-10-20T12:00:00.000Z',
       },
     });
@@ -1840,14 +1840,14 @@ it('API-01 飲食台帳の暦日も日本の00:30を含めて翌日00:30を除�
 
 it('電話の全角・区切りを検索で整え、他店を混ぜず旧行も更新しない', async () => {
   seedRestaurantFixture();
-  testDb.raw.exec("UPDATE rt_reservations SET customer_phone='０９０－１２３４－５６７８',status='visited' WHERE id='reservation-ginza'");
+  testDb.raw.exec("UPDATE rt_reservations SET customer_phone='０９０－００００－５６７８',status='visited' WHERE id='reservation-ginza'");
   const path='/api/restaurant-test/customers/search?account_id=account-1&storeId=store-ginza&q=';
-  const rows=(await (await request(path+encodeURIComponent('090 1234 5678'))).json() as {data:Array<{phone:string|null}>}).data;
-  expect(rows).toHaveLength(1);expect(rows[0].phone).toBe('09012345678');
+  const rows=(await (await request(path+encodeURIComponent('090 0000 5678'))).json() as {data:Array<{phone:string|null}>}).data;
+  expect(rows).toHaveLength(1);expect(rows[0].phone).toBe('09000005678');
   const history='/api/restaurant-test/customers/history?account_id=account-1&storeId=store-ginza&phone=';
-  expect((await (await request(history+encodeURIComponent('０９０－１２３４－５６７８'))).json() as {data:{visitCount:number}}).data.visitCount).toBe(1);
-  expect((await (await request(path.replace('store-ginza','store-yokohama')+'09012345678')).json() as {data:unknown[]}).data).toEqual([]);
-  expect(testDb.raw.prepare("SELECT customer_phone FROM rt_reservations WHERE id='reservation-ginza'").get()).toEqual({customer_phone:'０９０－１２３４－５６７８'});
+  expect((await (await request(history+encodeURIComponent('０９０－００００－５６７８'))).json() as {data:{visitCount:number}}).data.visitCount).toBe(1);
+  expect((await (await request(path.replace('store-ginza','store-yokohama')+'09000005678')).json() as {data:unknown[]}).data).toEqual([]);
+  expect(testDb.raw.prepare("SELECT customer_phone FROM rt_reservations WHERE id='reservation-ginza'").get()).toEqual({customer_phone:'０９０－００００－５６７８'});
 });
 
 describe('電話予約と押さえの受付条件', () => {

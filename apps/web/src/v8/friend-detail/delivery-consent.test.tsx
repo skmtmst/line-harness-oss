@@ -20,7 +20,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
-const open = (canEdit = true) => render(<Drawer open friendId="f1" friendName="山田 花子" rows={ROWS as never} canEdit={canEdit} onClose={() => {}} onSaved={() => {}} />)
+const open = (canEdit = true) => render(<Drawer open friendId="f1" friendName="見本 143" rows={ROWS as never} canEdit={canEdit} onClose={() => {}} onSaved={() => {}} />)
 
 describe('配信の受け取り', () => {
   it('4つの目的ごとに状態を出す。記録が無い目的は「不明」', async () => {

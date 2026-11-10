@@ -233,3 +233,38 @@ describe('保存と停止', () => {
     expect(net.archive).toHaveBeenCalledWith('rule-1', 'acc', 3)
   })
 })
+
+it('自動変更ルールの入力後にキャンセルすると破棄を確認する', async () => {
+  render(<SupportMarkRulesPanel accountId="acc" markId="mk1" markName="対応中" />)
+  fireEvent.click(await screen.findByRole('button', { name: /ルールを作る/ }))
+  const field = screen.getByPlaceholderText('例：担当者が決まったら対応中へ') as HTMLInputElement
+  fireEvent.change(field, { target: { value: '作りかけのルール' } })
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('自動変更ルールへの変更')
+  expect(field.value).toBe('作りかけのルール')
+})
+
+it('ルールの窓を閉じるときも中の未保存入力を確認する', async () => {
+  render(<MarkEditor markId="mk1" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'きまりを作る' }))
+  const outer = await screen.findByRole('dialog', { name: '自動で変えるきまり' })
+  fireEvent.click(await within(outer).findByRole('button', { name: /ルールを作る/ }))
+  const field = within(outer).getByPlaceholderText('例：担当者が決まったら対応中へ') as HTMLInputElement
+  fireEvent.change(field, { target: { value: '作りかけのルール' } })
+  fireEvent.click(within(outer).getByRole('button', { name: '閉じる' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  expect(field.value).toBe('作りかけのルール')
+})
+
+it('親のマークだけを編集した状態では、未変更のルール窓を確認なしで閉じて親の入力を残す', async () => {
+  render(<MarkEditor markId="mk1" />)
+  const name = await screen.findByPlaceholderText('例：要確認') as HTMLInputElement
+  fireEvent.change(name, { target: { value: '親の編集中' } })
+  fireEvent.click(await screen.findByRole('button', { name: 'きまりを作る' }))
+  const outer = await screen.findByRole('dialog', { name: '自動で変えるきまり' })
+  fireEvent.click(within(outer).getByRole('button', { name: '閉じる' }))
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '自動で変えるきまり' })).toBeNull())
+  expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+  expect(name.value).toBe('親の編集中')
+})

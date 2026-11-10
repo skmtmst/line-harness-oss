@@ -87,6 +87,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     return content?.kind === 'question' && isEditableQuestion(content.question as unknown as ScenarioQuestion) ? { name: content.name, question: content.question as unknown as ScenarioQuestion } : null
   })
   const editVersion = useRef<{ expectedVersion: number; expectedDraftRevision: number } | null>(null)
+  const createdDraft = useRef<{ id: string; generation: number } | null>(null)
   const [name, setName] = useState(hostInitial?.name ?? '')
   const [category, setCategory] = useState('未分類')
   const [folderId, setFolderId] = useState<string | null>(null)
@@ -190,7 +191,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionDraftSnapshot])
 
-  const save = async (questionStatus: 'draft' | 'published', confirmedVersion?: { expectedVersion: number; expectedDraftRevision: number }): Promise<boolean> => {
+  const save = async (questionStatus: 'draft' | 'published', confirmedVersion?: { expectedVersion: number; expectedDraftRevision: number }, onSaved?: () => void): Promise<boolean> => {
     if (host) {
       if (fields.submit().length > 0) { setError(''); return false }
       setError('')
@@ -202,6 +203,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     if (fields.submit().length > 0) { setError(''); return false }
     setSaving(true)
     setError('')
+    const generation = scope.current.generation
+    const savedId = id ?? (createdDraft.current?.generation === generation ? createdDraft.current.id : null)
+    let saved = false
     const payload = {
       accountId: selectedAccountId,
       name: name.trim(),
@@ -213,16 +217,27 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       folderId,
     }
     try {
-      const result = id ? await api.templates.update(id, { ...payload, ...(confirmedVersion ?? editVersion.current) }) : await api.templates.create(payload)
+      const result = savedId ? await api.templates.update(savedId, { ...payload, ...(confirmedVersion ?? editVersion.current) }) : await api.templates.create(payload)
       if (!result.success) { setError(result.error || '保存できませんでした。時間をおいて、もう一度お試しください。'); return false }
+      if (!alive.current || generation !== scope.current.generation) return false
+      const templateId = result.data.id || savedId
+      if (!id && templateId) createdDraft.current = { id: templateId, generation }
       editVersion.current = { expectedVersion: result.data.publishedVersion, expectedDraftRevision: result.data.draftRevision }
+      saved = true
+      onSaved?.()
+      if (questionStatus === 'published') {
+        if (!templateId || !canMutateRef.current) { setError('下書きは保存しましたが、公開できませんでした。一覧で確認してください。'); return false }
+        const published = await api.templates.publish(templateId, editVersion.current)
+        if (!alive.current || generation !== scope.current.generation) return false
+        if (!published.success) { setError('下書きは保存しましたが、公開できませんでした。もう一度お試しください。'); return false }
+      }
       return true
     } catch (caught) {
       const extraError = tapExtraSaveError(caught)
       if (extraError) { fields.setServerErrors(Object.fromEntries(question.choices.map((_, ci) => [`extras-${ci}`, extraError]))); return false }
       if (!saveErrors.capture(caught, fields))
 
- setError(describeApiFailure(caught, '保存', { scope: 'store' }));
+ setError(saved && questionStatus === 'published' ? '下書きは保存しましたが、公開できませんでした。もう一度お試しください。' : describeApiFailure(caught, '保存', { scope: 'store' }));
 
       return false
     } finally {
@@ -281,7 +296,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const busy = saving || publishing || Boolean(host?.busy)
   const previewAccountName = host ? host.accountName : accounts.find((account) => account.id === (id ? templateAccountId : selectedAccountId))?.name
   const phone = (
-    <LinePreview title={null} note="質問の見え方（山田 太郎さんの場合）" accountName={previewAccountName ?? undefined}>
+    <LinePreview title={null} note="質問の見え方（見本 141さんの場合）" accountName={previewAccountName ?? undefined}>
       <div className={styles.bubble}>
         {question.intro?.trim() ? <p className={styles.bubbleIntro}>{displayText(question.intro)}</p> : null}
         <p className={styles.bubbleText}>{displayText(question.text) || '質問文を入力すると、ここに出ます。'}</p>
@@ -405,7 +420,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         title="この質問を公開しますか？"
         description={`この質問は ${usageCount}か所で使われています。公開すると、シナリオや一斉配信へ新しい内容が届きます。`}
         confirmLabel="公開する"
-        busy={saving}
+        busy={saving || publishing}
         confirmDisabled={publishTarget !== null && publishTarget.form !== publishFormScope.current}
         confirmDisabledReason="内容が変わりました。閉じて確認し直してください。"
         error={error || undefined}
@@ -414,7 +429,38 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           if (!alive.current || !canMutateRef.current || !publishTarget || !renderedPublishTicket || renderedPublishTicket !== publishTicket.current || publishTarget.generation !== scope.current.generation || publishTarget.form !== publishFormScope.current) return
           setPublishing(true)
           try {
-            if (await save('published', publishTarget.version)) { publishTicket.current = null; setPublishTarget(null); leaveToList() }
+            let savedBeforeFailure = false
+            if (await save('published', publishTarget.version, () => { savedBeforeFailure = true })) { publishTicket.current = null; setPublishTarget(null); leaveToList(); return }
+            // 保存が通ってから公開に失敗した場合、確認時の版は自分の保存で古くなる。
+            // 最新の対象・利用先と版を読み直して、あらためて確認してもらう。
+            if (savedBeforeFailure) {
+              const target = publishTarget
+              publishTicket.current = null
+              setPublishTarget(null)
+              editVersion.current = null
+              try {
+                const latest = await api.templates.get(id!)
+                if (!alive.current || target.generation !== scope.current.generation) return
+                if (!latest.success || !latest.data.question || !isEditableQuestion(latest.data.question) || target.form !== publishFormScope.current) {
+                  setError('最新の質問を確認できませんでした。読み直してから公開してください。')
+                  return
+                }
+                const latestQuestion = latest.data.question
+                const data = latest.data
+                editVersion.current = { expectedVersion: data.publishedVersion, expectedDraftRevision: data.draftRevision }
+                setTemplateAccountId(data.accountId ?? null)
+                setTemplateAccountKnown(Object.prototype.hasOwnProperty.call(data, 'accountId') && data.accountId !== undefined)
+                setName(data.name)
+                setCategory(data.category || '未分類')
+                setFolderId(data.folderId ?? null)
+                setQuestion(latestQuestion)
+                setSavedSnapshot(snapshotOf({ name: data.name, category: data.category || '未分類', folderId: data.folderId ?? null, question: latestQuestion }))
+                setUsageCount(Object.values(data.usedBy).reduce((total, items) => total + items.length, 0))
+                setError('下書きは保存しましたが、公開できませんでした。最新の内容を確認し、もう一度公開してください。')
+              } catch {
+                if (alive.current && target.generation === scope.current.generation) setError('最新の質問を読み直せませんでした。読み直してから公開してください。')
+              }
+            }
           } finally {
             setPublishing(false)
           }

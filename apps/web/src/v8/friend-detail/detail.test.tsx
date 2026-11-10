@@ -126,7 +126,7 @@ Object.defineProperty(window, 'localStorage', {
 const friend = {
   id: 'friend-1',
   lineUserId: 'U1',
-  displayName: '山田 花子',
+  displayName: '見本 143',
   pictureUrl: null,
   statusMessage: null,
   isFollowing: true,
@@ -170,7 +170,7 @@ beforeEach(() => {
     success: true,
     data: { items: path.includes('cursor=') ? [] : timeline, nextCursor: path.includes('cursor=') ? null : 'next-1' },
   }))
-  forFriend.mockImplementation(async () => ({ success: true, data: { items: [field('f-name', '本名', '山田 花子', true), field('f-dog', '犬の名前', 'こむぎ')], hiddenPersonalCount: 0 } }))
+  forFriend.mockImplementation(async () => ({ success: true, data: { items: [field('f-name', '本名', '見本 143', true), field('f-dog', '犬の名前', 'こむぎ')], hiddenPersonalCount: 0 } }))
   saveForFriend.mockImplementation(async () => ({ success: true, data: { updated: 1 } }))
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -259,7 +259,7 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
   it('概要に名前・札・本名・タグ・マイル・次の配信・最近の履歴が出る', async () => {
     await render()
     const text = host.textContent ?? ''
-    expect(text).toContain('山田 花子')
+    expect(text).toContain('見本 143')
     expect(text).toContain('対応済み')
     expect(text).toContain('VIP')
     expect(text).toContain('2,450')
@@ -350,22 +350,22 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
 
 it('本名の固定欄とシステム表示名を、LINE登録名や通常の情報欄と分けて表示する', async () => {
   getFriend.mockResolvedValue({ success: true, data: { ...friend, realName: '以前の本名', systemDisplayName: '社内の呼び名' } })
-  forFriend.mockResolvedValue({ success: true, data: { items: [{ ...field('fixed-name', '名前', '本名の値', true), fixedKey: 'name' }, field('other-name', '本名', '山田 花子')], hiddenPersonalCount: 0 } })
+  forFriend.mockResolvedValue({ success: true, data: { items: [{ ...field('fixed-name', '名前', '本名の値', true), fixedKey: 'name' }, field('other-name', '本名', '見本 143')], hiddenPersonalCount: 0 } })
   await render()
   const basic = host.querySelector('[aria-label="基本"]')!
   expect(basic.textContent).toContain('本名の値')
   expect(basic.textContent).not.toContain('以前の本名')
-  expect(basic.textContent).not.toContain('山田 花子')
+  expect(basic.textContent).not.toContain('見本 143')
   act(() => { (links('顧客情報をすべて表示')[0] as HTMLButtonElement).click() })
   await flush()
   expect(host.querySelector('[aria-label="友だち情報"]')!.textContent).toContain('社内の呼び名')
 })
 it('本名の固定欄が未設定でも、同じ名前の通常情報欄を代わりに表示しない', async () => {
   getFriend.mockResolvedValue({ success: true, data: { ...friend, realName: null, systemDisplayName: null } })
-  forFriend.mockResolvedValue({ success: true, data: { items: [{ ...field('fixed-name', '名前', '', true), fixedKey: 'name', value: null }, field('other-name', '本名', '山田 花子')], hiddenPersonalCount: 0 } })
+  forFriend.mockResolvedValue({ success: true, data: { items: [{ ...field('fixed-name', '名前', '', true), fixedKey: 'name', value: null }, field('other-name', '本名', '見本 143')], hiddenPersonalCount: 0 } })
   await render()
   const basic = host.querySelector('[aria-label="基本"]')!
-  expect(basic.textContent).not.toContain('山田 花子')
+  expect(basic.textContent).not.toContain('見本 143')
   expect(basic.textContent).toContain('未設定')
 })
 
@@ -394,7 +394,7 @@ it('友だち削除の確認には対象アカウントが不明な場合も明�
   act(() => bodyButtons().find(button => button.textContent === '友だちのデータを削除する')!.click()); await flush()
   const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
   expect(dialog.textContent).toContain('LINEアカウント')
-  expect(dialog.textContent).toContain('山田 花子')
+  expect(dialog.textContent).toContain('見本 143')
   expect(dialog.textContent).toContain('名前を確認できません')
   expect(dialog.textContent).toContain('環境')
 })

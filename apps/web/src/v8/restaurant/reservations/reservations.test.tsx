@@ -45,12 +45,13 @@ import { ApiError } from '@/lib/api'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { at, reservation, snapshotOf, tables } from '../booking-kit/test-data'
 
 /* 今日：佐藤（LINE・T1）・山田（食べログ・承認待ち・T3・乳）・押さえ（T4）。 */
 const reservationsToday = () => [
-  reservation('r1', { customer_name: '佐藤 健', source: 'line', starts_at: at(0, 18), ends_at: at(0, 20), table_id: 't1' }),
-  reservation('r2', { customer_name: '山田 太郎', source: 'tabelog', status: 'pending', allergy_note: '乳', guest_count: 4, starts_at: at(0, 18, 30), ends_at: at(0, 20, 30), table_id: 't3', course_name: 'おまかせコース' }),
+  reservation('r1', { customer_name: '見本 114', source: 'line', starts_at: at(0, 18), ends_at: at(0, 20), table_id: 't1' }),
+  reservation('r2', { customer_name: '見本 141', source: 'tabelog', status: 'pending', allergy_note: '乳', guest_count: 4, starts_at: at(0, 18, 30), ends_at: at(0, 20, 30), table_id: 't3', course_name: 'おまかせコース' }),
   reservation('r3', { customer_name: '押さえ', source: 'phone', status: 'pending', hold_expires_at: at(0, 23), note: '電話のお客さま用', guest_count: 4, starts_at: at(0, 20), ends_at: at(0, 21, 30), table_id: 't4' }),
 ]
 
@@ -76,12 +77,12 @@ beforeEach(() => {
   fixture.customerSearch.mockResolvedValue({ data: [] })
   fixture.customerHistory.mockResolvedValue({ data: { visitCount: 0, visits: [] } })
 })
-afterEach(() => { cleanup(); verifiedStaffRole(null); forgetSessionSnapshot(); vi.useRealTimers(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); clearToastsForTest(); verifiedStaffRole(null); forgetSessionSnapshot(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
   it('今日のこれからの予約を現在進行中と誤表示しない', async () => {
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     const heading = screen.getByRole('heading', { name: '次の予約' })
     expect(heading.parentElement?.textContent).toContain('今日これからの予約')
     expect(heading.parentElement?.textContent).not.toContain('いま')
@@ -92,7 +93,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
       { id: 'cl-1', storeId: 'store-1', startDate: '2026-10-20', endDate: '2026-10-20', allDay: false, startTime: '18:00', endTime: '22:00', kind: 'private_event', memo: null, tableIds: ['pa', 't1'], createdBy: null, createdByName: null, createdAt: '', updatedAt: '', version: 1 },
     ] } })
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     const icons = document.querySelectorAll('[data-kpi-icon] svg')
     expect(icons).toHaveLength(4)
     for (const icon of icons) expect(icon.classList.contains('lucide-inbox')).toBe(true)
@@ -104,12 +105,12 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     })
     expect(band.textContent).toContain('貸切（18:00〜22:00・個室A・T1）です。閉じた時間帯は LINE からの予約を受け付けません。入っている予約は取り消していません。')
     expect(within(band).getByRole('link', { name: '休業日・貸切へ' }).getAttribute('href')).toBe('/restaurant-test/inventory?tab=closures')
-    expect(screen.getByText('佐藤 健')).not.toBeNull()
+    expect(screen.getByText('見本 114')).not.toBeNull()
   })
 
   it('数4・時間×卓の箱（予約元・アレルギー・承認待ち・押さえ）・右の4枚が出る', async () => {
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     const board = document.querySelector('[data-design-node="l9NlC0"]')!
     expect(board.textContent).toContain('今日の予約')
     expect(screen.getByText('⚠ 乳')).not.toBeNull()
@@ -119,17 +120,17 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     expect(hold.getAttribute('data-booking-state')).toBe('hold')
     expect(hold.textContent).toMatch(/\d{2}:\d{2}〜\d{2}:\d{2}/)
     expect(screen.getByText('個室B は停止中のため出していません')).not.toBeNull()
-    expect(board.textContent).toContain('・承認待ちが 1 件（山田さん・食べログ）')
+    expect(board.textContent).toContain('・承認待ちが 1 件（見本さん・食べログ）')
     for (const title of ['次の予約', 'つながる先']) expect(screen.getByRole('heading', { name: title })).not.toBeNull()
   })
 
   it('箱を押すと予約の詳細（AjZhH）が開き、「内容を変える」から変更の窓へ。保存は今の口へ届く', async () => {
     render(<ReservationsPage />)
-    fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
     fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
-    fireEvent.change(screen.getByLabelText('お客様名'), { target: { value: '佐藤 健太' } })
+    fireEvent.change(screen.getByLabelText('お客様名'), { target: { value: '見本 116' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', expect.objectContaining({ customerName: '佐藤 健太', tableId: 't1' })))
+    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', expect.objectContaining({ customerName: '見本 116', tableId: 't1' })))
   })
 
   it('押さえの箱からは解除ができる（取消として送る）', async () => {
@@ -142,41 +143,41 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
 
   it('一覧（Z3FoM）は予約タイムラインの表と変更・取消が出る', async () => {
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     fireEvent.click(screen.getByRole('button', { name: '一覧' }))
     await screen.findByRole('heading',{name:'予約の詳細'})
     expect(document.querySelector('[data-design-node="Z3FoM"]')).not.toBeNull()
     // 絵 Z3FoM：一覧でも頭の右に「枠を押さえる」「電話の予約を入れる」を置く。
     expect(screen.getByRole('button', { name: /枠を押さえる/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /電話の予約を入れる/ })).toBeTruthy()
-    const row = screen.getByRole('button',{name:'佐藤 健'}).closest('tr')!
-    fireEvent.click(within(row).getByRole('button',{name:'佐藤 健のその他操作'}));fireEvent.click(screen.getByRole('menuitem',{name:'取消'}))
+    const row = screen.getByRole('button',{name:'見本 114'}).closest('tr')!
+    fireEvent.click(within(row).getByRole('button',{name:'見本 114のその他操作'}));fireEvent.click(screen.getByRole('menuitem',{name:'取消'}))
     expect(fixture.updateReservation).not.toHaveBeenCalled()
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'キャンセル' }))
     expect(fixture.updateReservation).not.toHaveBeenCalled()
-    fireEvent.click(within(row).getByRole('button',{name:'佐藤 健のその他操作'}));fireEvent.click(screen.getByRole('menuitem',{name:'取消'}))
+    fireEvent.click(within(row).getByRole('button',{name:'見本 114のその他操作'}));fireEvent.click(screen.getByRole('menuitem',{name:'取消'}))
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '取り消す' }))
     await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'cancelled', expectedVersion: 1 }))
   })
 
   it('電話の予約を入れる（rm92Y）で台帳に入れると createReservation へ送る', async () => {
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     fireEvent.click(screen.getByRole('button', { name: /電話の予約を入れる/ }))
     await screen.findByText('何を入れますか', { selector: 'h2' })
     expect(document.querySelector('[data-design-node="rm92Y"]')).not.toBeNull()
     expect(screen.getByRole('button', { name: '予約内容と卓を見る' })).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'LINE 未連携の電話番号' }))
-    fireEvent.change(screen.getByLabelText('お名前'), { target: { value: '鈴木 花子' } })
+    fireEvent.change(screen.getByLabelText('お名前'), { target: { value: '見本 184' } })
     fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '090-0000-1111' } })
     fireEvent.click(screen.getByRole('button', { name: '17:00' }))
     fireEvent.click(await screen.findByRole('button', { name: /台帳に入れる/ }))
-    await waitFor(() => expect(fixture.createReservation).toHaveBeenCalledWith('account-1', expect.objectContaining({ customerName: '鈴木 花子', customerPhone: '09000001111', guestCount: 2, source: 'phone', kind: 'customer', startsAt: '2026-10-10T08:00:00.000Z', endsAt: '2026-10-10T10:00:00.000Z' })))
+    await waitFor(() => expect(fixture.createReservation).toHaveBeenCalledWith('account-1', expect.objectContaining({ customerName: '見本 184', customerPhone: '09000001111', guestCount: 2, source: 'phone', kind: 'customer', startsAt: '2026-10-10T08:00:00.000Z', endsAt: '2026-10-10T10:00:00.000Z' })))
   })
 
   it('電話予約の保存成功後は再読込を待たず台帳に戻り、更新中を知らせる', async () => {
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     let finish!: (value: unknown) => void
     fixture.createReservation.mockImplementationOnce(async () => {
       fixture.snapshot.mockImplementation(() => new Promise(resolve => { finish = resolve }))
@@ -197,7 +198,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
 
   it('電話予約が保存済みで再読込に失敗したら、台帳で再取得失敗を知らせる', async () => {
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     fixture.createReservation.mockImplementationOnce(async () => {
       fixture.snapshot.mockRejectedValue(new Error('offline'))
       return { success: true, data: { id: 'new', tableId: 't2', lineNotice: { sent: true, reason: null } } }
@@ -216,10 +217,10 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
   it('電話予約の保存時に営業時間未設定のコードを受け取ると設定を案内する', async () => {
     fixture.createReservation.mockRejectedValueOnce(new ApiError(409, 'synthetic', 'opening_hours_unconfigured'))
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     fireEvent.click(screen.getByRole('button', { name: /電話の予約を入れる/ }))
     fireEvent.click(await screen.findByRole('button', { name: 'LINE 未連携の電話番号' }))
-    fireEvent.change(screen.getByLabelText('お名前'), { target: { value: '鈴木 花子' } })
+    fireEvent.change(screen.getByLabelText('お名前'), { target: { value: '見本 184' } })
     fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '090-0000-1111' } })
     fireEvent.click(await screen.findByRole('button', { name: '17:00' }))
     fireEvent.click(screen.getByRole('button', { name: /台帳に入れる/ }))
@@ -229,29 +230,29 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
 
   it('一覧の行メニューから直接変更し、詳細への入口と版つき保存を保つ', async () => {
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     fireEvent.click(screen.getByRole('button', { name: '一覧' }))
-    const row = (await screen.findByRole('button', { name: '佐藤 健' })).closest('tr')!
+    const row = (await screen.findByRole('button', { name: '見本 114' })).closest('tr')!
     expect(within(row).getAllByRole('button')).toHaveLength(2)
-    fireEvent.click(within(row).getByRole('button', { name: '佐藤 健のその他操作' }))
+    fireEvent.click(within(row).getByRole('button', { name: '見本 114のその他操作' }))
     expect(screen.getByRole('menuitem', { name: '詳細を見る' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '取消' })).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitem', { name: '変更', exact: true }))
     expect(fixture.updateReservation).not.toHaveBeenCalled()
     const dialog = screen.getByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('お客様名'), { target: { value: '佐藤 健太' } })
+    fireEvent.change(within(dialog).getByLabelText('お客様名'), { target: { value: '見本 116' } })
     fireEvent.click(within(dialog).getByRole('button', { name: '保存する' }))
-    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', expect.objectContaining({ customerName: '佐藤 健太', expectedVersion: 1 })))
+    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', expect.objectContaining({ customerName: '見本 116', expectedVersion: 1 })))
   })
 
   it('取消した行はメニューから復活し、取消操作を同時に出さない', async () => {
     today[0].status = 'cancelled'
     fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today, reservationTotal: 3 }) })
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     fireEvent.click(screen.getByRole('button', { name: '一覧' }))
-    const row = (await screen.findByRole('button', { name: '佐藤 健' })).closest('tr')!
-    fireEvent.click(within(row).getByRole('button', { name: '佐藤 健のその他操作' }))
+    const row = (await screen.findByRole('button', { name: '見本 114' })).closest('tr')!
+    fireEvent.click(within(row).getByRole('button', { name: '見本 114のその他操作' }))
     expect(screen.queryByRole('menuitem', { name: '取消' })).toBeNull()
     expect(fixture.updateReservation).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('menuitem', { name: '予約を有効に戻す' }))
@@ -262,10 +263,10 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     today[0].status = 'no_show'
     fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today, reservationTotal: 3 }) })
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     fireEvent.click(screen.getByRole('button', { name: '一覧' }))
-    const row = (await screen.findByRole('button', { name: '佐藤 健' })).closest('tr')!
-    fireEvent.click(within(row).getByRole('button', { name: '佐藤 健のその他操作' }))
+    const row = (await screen.findByRole('button', { name: '見本 114' })).closest('tr')!
+    fireEvent.click(within(row).getByRole('button', { name: '見本 114のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '予約を有効に戻す' }))
     await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'confirmed', expectedVersion: 1 }))
   })
@@ -273,17 +274,17 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
   it('閲覧者の一覧は予約を読めても行の変更メニューを出さない', async () => {
     role.value = verifiedStaffRole('viewer')
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     fireEvent.click(screen.getByRole('button', { name: '一覧' }))
-    const row = (await screen.findByRole('button', { name: '佐藤 健' })).closest('tr')!
-    expect(within(row).queryByRole('button', { name: '佐藤 健のその他操作' })).toBeNull()
+    const row = (await screen.findByRole('button', { name: '見本 114' })).closest('tr')!
+    expect(within(row).queryByRole('button', { name: '見本 114のその他操作' })).toBeNull()
     expect(within(row).getAllByRole('button')).toHaveLength(1)
     expect(fixture.updateReservation).not.toHaveBeenCalled()
   })
   it('電話予約の入力不足はボタンで止め、フォームを直接送っても欄へ移動して保存しない', async () => {
     const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {})
     render(<ReservationsPage />)
-    await screen.findByText('山田 太郎')
+    await screen.findByText('見本 141')
     fireEvent.click(screen.getByRole('button', { name: /電話の予約を入れる/ }))
     const submit = await screen.findByRole('button', { name: /台帳に入れる/ })
     expect(submit.hasAttribute('disabled')).toBe(true)
@@ -303,7 +304,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
   it('変更でお客様名が空なら、欄を赤くしてフォーカスを移し、予約を更新しない', async () => {
     const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {})
     render(<ReservationsPage />)
-    fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
     fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
     const name = screen.getByLabelText('お客様名')
     fireEvent.change(name, { target: { value: '' } })
@@ -328,7 +329,7 @@ describe('日本時間の今日（端末の時間帯とは別）', () => {
     fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today, reservationTotal: 3 }) })
     fixture.reservationsDay.mockResolvedValue({ data: { date: '2026-10-11', reservations: today } })
     render(<ReservationsPage />)
-    await screen.findByRole('button', { name: /^佐藤 健 2名/ })
+    await screen.findByRole('button', { name: /^見本 114 2名/ })
     expect(fixture.reservationsDay).toHaveBeenCalledWith('account-1', 'store-1', '2026-10-11')
     expect(screen.getByRole('heading', { name: '10月11日（日）' })).not.toBeNull()
     expect(Boolean(screen.queryByRole('button', { name: '詳細を見る' }))).toBe(hasNext)
@@ -347,7 +348,7 @@ describe('日本時間の今日（端末の時間帯とは別）', () => {
   expect(screen.queryByText('予約がありません')).toBeNull()
   expect(document.querySelector('[data-design-node="l9NlC0"] [data-list-state="empty"]')).toBeNull()
   fireEvent.click(within(alert).getByRole('button',{name:/もう一度/}))
-  await screen.findByText('山田 太郎')
+  await screen.findByText('見本 141')
   expect(fixture.reservationsDay).toHaveBeenCalledTimes(2)
   expect(screen.queryByRole('alert')).toBeNull()
  })
@@ -445,14 +446,14 @@ describe('予約台帳の初期状態', () => {
 
 it('共通タブを外し、reservationsの画面内操作を保つ', async () => {
   render(<ReservationsPage />)
-  await screen.findByText('山田 太郎')
+  await screen.findByText('見本 141')
   expect(screen.queryByRole('tablist', {name:'店の中の画面'})).toBeNull()
 })
 
 
 it('電話予約の作成でも共通タブを出さず、戻る操作を保つ', async () => {
   render(<ReservationsPage />)
-  await screen.findByText('山田 太郎')
+  await screen.findByText('見本 141')
   fireEvent.click(screen.getByRole('button',{name:/電話の予約を入れる/}))
   await screen.findByText('何を入れますか',{selector:'h2'})
   expect(screen.queryByRole('tablist',{name:'店の中の画面'})).toBeNull()
@@ -474,7 +475,7 @@ it('卓がない店の既存予約は一覧への操作から確認できる', a
   fixture.snapshot.mockResolvedValue({data:snapshotOf({tables:[],reservations:today,reservationTotal:today.length})})
   render(<ReservationsPage />)
   fireEvent.click(await screen.findByRole('button',{name:'一覧で予約を見る'}))
-  expect(await screen.findByRole('button',{name:'山田 太郎',exact:true})).toBeTruthy()
+  expect(await screen.findByRole('button',{name:'見本 141',exact:true})).toBeTruthy()
 })
 
 
@@ -493,9 +494,9 @@ it('座席表が読めなくても時間と一覧の取得済み予約は残す'
   fixture.floors.mockRejectedValue(new Error('synthetic floor failure'))
   render(<ReservationsPage />)
   expect(await screen.findByText('座席表を読み込めませんでした')).toBeTruthy()
-  expect(await screen.findByText('山田 太郎')).toBeTruthy()
+  expect(await screen.findByText('見本 141')).toBeTruthy()
   fireEvent.click(screen.getByRole('button',{name:'一覧',exact:true}))
-  expect(await screen.findByRole('button',{name:'山田 太郎',exact:true})).toBeTruthy()
+  expect(await screen.findByRole('button',{name:'見本 141',exact:true})).toBeTruthy()
   expect(await screen.findByText('座席表を読み込めませんでした')).toBeTruthy()
 })
 
@@ -514,7 +515,7 @@ it('通常取得の卓定義を電話画面へ渡し、人数が全卓と結合�
 it('来店の競合は詳細の中に示してから予約を読み直す', async () => {
   fixture.attendance.mockRejectedValueOnce(new ApiError(409, '最新の予約を確認してください。', 'version_conflict'))
   render(<ReservationsPage />)
-  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
   const dialog = await screen.findByRole('dialog')
   fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
   expect((await within(dialog).findByRole('alert')).textContent).toContain('ほかの操作で予約が変わりました。読み直してから、もう一度選んでください。')
@@ -528,7 +529,7 @@ it('来店の競合は詳細の中に示してから予約を読み直す', asyn
 
 it('現在の詳細と違う予約IDの来店を受け付けない', async () => {
   render(<ReservationsPage />)
-  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
   await screen.findByRole('dialog')
   expect(detailAttendance.current).toBeTypeOf('function')
   await act(async () => { await detailAttendance.current!('r2', 'visited') })
@@ -538,28 +539,101 @@ it('現在の詳細と違う予約IDの来店を受け付けない', async () =>
 it('別の予約へ切り替えた後に古い来店操作を受け付けない', async () => {
   mutationEntry.enabled = true
   render(<ReservationsPage />)
-  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
   const dialog = await screen.findByRole('dialog')
   const previous = detailAttendance.current!
   expect(previous).toBeTypeOf('function')
   fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
-  fireEvent.click(await screen.findByRole('button', { name: /^山田 太郎 4名/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 141 4名/ }))
   await screen.findByRole('dialog')
   await act(async () => { await previous('r1', 'visited') })
   expect(fixture.attendance).not.toHaveBeenCalled()
   expect(mutationEntry.called).not.toHaveBeenCalled()
 })
 
-it('詳細を閉じた後に古い来店の成功が届いても成功通知しない', async () => {
+it('詳細を閉じただけなら来店の成功とスタンプを通知する', async () => {
   let finish!: (result: unknown) => void
   fixture.attendance.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
   render(<ReservationsPage />)
-  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
   await screen.findByRole('dialog')
   act(() => { void detailAttendance.current!('r1', 'visited') })
   await waitFor(() => expect(fixture.attendance).toHaveBeenCalledOnce())
   act(() => detailAttendance.close!())
   notifications.mockClear()
   await act(async () => { finish({ success: true, data: { stamp: { status: 'recorded', count: 3 } } }) })
-  expect(notifications).not.toHaveBeenCalled()
+  expect(notifications).toHaveBeenCalledWith(expect.stringContaining('来店スタンプ 3 個を確認しました。'), undefined)
+})
+
+it('来店が保存され再読込に失敗したら窓の中で知らせ、二重操作を防ぐ', async () => {
+  fixture.attendance.mockResolvedValueOnce({ success: true, data: { stamp: { status: 'recorded', count: 2 } } })
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  fixture.snapshot.mockRejectedValue(new Error('offline'))
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  expect((await within(dialog).findByRole('alert')).textContent).toContain('保存しましたが、最新の予約を読み込めませんでした')
+  expect(await within(dialog).findByText(/来店スタンプ 2 個を確認しました。/)).toBeTruthy()
+  expect(fixture.attendance).toHaveBeenCalledTimes(1)
+  expect((within(dialog).getByRole('button', { name: '来店にする', exact: true }) as HTMLButtonElement).disabled).toBe(true)
+})
+
+it('来店処理中に詳細を閉じても、完了とスタンプを通知する', async () => {
+  let finish!: (value: unknown) => void
+  fixture.attendance.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(<><ReservationsPage /><ToastHost /></>)
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  await act(async () => { finish({ success: true, data: { stamp: { status: 'recorded', count: 2 } } }) })
+  expect(await screen.findByText(/来店スタンプ 2 個を確認しました。/)).toBeTruthy()
+})
+
+it('来店処理中に一覧の詳細を閉じた後の競合はトーストで知らせる', async () => {
+  let fail!: (error: Error) => void
+  fixture.attendance.mockReturnValueOnce(new Promise((_, reject) => { fail = reject }))
+  render(<><ReservationsPage /><ToastHost /></>)
+  fireEvent.click(await screen.findByRole('button', { name: '一覧', exact: true }))
+  fireEvent.click(await screen.findByRole('button', { name: '来店にする', exact: true }))
+  fireEvent.click(screen.getByRole('button', { name: '予約の詳細を閉じる' }))
+  await act(async () => { fail(new ApiError(409, '最新の予約を確認してください。', 'version_conflict')) })
+  await waitFor(() => expect(within(screen.getByRole('status', { name: '知らせ' })).getByText('ほかの操作で予約が変わりました。読み直してから、もう一度選んでください。')).toBeTruthy())
+})
+
+it('処理中に別の予約を開いて閉じた後は、前の予約の完了を通知しない', async () => {
+  let finish!: (value: unknown) => void
+  fixture.attendance.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(<><ReservationsPage /><ToastHost /></>)
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
+  let dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 141 4名/ }))
+  dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  await act(async () => { finish({ success: true, data: { stamp: { status: 'recorded', count: 2 } } }) })
+  expect(screen.queryByText(/来店スタンプ 2 個を確認しました。/)).toBeNull()
+})
+
+it('来店の保存と読み直しが終わった後、結果を窓の中で示す', async () => {
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  expect(await within(dialog).findByText(/来店にしました。/)).toBeTruthy()
+  expect(fixture.snapshot.mock.calls.length).toBeGreaterThan(1)
+})
+
+it('来店の処理が終わるまで窓の中に処理中を示す', async () => {
+  let finish!: (value: unknown) => void
+  fixture.attendance.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  expect(await within(dialog).findByText('予約を反映しています。完了するまでお待ちください。')).toBeTruthy()
+  expect(within(dialog).queryByText(/来店にしました。/)).toBeNull()
+  await act(async () => { finish({ data: { stamp: { status: 'recorded', count: 2 } } }) })
+  expect(await within(dialog).findByText(/来店スタンプ 2 個を確認しました。/)).toBeTruthy()
 })

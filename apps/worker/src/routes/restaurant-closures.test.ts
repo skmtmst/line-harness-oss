@@ -343,8 +343,8 @@ test('変更のpreviewは自分だけを除外し、他店や存在しないID�
  expect((await post(closurePath+'/preview',{...closureInput,excludeId:'other-id'})).status).toBe(404);
 });
 test('重なり409のdataに相手の名前と日付が入り、previewに電話・LINE友だちを返す',async()=>{
- seedReservation('with-phone');testDb.raw.exec("UPDATE rt_reservations SET customer_phone='09012345678' WHERE id='with-phone'");
- const preview=await post(closurePath+'/preview',closureInput);expect((await preview.json() as any).data.reservations[0]).toMatchObject({customerPhone:'09012345678',friendId:null,isLineFriend:false});
+ seedReservation('with-phone');testDb.raw.exec("UPDATE rt_reservations SET customer_phone='09000005678' WHERE id='with-phone'");
+ const preview=await post(closurePath+'/preview',closureInput);expect((await preview.json() as any).data.reservations[0]).toMatchObject({customerPhone:'09000005678',friendId:null,isLineFriend:false});
  await create({...closureInput,memo:'設備の交換'});const res=await create();expect(res.body).toMatchObject({code:'closure_overlap',data:{conflicts:[expect.objectContaining({name:'設備の交換',startDate:'2026-11-10',endDate:'2026-11-10'})]}});
 });
 test('連絡済みは作成後に担当者が手動送信した重なる予約だけを数え、同じ予約は一度',async()=>{
